@@ -1,0 +1,847 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>AbstractISOChannel.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">switch</a> &gt; <a href="index.source.html" class="el_package">com.lps.isoswitch.tcpconnector.channel</a> &gt; <span class="el_source">AbstractISOChannel.java</span></div><h1>AbstractISOChannel.java</h1><pre class="source lang-java linenums">package com.lps.isoswitch.tcpconnector.channel;
+
+import io.netty.buffer.ByteBuf;
+import io.netty.buffer.Unpooled;
+import io.netty.channel.ChannelHandlerContext;
+import io.netty.channel.ChannelInboundHandlerAdapter;
+import io.netty.bootstrap.Bootstrap;
+import io.netty.channel.ChannelFuture;
+import io.netty.channel.ChannelFutureListener;
+import io.netty.channel.EventLoopGroup;
+import io.netty.channel.nio.NioEventLoopGroup;
+import io.netty.channel.socket.nio.NioSocketChannel;
+import io.netty.channel.ChannelInitializer;
+import io.netty.channel.socket.SocketChannel;
+import io.netty.channel.ChannelPipeline;
+import org.jpos.iso.ISOMsg;
+import org.jpos.iso.ISOPackager;
+import org.jpos.iso.ISOException;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
+import java.nio.ByteBuffer;
+import java.nio.charset.StandardCharsets;
+import java.util.concurrent.*;
+import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.concurrent.atomic.AtomicInteger;
+
+/**
+ * Abstract base class for ISO8583 channels that provides length-based message reading.
+ * This class implements message framing similar to jPOS channels with support for
+ * different length formats (ASCII, HEX, BINARY) and client connection capabilities.
+ * 
+ * Features:
+ * - Length-based message framing
+ * - Support for different length formats (2-byte, 4-byte, ASCII, HEX)
+ * - Message buffering for incomplete messages
+ * - Proper error handling and logging
+ * - Thread-safe message processing
+ * - Client connection management
+ * - Automatic reconnection handling
+ * 
+ * @author Logicpoint Systems
+ * @version 1.0
+ * @since 2025-06-15
+ */
+public abstract class AbstractISOChannel extends ChannelInboundHandlerAdapter {
+
+<span class="fc" id="L48">    private static final Logger log = LoggerFactory.getLogger(AbstractISOChannel.class);</span>
+    
+    // Length format constants
+    protected static final int LENGTH_FORMAT_2BYTE = 2;
+    protected static final int LENGTH_FORMAT_4BYTE = 4;
+    protected static final int LENGTH_FORMAT_ASCII = 1;
+    protected static final int LENGTH_FORMAT_HEX = 2;
+    
+    // Default configuration
+    protected static final int DEFAULT_MAX_MESSAGE_LENGTH = 8192;
+    protected static final int DEFAULT_READ_TIMEOUT = 30000;
+    protected static final int DEFAULT_WRITE_TIMEOUT = 30000;
+    protected static final int DEFAULT_CONNECT_TIMEOUT = 10000;
+    protected static final int DEFAULT_RECONNECT_DELAY = 5000;
+    
+    // Channel state
+<span class="fc" id="L64">    protected final AtomicInteger messageCounter = new AtomicInteger(0);</span>
+<span class="fc" id="L65">    protected ByteBuffer messageBuffer = ByteBuffer.allocate(DEFAULT_MAX_MESSAGE_LENGTH);</span>
+<span class="fc" id="L66">    protected boolean connected = false;</span>
+<span class="fc" id="L67">    protected long lastActivity = System.currentTimeMillis();</span>
+    
+    // Client connection management
+    protected Bootstrap bootstrap;
+    protected EventLoopGroup eventLoopGroup;
+    protected String host;
+    protected int port;
+<span class="fc" id="L74">    protected final AtomicBoolean isConnecting = new AtomicBoolean(false);</span>
+<span class="fc" id="L75">    protected final AtomicBoolean isReconnecting = new AtomicBoolean(false);</span>
+    protected ScheduledExecutorService reconnectExecutor;
+<span class="fc" id="L77">    protected final AtomicBoolean isShuttingDown = new AtomicBoolean(false);</span>
+    
+    // Configuration
+<span class="fc" id="L80">    protected int lengthFieldSize = LENGTH_FORMAT_2BYTE;</span>
+<span class="fc" id="L81">    protected int maxMessageLength = DEFAULT_MAX_MESSAGE_LENGTH;</span>
+<span class="fc" id="L82">    protected int readTimeout = DEFAULT_READ_TIMEOUT;</span>
+<span class="fc" id="L83">    protected int writeTimeout = DEFAULT_WRITE_TIMEOUT;</span>
+<span class="fc" id="L84">    protected int connectTimeout = DEFAULT_CONNECT_TIMEOUT;</span>
+<span class="fc" id="L85">    protected int reconnectDelay = DEFAULT_RECONNECT_DELAY;</span>
+<span class="fc" id="L86">    protected boolean includeLengthField = false;</span>
+<span class="fc" id="L87">    protected boolean lengthInHex = false;</span>
+<span class="fc" id="L88">    protected boolean lengthInAscii = false;</span>
+<span class="fc" id="L89">    protected boolean autoReconnect = true;</span>
+    
+    // ISO8583 packager
+    protected ISOPackager packager;
+    
+    /**
+     * Constructs a new AbstractISOChannel with default configuration.
+     */
+    public AbstractISOChannel() {
+<span class="fc" id="L98">        this(DEFAULT_MAX_MESSAGE_LENGTH);</span>
+<span class="fc" id="L99">    }</span>
+    
+    /**
+     * Constructs a new AbstractISOChannel with specified maximum message length.
+     *
+     * @param maxMessageLength The maximum message length in bytes
+     */
+<span class="fc" id="L106">    public AbstractISOChannel(int maxMessageLength) {</span>
+<span class="fc" id="L107">        this.maxMessageLength = maxMessageLength;</span>
+<span class="fc" id="L108">        this.messageBuffer = ByteBuffer.allocate(maxMessageLength);</span>
+<span class="fc" id="L109">        this.eventLoopGroup = new NioEventLoopGroup();</span>
+<span class="fc" id="L110">        this.reconnectExecutor = Executors.newSingleThreadScheduledExecutor();</span>
+<span class="fc" id="L111">    }</span>
+    
+    /**
+     * Sets the ISO8583 packager for message parsing.
+     *
+     * @param packager The ISO8583 packager
+     */
+    public void setPackager(ISOPackager packager) {
+<span class="fc" id="L119">        this.packager = packager;</span>
+<span class="fc" id="L120">    }</span>
+    
+    /**
+     * Gets the ISO8583 packager.
+     *
+     * @return The ISO8583 packager
+     */
+    public ISOPackager getPackager() {
+<span class="fc" id="L128">        return this.packager;</span>
+    }
+    
+    /**
+     * Sets the length field configuration.
+     *
+     * @param lengthFieldSize Size of the length field (2 or 4 bytes)
+     * @param includeLengthField Whether to include length field in message
+     * @param lengthInHex Whether length is in hexadecimal format
+     * @param lengthInAscii Whether length is in ASCII format
+     */
+    public void setLengthFieldConfig(int lengthFieldSize, boolean includeLengthField, 
+                                   boolean lengthInHex, boolean lengthInAscii) {
+<span class="fc" id="L141">        this.lengthFieldSize = lengthFieldSize;</span>
+<span class="fc" id="L142">        this.includeLengthField = includeLengthField;</span>
+<span class="fc" id="L143">        this.lengthInHex = lengthInHex;</span>
+<span class="fc" id="L144">        this.lengthInAscii = lengthInAscii;</span>
+<span class="fc" id="L145">    }</span>
+    
+    /**
+     * Sets timeout configuration.
+     *
+     * @param readTimeout Read timeout in milliseconds
+     * @param writeTimeout Write timeout in milliseconds
+     */
+    public void setTimeout(int readTimeout, int writeTimeout) {
+<span class="fc" id="L154">        this.readTimeout = readTimeout;</span>
+<span class="fc" id="L155">        this.writeTimeout = writeTimeout;</span>
+<span class="fc" id="L156">    }</span>
+    
+    /**
+     * Sets connection timeout.
+     *
+     * @param connectTimeout Connection timeout in milliseconds
+     */
+    public void setConnectTimeout(int connectTimeout) {
+<span class="nc" id="L164">        this.connectTimeout = connectTimeout;</span>
+<span class="nc" id="L165">    }</span>
+    
+    /**
+     * Sets reconnection configuration.
+     *
+     * @param autoReconnect Whether to automatically reconnect
+     * @param reconnectDelay Reconnection delay in milliseconds
+     */
+    public void setReconnectConfig(boolean autoReconnect, int reconnectDelay) {
+<span class="fc" id="L174">        this.autoReconnect = autoReconnect;</span>
+<span class="fc" id="L175">        this.reconnectDelay = reconnectDelay;</span>
+<span class="fc" id="L176">    }</span>
+    
+    /**
+     * Connects to the specified host and port as a client.
+     *
+     * @param host The host address to connect to
+     * @param port The port number to connect to
+     * @return CompletableFuture that completes when connection is established
+     */
+    public CompletableFuture&lt;Boolean&gt; connect(String host, int port) {
+<span class="fc" id="L186">        this.host = host;</span>
+<span class="fc" id="L187">        this.port = port;</span>
+        
+<span class="fc" id="L189">        CompletableFuture&lt;Boolean&gt; connectFuture = new CompletableFuture&lt;&gt;();</span>
+        
+<span class="pc bpc" id="L191" title="1 of 2 branches missed.">        if (isConnecting.compareAndSet(false, true)) {</span>
+            try {
+<span class="fc" id="L193">                log.info(&quot;Connecting to {}:{}&quot;, host, port);</span>
+                
+                // Create bootstrap if not exists
+<span class="pc bpc" id="L196" title="1 of 2 branches missed.">                if (bootstrap == null) {</span>
+<span class="nc" id="L197">                    bootstrap = new Bootstrap();</span>
+<span class="nc" id="L198">                    bootstrap.group(eventLoopGroup)</span>
+<span class="nc" id="L199">                            .channel(NioSocketChannel.class)</span>
+<span class="nc" id="L200">                            .handler(new ChannelInitializer&lt;SocketChannel&gt;() {</span>
+                                @Override
+                                protected void initChannel(SocketChannel ch) throws Exception {
+<span class="nc" id="L203">                                    ChannelPipeline pipeline = ch.pipeline();</span>
+<span class="nc" id="L204">                                    configurePipeline(pipeline);</span>
+<span class="nc" id="L205">                                }</span>
+                            });
+                }
+                
+                // Connect to server
+<span class="fc" id="L210">                bootstrap.connect(host, port).addListener((ChannelFutureListener) future -&gt; {</span>
+<span class="fc bfc" id="L211" title="All 2 branches covered.">                    if (future.isSuccess()) {</span>
+<span class="fc" id="L212">                        log.info(&quot;Successfully connected to {}:{}&quot;, host, port);</span>
+<span class="fc" id="L213">                        connected = true;</span>
+<span class="fc" id="L214">                        lastActivity = System.currentTimeMillis();</span>
+<span class="fc" id="L215">                        onConnect(future.channel().pipeline().context(this));</span>
+<span class="fc" id="L216">                        connectFuture.complete(true);</span>
+                    } else {
+<span class="fc" id="L218">                        log.error(&quot;Failed to connect to {}:{}&quot;, host, port, future.cause());</span>
+<span class="fc" id="L219">                        connected = false;</span>
+<span class="fc" id="L220">                        connectFuture.complete(false);</span>
+                        
+<span class="pc bpc" id="L222" title="1 of 2 branches missed.">                        if (autoReconnect) {</span>
+<span class="nc" id="L223">                            scheduleReconnect();</span>
+                        }
+                    }
+<span class="fc" id="L226">                    isConnecting.set(false);</span>
+<span class="fc" id="L227">                });</span>
+                
+<span class="nc" id="L229">            } catch (Exception e) {</span>
+<span class="nc" id="L230">                log.error(&quot;Error during connection attempt&quot;, e);</span>
+<span class="nc" id="L231">                isConnecting.set(false);</span>
+<span class="nc" id="L232">                connectFuture.completeExceptionally(e);</span>
+<span class="pc" id="L233">            }</span>
+        } else {
+<span class="nc" id="L235">            connectFuture.complete(false);</span>
+        }
+        
+<span class="fc" id="L238">        return connectFuture;</span>
+    }
+    
+    /**
+     * Disconnects from the server.
+     *
+     * @return CompletableFuture that completes when disconnection is finished
+     */
+    public CompletableFuture&lt;Void&gt; disconnect() {
+<span class="fc" id="L247">        CompletableFuture&lt;Void&gt; disconnectFuture = new CompletableFuture&lt;&gt;();</span>
+        
+        try {
+<span class="fc" id="L250">            log.info(&quot;Disconnecting from {}:{}&quot;, host, port);</span>
+            
+<span class="pc bpc" id="L252" title="1 of 2 branches missed.">            if (connected) {</span>
+                // Close the channel
+<span class="pc bpc" id="L254" title="3 of 4 branches missed.">                if (bootstrap != null &amp;&amp; bootstrap.config().group() != null) {</span>
+<span class="nc" id="L255">                    bootstrap.config().group().shutdownGracefully();</span>
+                }
+                
+<span class="fc" id="L258">                connected = false;</span>
+<span class="fc" id="L259">                onDisconnect(null);</span>
+<span class="fc" id="L260">                log.info(&quot;Disconnected from {}:{}&quot;, host, port);</span>
+            }
+            
+<span class="fc" id="L263">            disconnectFuture.complete(null);</span>
+            
+<span class="nc" id="L265">        } catch (Exception e) {</span>
+<span class="nc" id="L266">            log.error(&quot;Error during disconnection&quot;, e);</span>
+<span class="nc" id="L267">            disconnectFuture.completeExceptionally(e);</span>
+<span class="fc" id="L268">        }</span>
+        
+<span class="fc" id="L270">        return disconnectFuture;</span>
+    }
+    
+    /**
+     * Schedules a reconnection attempt using virtual threads.
+     */
+    protected void scheduleReconnect() {
+        // Check if we're shutting down
+<span class="nc bnc" id="L278" title="All 2 branches missed.">        if (isShuttingDown.get()) {</span>
+<span class="nc" id="L279">            log.info(&quot;Skipping reconnection - channel is shutting down&quot;);</span>
+<span class="nc" id="L280">            return;</span>
+        }
+        
+<span class="nc bnc" id="L283" title="All 2 branches missed.">        if (isReconnecting.compareAndSet(false, true)) {</span>
+<span class="nc" id="L284">            log.info(&quot;Scheduling reconnection to {}:{} in {} ms using virtual threads&quot;, host, port, reconnectDelay);</span>
+            
+            // Use virtual thread executor for reconnection scheduling
+<span class="nc" id="L287">            CompletableFuture.runAsync(() -&gt; {</span>
+                try {
+<span class="nc" id="L289">                    Thread.sleep(reconnectDelay);</span>
+                    
+                    // Check shutdown state before attempting reconnection
+<span class="nc bnc" id="L292" title="All 2 branches missed.">                    if (isShuttingDown.get()) {</span>
+<span class="nc" id="L293">                        log.info(&quot;Cancelling reconnection - channel is shutting down&quot;);</span>
+<span class="nc" id="L294">                        isReconnecting.set(false);</span>
+<span class="nc" id="L295">                        return;</span>
+                    }
+                    
+<span class="nc bnc" id="L298" title="All 4 branches missed.">                    if (!connected &amp;&amp; autoReconnect) {</span>
+<span class="nc" id="L299">                        log.info(&quot;Attempting to reconnect to {}:{} using virtual threads&quot;, host, port);</span>
+<span class="nc" id="L300">                        connect(host, port).thenAccept(success -&gt; {</span>
+<span class="nc bnc" id="L301" title="All 6 branches missed.">                            if (!success &amp;&amp; autoReconnect &amp;&amp; !isShuttingDown.get()) {</span>
+<span class="nc" id="L302">                                scheduleReconnect();</span>
+                            }
+<span class="nc" id="L304">                        });</span>
+                    }
+<span class="nc" id="L306">                } catch (Exception e) {</span>
+<span class="nc" id="L307">                    log.error(&quot;Error during reconnection attempt&quot;, e);</span>
+<span class="nc bnc" id="L308" title="All 4 branches missed.">                    if (autoReconnect &amp;&amp; !isShuttingDown.get()) {</span>
+<span class="nc" id="L309">                        scheduleReconnect();</span>
+                    }
+                } finally {
+<span class="nc" id="L312">                    isReconnecting.set(false);</span>
+                }
+<span class="nc" id="L314">            }, reconnectExecutor);</span>
+        }
+<span class="nc" id="L316">    }</span>
+    
+    /**
+     * Configures the Netty pipeline for the channel.
+     * This method should be overridden by subclasses to add specific handlers.
+     *
+     * @param pipeline The channel pipeline to configure
+     */
+    protected void configurePipeline(ChannelPipeline pipeline) {
+        // Add this channel handler to the pipeline
+<span class="nc" id="L326">        pipeline.addLast(this);</span>
+<span class="nc" id="L327">    }</span>
+    
+    /**
+     * Called when a connection is established with the server.
+     * Resets the reconnection flag and logs the connection status.
+     *
+     * @param ctx The channel handler context
+     */
+    @Override
+    public void channelActive(ChannelHandlerContext ctx) {
+<span class="fc" id="L337">        this.connected = true;</span>
+<span class="fc" id="L338">        this.lastActivity = System.currentTimeMillis();</span>
+<span class="fc" id="L339">        log.info(&quot;Channel connected to: {}&quot;, ctx.channel().remoteAddress());</span>
+<span class="fc" id="L340">        onConnect(ctx);</span>
+<span class="fc" id="L341">    }</span>
+
+    /**
+     * Called when the connection with the server is lost.
+     * Initiates reconnection process if not already reconnecting.
+     *
+     * @param ctx The channel handler context
+     */
+    @Override
+    public void channelInactive(ChannelHandlerContext ctx) {
+<span class="fc" id="L351">        this.connected = false;</span>
+<span class="fc" id="L352">        log.info(&quot;Channel disconnected from: {}&quot;, ctx.channel().remoteAddress());</span>
+<span class="fc" id="L353">        onDisconnect(ctx);</span>
+        
+<span class="pc bpc" id="L355" title="3 of 4 branches missed.">        if (autoReconnect &amp;&amp; !isReconnecting.get()) {</span>
+<span class="nc" id="L356">            scheduleReconnect();</span>
+        }
+<span class="fc" id="L358">    }</span>
+
+    /**
+     * Main message reading method that handles length-based message framing.
+     *
+     * @param ctx The channel handler context
+     * @param msg The received message
+     */
+    @Override
+    public void channelRead(ChannelHandlerContext ctx, Object msg) {
+        try {
+<span class="fc" id="L369">            ByteBuf buf = (ByteBuf) msg;</span>
+<span class="fc" id="L370">            byte[] data = new byte[buf.readableBytes()];</span>
+<span class="fc" id="L371">            buf.readBytes(data);</span>
+            
+<span class="fc" id="L373">            log.debug(&quot;Received {} bytes from channel&quot;, data.length);</span>
+            
+            // Process the received data
+<span class="fc" id="L376">            processReceivedData(ctx, data);</span>
+            
+<span class="fc" id="L378">        } catch (Exception e) {</span>
+<span class="fc" id="L379">            log.error(&quot;Error reading from channel&quot;, e);</span>
+<span class="fc" id="L380">            onError(ctx, e);</span>
+        } finally {
+<span class="fc bfc" id="L382" title="All 2 branches covered.">            if (msg instanceof ByteBuf) {</span>
+<span class="fc" id="L383">                ((ByteBuf) msg).release();</span>
+            }
+        }
+<span class="fc" id="L386">    }</span>
+    
+    /**
+     * Processes received data with length-based framing.
+     *
+     * @param ctx The channel handler context
+     * @param data The received data
+     */
+    protected void processReceivedData(ChannelHandlerContext ctx, byte[] data) {
+        // Add data to buffer
+<span class="fc" id="L396">        messageBuffer.put(data);</span>
+<span class="fc" id="L397">        messageBuffer.flip();</span>
+        
+        // Process complete messages
+<span class="pc bpc" id="L400" title="1 of 2 branches missed.">        while (messageBuffer.remaining() &gt;= getMinimumMessageLength()) {</span>
+            // Check if we have enough data to read the length
+<span class="pc bpc" id="L402" title="1 of 2 branches missed.">            if (messageBuffer.remaining() &lt; lengthFieldSize) {</span>
+<span class="nc" id="L403">                break;</span>
+            }
+            
+            // Mark current position
+<span class="fc" id="L407">            messageBuffer.mark();</span>
+            
+            // Read message length
+<span class="fc" id="L410">            int messageLength = readMessageLength();</span>
+            
+            // Validate message length
+<span class="fc bfc" id="L413" title="All 4 branches covered.">            if (messageLength &lt;= 0 || messageLength &gt; maxMessageLength) {</span>
+<span class="fc" id="L414">                log.error(&quot;Invalid message length: {}&quot;, messageLength);</span>
+<span class="fc" id="L415">                messageBuffer.reset();</span>
+<span class="fc" id="L416">                break;</span>
+            }
+            
+            // Check if we have the complete message
+<span class="pc bpc" id="L420" title="1 of 2 branches missed.">            int totalLength = includeLengthField ? messageLength : messageLength + lengthFieldSize;</span>
+<span class="pc bpc" id="L421" title="1 of 2 branches missed.">            if (messageBuffer.remaining() &lt; totalLength) {</span>
+<span class="nc" id="L422">                messageBuffer.reset();</span>
+<span class="nc" id="L423">                break;</span>
+            }
+            
+            // Extract the complete message
+<span class="fc" id="L427">            byte[] messageData = new byte[messageLength];</span>
+<span class="pc bpc" id="L428" title="1 of 2 branches missed.">            if (includeLengthField) {</span>
+                // Skip length field and read message
+<span class="nc" id="L430">                messageBuffer.position(messageBuffer.position() + lengthFieldSize);</span>
+<span class="nc" id="L431">                messageBuffer.get(messageData);</span>
+            } else {
+                // Read message directly
+<span class="fc" id="L434">                messageBuffer.get(messageData);</span>
+            }
+            
+            // Process the complete message
+<span class="fc" id="L438">            processCompleteMessage(ctx, messageData);</span>
+            
+            // Compact buffer for next message
+<span class="fc" id="L441">            messageBuffer.compact();</span>
+<span class="fc" id="L442">        }</span>
+<span class="fc" id="L443">    }</span>
+    
+    /**
+     * Reads the message length from the buffer based on the configured format.
+     *
+     * @return The message length
+     */
+    protected int readMessageLength() {
+<span class="pc bpc" id="L451" title="1 of 2 branches missed.">        if (lengthInAscii) {</span>
+<span class="nc" id="L452">            return readAsciiLength();</span>
+<span class="pc bpc" id="L453" title="1 of 2 branches missed.">        } else if (lengthInHex) {</span>
+<span class="nc" id="L454">            return readHexLength();</span>
+        } else {
+<span class="fc" id="L456">            return readBinaryLength();</span>
+        }
+    }
+    
+    /**
+     * Reads ASCII length from the buffer.
+     *
+     * @return The message length
+     */
+    protected int readAsciiLength() {
+<span class="nc" id="L466">        byte[] lengthBytes = new byte[lengthFieldSize];</span>
+<span class="nc" id="L467">        messageBuffer.get(lengthBytes);</span>
+<span class="nc" id="L468">        String lengthStr = new String(lengthBytes, StandardCharsets.US_ASCII);</span>
+<span class="nc" id="L469">        return Integer.parseInt(lengthStr);</span>
+    }
+    
+    /**
+     * Reads hexadecimal length from the buffer.
+     *
+     * @return The message length
+     */
+    protected int readHexLength() {
+<span class="nc" id="L478">        byte[] lengthBytes = new byte[lengthFieldSize];</span>
+<span class="nc" id="L479">        messageBuffer.get(lengthBytes);</span>
+<span class="nc" id="L480">        String lengthStr = new String(lengthBytes, StandardCharsets.US_ASCII);</span>
+<span class="nc" id="L481">        return Integer.parseInt(lengthStr, 16);</span>
+    }
+    
+    /**
+     * Reads binary length from the buffer.
+     *
+     * @return The message length
+     */
+    protected int readBinaryLength() {
+<span class="fc bfc" id="L490" title="All 2 branches covered.">        if (lengthFieldSize == 2) {</span>
+<span class="fc" id="L491">            return messageBuffer.getShort() &amp; 0xFFFF;</span>
+<span class="pc bpc" id="L492" title="1 of 2 branches missed.">        } else if (lengthFieldSize == 4) {</span>
+<span class="nc" id="L493">            return messageBuffer.getInt();</span>
+        } else {
+<span class="fc" id="L495">            throw new IllegalArgumentException(&quot;Unsupported length field size: &quot; + lengthFieldSize);</span>
+        }
+    }
+    
+    /**
+     * Gets the minimum message length required to start processing.
+     *
+     * @return The minimum message length
+     */
+    protected int getMinimumMessageLength() {
+<span class="fc" id="L505">        return lengthFieldSize;</span>
+    }
+    
+    /**
+     * Processes a complete ISO8583 message.
+     *
+     * @param ctx The channel handler context
+     * @param messageData The complete message data
+     */
+    protected void processCompleteMessage(ChannelHandlerContext ctx, byte[] messageData) {
+        try {
+<span class="fc" id="L516">            log.debug(&quot;Processing complete message of {} bytes&quot;, messageData.length);</span>
+            
+            // Parse ISO8583 message
+<span class="fc" id="L519">            ISOMsg isoMsg = parseISOMessage(messageData);</span>
+            
+            // Handle the message
+<span class="fc" id="L522">            onMessage(ctx, isoMsg);</span>
+            
+            // Update activity timestamp
+<span class="fc" id="L525">            lastActivity = System.currentTimeMillis();</span>
+<span class="fc" id="L526">            messageCounter.incrementAndGet();</span>
+            
+<span class="nc" id="L528">        } catch (Exception e) {</span>
+<span class="nc" id="L529">            log.error(&quot;Error processing message&quot;, e);</span>
+<span class="nc" id="L530">            onError(ctx, e);</span>
+<span class="fc" id="L531">        }</span>
+<span class="fc" id="L532">    }</span>
+    
+    /**
+     * Parses ISO8583 message from byte array.
+     *
+     * @param messageData The message data
+     * @return The parsed ISO8583 message
+     * @throws ISOException if parsing fails
+     */
+    protected ISOMsg parseISOMessage(byte[] messageData) throws ISOException {
+<span class="pc bpc" id="L542" title="1 of 2 branches missed.">        if (packager == null) {</span>
+<span class="fc" id="L543">            throw new ISOException(&quot;Packager not set&quot;);</span>
+        }
+        
+<span class="nc" id="L546">        ISOMsg isoMsg = new ISOMsg();</span>
+<span class="nc" id="L547">        isoMsg.setPackager(packager);</span>
+<span class="nc" id="L548">        isoMsg.unpack(messageData);</span>
+        
+<span class="nc" id="L550">        return isoMsg;</span>
+    }
+    
+    /**
+     * Sends an ISO8583 message with proper length prefixing.
+     *
+     * @param ctx The channel handler context
+     * @param isoMsg The ISO8583 message to send
+     * @throws ISOException if packing fails
+     */
+    public void sendMessage(ChannelHandlerContext ctx, ISOMsg isoMsg) throws ISOException {
+<span class="fc bfc" id="L561" title="All 2 branches covered.">        if (!connected) {</span>
+<span class="fc" id="L562">            throw new IllegalStateException(&quot;Channel not connected&quot;);</span>
+        }
+        
+<span class="fc" id="L565">        byte[] messageData = isoMsg.pack();</span>
+<span class="fc" id="L566">        byte[] framedMessage = frameMessage(messageData);</span>
+        
+<span class="fc" id="L568">        log.debug(&quot;Sending message of {} bytes (framed: {} bytes)&quot;, </span>
+<span class="fc" id="L569">                 messageData.length, framedMessage.length);</span>
+        
+<span class="fc" id="L571">        ByteBuf buf = Unpooled.wrappedBuffer(framedMessage);</span>
+<span class="fc" id="L572">        ctx.writeAndFlush(buf);</span>
+        
+<span class="fc" id="L574">        lastActivity = System.currentTimeMillis();</span>
+<span class="fc" id="L575">    }</span>
+    
+    /**
+     * Sends an ISO8583 message using the current channel context.
+     *
+     * @param isoMsg The ISO8583 message to send
+     * @throws ISOException if packing fails
+     */
+    public void sendMessage(ISOMsg isoMsg) throws ISOException {
+<span class="pc bpc" id="L584" title="3 of 4 branches missed.">        if (bootstrap == null || bootstrap.config().group() == null) {</span>
+<span class="fc" id="L585">            throw new IllegalStateException(&quot;Channel not initialized&quot;);</span>
+        }
+        
+        // This is a simplified version - in practice, you'd need to store the channel context
+<span class="nc" id="L589">        throw new UnsupportedOperationException(&quot;Use sendMessage(ctx, isoMsg) with channel context&quot;);</span>
+    }
+    
+    /**
+     * Frames a message with length prefix according to the channel configuration.
+     *
+     * @param messageData The message data to frame
+     * @return The framed message
+     */
+    protected byte[] frameMessage(byte[] messageData) {
+<span class="fc" id="L599">        int messageLength = messageData.length;</span>
+<span class="fc" id="L600">        byte[] lengthBytes = encodeLength(messageLength);</span>
+        
+<span class="pc bpc" id="L602" title="1 of 2 branches missed.">        if (includeLengthField) {</span>
+            // Include length field in the message
+<span class="nc" id="L604">            byte[] framedMessage = new byte[lengthBytes.length + messageData.length];</span>
+<span class="nc" id="L605">            System.arraycopy(lengthBytes, 0, framedMessage, 0, lengthBytes.length);</span>
+<span class="nc" id="L606">            System.arraycopy(messageData, 0, framedMessage, lengthBytes.length, messageData.length);</span>
+<span class="nc" id="L607">            return framedMessage;</span>
+        } else {
+            // Length field is separate
+<span class="fc" id="L610">            byte[] framedMessage = new byte[lengthBytes.length + messageData.length];</span>
+<span class="fc" id="L611">            System.arraycopy(lengthBytes, 0, framedMessage, 0, lengthBytes.length);</span>
+<span class="fc" id="L612">            System.arraycopy(messageData, 0, framedMessage, lengthBytes.length, messageData.length);</span>
+<span class="fc" id="L613">            return framedMessage;</span>
+        }
+    }
+    
+    /**
+     * Encodes the message length according to the channel configuration.
+     *
+     * @param length The message length
+     * @return The encoded length bytes
+     */
+    protected byte[] encodeLength(int length) {
+<span class="fc bfc" id="L624" title="All 2 branches covered.">        if (lengthInAscii) {</span>
+<span class="fc" id="L625">            return encodeAsciiLength(length);</span>
+<span class="fc bfc" id="L626" title="All 2 branches covered.">        } else if (lengthInHex) {</span>
+<span class="fc" id="L627">            return encodeHexLength(length);</span>
+        } else {
+<span class="fc" id="L629">            return encodeBinaryLength(length);</span>
+        }
+    }
+    
+    /**
+     * Encodes length in ASCII format.
+     *
+     * @param length The message length
+     * @return The ASCII encoded length
+     */
+    protected byte[] encodeAsciiLength(int length) {
+<span class="fc" id="L640">        String lengthStr = String.format(&quot;%0&quot; + lengthFieldSize + &quot;d&quot;, length);</span>
+<span class="fc" id="L641">        return lengthStr.getBytes(StandardCharsets.US_ASCII);</span>
+    }
+    
+    /**
+     * Encodes length in hexadecimal format.
+     *
+     * @param length The message length
+     * @return The hexadecimal encoded length
+     */
+    protected byte[] encodeHexLength(int length) {
+<span class="fc" id="L651">        String lengthStr = String.format(&quot;%0&quot; + (lengthFieldSize * 2) + &quot;x&quot;, length);</span>
+<span class="fc" id="L652">        return lengthStr.getBytes(StandardCharsets.US_ASCII);</span>
+    }
+    
+    /**
+     * Encodes length in binary format.
+     *
+     * @param length The message length
+     * @return The binary encoded length
+     */
+    protected byte[] encodeBinaryLength(int length) {
+<span class="fc" id="L662">        ByteBuffer buffer = ByteBuffer.allocate(lengthFieldSize);</span>
+<span class="fc bfc" id="L663" title="All 2 branches covered.">        if (lengthFieldSize == 2) {</span>
+<span class="fc" id="L664">            buffer.putShort((short) length);</span>
+<span class="fc bfc" id="L665" title="All 2 branches covered.">        } else if (lengthFieldSize == 4) {</span>
+<span class="fc" id="L666">            buffer.putInt(length);</span>
+        } else {
+<span class="fc" id="L668">            throw new IllegalArgumentException(&quot;Unsupported length field size: &quot; + lengthFieldSize);</span>
+        }
+<span class="fc" id="L670">        return buffer.array();</span>
+    }
+    
+    /**
+     * Called when an exception occurs.
+     *
+     * @param ctx The channel handler context
+     * @param cause The exception
+     */
+    @Override
+    public void exceptionCaught(ChannelHandlerContext ctx, Throwable cause) {
+<span class="nc" id="L681">        log.error(&quot;Channel exception&quot;, cause);</span>
+<span class="nc" id="L682">        onError(ctx, cause);</span>
+<span class="nc" id="L683">    }</span>
+    
+    /**
+     * Shuts down the channel and releases resources.
+     *
+     * @return CompletableFuture that completes when shutdown is finished
+     */
+    public CompletableFuture&lt;Void&gt; shutdown() {
+<span class="fc" id="L691">        CompletableFuture&lt;Void&gt; shutdownFuture = new CompletableFuture&lt;&gt;();</span>
+        
+        try {
+<span class="fc" id="L694">            log.info(&quot;Shutting down channel&quot;);</span>
+            
+            // Disconnect if connected
+<span class="fc bfc" id="L697" title="All 2 branches covered.">            if (connected) {</span>
+<span class="fc" id="L698">                disconnect().thenRun(() -&gt; {</span>
+                    try {
+                        // Shutdown event loop group
+<span class="pc bpc" id="L701" title="1 of 2 branches missed.">                        if (eventLoopGroup != null) {</span>
+<span class="fc" id="L702">                            eventLoopGroup.shutdownGracefully();</span>
+                        }
+                        
+                        // Shutdown reconnect executor
+<span class="pc bpc" id="L706" title="1 of 2 branches missed.">                        if (reconnectExecutor != null) {</span>
+<span class="fc" id="L707">                            reconnectExecutor.shutdown();</span>
+<span class="pc bpc" id="L708" title="1 of 2 branches missed.">                            if (!reconnectExecutor.awaitTermination(5, TimeUnit.SECONDS)) {</span>
+<span class="nc" id="L709">                                reconnectExecutor.shutdownNow();</span>
+                            }
+                        }
+                        
+<span class="fc" id="L713">                        log.info(&quot;Channel shutdown completed&quot;);</span>
+<span class="fc" id="L714">                        shutdownFuture.complete(null);</span>
+                        
+<span class="nc" id="L716">                    } catch (Exception e) {</span>
+<span class="nc" id="L717">                        log.error(&quot;Error during channel shutdown&quot;, e);</span>
+<span class="nc" id="L718">                        shutdownFuture.completeExceptionally(e);</span>
+<span class="fc" id="L719">                    }</span>
+<span class="fc" id="L720">                });</span>
+            } else {
+                // Shutdown event loop group
+<span class="pc bpc" id="L723" title="1 of 2 branches missed.">                if (eventLoopGroup != null) {</span>
+<span class="fc" id="L724">                    eventLoopGroup.shutdownGracefully();</span>
+                }
+                
+                // Shutdown reconnect executor
+<span class="pc bpc" id="L728" title="1 of 2 branches missed.">                if (reconnectExecutor != null) {</span>
+<span class="fc" id="L729">                    reconnectExecutor.shutdown();</span>
+<span class="pc bpc" id="L730" title="1 of 2 branches missed.">                    if (!reconnectExecutor.awaitTermination(5, TimeUnit.SECONDS)) {</span>
+<span class="nc" id="L731">                        reconnectExecutor.shutdownNow();</span>
+                    }
+                }
+                
+<span class="fc" id="L735">                log.info(&quot;Channel shutdown completed&quot;);</span>
+<span class="fc" id="L736">                shutdownFuture.complete(null);</span>
+            }
+            
+<span class="nc" id="L739">        } catch (Exception e) {</span>
+<span class="nc" id="L740">            log.error(&quot;Error during channel shutdown&quot;, e);</span>
+<span class="nc" id="L741">            shutdownFuture.completeExceptionally(e);</span>
+<span class="fc" id="L742">        }</span>
+        
+<span class="fc" id="L744">        return shutdownFuture;</span>
+    }
+    
+    // Abstract methods to be implemented by subclasses
+    
+    /**
+     * Called when a connection is established.
+     *
+     * @param ctx The channel handler context
+     */
+    protected abstract void onConnect(ChannelHandlerContext ctx);
+    
+    /**
+     * Called when a connection is closed.
+     *
+     * @param ctx The channel handler context
+     */
+    protected abstract void onDisconnect(ChannelHandlerContext ctx);
+    
+    /**
+     * Called when a complete ISO8583 message is received.
+     *
+     * @param ctx The channel handler context
+     * @param isoMsg The received ISO8583 message
+     */
+    protected abstract void onMessage(ChannelHandlerContext ctx, ISOMsg isoMsg);
+    
+    /**
+     * Called when an error occurs.
+     *
+     * @param ctx The channel handler context
+     * @param cause The error
+     */
+    protected abstract void onError(ChannelHandlerContext ctx, Throwable cause);
+    
+    // Utility methods
+    
+    /**
+     * Checks if the channel is connected.
+     *
+     * @return true if connected, false otherwise
+     */
+    public boolean isConnected() {
+<span class="fc" id="L787">        return connected;</span>
+    }
+    
+    /**
+     * Gets the number of messages processed.
+     *
+     * @return The message count
+     */
+    public int getMessageCount() {
+<span class="fc" id="L796">        return messageCounter.get();</span>
+    }
+    
+    /**
+     * Gets the last activity timestamp.
+     *
+     * @return The last activity timestamp
+     */
+    public long getLastActivity() {
+<span class="fc" id="L805">        return lastActivity;</span>
+    }
+    
+    /**
+     * Resets the message counter.
+     */
+    public void resetMessageCounter() {
+<span class="fc" id="L812">        messageCounter.set(0);</span>
+<span class="fc" id="L813">    }</span>
+    
+    /**
+     * Gets the connection host.
+     *
+     * @return The connection host
+     */
+    public String getHost() {
+<span class="nc" id="L821">        return host;</span>
+    }
+    
+    /**
+     * Gets the connection port.
+     *
+     * @return The connection port
+     */
+    public int getPort() {
+<span class="nc" id="L830">        return port;</span>
+    }
+    
+    /**
+     * Gets the connection status information.
+     *
+     * @return A string describing the connection status
+     */
+    public String getConnectionStatus() {
+<span class="fc" id="L839">        return String.format(&quot;Connected: %s, Host: %s, Port: %d, Messages: %d, Last Activity: %d&quot;,</span>
+<span class="fc" id="L840">                connected, host, port, messageCounter.get(), lastActivity);</span>
+    }
+
+    public void setShuttingDown(boolean shuttingDown) {
+<span class="fc" id="L844">        this.isShuttingDown.set(shuttingDown);</span>
+<span class="fc" id="L845">    }</span>
+} 
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.14.202510111229</span></div></body></html>

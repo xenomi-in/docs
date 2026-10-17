@@ -68,7 +68,7 @@ The original review used source `774c33a12e1d9c7e959f6e12d46784f2f79f9042`: 24 s
 
 These are local automated unit/component tests using mocks and embedded channels. No completed RuPay simulator session, Falcon UAT acceptance, production TLS validation, load/soak test, or external service integration is claimed. The container smoke test uses the test profile and does not contact those services.
 
-Original report evidence is retained locally under ignored `release-assets/v1.0.0/` as pre-correction evidence. Candidate reports will be attached to the draft release by a successful tag workflow. **Release asset upload is pending.** Do not replace the candidate evidence with the earlier archive.
+Original report evidence is retained locally in the source repository under ignored `release-assets/v1.0.0/` and bundled here as [pre-correction reports](#bundled-pre-correction-reports). Candidate reports will be attached to the draft release by a successful tag workflow. **Release asset upload is pending.** Do not replace the candidate evidence with the earlier archive.
 
 ## Measured code coverage
 
@@ -94,7 +94,7 @@ Generate fresh reports for this candidate with `mvn clean verify`. Surefire XML 
 2. Configure Keycloak issuer, JWK endpoint, expected caller, audience, and scopes. Previously unauthenticated API clients must supply valid bearer tokens.
 3. Provision Switch Core OAuth client credentials and token endpoint through deployment secrets.
 4. For production, configure HTTPS Switch Core URLs and separate `SWITCH_CORE_TLS_*` and `SCHEME_TLS_*` client key/trust stores. Both remote endpoints must accept the configured TLS/mTLS connections.
-5. Set `KEYCLOAK_REQUIRE_MTLS=true` for direct incoming API mTLS enforcement and configure the listener's HTTPS/client-certificate boundary. Compose defaults this flag to true; direct JAR deployments must set it explicitly. See the [deployment, configuration, and setup guide](../DEPLOYMENT_CONFIGURATION_SETUP.md) for HTTPS and certificate settings.
+5. Set `KEYCLOAK_REQUIRE_MTLS=true` for direct incoming API mTLS enforcement and configure the listener's HTTPS/client-certificate boundary. Compose defaults this flag to true; direct JAR deployments must set it explicitly. See the [deployment, configuration, and setup guide](https://github.com/lps-pavangutha/tcp-listner/blob/refactor/docs/DEPLOYMENT_CONFIGURATION_SETUP.md) for HTTPS and certificate settings.
 6. Review scheme-specific field 70 codes, `site_id`, `listener_id`, and `connection_id` against downstream configuration.
 7. For hardened container deployments, provide a log directory writable by UID/GID `1001:1001` and mount certificates/configuration read-only. Disable raw-data logging in production.
 
@@ -115,7 +115,7 @@ To build a version-labeled container:
 docker build -f dockerfile -t iso8583-switch:1.0.0 .
 ```
 
-The default Docker build runs Maven verification. CI packages the exact JAR from its successful test/build job using the Dockerfile release target. Configure environment values, secrets, certificates, and profile settings using the [README](../../README.md), [production usage guide](../CHANNEL_CLIENT_USAGE.md), and supplied `docker-compose.yml` before deployment.
+The default Docker build runs Maven verification. CI packages the exact JAR from its successful test/build job using the Dockerfile release target. Configure environment values, secrets, certificates, and profile settings using the [README](https://github.com/lps-pavangutha/tcp-listner/blob/refactor/README.md), [production usage guide](https://github.com/lps-pavangutha/tcp-listner/blob/refactor/docs/CHANNEL_CLIENT_USAGE.md), and supplied `docker-compose.yml` before deployment.
 
 ### Deployment verification
 
@@ -143,14 +143,26 @@ No earlier client deployment is confirmed. Retain the accepted artifact/image an
 
 ## References
 
+Implementation guides below are maintained on the source repository’s `refactor` branch and may change independently of this candidate. Access requires permission to that repository.
+
 - [Candidate verification and build identity](VERIFICATION_v1.0.0.md)
-- [Deployment, configuration, and setup](../DEPLOYMENT_CONFIGURATION_SETUP.md)
+- [Deployment, configuration, and setup](https://github.com/lps-pavangutha/tcp-listner/blob/refactor/docs/DEPLOYMENT_CONFIGURATION_SETUP.md)
 - [Cross-service release compatibility](RELEASE_COMPATIBILITY.md)
 - [Release build and evidence](RELEASE_PROCESS.md)
-- [Setup, configuration, and API scopes](../../README.md)
-- [Keycloak service authentication and pending integration](../KEYCLOAK_AUTHENTICATION.md)
-- [Production implementation guide](../CHANNEL_CLIENT_USAGE.md)
-- [Tester guide](../testing.md)
-- [Architecture](../architecture.md)
-- [Channel implementation](../CHANNEL_IMPLEMENTATION.md)
-- [Virtual-thread migration](../VIRTUAL_THREAD_MIGRATION.md)
+- [Setup, configuration, and API scopes](https://github.com/lps-pavangutha/tcp-listner/blob/refactor/README.md)
+- [Keycloak service authentication and pending integration](https://github.com/lps-pavangutha/tcp-listner/blob/refactor/docs/KEYCLOAK_AUTHENTICATION.md)
+- [Production implementation guide](https://github.com/lps-pavangutha/tcp-listner/blob/refactor/docs/CHANNEL_CLIENT_USAGE.md)
+- [Tester guide](https://github.com/lps-pavangutha/tcp-listner/blob/refactor/docs/testing.md)
+- [Architecture](https://github.com/lps-pavangutha/tcp-listner/blob/refactor/docs/architecture.md)
+- [Channel implementation](https://github.com/lps-pavangutha/tcp-listner/blob/refactor/docs/CHANNEL_IMPLEMENTATION.md)
+- [Virtual-thread migration](https://github.com/lps-pavangutha/tcp-listner/blob/refactor/docs/VIRTUAL_THREAD_MIGRATION.md)
+
+### Bundled pre-correction reports
+
+These reports apply to source `774c33a`, not the corrected candidate binary.
+
+- [JUnit test results](test-report/junit/index.html)
+- [JaCoCo coverage report](test-report/jacoco/index.html)
+- [Maven build log](test-report/build.log)
+- [Surefire XML and text reports](test-report/surefire-reports/)
+- [Download original test reports](test-report/v1.0.0-test-reports.zip)

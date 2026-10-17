@@ -1,0 +1,193 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>SwitchApplication.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">switch</a> &gt; <a href="index.source.html" class="el_package">com.lps.isoswitch</a> &gt; <span class="el_source">SwitchApplication.java</span></div><h1>SwitchApplication.java</h1><pre class="source lang-java linenums">package com.lps.isoswitch;
+
+import java.util.concurrent.ExecutorService;
+
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.beans.factory.annotation.Qualifier;
+import org.springframework.beans.factory.annotation.Value;
+import org.springframework.boot.CommandLineRunner;
+import org.springframework.boot.SpringApplication;
+import org.springframework.boot.autoconfigure.SpringBootApplication;
+import org.springframework.context.annotation.Bean;
+import org.springframework.context.ApplicationListener;
+import org.springframework.context.event.ContextClosedEvent;
+import org.springframework.scheduling.annotation.EnableScheduling;
+
+import com.lps.isoswitch.config.SchemeConfig;
+import com.lps.isoswitch.helper.SchemeConnHelpr;
+import com.lps.isoswitch.service.SchemeRegistryService;
+import com.lps.isoswitch.tcpconnector.SchemesConnector;
+
+import jakarta.annotation.PreDestroy;
+
+/**
+ * Main application class for the ISO8583 Switch.
+ * This class handles both server and client modes of operation.
+ * Uses virtual threads for improved scalability and resource utilization.
+ * 
+ * @author Logicpoint Systems
+ * @version 2.0
+ * @since 2025-06-15
+ *
+ * Coding Standards:
+ * 1. All constants should be UPPER_CASE
+ * 2. All instance variables should be private
+ * 3. All public methods should have JavaDoc
+ * 4. Use meaningful variable names
+ * 5. Keep methods focused and small
+ * 6. Handle exceptions appropriately
+ * 7. Use proper logging levels
+ * 8. Use virtual threads for I/O operations
+ */
+@SpringBootApplication
+@EnableScheduling
+<span class="fc" id="L46">public class SwitchApplication implements ApplicationListener&lt;ContextClosedEvent&gt; {</span>
+<span class="fc" id="L47">    private static final Logger log = LoggerFactory.getLogger(SwitchApplication.class);</span>
+    
+    /** Application mode (server/client) */
+    @Value(&quot;${app.mode:client}&quot;)
+    private String appMode;
+
+    /** Connection parameters */
+    @Value(&quot;${tcp.client.host:}&quot;)
+    private String host;
+    @Value(&quot;${tcp.client.port:#{null}}&quot;)
+    private Integer port;
+    @Value(&quot;${tcp.client.connectionId:}&quot;)
+    private String connectionId;
+  
+    /** Scheme connection helper */
+    @Autowired
+    private SchemeConnHelpr schemeConnHelper;
+
+    @Autowired
+    private SchemeRegistryService schemeRegistryService;
+
+    @Autowired
+    @Qualifier(&quot;tcpConnectionExecutor&quot;)
+    private ExecutorService tcpConnectionExecutor;
+
+    /**
+     * Main application entry point
+     * @param args Command line arguments
+     */
+    public static void main(String[] args) {
+<span class="nc" id="L77">        SpringApplication.run(SwitchApplication.class, args);</span>
+<span class="nc" id="L78">    }</span>
+
+    /**
+     * Handles Spring Boot shutdown event.
+     *
+     * @param event The context closed event
+     */
+    @Override
+    public void onApplicationEvent(ContextClosedEvent event) {
+<span class="fc" id="L87">        log.info(&quot;SwitchApplication received shutdown event&quot;);</span>
+        // The ShutdownCoordinator will handle the actual shutdown
+<span class="fc" id="L89">    }</span>
+
+    /**
+     * PreDestroy method for additional cleanup.
+     */
+    @PreDestroy
+    public void onPreDestroy() {
+<span class="fc" id="L96">        log.info(&quot;SwitchApplication PreDestroy called&quot;);</span>
+<span class="fc" id="L97">    }</span>
+
+    /**
+     * Command line runner bean that initializes the application based on mode
+     * @return CommandLineRunner instance
+     */
+    @Bean
+    public CommandLineRunner commandLineRunner() {
+<span class="fc" id="L105">        return args -&gt; {</span>
+<span class="fc" id="L106">            log.info(&quot;Starting application in {} mode&quot;, appMode);</span>
+            
+<span class="fc bfc" id="L108" title="All 2 branches covered.">            if (&quot;server&quot;.equalsIgnoreCase(appMode)) {</span>
+<span class="fc" id="L109">                startServerMode();</span>
+<span class="pc bpc" id="L110" title="1 of 2 branches missed.">            } else if (&quot;client&quot;.equalsIgnoreCase(appMode)) {</span>
+<span class="fc" id="L111">                startClientMode();</span>
+            } else {
+<span class="nc" id="L113">                handleInvalidMode();</span>
+            }
+<span class="fc" id="L115">        };</span>
+    }
+
+    /**
+     * Starts the application in server mode
+     */
+    private void startServerMode() {
+<span class="fc" id="L122">        log.info(&quot;TCP Server started successfully&quot;);</span>
+<span class="fc" id="L123">    }</span>
+
+    /**
+     * Starts the application in client mode
+     */
+    private void startClientMode() {
+<span class="fc" id="L129">        log.info(&quot;Message processing started in client mode using virtual threads&quot;);</span>
+<span class="fc" id="L130">        StratClient();</span>
+<span class="fc" id="L131">    }</span>
+
+    /**
+     * Handles invalid application mode
+     */
+    private void handleInvalidMode() {
+<span class="nc" id="L137">        log.error(&quot;Invalid application mode: {}. Must be either 'server' or 'client'&quot;, appMode);</span>
+<span class="nc" id="L138">        System.exit(1);</span>
+<span class="nc" id="L139">    }</span>
+  
+    /**
+     * Starts the client using injected virtual thread executor.
+     */
+    public void StratClient() {
+<span class="fc" id="L145">        SchemeConfig.ResolvedSchemeSettings settings = schemeRegistryService.getActiveSchemeSettings(host, port, connectionId);</span>
+<span class="fc" id="L146">        SchemesConnector connector = schemeRegistryService.getActiveConnector();</span>
+<span class="fc" id="L147">        connector.setSchemeConnHelper(schemeConnHelper);</span>
+
+        // Validate connection details
+<span class="fc bfc" id="L150" title="All 2 branches covered.">        if (!validateConnectionDetails(settings.host(), settings.port())) {</span>
+<span class="fc" id="L151">            return;</span>
+        }
+
+        // Start connection using injected virtual thread executor
+<span class="fc" id="L155">        startConnection(tcpConnectionExecutor, connector, settings);</span>
+<span class="fc" id="L156">    }</span>
+
+    /**
+     * Validates connection details
+     * @return true if valid, false otherwise
+     */
+    private boolean validateConnectionDetails(String resolvedHost, Integer resolvedPort) {
+<span class="pc bpc" id="L163" title="1 of 4 branches missed.">        if (resolvedHost == null || resolvedPort == null) {</span>
+<span class="fc" id="L164">            log.error(&quot;Connection details not properly configured. Host: {}, Port: {}&quot;, resolvedHost, resolvedPort);</span>
+<span class="fc" id="L165">            return false;</span>
+        }
+<span class="fc" id="L167">        return true;</span>
+    }
+
+    /**
+     * Starts the connection using virtual threads for improved scalability.
+     * @param executorService Virtual thread executor service
+     * @param connector scheme connector bean
+     */
+    private void startConnection(
+            ExecutorService executorService,
+            SchemesConnector connector,
+            SchemeConfig.ResolvedSchemeSettings settings) {
+<span class="fc" id="L179">        log.info(&quot;Starting {} client connection to {}:{} using virtual threads&quot;,</span>
+<span class="fc" id="L180">                settings.scheme(), settings.host(), settings.port());</span>
+<span class="fc" id="L181">        executorService.submit(() -&gt; {</span>
+            try {   
+<span class="fc" id="L183">                connector.connect(settings.host(), settings.port(), settings.connectionId());</span>
+<span class="nc" id="L184">            } catch (InterruptedException e) {</span>
+<span class="nc" id="L185">                log.error(&quot;Connection interrupted&quot;, e);</span>
+<span class="nc" id="L186">                Thread.currentThread().interrupt();</span>
+<span class="fc" id="L187">            } catch (Exception e) {</span>
+<span class="fc" id="L188">                log.error(&quot;Failed to start client connection&quot;, e);</span>
+<span class="pc" id="L189">            }</span>
+<span class="fc" id="L190">        });</span>
+<span class="fc" id="L191">    }</span>
+} 
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.14.202510111229</span></div></body></html>

@@ -1,0 +1,89 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>IsoRequestMapper.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">switch</a> &gt; <a href="index.source.html" class="el_package">com.lps.isoswitch.service</a> &gt; <span class="el_source">IsoRequestMapper.java</span></div><h1>IsoRequestMapper.java</h1><pre class="source lang-java linenums">package com.lps.isoswitch.service;
+
+import com.lps.isoswitch.model.IsoRequest;
+import org.jpos.iso.ISOException;
+import org.jpos.iso.ISOMsg;
+import org.jpos.iso.ISOPackager;
+import org.springframework.stereotype.Component;
+
+import java.util.LinkedHashMap;
+import java.util.Map;
+
+/**
+ * Converts Switch Core API payloads into jPOS ISO8583 messages.
+ */
+@Component
+<span class="fc" id="L16">public class IsoRequestMapper {</span>
+
+    public ISOMsg convertApiRequest(IsoRequest request, ISOPackager packager) throws ISOException {
+<span class="pc bpc" id="L19" title="1 of 2 branches missed.">        if (request == null) {</span>
+<span class="nc" id="L20">            throw new ISOException(&quot;Request body is required&quot;);</span>
+        }
+<span class="pc bpc" id="L22" title="2 of 4 branches missed.">        if (request.getMti() == null || request.getMti().isBlank()) {</span>
+<span class="nc" id="L23">            throw new ISOException(&quot;MTI is required&quot;);</span>
+        }
+
+<span class="fc" id="L26">        ISOMsg isoMsg = new ISOMsg();</span>
+<span class="fc" id="L27">        isoMsg.setPackager(packager);</span>
+<span class="fc" id="L28">        isoMsg.setMTI(request.getMti());</span>
+
+<span class="fc" id="L30">        Map&lt;String, String&gt; fields = new LinkedHashMap&lt;&gt;();</span>
+<span class="pc bpc" id="L31" title="1 of 2 branches missed.">        if (request.getFields() != null) {</span>
+<span class="fc" id="L32">            fields.putAll(request.getFields());</span>
+        }
+<span class="fc" id="L34">        putIfAbsent(fields, &quot;2&quot;, request.getPan());</span>
+<span class="fc" id="L35">        putIfAbsent(fields, &quot;3&quot;, request.getProcessingCode());</span>
+<span class="fc" id="L36">        putIfAbsent(fields, &quot;4&quot;, request.getAmount());</span>
+<span class="fc" id="L37">        putIfAbsent(fields, &quot;7&quot;, request.getTransmissionDateTime());</span>
+<span class="fc" id="L38">        putIfAbsent(fields, &quot;11&quot;, request.getStan());</span>
+<span class="fc" id="L39">        putIfAbsent(fields, &quot;12&quot;, request.getLocalTransactionTime());</span>
+<span class="fc" id="L40">        putIfAbsent(fields, &quot;13&quot;, request.getLocalTransactionDate());</span>
+<span class="fc" id="L41">        putIfAbsent(fields, &quot;18&quot;, request.getMerchantType());</span>
+<span class="fc" id="L42">        putIfAbsent(fields, &quot;22&quot;, request.getPosEntryMode());</span>
+<span class="fc" id="L43">        putIfAbsent(fields, &quot;25&quot;, request.getPosConditionCode());</span>
+<span class="fc" id="L44">        putIfAbsent(fields, &quot;32&quot;, request.getAcquiringInstitutionId());</span>
+<span class="fc" id="L45">        putIfAbsent(fields, &quot;33&quot;, request.getForwardingInstitutionId());</span>
+<span class="fc" id="L46">        putIfAbsent(fields, &quot;37&quot;, request.getRrn());</span>
+<span class="fc" id="L47">        putIfAbsent(fields, &quot;38&quot;, request.getAuthorizationId());</span>
+<span class="fc" id="L48">        putIfAbsent(fields, &quot;39&quot;, request.getResponseCode());</span>
+<span class="fc" id="L49">        putIfAbsent(fields, &quot;42&quot;, request.getCardAcceptorId());</span>
+<span class="fc" id="L50">        putIfAbsent(fields, &quot;43&quot;, request.getCardAcceptorName());</span>
+<span class="fc" id="L51">        putIfAbsent(fields, &quot;48&quot;, request.getAdditionalData());</span>
+<span class="fc" id="L52">        putIfAbsent(fields, &quot;49&quot;, request.getCurrencyCode());</span>
+<span class="fc" id="L53">        putIfAbsent(fields, &quot;90&quot;, request.getOriginalData());</span>
+<span class="fc" id="L54">        putIfAbsent(fields, &quot;95&quot;, request.getReplacementAmount());</span>
+<span class="fc" id="L55">        putIfAbsent(fields, &quot;100&quot;, request.getReceivingInstitutionId());</span>
+<span class="fc" id="L56">        putIfAbsent(fields, &quot;102&quot;, request.getAccountId1());</span>
+<span class="fc" id="L57">        putIfAbsent(fields, &quot;103&quot;, request.getAccountId2());</span>
+
+<span class="fc bfc" id="L59" title="All 2 branches covered.">        for (Map.Entry&lt;String, String&gt; entry : fields.entrySet()) {</span>
+<span class="fc" id="L60">            String value = entry.getValue();</span>
+<span class="pc bpc" id="L61" title="1 of 2 branches missed.">            if (value == null) {</span>
+<span class="nc" id="L62">                continue;</span>
+            }
+<span class="fc" id="L64">            int fieldNumber = parseFieldNumber(entry.getKey());</span>
+<span class="fc" id="L65">            isoMsg.set(fieldNumber, value);</span>
+<span class="fc" id="L66">        }</span>
+
+<span class="fc" id="L68">        return isoMsg;</span>
+    }
+
+    private void putIfAbsent(Map&lt;String, String&gt; fields, String fieldNumber, String value) {
+<span class="pc bpc" id="L72" title="3 of 4 branches missed.">        if (value != null &amp;&amp; !value.isBlank()) {</span>
+<span class="nc" id="L73">            fields.putIfAbsent(fieldNumber, value);</span>
+        }
+<span class="fc" id="L75">    }</span>
+
+    private int parseFieldNumber(String fieldNumber) throws ISOException {
+        try {
+<span class="fc" id="L79">            int parsed = Integer.parseInt(fieldNumber);</span>
+<span class="pc bpc" id="L80" title="2 of 4 branches missed.">            if (parsed &lt; 1 || parsed &gt; 128) {</span>
+<span class="nc" id="L81">                throw new ISOException(&quot;ISO field number out of range: &quot; + fieldNumber);</span>
+            }
+<span class="fc" id="L83">            return parsed;</span>
+<span class="fc" id="L84">        } catch (NumberFormatException e) {</span>
+<span class="fc" id="L85">            throw new ISOException(&quot;Invalid ISO field number: &quot; + fieldNumber, e);</span>
+        }
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.14.202510111229</span></div></body></html>

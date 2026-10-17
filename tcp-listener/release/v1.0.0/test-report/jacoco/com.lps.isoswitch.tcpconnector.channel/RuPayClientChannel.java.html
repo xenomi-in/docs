@@ -1,0 +1,446 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>RuPayClientChannel.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">switch</a> &gt; <a href="index.source.html" class="el_package">com.lps.isoswitch.tcpconnector.channel</a> &gt; <span class="el_source">RuPayClientChannel.java</span></div><h1>RuPayClientChannel.java</h1><pre class="source lang-java linenums">package com.lps.isoswitch.tcpconnector.channel;
+
+import io.netty.channel.ChannelHandler.Sharable;
+import io.netty.channel.ChannelHandlerContext;
+
+import org.jpos.iso.ISOException;
+import org.jpos.iso.ISOMsg;
+import org.jpos.iso.ISOPackager;
+import org.jpos.iso.packager.GenericPackager;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+import com.lps.isoswitch.config.RawDataLogging;
+
+import java.io.InputStream;
+
+/**
+ * RuPay Client Channel implementation for connecting to RuPay servers.
+ * This class provides RuPay-specific client functionality with proper
+ * length-based message framing and connection management.
+ *
+ * Features:
+ * - RuPay-specific configuration (2-byte binary length fields)
+ * - Client connection management
+ * - Automatic reconnection
+ * - ISO8583 message handling
+ * - Network and financial message processing
+ * - Sign-on/Sign-off/Echo functionality
+ *
+ * @author Logicpoint Systems
+ * @version 1.0
+ * @since 2025-06-15
+ */
+@Sharable
+public class RuPayClientChannel extends ISOClientChannel {
+
+<span class="fc" id="L36">    private static final Logger log = LoggerFactory.getLogger(RuPayClientChannel.class);</span>
+
+    // RuPay-specific configuration
+    private static final int RUPAY_LENGTH_FIELD_SIZE = 2;
+    private static final int RUPAY_MAX_MESSAGE_LENGTH = 6144;
+    private static final boolean RUPAY_INCLUDE_LENGTH_FIELD = false;
+    private static final boolean RUPAY_LENGTH_IN_ASCII = false;
+    private static final boolean RUPAY_LENGTH_IN_HEX = false;
+
+    // Connection status
+<span class="fc" id="L46">    private boolean signedOn = false;</span>
+
+    /**
+     * Constructs a new RuPayClientChannel with default RuPay configuration.
+     */
+    public RuPayClientChannel() {
+<span class="fc" id="L52">        super(RUPAY_MAX_MESSAGE_LENGTH);</span>
+<span class="fc" id="L53">        configureRuPayChannel();</span>
+<span class="fc" id="L54">        initializeRuPayPackager();</span>
+<span class="fc" id="L55">    }</span>
+
+    /**
+     * Constructs a new RuPayClientChannel with custom maximum message length.
+     *
+     * @param maxMessageLength The maximum message length in bytes
+     */
+    public RuPayClientChannel(int maxMessageLength) {
+<span class="fc" id="L63">        super(maxMessageLength);</span>
+<span class="fc" id="L64">        configureRuPayChannel();</span>
+<span class="fc" id="L65">        initializeRuPayPackager();</span>
+<span class="fc" id="L66">    }</span>
+
+    /**
+     * Configures the channel for RuPay protocol requirements.
+     */
+    private void configureRuPayChannel() {
+<span class="fc" id="L72">        setLengthFieldConfig(RUPAY_LENGTH_FIELD_SIZE, RUPAY_INCLUDE_LENGTH_FIELD,RUPAY_LENGTH_IN_HEX, RUPAY_LENGTH_IN_ASCII);</span>
+<span class="fc" id="L73">        setTimeout(30000, 30000); // 30 seconds timeout</span>
+<span class="fc" id="L74">        setReconnectConfig(true, 5000); // Auto-reconnect with 5 second delay</span>
+<span class="fc" id="L75">    }</span>
+
+    /**
+     * Initializes the RuPay ISO8583 packager.
+     */
+    private void initializeRuPayPackager() {
+        try {
+<span class="fc" id="L82">            InputStream is = getClass().getResourceAsStream(&quot;/RuPayISO8583.xml&quot;);</span>
+<span class="pc bpc" id="L83" title="1 of 2 branches missed.">            if (is == null) {</span>
+<span class="nc" id="L84">                log.error(&quot;Could not find RuPayISO8583.xml in classpath&quot;);</span>
+<span class="nc" id="L85">                throw new RuntimeException(&quot;RuPay packager configuration file not found&quot;);</span>
+            }
+<span class="fc" id="L87">            ISOPackager ruPayPackager = new GenericPackager(is);</span>
+<span class="fc" id="L88">            setPackager(ruPayPackager);</span>
+<span class="fc" id="L89">            is.close();</span>
+<span class="fc" id="L90">            log.info(&quot;RuPay ISO8583 packager initialized successfully&quot;);</span>
+<span class="nc" id="L91">        } catch (Exception e) {</span>
+<span class="nc" id="L92">            log.error(&quot;Error initializing RuPay ISO8583 packager&quot;, e);</span>
+<span class="nc" id="L93">            throw new RuntimeException(&quot;Failed to initialize RuPay packager&quot;, e);</span>
+<span class="fc" id="L94">        }</span>
+<span class="fc" id="L95">    }</span>
+
+    /**
+     * Connects to a RuPay server with the specified host and port.
+     *
+     * @param host The host address to connect to
+     * @param port The port number to connect to
+     * @return CompletableFuture that completes when connection is established
+     */
+    public java.util.concurrent.CompletableFuture&lt;Boolean&gt; connectToRuPayServer(String host, int port) {
+<span class="fc" id="L105">        log.info(&quot;Connecting to RuPay server at {}:{}&quot;, host, port);</span>
+<span class="fc" id="L106">        return connect(host, port);</span>
+    }
+
+    /**
+     * Connects to a RuPay server with timeout.
+     *
+     * @param host The host address to connect to
+     * @param port The port number to connect to
+     * @param timeoutMs Connection timeout in milliseconds
+     * @return CompletableFuture that completes when connection is established
+     */
+    public java.util.concurrent.CompletableFuture&lt;Boolean&gt; connectToRuPayServer(String host, int port, long timeoutMs) {
+<span class="fc" id="L118">        log.info(&quot;Connecting to RuPay server at {}:{} with timeout {}ms&quot;, host, port, timeoutMs);</span>
+
+<span class="fc" id="L120">        java.util.concurrent.CompletableFuture&lt;Boolean&gt; connectFuture = connect(host, port);</span>
+
+        // Add timeout
+<span class="fc" id="L123">        java.util.concurrent.CompletableFuture&lt;Boolean&gt; timeoutFuture = new java.util.concurrent.CompletableFuture&lt;&gt;();</span>
+<span class="fc" id="L124">        connectFuture.orTimeout(timeoutMs, java.util.concurrent.TimeUnit.MILLISECONDS)</span>
+<span class="fc" id="L125">                    .whenComplete((result, throwable) -&gt; {</span>
+<span class="fc bfc" id="L126" title="All 2 branches covered.">                        if (throwable != null) {</span>
+<span class="fc" id="L127">                            log.error(&quot;Connection timeout to RuPay server {}:{}&quot;, host, port);</span>
+<span class="fc" id="L128">                            timeoutFuture.complete(false);</span>
+                        } else {
+<span class="fc" id="L130">                            timeoutFuture.complete(result);</span>
+                        }
+<span class="fc" id="L132">                    });</span>
+
+<span class="fc" id="L134">        return timeoutFuture;</span>
+    }
+
+    /**
+     * Called when a connection is established.
+     *
+     * @param ctx The channel handler context
+     */
+    @Override
+    protected void onConnect(ChannelHandlerContext ctx) {
+<span class="fc" id="L144">        log.info(&quot;RuPay client channel connected to: {}&quot;, ctx.channel().remoteAddress());</span>
+<span class="fc" id="L145">        signedOn = false; // Reset sign-on status on new connection</span>
+<span class="fc" id="L146">    }</span>
+
+    /**
+     * Called when a connection is closed.
+     *
+     * @param ctx The channel handler context
+     */
+    @Override
+    protected void onDisconnect(ChannelHandlerContext ctx) {
+<span class="fc" id="L155">        log.info(&quot;RuPay client channel disconnected from: {}&quot;,</span>
+<span class="fc bfc" id="L156" title="All 2 branches covered.">                ctx != null ? ctx.channel().remoteAddress() : &quot;unknown&quot;);</span>
+<span class="fc" id="L157">        signedOn = false; // Reset sign-on status on disconnection</span>
+<span class="fc" id="L158">    }</span>
+
+    /**
+     * Called when a complete ISO8583 message is received.
+     *
+     * @param ctx The channel handler context
+     * @param isoMsg The received ISO8583 message
+     */
+    @Override
+    protected void onMessage(ChannelHandlerContext ctx, ISOMsg isoMsg) {
+        try {
+<span class="fc" id="L169">            log.info(&quot;Received RuPay ISO8583 message - MTI: {}, STAN: {}&quot;,</span>
+<span class="fc" id="L170">                    isoMsg.getMTI(), isoMsg.getString(11));</span>
+
+            // Log message details for debugging
+<span class="fc" id="L173">            RawDataLogging.isoMessage(&quot;RuPay client channel ISO message&quot;, isoMsg);</span>
+
+            // Handle the message based on MTI
+<span class="fc" id="L176">            String mti = isoMsg.getMTI();</span>
+<span class="pc bpc" id="L177" title="1 of 2 branches missed.">            if (mti != null) {</span>
+<span class="fc bfc" id="L178" title="All 2 branches covered.">                if (mti.endsWith(&quot;800&quot;)) {</span>
+<span class="fc" id="L179">                    handleNetworkMessage(ctx, isoMsg);</span>
+                } else {
+<span class="fc" id="L181">                    handleFinancialMessage(ctx, isoMsg);</span>
+                }
+            } else {
+<span class="nc" id="L184">                log.warn(&quot;Received RuPay message without MTI&quot;);</span>
+            }
+<span class="fc" id="L186">        } catch (Exception e) {</span>
+<span class="fc" id="L187">            log.error(&quot;Error processing RuPay message&quot;, e);</span>
+<span class="fc" id="L188">            onError(ctx, e);</span>
+<span class="fc" id="L189">        }</span>
+<span class="fc" id="L190">    }</span>
+
+    /**
+     * Called when an error occurs.
+     *
+     * @param ctx The channel handler context
+     * @param cause The error
+     */
+    @Override
+    protected void onError(ChannelHandlerContext ctx, Throwable cause) {
+<span class="fc" id="L200">        log.error(&quot;RuPay client channel error&quot;, cause);</span>
+        // Close the connection on error
+<span class="pc bpc" id="L202" title="1 of 2 branches missed.">        if (ctx != null) {</span>
+<span class="fc" id="L203">            ctx.close();</span>
+        }
+<span class="fc" id="L205">    }</span>
+
+    /**
+     * Handles network messages (MTI 0800).
+     *
+     * @param ctx The channel handler context
+     * @param isoMsg The network message
+     */
+    @Override
+    protected void handleNetworkMessage(ChannelHandlerContext ctx, ISOMsg isoMsg) {
+        try {
+<span class="fc" id="L216">            log.info(&quot;Handling RuPay network message - MTI: {}&quot;, isoMsg.getMTI());</span>
+
+            // Check network management information code
+<span class="fc" id="L219">            String networkCode = isoMsg.getString(70);</span>
+<span class="fc bfc" id="L220" title="All 2 branches covered.">            if (networkCode != null) {</span>
+<span class="fc bfc" id="L221" title="All 4 branches covered.">                switch (networkCode) {</span>
+                    case &quot;001&quot;: // Sign-on
+<span class="fc" id="L223">                        handleSignOnResponse(ctx, isoMsg);</span>
+<span class="fc" id="L224">                        break;</span>
+                    case &quot;002&quot;: // Sign-off
+<span class="fc" id="L226">                        handleSignOffResponse(ctx, isoMsg);</span>
+<span class="fc" id="L227">                        break;</span>
+                    case &quot;301&quot;: // Echo
+<span class="fc" id="L229">                        handleEchoResponse(ctx, isoMsg);</span>
+<span class="fc" id="L230">                        break;</span>
+                    default:
+<span class="fc" id="L232">                        log.info(&quot;Unknown network management code: {}&quot;, networkCode);</span>
+                }
+            }
+<span class="nc" id="L235">        } catch (Exception e) {</span>
+<span class="nc" id="L236">            log.error(&quot;Error handling RuPay network message&quot;, e);</span>
+<span class="fc" id="L237">        }</span>
+<span class="fc" id="L238">    }</span>
+
+    /**
+     * Handles financial messages.
+     *
+     * @param ctx The channel handler context
+     * @param isoMsg The financial message
+     */
+    @Override
+    protected void handleFinancialMessage(ChannelHandlerContext ctx, ISOMsg isoMsg) {
+        try {
+<span class="fc" id="L249">            log.info(&quot;Handling RuPay financial message - MTI: {}&quot;, isoMsg.getMTI());</span>
+
+            // Check if we're signed on
+<span class="fc bfc" id="L252" title="All 2 branches covered.">            if (!signedOn) {</span>
+<span class="fc" id="L253">                log.warn(&quot;Received financial message but not signed on&quot;);</span>
+                // Send decline response
+<span class="fc" id="L255">                sendDeclineResponse(ctx, isoMsg, &quot;96&quot;, &quot;Not signed on&quot;);</span>
+<span class="fc" id="L256">                return;</span>
+            }
+
+            // Process the financial message
+<span class="fc" id="L260">            processFinancialMessage(ctx, isoMsg);</span>
+
+<span class="nc" id="L262">        } catch (Exception e) {</span>
+<span class="nc" id="L263">            log.error(&quot;Error handling RuPay financial message&quot;, e);</span>
+<span class="fc" id="L264">        }</span>
+<span class="fc" id="L265">    }</span>
+
+    /**
+     * Handles sign-on response.
+     *
+     * @param ctx The channel handler context
+     * @param isoMsg The sign-on response message
+     */
+    protected void handleSignOnResponse(ChannelHandlerContext ctx, ISOMsg isoMsg) {
+        try {
+<span class="fc" id="L275">            String responseCode = isoMsg.getString(39);</span>
+<span class="fc bfc" id="L276" title="All 2 branches covered.">            if (&quot;00&quot;.equals(responseCode)) {</span>
+<span class="fc" id="L277">                signedOn = true;</span>
+<span class="fc" id="L278">                log.info(&quot;RuPay sign-on successful&quot;);</span>
+            } else {
+<span class="fc" id="L280">                signedOn = false;</span>
+<span class="fc" id="L281">                log.error(&quot;RuPay sign-on failed with response code: {}&quot;, responseCode);</span>
+            }
+<span class="nc" id="L283">        } catch (Exception e) {</span>
+<span class="nc" id="L284">            log.error(&quot;Error handling sign-on response&quot;, e);</span>
+<span class="fc" id="L285">        }</span>
+<span class="fc" id="L286">    }</span>
+
+    /**
+     * Handles sign-off response.
+     *
+     * @param ctx The channel handler context
+     * @param isoMsg The sign-off response message
+     */
+    protected void handleSignOffResponse(ChannelHandlerContext ctx, ISOMsg isoMsg) {
+        try {
+<span class="fc" id="L296">            String responseCode = isoMsg.getString(39);</span>
+<span class="fc bfc" id="L297" title="All 2 branches covered.">            if (&quot;00&quot;.equals(responseCode)) {</span>
+<span class="fc" id="L298">                signedOn = false;</span>
+<span class="fc" id="L299">                log.info(&quot;RuPay sign-off successful&quot;);</span>
+            } else {
+<span class="fc" id="L301">                log.error(&quot;RuPay sign-off failed with response code: {}&quot;, responseCode);</span>
+            }
+<span class="nc" id="L303">        } catch (Exception e) {</span>
+<span class="nc" id="L304">            log.error(&quot;Error handling sign-off response&quot;, e);</span>
+<span class="fc" id="L305">        }</span>
+<span class="fc" id="L306">    }</span>
+
+    /**
+     * Handles echo response.
+     *
+     * @param ctx The channel handler context
+     * @param isoMsg The echo response message
+     */
+    protected void handleEchoResponse(ChannelHandlerContext ctx, ISOMsg isoMsg) {
+        try {
+<span class="fc" id="L316">            String responseCode = isoMsg.getString(39);</span>
+<span class="fc bfc" id="L317" title="All 2 branches covered.">            if (&quot;00&quot;.equals(responseCode)) {</span>
+<span class="fc" id="L318">                log.info(&quot;RuPay echo successful&quot;);</span>
+            } else {
+<span class="fc" id="L320">                log.error(&quot;RuPay echo failed with response code: {}&quot;, responseCode);</span>
+            }
+<span class="nc" id="L322">        } catch (Exception e) {</span>
+<span class="nc" id="L323">            log.error(&quot;Error handling echo response&quot;, e);</span>
+<span class="fc" id="L324">        }</span>
+<span class="fc" id="L325">    }</span>
+
+    /**
+     * Processes financial messages.
+     * This method should be overridden by subclasses to provide specific financial message handling.
+     *
+     * @param ctx The channel handler context
+     * @param isoMsg The financial message
+     */
+    protected void processFinancialMessage(ChannelHandlerContext ctx, ISOMsg isoMsg) {
+        try {
+<span class="fc" id="L336">            log.info(&quot;Processing RuPay financial message - MTI: {}&quot;, isoMsg.getMTI());</span>
+            // Default implementation - can be overridden by subclasses
+<span class="nc" id="L338">        } catch (ISOException e) {</span>
+<span class="nc" id="L339">            log.error(&quot;Error processing RuPay financial message&quot;, e);</span>
+<span class="fc" id="L340">        }</span>
+<span class="fc" id="L341">    }</span>
+
+    /**
+     * Sends a decline response.
+     *
+     * @param ctx The channel handler context
+     * @param originalMsg The original message
+     * @param responseCode The response code
+     * @param errorMessage The error message
+     */
+    protected void sendDeclineResponse(ChannelHandlerContext ctx, ISOMsg originalMsg, String responseCode, String errorMessage) {
+        try {
+<span class="fc" id="L353">            log.error(&quot;Sending RuPay decline response. Error: {}&quot;, errorMessage);</span>
+
+<span class="fc" id="L355">            ISOMsg responseMsg = new ISOMsg();</span>
+<span class="fc" id="L356">            responseMsg.setPackager(getPackager());</span>
+
+            // Set response MTI (change last digit to 1 for response)
+<span class="fc" id="L359">            String mti = originalMsg.getMTI();</span>
+<span class="fc" id="L360">            int mtiNumber = Integer.parseInt(mti) + 10;</span>
+<span class="fc" id="L361">            responseMsg.setMTI(&quot;0&quot; + mtiNumber);</span>
+
+            // Copy essential fields from original message
+<span class="fc" id="L364">            copyEssentialFields(originalMsg, responseMsg);</span>
+
+            // Set response code
+<span class="fc" id="L367">            responseMsg.set(39, responseCode);</span>
+
+            // Set additional fields based on response code
+<span class="fc bfc" id="L370" title="All 5 branches covered.">            switch (responseCode) {</span>
+                case &quot;96&quot;:
+<span class="fc" id="L372">                    responseMsg.set(44, &quot;SYSTEM ERROR&quot;);</span>
+<span class="fc" id="L373">                    break;</span>
+                case &quot;91&quot;:
+<span class="fc" id="L375">                    responseMsg.set(44, &quot;SERVICE UNAVAILABLE&quot;);</span>
+<span class="fc" id="L376">                    break;</span>
+                case &quot;05&quot;:
+<span class="fc" id="L378">                    responseMsg.set(44, &quot;DECLINED&quot;);</span>
+<span class="fc" id="L379">                    break;</span>
+                case &quot;12&quot;:
+<span class="fc" id="L381">                    responseMsg.set(44, &quot;INVALID TRANSACTION&quot;);</span>
+<span class="fc" id="L382">                    break;</span>
+                default:
+<span class="fc" id="L384">                    responseMsg.set(44, &quot;DECLINED&quot;);</span>
+            }
+
+            // Send the response
+<span class="fc" id="L388">            sendMessage(ctx, responseMsg);</span>
+<span class="fc" id="L389">            log.info(&quot;RuPay decline response sent successfully&quot;);</span>
+
+<span class="nc" id="L391">        } catch (Exception e) {</span>
+<span class="nc" id="L392">            log.error(&quot;Error sending RuPay decline response&quot;, e);</span>
+<span class="fc" id="L393">        }</span>
+<span class="fc" id="L394">    }</span>
+
+    /**
+     * Copies essential fields from the original message to the response message.
+     *
+     * @param originalMsg The original ISO message
+     * @param responseMsg The response ISO message
+     */
+    protected void copyEssentialFields(ISOMsg originalMsg, ISOMsg responseMsg) {
+        try {
+            // Copy essential fields that should be present in response
+<span class="fc bfc" id="L405" title="All 2 branches covered.">            if (originalMsg.hasField(2)) responseMsg.set(2, originalMsg.getString(2));</span>
+<span class="fc bfc" id="L406" title="All 2 branches covered.">            if (originalMsg.hasField(3)) responseMsg.set(3, originalMsg.getString(3));</span>
+<span class="fc bfc" id="L407" title="All 2 branches covered.">            if (originalMsg.hasField(4)) responseMsg.set(4, originalMsg.getString(4));</span>
+<span class="fc bfc" id="L408" title="All 2 branches covered.">            if (originalMsg.hasField(7)) responseMsg.set(7, originalMsg.getString(7));</span>
+<span class="pc bpc" id="L409" title="1 of 2 branches missed.">            if (originalMsg.hasField(11)) responseMsg.set(11, originalMsg.getString(11));</span>
+<span class="fc bfc" id="L410" title="All 2 branches covered.">            if (originalMsg.hasField(12)) responseMsg.set(12, originalMsg.getString(12));</span>
+<span class="fc bfc" id="L411" title="All 2 branches covered.">            if (originalMsg.hasField(13)) responseMsg.set(13, originalMsg.getString(13));</span>
+<span class="fc bfc" id="L412" title="All 2 branches covered.">            if (originalMsg.hasField(14)) responseMsg.set(14, originalMsg.getString(14));</span>
+<span class="fc bfc" id="L413" title="All 2 branches covered.">            if (originalMsg.hasField(22)) responseMsg.set(22, originalMsg.getString(22));</span>
+<span class="fc bfc" id="L414" title="All 2 branches covered.">            if (originalMsg.hasField(25)) responseMsg.set(25, originalMsg.getString(25));</span>
+<span class="fc bfc" id="L415" title="All 2 branches covered.">            if (originalMsg.hasField(35)) responseMsg.set(35, originalMsg.getString(35));</span>
+<span class="fc bfc" id="L416" title="All 2 branches covered.">            if (originalMsg.hasField(37)) responseMsg.set(37, originalMsg.getString(37));</span>
+<span class="fc bfc" id="L417" title="All 2 branches covered.">            if (originalMsg.hasField(41)) responseMsg.set(41, originalMsg.getString(41));</span>
+<span class="fc bfc" id="L418" title="All 2 branches covered.">            if (originalMsg.hasField(42)) responseMsg.set(42, originalMsg.getString(42));</span>
+<span class="fc bfc" id="L419" title="All 2 branches covered.">            if (originalMsg.hasField(43)) responseMsg.set(43, originalMsg.getString(43));</span>
+<span class="fc bfc" id="L420" title="All 2 branches covered.">            if (originalMsg.hasField(49)) responseMsg.set(49, originalMsg.getString(49));</span>
+<span class="fc bfc" id="L421" title="All 2 branches covered.">            if (originalMsg.hasField(55)) responseMsg.set(55, originalMsg.getString(55));</span>
+<span class="nc" id="L422">        } catch (Exception e) {</span>
+<span class="nc" id="L423">            log.error(&quot;Error copying essential fields&quot;, e);</span>
+<span class="fc" id="L424">        }</span>
+<span class="fc" id="L425">    }</span>
+
+    /**
+     * Checks if the client is signed on.
+     *
+     * @return true if signed on, false otherwise
+     */
+    public boolean isSignedOn() {
+<span class="fc" id="L433">        return signedOn;</span>
+    }
+
+    /**
+     * Gets the RuPay client status information.
+     *
+     * @return A string describing the RuPay client status
+     */
+    public String getRuPayClientStatus() {
+<span class="fc" id="L442">        return String.format(&quot;RuPay Client - %s, Signed On: %s&quot;,</span>
+<span class="fc bfc" id="L443" title="All 2 branches covered.">                getConnectionStatus(), signedOn ? &quot;Yes&quot; : &quot;No&quot;);</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.14.202510111229</span></div></body></html>

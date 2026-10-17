@@ -1,0 +1,174 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>ThreadPoolConfig.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">switch</a> &gt; <a href="index.source.html" class="el_package">com.lps.isoswitch.config</a> &gt; <span class="el_source">ThreadPoolConfig.java</span></div><h1>ThreadPoolConfig.java</h1><pre class="source lang-java linenums">package com.lps.isoswitch.config;
+
+import org.springframework.context.annotation.Bean;
+import org.springframework.context.annotation.Configuration;
+import org.springframework.scheduling.concurrent.ThreadPoolTaskExecutor;
+
+import java.util.concurrent.Executor;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
+import jakarta.annotation.PreDestroy;
+
+/**
+ * Configuration class for thread pool settings.
+ * This class provides configuration for various thread pools
+ * used in the application for concurrent processing.
+ * 
+ * Virtual threads are used for I/O-bound operations to improve scalability
+ * and resource utilization, while traditional thread pools are maintained
+ * for CPU-intensive operations.
+ *
+ * @author Logicpoint Systems
+ * @version 2.0
+ * @since 2025-06-15
+ */
+@Configuration
+<span class="fc" id="L30">public class ThreadPoolConfig {</span>
+
+<span class="fc" id="L32">    private static final Logger log = LoggerFactory.getLogger(ThreadPoolConfig.class);</span>
+    private ExecutorService virtualThreadExecutor;
+    private ExecutorService cpuIntensiveExecutor;
+    private ExecutorService isoMessageExecutor;
+    private ExecutorService tcpConnectionExecutor;
+    private ExecutorService scheduledTaskExecutor;
+    private ThreadPoolTaskExecutor legacyThreadPoolExecutor;
+
+    /**
+     * Virtual thread executor for I/O-bound operations.
+     * Ideal for API calls, database operations, and network I/O.
+     * 
+     * @return Virtual thread executor service
+     */
+    @Bean(name = &quot;virtualThreadExecutor&quot;)
+    public ExecutorService virtualThreadExecutor() {
+<span class="fc" id="L48">        this.virtualThreadExecutor = Executors.newVirtualThreadPerTaskExecutor();</span>
+<span class="fc" id="L49">        return this.virtualThreadExecutor;</span>
+    }
+
+    /**
+     * Traditional thread pool executor for CPU-intensive operations.
+     * Used for message processing, data transformation, and calculations.
+     * 
+     * @return Traditional thread pool executor
+     */
+    @Bean(name = &quot;cpuIntensiveExecutor&quot;)
+    public ExecutorService cpuIntensiveExecutor() {
+<span class="fc" id="L60">        this.cpuIntensiveExecutor = Executors.newFixedThreadPool(</span>
+<span class="fc" id="L61">            Runtime.getRuntime().availableProcessors(),</span>
+            r -&gt; {
+<span class="nc" id="L63">                Thread t = new Thread(r, &quot;cpu-intensive-&quot;);</span>
+<span class="nc" id="L64">                t.setPriority(Thread.NORM_PRIORITY);</span>
+<span class="nc" id="L65">                return t;</span>
+            }
+        );
+<span class="fc" id="L68">        return this.cpuIntensiveExecutor;</span>
+    }
+
+    /**
+     * ISO message processing executor using virtual threads.
+     * Optimized for I/O-bound ISO8583 message processing.
+     * 
+     * @return Virtual thread executor for ISO messages
+     */
+    @Bean(name = &quot;isoMessageExecutor&quot;)
+    public ExecutorService isoMessageExecutor() {
+<span class="fc" id="L79">        this.isoMessageExecutor = Executors.newVirtualThreadPerTaskExecutor();</span>
+<span class="fc" id="L80">        return this.isoMessageExecutor;</span>
+    }
+
+    /**
+     * TCP connection management executor using virtual threads.
+     * Handles connection establishment, maintenance, and cleanup.
+     * 
+     * @return Virtual thread executor for TCP operations
+     */
+    @Bean(name = &quot;tcpConnectionExecutor&quot;)
+    public ExecutorService tcpConnectionExecutor() {
+<span class="fc" id="L91">        this.tcpConnectionExecutor = Executors.newVirtualThreadPerTaskExecutor();</span>
+<span class="fc" id="L92">        return this.tcpConnectionExecutor;</span>
+    }
+
+    /**
+     * Scheduled task executor using virtual threads.
+     * For periodic tasks like health checks, monitoring, and cleanup.
+     * 
+     * @return Virtual thread scheduled executor
+     */
+    @Bean(name = &quot;scheduledTaskExecutor&quot;)
+    public ExecutorService scheduledTaskExecutor() {
+<span class="fc" id="L103">        this.scheduledTaskExecutor = Executors.newVirtualThreadPerTaskExecutor();</span>
+<span class="fc" id="L104">        return this.scheduledTaskExecutor;</span>
+    }
+
+    /**
+     * Legacy thread pool executor for backward compatibility.
+     * Maintained for components that haven't been migrated yet.
+     * 
+     * @return Traditional thread pool task executor
+     */
+    @Bean(name = &quot;legacyThreadPoolExecutor&quot;)
+    public Executor legacyThreadPoolExecutor() {
+<span class="fc" id="L115">        this.legacyThreadPoolExecutor = new ThreadPoolTaskExecutor();</span>
+<span class="fc" id="L116">        this.legacyThreadPoolExecutor.setCorePoolSize(10);</span>
+<span class="fc" id="L117">        this.legacyThreadPoolExecutor.setMaxPoolSize(20);</span>
+<span class="fc" id="L118">        this.legacyThreadPoolExecutor.setQueueCapacity(500);</span>
+<span class="fc" id="L119">        this.legacyThreadPoolExecutor.setThreadNamePrefix(&quot;legacy-&quot;);</span>
+<span class="fc" id="L120">        this.legacyThreadPoolExecutor.initialize();</span>
+<span class="fc" id="L121">        return this.legacyThreadPoolExecutor;</span>
+    }
+
+    /**
+     * Shutdown hook for graceful cleanup of thread pools.
+     */
+    @PreDestroy
+    public void shutdown() {
+<span class="fc" id="L129">        log.info(&quot;Shutting down ThreadPoolConfig...&quot;);</span>
+        
+        try {
+<span class="fc" id="L132">            shutdownExecutor(&quot;virtualThreadExecutor&quot;, virtualThreadExecutor);</span>
+<span class="fc" id="L133">            shutdownExecutor(&quot;cpuIntensiveExecutor&quot;, cpuIntensiveExecutor);</span>
+<span class="fc" id="L134">            shutdownExecutor(&quot;isoMessageExecutor&quot;, isoMessageExecutor);</span>
+<span class="fc" id="L135">            shutdownExecutor(&quot;tcpConnectionExecutor&quot;, tcpConnectionExecutor);</span>
+<span class="fc" id="L136">            shutdownExecutor(&quot;scheduledTaskExecutor&quot;, scheduledTaskExecutor);</span>
+<span class="fc" id="L137">            shutdownLegacyExecutor();</span>
+            
+<span class="fc" id="L139">            log.info(&quot;ThreadPoolConfig shutdown completed&quot;);</span>
+<span class="nc" id="L140">        } catch (Exception e) {</span>
+<span class="nc" id="L141">            log.error(&quot;Error during ThreadPoolConfig shutdown&quot;, e);</span>
+<span class="fc" id="L142">        }</span>
+<span class="fc" id="L143">    }</span>
+
+    /**
+     * Shuts down a specific executor by name.
+     *
+     * @param executorName The name of the executor to shutdown
+     */
+    private void shutdownExecutor(String executorName, ExecutorService executorService) {
+        try {
+<span class="pc bpc" id="L152" title="1 of 2 branches missed.">            if (executorService == null) {</span>
+<span class="nc" id="L153">                return;</span>
+            }
+<span class="fc" id="L155">            log.info(&quot;Shutting down executor: {}&quot;, executorName);</span>
+<span class="fc" id="L156">            executorService.shutdown();</span>
+<span class="pc bpc" id="L157" title="1 of 2 branches missed.">            if (!executorService.awaitTermination(5, java.util.concurrent.TimeUnit.SECONDS)) {</span>
+<span class="nc" id="L158">                log.warn(&quot;Executor {} did not terminate in time, forcing shutdown&quot;, executorName);</span>
+<span class="nc" id="L159">                executorService.shutdownNow();</span>
+            }
+<span class="nc" id="L161">        } catch (Exception e) {</span>
+<span class="nc" id="L162">            log.error(&quot;Error shutting down executor: {}&quot;, executorName, e);</span>
+<span class="fc" id="L163">        }</span>
+<span class="fc" id="L164">    }</span>
+
+    private void shutdownLegacyExecutor() {
+<span class="pc bpc" id="L167" title="1 of 2 branches missed.">        if (legacyThreadPoolExecutor == null) {</span>
+<span class="nc" id="L168">            return;</span>
+        }
+<span class="fc" id="L170">        log.info(&quot;Shutting down executor: legacyThreadPoolExecutor&quot;);</span>
+<span class="fc" id="L171">        legacyThreadPoolExecutor.shutdown();</span>
+<span class="fc" id="L172">    }</span>
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.14.202510111229</span></div></body></html>

@@ -1,0 +1,196 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>ConnectionStatusService.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">switch</a> &gt; <a href="index.source.html" class="el_package">com.lps.isoswitch.service</a> &gt; <span class="el_source">ConnectionStatusService.java</span></div><h1>ConnectionStatusService.java</h1><pre class="source lang-java linenums">package com.lps.isoswitch.service;
+
+import com.lps.isoswitch.config.SchemeConfig;
+import com.lps.isoswitch.utils.Enums.SwitchDestinationEnum;
+import io.micrometer.core.instrument.Gauge;
+import io.micrometer.core.instrument.MeterRegistry;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+import org.springframework.beans.factory.annotation.Value;
+import org.springframework.stereotype.Service;
+
+import java.time.LocalDateTime;
+import java.util.Map;
+import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.concurrent.atomic.AtomicInteger;
+
+/**
+ * Service for tracking connection and sign-on status of different schemes.
+ * This service maintains the state of connections and sign-on status,
+ * and provides metrics for monitoring.
+ *
+ * @author Logicpoint Systems
+ * @version 1.0
+ * @since 2025-06-15
+ */
+@Service
+public class ConnectionStatusService {
+<span class="fc" id="L29">    private static final Logger log = LoggerFactory.getLogger(ConnectionStatusService.class);</span>
+
+    // Connection status tracking
+<span class="fc" id="L32">    private final static Map&lt;SwitchDestinationEnum, AtomicBoolean&gt; connectionStatus = new ConcurrentHashMap&lt;&gt;();</span>
+<span class="fc" id="L33">    private final static Map&lt;SwitchDestinationEnum, AtomicBoolean&gt; signOnStatus = new ConcurrentHashMap&lt;&gt;();</span>
+<span class="fc" id="L34">    private final static Map&lt;SwitchDestinationEnum, LocalDateTime&gt; lastSignOnTime = new ConcurrentHashMap&lt;&gt;();</span>
+<span class="fc" id="L35">    private final static Map&lt;SwitchDestinationEnum, LocalDateTime&gt; lastSignOffTime = new ConcurrentHashMap&lt;&gt;();</span>
+    
+    // Metrics tracking
+<span class="fc" id="L38">    private final static Map&lt;SwitchDestinationEnum, AtomicInteger&gt; totalTransactions = new ConcurrentHashMap&lt;&gt;();</span>
+<span class="fc" id="L39">    private final static Map&lt;SwitchDestinationEnum, AtomicInteger&gt; successfulTransactions = new ConcurrentHashMap&lt;&gt;();</span>
+<span class="fc" id="L40">    private final static Map&lt;SwitchDestinationEnum, AtomicInteger&gt; failedTransactions = new ConcurrentHashMap&lt;&gt;();</span>
+<span class="fc" id="L41">    private final static Map&lt;SwitchDestinationEnum, LocalDateTime&gt; lastTransactionTime = new ConcurrentHashMap&lt;&gt;();</span>
+
+    public ConnectionStatusService(
+            MeterRegistry meterRegistry,
+            SchemeConfig schemeConfig,
+            @Value(&quot;${app.site-id:unknown}&quot;) String siteId,
+<span class="fc" id="L47">            @Value(&quot;${app.listener-id:unknown}&quot;) String listenerId) {</span>
+<span class="fc" id="L48">        SwitchDestinationEnum scheme = schemeConfig.getActiveScheme();</span>
+<span class="fc" id="L49">        SchemeConfig.BaseConfig schemeSettings = schemeConfig.getConfig(scheme);</span>
+<span class="pc bpc" id="L50" title="1 of 4 branches missed.">        String connectionId = schemeSettings == null || isBlank(schemeSettings.getConnectionId())</span>
+<span class="fc" id="L51">                ? scheme.name()</span>
+<span class="fc" id="L52">                : schemeSettings.getConnectionId();</span>
+<span class="pc bpc" id="L53" title="1 of 4 branches missed.">        String endpointHost = schemeSettings == null || isBlank(schemeSettings.getHost())</span>
+<span class="fc" id="L54">                ? &quot;unknown&quot;</span>
+<span class="fc" id="L55">                : schemeSettings.getHost();</span>
+<span class="pc bpc" id="L56" title="1 of 4 branches missed.">        String endpointPort = schemeSettings == null || schemeSettings.getPort() == null</span>
+<span class="fc" id="L57">                ? &quot;unknown&quot;</span>
+<span class="fc" id="L58">                : schemeSettings.getPort().toString();</span>
+
+<span class="fc" id="L60">        AtomicBoolean connected = connectionStatus.computeIfAbsent(</span>
+<span class="fc" id="L61">                scheme, ignored -&gt; new AtomicBoolean(false));</span>
+<span class="fc" id="L62">        AtomicBoolean signedOn = signOnStatus.computeIfAbsent(</span>
+<span class="fc" id="L63">                scheme, ignored -&gt; new AtomicBoolean(false));</span>
+
+<span class="fc" id="L65">        Gauge.builder(&quot;switch.endpoint.tcp.connected&quot;, connected,</span>
+<span class="nc bnc" id="L66" title="All 2 branches missed.">                        status -&gt; status.get() ? 1.0 : 0.0)</span>
+<span class="fc" id="L67">                .description(&quot;TCP connection status: 1=connected, 0=disconnected&quot;)</span>
+<span class="fc" id="L68">                .tag(&quot;site_id&quot;, siteId)</span>
+<span class="fc" id="L69">                .tag(&quot;listener_id&quot;, listenerId)</span>
+<span class="fc" id="L70">                .tag(&quot;connection_id&quot;, connectionId)</span>
+<span class="fc" id="L71">                .tag(&quot;scheme&quot;, scheme.name())</span>
+<span class="fc" id="L72">                .tag(&quot;endpoint_host&quot;, endpointHost)</span>
+<span class="fc" id="L73">                .tag(&quot;endpoint_port&quot;, endpointPort)</span>
+<span class="fc" id="L74">                .register(meterRegistry);</span>
+
+<span class="fc" id="L76">        Gauge.builder(&quot;switch.endpoint.signed.on&quot;, signedOn,</span>
+<span class="nc bnc" id="L77" title="All 2 branches missed.">                        status -&gt; status.get() ? 1.0 : 0.0)</span>
+<span class="fc" id="L78">                .description(&quot;Scheme sign-on status: 1=signed on, 0=signed off&quot;)</span>
+<span class="fc" id="L79">                .tag(&quot;site_id&quot;, siteId)</span>
+<span class="fc" id="L80">                .tag(&quot;listener_id&quot;, listenerId)</span>
+<span class="fc" id="L81">                .tag(&quot;connection_id&quot;, connectionId)</span>
+<span class="fc" id="L82">                .tag(&quot;scheme&quot;, scheme.name())</span>
+<span class="fc" id="L83">                .tag(&quot;endpoint_host&quot;, endpointHost)</span>
+<span class="fc" id="L84">                .tag(&quot;endpoint_port&quot;, endpointPort)</span>
+<span class="fc" id="L85">                .register(meterRegistry);</span>
+
+<span class="fc" id="L87">        Gauge.builder(&quot;switch.endpoint.ready&quot;, this,</span>
+<span class="nc bnc" id="L88" title="All 2 branches missed.">                        ignored -&gt; isReadyForTransactions(scheme) ? 1.0 : 0.0)</span>
+<span class="fc" id="L89">                .description(&quot;Endpoint transaction readiness: 1=ready, 0=not ready&quot;)</span>
+<span class="fc" id="L90">                .tag(&quot;site_id&quot;, siteId)</span>
+<span class="fc" id="L91">                .tag(&quot;listener_id&quot;, listenerId)</span>
+<span class="fc" id="L92">                .tag(&quot;connection_id&quot;, connectionId)</span>
+<span class="fc" id="L93">                .tag(&quot;scheme&quot;, scheme.name())</span>
+<span class="fc" id="L94">                .tag(&quot;endpoint_host&quot;, endpointHost)</span>
+<span class="fc" id="L95">                .tag(&quot;endpoint_port&quot;, endpointPort)</span>
+<span class="fc" id="L96">                .register(meterRegistry);</span>
+<span class="fc" id="L97">    }</span>
+
+    /**
+     * Updates the connection status for a scheme.
+     *
+     * @param scheme The scheme to update
+     * @param isConnected The new connection status
+     */
+    public void updateConnectionStatus(SwitchDestinationEnum scheme, boolean isConnected) {
+<span class="pc" id="L106">        connectionStatus.computeIfAbsent(scheme, k -&gt; new AtomicBoolean(false))</span>
+<span class="fc" id="L107">                       .set(isConnected);</span>
+<span class="fc bfc" id="L108" title="All 2 branches covered.">        if (!isConnected) {</span>
+<span class="pc" id="L109">            signOnStatus.computeIfAbsent(scheme, k -&gt; new AtomicBoolean(false))</span>
+<span class="fc" id="L110">                    .set(false);</span>
+        }
+<span class="fc" id="L112">        log.info(&quot;Connection status updated for {}: {}&quot;, scheme, isConnected);</span>
+<span class="fc" id="L113">    }</span>
+
+    /**
+     * Updates the sign-on status for a scheme.
+     *
+     * @param scheme The scheme to update
+     * @param isSignedOn The new sign-on status
+     */
+    public void updateSignOnStatus(SwitchDestinationEnum scheme, boolean isSignedOn) {
+<span class="pc" id="L122">        signOnStatus.computeIfAbsent(scheme, k -&gt; new AtomicBoolean(false))</span>
+<span class="fc" id="L123">                   .set(isSignedOn);</span>
+<span class="fc bfc" id="L124" title="All 2 branches covered.">        if (isSignedOn) {</span>
+<span class="fc" id="L125">            lastSignOnTime.put(scheme, LocalDateTime.now());</span>
+        } else {
+<span class="fc" id="L127">            lastSignOffTime.put(scheme, LocalDateTime.now());</span>
+        }
+<span class="fc" id="L129">        log.info(&quot;Sign-on status updated for {}: {}&quot;, scheme, isSignedOn);</span>
+<span class="fc" id="L130">    }</span>
+
+    /**
+     * Checks if a scheme is both connected and signed on.
+     *
+     * @param scheme The scheme to check
+     * @return true if both connected and signed on, false otherwise
+     */
+    public boolean isReadyForTransactions(SwitchDestinationEnum scheme) {
+<span class="fc" id="L139">        boolean isConnected = connectionStatus.getOrDefault(scheme, new AtomicBoolean(false)).get();</span>
+<span class="fc" id="L140">        boolean isSignedOn = signOnStatus.getOrDefault(scheme, new AtomicBoolean(false)).get();</span>
+<span class="fc bfc" id="L141" title="All 4 branches covered.">        return isConnected &amp;&amp; isSignedOn;</span>
+    }
+
+    /**
+     * Records a transaction attempt and its result.
+     *
+     * @param scheme The scheme where the transaction occurred
+     * @param isSuccessful Whether the transaction was successful
+     */
+    public void recordTransaction(SwitchDestinationEnum scheme, boolean isSuccessful) {
+<span class="fc" id="L151">        totalTransactions.computeIfAbsent(scheme, k -&gt; new AtomicInteger(0)).incrementAndGet();</span>
+<span class="fc bfc" id="L152" title="All 2 branches covered.">        if (isSuccessful) {</span>
+<span class="fc" id="L153">            successfulTransactions.computeIfAbsent(scheme, k -&gt; new AtomicInteger(0)).incrementAndGet();</span>
+        } else {
+<span class="fc" id="L155">            failedTransactions.computeIfAbsent(scheme, k -&gt; new AtomicInteger(0)).incrementAndGet();</span>
+        }
+<span class="fc" id="L157">        lastTransactionTime.put(scheme, LocalDateTime.now());</span>
+<span class="fc" id="L158">    }</span>
+
+    /**
+     * Gets the current metrics for a scheme.
+     *
+     * @param scheme The scheme to get metrics for
+     * @return A map containing the metrics
+     */
+    public Map&lt;String, Object&gt; getMetrics(SwitchDestinationEnum scheme) {
+<span class="fc" id="L167">        Map&lt;String, Object&gt; metrics = new ConcurrentHashMap&lt;&gt;();</span>
+<span class="fc" id="L168">        metrics.put(&quot;isConnected&quot;, connectionStatus.getOrDefault(scheme, new AtomicBoolean(false)).get());</span>
+<span class="fc" id="L169">        metrics.put(&quot;isSignedOn&quot;, signOnStatus.getOrDefault(scheme, new AtomicBoolean(false)).get());</span>
+        //metrics.put(&quot;lastSignOnTime&quot;, lastSignOnTime.get(scheme));
+       // metrics.put(&quot;lastSignOffTime&quot;, lastSignOffTime.get(scheme));
+<span class="fc" id="L172">        metrics.put(&quot;totalTransactions&quot;, totalTransactions.getOrDefault(scheme, new AtomicInteger(0)).get());</span>
+<span class="fc" id="L173">        metrics.put(&quot;successfulTransactions&quot;, successfulTransactions.getOrDefault(scheme, new AtomicInteger(0)).get());</span>
+<span class="fc" id="L174">        metrics.put(&quot;failedTransactions&quot;, failedTransactions.getOrDefault(scheme, new AtomicInteger(0)).get());</span>
+       // metrics.put(&quot;lastTransactionTime&quot;, lastTransactionTime.get(scheme));
+<span class="fc" id="L176">        return metrics;</span>
+    }
+
+    /**
+     * Gets the current metrics for all schemes.
+     *
+     * @return A map containing metrics for all schemes
+     */
+    public Map&lt;SwitchDestinationEnum, Map&lt;String, Object&gt;&gt; getAllMetrics() {
+<span class="fc" id="L185">        Map&lt;SwitchDestinationEnum, Map&lt;String, Object&gt;&gt; allMetrics = new ConcurrentHashMap&lt;&gt;();</span>
+<span class="fc bfc" id="L186" title="All 2 branches covered.">        for (SwitchDestinationEnum scheme : SwitchDestinationEnum.values()) {</span>
+<span class="fc" id="L187">            allMetrics.put(scheme, getMetrics(scheme));</span>
+        }
+<span class="fc" id="L189">        return allMetrics;</span>
+    }
+
+    private boolean isBlank(String value) {
+<span class="pc bpc" id="L193" title="1 of 4 branches missed.">        return value == null || value.isBlank();</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.14.202510111229</span></div></body></html>

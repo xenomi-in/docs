@@ -1,0 +1,184 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>AsciiLengthChannel.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">switch</a> &gt; <a href="index.source.html" class="el_package">com.lps.isoswitch.tcpconnector.channel</a> &gt; <span class="el_source">AsciiLengthChannel.java</span></div><h1>AsciiLengthChannel.java</h1><pre class="source lang-java linenums">package com.lps.isoswitch.tcpconnector.channel;
+
+import io.netty.channel.ChannelHandlerContext;
+import org.jpos.iso.ISOMsg;
+import org.jpos.iso.ISOException;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+import com.lps.isoswitch.config.RawDataLogging;
+
+/**
+ * ASCII Length Channel implementation for ISO8583 message handling.
+ * This channel uses ASCII-encoded length fields similar to jPOS ASCII channel.
+ *
+ * Features:
+ * - ASCII length field (e.g., &quot;0128&quot; for 128 bytes)
+ * - Configurable length field size (typically 4 characters)
+ * - Length field is separate from message data
+ * - Compatible with jPOS ASCII channel format
+ *
+ * @author Logicpoint Systems
+ * @version 1.0
+ * @since 2025-06-15
+ */
+public class AsciiLengthChannel extends AbstractISOChannel {
+
+<span class="fc" id="L26">    private static final Logger log = LoggerFactory.getLogger(AsciiLengthChannel.class);</span>
+
+    // Default ASCII length configuration
+    private static final int DEFAULT_ASCII_LENGTH_SIZE = 4;
+    private static final boolean DEFAULT_INCLUDE_LENGTH_FIELD = false;
+    private static final boolean DEFAULT_LENGTH_IN_ASCII = true;
+    private static final boolean DEFAULT_LENGTH_IN_HEX = false;
+
+    /**
+     * Constructs a new AsciiLengthChannel with default configuration.
+     */
+    public AsciiLengthChannel() {
+<span class="fc" id="L38">        super();</span>
+<span class="fc" id="L39">        configureAsciiLength();</span>
+<span class="fc" id="L40">    }</span>
+
+    /**
+     * Constructs a new AsciiLengthChannel with specified maximum message length.
+     *
+     * @param maxMessageLength The maximum message length in bytes
+     */
+    public AsciiLengthChannel(int maxMessageLength) {
+<span class="fc" id="L48">        super(maxMessageLength);</span>
+<span class="fc" id="L49">        configureAsciiLength();</span>
+<span class="fc" id="L50">    }</span>
+
+    /**
+     * Constructs a new AsciiLengthChannel with custom length field size.
+     *
+     * @param maxMessageLength The maximum message length in bytes
+     * @param lengthFieldSize The size of the ASCII length field
+     */
+    public AsciiLengthChannel(int maxMessageLength, int lengthFieldSize) {
+<span class="fc" id="L59">        super(maxMessageLength);</span>
+<span class="fc" id="L60">        setLengthFieldConfig(lengthFieldSize, DEFAULT_INCLUDE_LENGTH_FIELD,</span>
+                           DEFAULT_LENGTH_IN_HEX, DEFAULT_LENGTH_IN_ASCII);
+<span class="fc" id="L62">    }</span>
+
+    /**
+     * Configures the channel for ASCII length handling.
+     */
+    private void configureAsciiLength() {
+<span class="fc" id="L68">        setLengthFieldConfig(DEFAULT_ASCII_LENGTH_SIZE, DEFAULT_INCLUDE_LENGTH_FIELD,</span>
+                           DEFAULT_LENGTH_IN_HEX, DEFAULT_LENGTH_IN_ASCII);
+<span class="fc" id="L70">    }</span>
+
+    /**
+     * Called when a connection is established.
+     *
+     * @param ctx The channel handler context
+     */
+    @Override
+    protected void onConnect(ChannelHandlerContext ctx) {
+<span class="fc" id="L79">        log.info(&quot;ASCII Length Channel connected to: {}&quot;, ctx.channel().remoteAddress());</span>
+<span class="fc" id="L80">    }</span>
+
+    /**
+     * Called when a connection is closed.
+     *
+     * @param ctx The channel handler context
+     */
+    @Override
+    protected void onDisconnect(ChannelHandlerContext ctx) {
+<span class="fc" id="L89">        log.info(&quot;ASCII Length Channel disconnected from: {}&quot;, ctx.channel().remoteAddress());</span>
+<span class="fc" id="L90">    }</span>
+
+    /**
+     * Called when a complete ISO8583 message is received.
+     *
+     * @param ctx The channel handler context
+     * @param isoMsg The received ISO8583 message
+     */
+    @Override
+    protected void onMessage(ChannelHandlerContext ctx, ISOMsg isoMsg) {
+        try {
+<span class="fc" id="L101">        log.info(&quot;Received ISO8583 message via ASCII Length Channel - MTI: {}, STAN: {}&quot;,</span>
+<span class="fc" id="L102">                isoMsg.getMTI(), isoMsg.getString(11));</span>
+
+        // Log message details for debugging
+<span class="fc" id="L105">        RawDataLogging.isoMessage(&quot;ASCII channel ISO message&quot;, isoMsg);</span>
+
+        // Delegate to message handler or process directly
+<span class="fc" id="L108">        handleISOMessage(ctx, isoMsg);</span>
+<span class="nc" id="L109">        } catch (ISOException e) {</span>
+<span class="nc" id="L110">            log.error(&quot;Error processing ISO8583 message&quot;, e);</span>
+<span class="fc" id="L111">        }</span>
+<span class="fc" id="L112">    }</span>
+
+    /**
+     * Called when an error occurs.
+     *
+     * @param ctx The channel handler context
+     * @param cause The error
+     */
+    @Override
+    protected void onError(ChannelHandlerContext ctx, Throwable cause) {
+<span class="fc" id="L122">        log.error(&quot;ASCII Length Channel error&quot;, cause);</span>
+        // Close the connection on error
+<span class="fc" id="L124">        ctx.close();</span>
+<span class="fc" id="L125">    }</span>
+
+    /**
+     * Handles the received ISO8583 message.
+     * This method should be overridden by subclasses to provide specific message handling.
+     *
+     * @param ctx The channel handler context
+     * @param isoMsg The ISO8583 message to handle
+     */
+    protected void handleISOMessage(ChannelHandlerContext ctx, ISOMsg isoMsg) {
+        try {
+            // Default implementation - log the message
+<span class="fc" id="L137">            log.info(&quot;Handling ISO8583 message - MTI: {}&quot;, isoMsg.getMTI());</span>
+<span class="nc" id="L138">        } catch (ISOException e) {</span>
+<span class="nc" id="L139">            log.error(&quot;Error processing ISO8583 message&quot;, e);</span>
+<span class="fc" id="L140">        }</span>
+<span class="fc" id="L141">    }</span>
+
+    /**
+     * Sends an ISO8583 message with ASCII length prefixing.
+     *
+     * @param ctx The channel handler context
+     * @param isoMsg The ISO8583 message to send
+     * @throws Exception if sending fails
+     */
+    public void sendISOMessage(ChannelHandlerContext ctx, ISOMsg isoMsg) throws Exception, ISOException {
+<span class="nc bnc" id="L151" title="All 2 branches missed.">        if (packager == null) {</span>
+<span class="nc" id="L152">            throw new IllegalStateException(&quot;Packager not set&quot;);</span>
+        }
+
+        try {
+<span class="nc" id="L156">            sendMessage(ctx, isoMsg);</span>
+<span class="nc" id="L157">            log.info(&quot;Sent ISO8583 message via ASCII Length Channel - MTI: {}, STAN: {}&quot;,</span>
+<span class="nc" id="L158">                    isoMsg.getMTI(), isoMsg.getString(11));</span>
+<span class="nc" id="L159">        } catch (Exception e) {</span>
+<span class="nc" id="L160">            log.error(&quot;Error sending ISO8583 message&quot;, e);</span>
+<span class="nc" id="L161">            throw e;</span>
+<span class="nc" id="L162">        }</span>
+<span class="nc" id="L163">    }</span>
+
+    /**
+     * Gets the channel type description.
+     *
+     * @return The channel type description
+     */
+    public String getChannelType() {
+<span class="fc" id="L171">        return &quot;ASCII Length Channel&quot;;</span>
+    }
+
+    /**
+     * Gets the current length field configuration.
+     *
+     * @return A string describing the length field configuration
+     */
+    public String getLengthFieldConfig() {
+<span class="fc" id="L180">        return String.format(&quot;ASCII Length Field: %d bytes, Include: %s&quot;,</span>
+<span class="fc" id="L181">                           lengthFieldSize, includeLengthField);</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.14.202510111229</span></div></body></html>

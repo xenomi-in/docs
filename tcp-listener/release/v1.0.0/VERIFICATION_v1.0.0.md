@@ -25,6 +25,6 @@ The container used the `test` profile and `app.mode=server`. It did not contact 
 
 ## Evidence locations
 
-Local generated evidence is under `target/release/`: `build-manifest.json`, `SHA256SUMS`, the JAR, `test-reports.tar.gz`, Maven output, image-build metadata, image-check output, image identity, and application smoke-test logs. It is ignored by Git and deleted by `mvn clean`; retain or upload it separately if needed. Earlier pre-correction evidence remains under ignored `release-assets/v1.0.0/` and must not be confused with this candidate's results.
+In the source repository, local generated evidence is under `target/release/`: `build-manifest.json`, `SHA256SUMS`, the JAR, `test-reports.tar.gz`, Maven output, image-build metadata, image-check output, image identity, and application smoke-test logs. It is ignored by Git and deleted by `mvn clean`; retain or upload it separately if needed. Earlier pre-correction evidence remains under ignored `release-assets/v1.0.0/` in the source repository; a [copy is bundled here](test-report/v1.0.0-test-reports.zip) and must not be confused with this candidate's results.
 
 The workflow bundles equivalent evidence with the committed revision and CI run URL, saves an image archive, and attaches successful tag builds to a draft GitHub Release. Its GitHub execution has not yet been verified. Review the [release process](RELEASE_PROCESS.md) and [compatibility register](RELEASE_COMPATIBILITY.md) before promotion.

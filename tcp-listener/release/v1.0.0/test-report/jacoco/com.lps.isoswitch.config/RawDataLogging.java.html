@@ -1,0 +1,79 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>RawDataLogging.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">switch</a> &gt; <a href="index.source.html" class="el_package">com.lps.isoswitch.config</a> &gt; <span class="el_source">RawDataLogging.java</span></div><h1>RawDataLogging.java</h1><pre class="source lang-java linenums">package com.lps.isoswitch.config;
+
+import java.io.ByteArrayOutputStream;
+import java.io.PrintStream;
+import java.nio.charset.StandardCharsets;
+import java.util.Arrays;
+
+import org.jpos.iso.ISOMsg;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+import org.springframework.beans.factory.annotation.Value;
+import org.springframework.core.env.Environment;
+import org.springframework.stereotype.Component;
+
+import jakarta.annotation.PostConstruct;
+
+/**
+ * Explicitly gated raw payment-message logging for local troubleshooting.
+ * Raw logging is never available while the {@code prod} profile is active.
+ */
+@Component
+public final class RawDataLogging {
+
+<span class="fc" id="L24">    private static final Logger rawLog = LoggerFactory.getLogger(&quot;com.lps.isoswitch.rawdata&quot;);</span>
+    private static volatile boolean enabled;
+
+    private final boolean requested;
+    private final Environment environment;
+
+    public RawDataLogging(
+            @Value(&quot;${security.raw-data-logging.enabled:false}&quot;) boolean requested,
+<span class="fc" id="L32">            Environment environment) {</span>
+<span class="fc" id="L33">        this.requested = requested;</span>
+<span class="fc" id="L34">        this.environment = environment;</span>
+<span class="fc" id="L35">    }</span>
+
+    @PostConstruct
+    void configure() {
+<span class="fc" id="L39">        enabled = false;</span>
+<span class="fc" id="L40">        boolean production = Arrays.stream(environment.getActiveProfiles())</span>
+<span class="fc" id="L41">                .anyMatch(&quot;prod&quot;::equalsIgnoreCase);</span>
+<span class="pc bpc" id="L42" title="1 of 4 branches missed.">        if (production &amp;&amp; requested) {</span>
+<span class="fc" id="L43">            throw new IllegalStateException(</span>
+                    &quot;Raw payment-data logging cannot be enabled with the prod profile&quot;);
+        }
+<span class="pc bpc" id="L46" title="3 of 4 branches missed.">        enabled = requested &amp;&amp; !production;</span>
+<span class="pc bpc" id="L47" title="1 of 2 branches missed.">        if (enabled) {</span>
+<span class="nc" id="L48">            rawLog.warn(&quot;RAW PAYMENT-DATA LOGGING IS ENABLED FOR NON-PRODUCTION TROUBLESHOOTING&quot;);</span>
+        }
+<span class="fc" id="L50">    }</span>
+
+    public static boolean isEnabled() {
+<span class="pc bpc" id="L53" title="3 of 4 branches missed.">        return enabled &amp;&amp; rawLog.isDebugEnabled();</span>
+    }
+
+    public static void bytes(String label, byte[] value) {
+<span class="pc bpc" id="L57" title="3 of 4 branches missed.">        if (isEnabled() &amp;&amp; value != null) {</span>
+<span class="nc" id="L58">            rawLog.debug(&quot;{}: {}&quot;, label, new String(value, StandardCharsets.ISO_8859_1));</span>
+        }
+<span class="fc" id="L60">    }</span>
+
+    public static void object(String label, Object value) {
+<span class="pc bpc" id="L63" title="1 of 2 branches missed.">        if (isEnabled()) {</span>
+<span class="nc" id="L64">            rawLog.debug(&quot;{}: {}&quot;, label, value);</span>
+        }
+<span class="fc" id="L66">    }</span>
+
+    public static void isoMessage(String label, ISOMsg message) {
+<span class="pc bpc" id="L69" title="3 of 4 branches missed.">        if (!isEnabled() || message == null) {</span>
+<span class="fc" id="L70">            return;</span>
+        }
+<span class="nc" id="L72">        ByteArrayOutputStream output = new ByteArrayOutputStream();</span>
+<span class="nc" id="L73">        try (PrintStream stream = new PrintStream(output, true, StandardCharsets.UTF_8)) {</span>
+<span class="nc" id="L74">            message.dump(stream, label + &quot;: &quot;);</span>
+        }
+<span class="nc" id="L76">        rawLog.debug(&quot;{}&quot;, output.toString(StandardCharsets.UTF_8));</span>
+<span class="nc" id="L77">    }</span>
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.14.202510111229</span></div></body></html>

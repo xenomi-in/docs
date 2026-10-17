@@ -1,0 +1,57 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>SwitchCoreOAuthExchangeFilter.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">switch</a> &gt; <a href="index.source.html" class="el_package">com.lps.isoswitch.config</a> &gt; <span class="el_source">SwitchCoreOAuthExchangeFilter.java</span></div><h1>SwitchCoreOAuthExchangeFilter.java</h1><pre class="source lang-java linenums">package com.lps.isoswitch.config;
+
+import java.util.Collections;
+
+import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
+import org.springframework.security.core.Authentication;
+import org.springframework.security.oauth2.client.OAuth2AuthorizeRequest;
+import org.springframework.security.oauth2.client.OAuth2AuthorizedClient;
+import org.springframework.security.oauth2.client.OAuth2AuthorizedClientManager;
+import org.springframework.web.reactive.function.client.ClientRequest;
+import org.springframework.web.reactive.function.client.ClientResponse;
+import org.springframework.web.reactive.function.client.ExchangeFilterFunction;
+import org.springframework.web.reactive.function.client.ExchangeFunction;
+
+import reactor.core.publisher.Mono;
+import reactor.core.scheduler.Schedulers;
+
+/** Adds a cached client-credentials token to background calls to Switch-core. */
+public final class SwitchCoreOAuthExchangeFilter implements ExchangeFilterFunction {
+
+    static final String REGISTRATION_ID = &quot;switch-core&quot;;
+<span class="fc" id="L22">    private static final Authentication SERVICE_PRINCIPAL =</span>
+            new UsernamePasswordAuthenticationToken(
+<span class="fc" id="L24">                    &quot;tcp-listener-service&quot;, &quot;N/A&quot;, Collections.emptyList());</span>
+
+    private final OAuth2AuthorizedClientManager authorizedClientManager;
+
+<span class="fc" id="L28">    public SwitchCoreOAuthExchangeFilter(OAuth2AuthorizedClientManager authorizedClientManager) {</span>
+<span class="fc" id="L29">        this.authorizedClientManager = authorizedClientManager;</span>
+<span class="fc" id="L30">    }</span>
+
+    @Override
+    public Mono&lt;ClientResponse&gt; filter(ClientRequest request, ExchangeFunction next) {
+<span class="fc" id="L34">        return Mono.fromCallable(this::authorize)</span>
+<span class="fc" id="L35">                .subscribeOn(Schedulers.boundedElastic())</span>
+<span class="fc" id="L36">                .flatMap(client -&gt; {</span>
+<span class="fc" id="L37">                    ClientRequest authenticatedRequest = ClientRequest.from(request)</span>
+<span class="fc" id="L38">                            .headers(headers -&gt; headers.setBearerAuth(</span>
+<span class="fc" id="L39">                                    client.getAccessToken().getTokenValue()))</span>
+<span class="fc" id="L40">                            .build();</span>
+<span class="fc" id="L41">                    return next.exchange(authenticatedRequest);</span>
+                });
+    }
+
+    private OAuth2AuthorizedClient authorize() {
+<span class="fc" id="L46">        OAuth2AuthorizeRequest request = OAuth2AuthorizeRequest</span>
+<span class="fc" id="L47">                .withClientRegistrationId(REGISTRATION_ID)</span>
+<span class="fc" id="L48">                .principal(SERVICE_PRINCIPAL)</span>
+<span class="fc" id="L49">                .build();</span>
+<span class="fc" id="L50">        OAuth2AuthorizedClient client = authorizedClientManager.authorize(request);</span>
+<span class="pc bpc" id="L51" title="1 of 4 branches missed.">        if (client == null || client.getAccessToken() == null) {</span>
+<span class="fc" id="L52">            throw new IllegalStateException(&quot;Unable to authorize TCP-listener for Switch-core&quot;);</span>
+        }
+<span class="fc" id="L54">        return client;</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.14.202510111229</span></div></body></html>

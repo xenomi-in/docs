@@ -1,0 +1,105 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>SwitchCoreOutboundController.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">switch</a> &gt; <a href="index.source.html" class="el_package">com.lps.isoswitch.controller</a> &gt; <span class="el_source">SwitchCoreOutboundController.java</span></div><h1>SwitchCoreOutboundController.java</h1><pre class="source lang-java linenums">package com.lps.isoswitch.controller;
+
+import com.lps.isoswitch.model.IsoRequest;
+import com.lps.isoswitch.service.SwitchCoreOutboundService;
+import com.lps.isoswitch.utils.Enums.SwitchDestinationEnum;
+import org.jpos.iso.ISOException;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+import org.springframework.beans.factory.annotation.Value;
+import org.springframework.http.HttpStatus;
+import org.springframework.http.ResponseEntity;
+import org.springframework.web.bind.annotation.PathVariable;
+import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.RequestBody;
+import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RestController;
+
+import java.util.Map;
+import java.util.concurrent.TimeUnit;
+import java.util.concurrent.TimeoutException;
+
+/**
+ * API used by Switch Core to send ISO8583 requests to the connected scheme.
+ */
+@RestController
+@RequestMapping(&quot;/api/v1/switch-core&quot;)
+public class SwitchCoreOutboundController {
+
+<span class="fc" id="L29">    private static final Logger log = LoggerFactory.getLogger(SwitchCoreOutboundController.class);</span>
+
+    private final SwitchCoreOutboundService outboundService;
+
+    @Value(&quot;${switch-core.outbound.ack.timeout.seconds:10}&quot;)
+    private int ackTimeoutSeconds;
+
+<span class="fc" id="L36">    public SwitchCoreOutboundController(SwitchCoreOutboundService outboundService) {</span>
+<span class="fc" id="L37">        this.outboundService = outboundService;</span>
+<span class="fc" id="L38">    }</span>
+
+    @PostMapping(&quot;/iso8583&quot;)
+    public ResponseEntity&lt;Map&lt;String, Object&gt;&gt; sendIso8583(@RequestBody IsoRequest request) {
+<span class="fc" id="L42">        return sendIso8583(null, request);</span>
+    }
+
+    @PostMapping(&quot;/{scheme}/iso8583&quot;)
+    public ResponseEntity&lt;Map&lt;String, Object&gt;&gt; sendIso8583(
+            @PathVariable String scheme,
+            @RequestBody IsoRequest request) {
+        try {
+<span class="fc" id="L50">            SwitchDestinationEnum destination = resolveDestination(scheme, request);</span>
+<span class="fc" id="L51">            boolean sent = outboundService.sendToScheme(request, destination)</span>
+<span class="fc" id="L52">                    .get(ackTimeoutSeconds, TimeUnit.SECONDS);</span>
+
+<span class="fc bfc" id="L54" title="All 2 branches covered.">            if (!sent) {</span>
+<span class="fc" id="L55">                return ResponseEntity.status(HttpStatus.SERVICE_UNAVAILABLE).body(Map.of(</span>
+                        &quot;status&quot;, &quot;error&quot;,
+                        &quot;message&quot;, &quot;Failed to write ISO8583 message to scheme socket&quot;,
+<span class="fc" id="L58">                        &quot;scheme&quot;, destination.name()</span>
+                ));
+            }
+
+<span class="fc" id="L62">            return ResponseEntity.ok(Map.of(</span>
+                    &quot;status&quot;, &quot;success&quot;,
+                    &quot;message&quot;, &quot;ISO8583 message written to scheme socket&quot;,
+<span class="fc" id="L65">                    &quot;scheme&quot;, destination.name(),</span>
+<span class="fc" id="L66">                    &quot;mti&quot;, request.getMti(),</span>
+<span class="fc" id="L67">                    &quot;uniqueTransactionId&quot;, valueOrEmpty(request.getUniqueTransactionId())</span>
+            ));
+<span class="fc" id="L69">        } catch (IllegalArgumentException | ISOException e) {</span>
+<span class="fc" id="L70">            log.error(&quot;Invalid outbound ISO8583 request for scheme {}&quot;, scheme, e);</span>
+<span class="fc" id="L71">            return ResponseEntity.badRequest().body(Map.of(</span>
+                    &quot;status&quot;, &quot;error&quot;,
+<span class="fc" id="L73">                    &quot;message&quot;, e.getMessage(),</span>
+                    &quot;scheme&quot;, scheme
+            ));
+<span class="fc" id="L76">        } catch (TimeoutException e) {</span>
+<span class="fc" id="L77">            log.error(&quot;Timed out waiting for outbound ISO8583 write acknowledgement for scheme {}&quot;, scheme, e);</span>
+<span class="fc" id="L78">            return ResponseEntity.status(HttpStatus.GATEWAY_TIMEOUT).body(Map.of(</span>
+                    &quot;status&quot;, &quot;error&quot;,
+                    &quot;message&quot;, &quot;Timed out waiting for socket write acknowledgement&quot;,
+                    &quot;scheme&quot;, scheme
+            ));
+<span class="fc" id="L83">        } catch (Exception e) {</span>
+<span class="fc" id="L84">            log.error(&quot;Error sending outbound ISO8583 request for scheme {}&quot;, scheme, e);</span>
+<span class="fc" id="L85">            return ResponseEntity.internalServerError().body(Map.of(</span>
+                    &quot;status&quot;, &quot;error&quot;,
+<span class="fc" id="L87">                    &quot;message&quot;, &quot;Failed to send ISO8583 message: &quot; + e.getMessage(),</span>
+                    &quot;scheme&quot;, scheme
+            ));
+        }
+    }
+
+    private SwitchDestinationEnum resolveDestination(String pathScheme, IsoRequest request) {
+<span class="pc bpc" id="L94" title="1 of 2 branches missed.">        String requestScheme = request == null ? null : request.getScheme();</span>
+<span class="pc bpc" id="L95" title="1 of 4 branches missed.">        if (pathScheme != null &amp;&amp; !pathScheme.isBlank()) {</span>
+<span class="fc" id="L96">            return SwitchDestinationEnum.from(pathScheme);</span>
+        }
+<span class="fc" id="L98">        return SwitchDestinationEnum.from(requestScheme);</span>
+    }
+
+    private String valueOrEmpty(String value) {
+<span class="pc bpc" id="L102" title="1 of 2 branches missed.">        return value == null ? &quot;&quot; : value;</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.14.202510111229</span></div></body></html>

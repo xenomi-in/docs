@@ -1,0 +1,141 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>KeycloakSecurityConfig.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">switch</a> &gt; <a href="index.source.html" class="el_package">com.lps.isoswitch.config</a> &gt; <span class="el_source">KeycloakSecurityConfig.java</span></div><h1>KeycloakSecurityConfig.java</h1><pre class="source lang-java linenums">package com.lps.isoswitch.config;
+
+import java.io.IOException;
+import java.security.cert.X509Certificate;
+import java.time.OffsetDateTime;
+import java.time.ZoneOffset;
+import java.util.LinkedHashMap;
+import java.util.Map;
+
+import tools.jackson.databind.ObjectMapper;
+import org.springframework.beans.factory.annotation.Value;
+import org.springframework.context.annotation.Bean;
+import org.springframework.context.annotation.Configuration;
+import org.springframework.core.annotation.Order;
+import org.springframework.http.HttpMethod;
+import org.springframework.security.config.annotation.web.builders.HttpSecurity;
+import org.springframework.security.config.http.SessionCreationPolicy;
+import org.springframework.security.authentication.AuthenticationServiceException;
+import org.springframework.security.oauth2.core.DelegatingOAuth2TokenValidator;
+import org.springframework.security.oauth2.core.OAuth2Error;
+import org.springframework.security.oauth2.core.OAuth2TokenValidatorResult;
+import org.springframework.security.oauth2.jwt.JwtValidators;
+import org.springframework.security.oauth2.jwt.NimbusJwtDecoder;
+import org.springframework.security.web.SecurityFilterChain;
+import org.springframework.security.web.access.intercept.AuthorizationFilter;
+import org.springframework.security.oauth2.server.resource.web.authentication.BearerTokenAuthenticationFilter;
+import org.springframework.web.filter.OncePerRequestFilter;
+
+import jakarta.servlet.FilterChain;
+import jakarta.servlet.ServletException;
+import jakarta.servlet.http.HttpServletRequest;
+import jakarta.servlet.http.HttpServletResponse;
+
+/** Keycloak-backed, default-deny security boundary for listener HTTP APIs. */
+@Configuration
+<span class="fc" id="L36">public class KeycloakSecurityConfig {</span>
+
+    @Bean
+    @Order(1)
+    SecurityFilterChain listenerApiSecurity(
+            HttpSecurity http,
+            @Value(&quot;${security.keycloak.jwk-set-uri}&quot;) String jwkSetUri,
+            @Value(&quot;${security.keycloak.issuer}&quot;) String issuer,
+            @Value(&quot;${security.keycloak.client-id}&quot;) String clientId,
+            @Value(&quot;${security.keycloak.audience:switch-internal}&quot;) String audience,
+            @Value(&quot;${security.keycloak.require-mtls:false}&quot;) boolean requireMtls,
+            ObjectMapper objectMapper) throws Exception {
+
+<span class="fc" id="L49">        NimbusJwtDecoder decoder = NimbusJwtDecoder.withJwkSetUri(jwkSetUri).build();</span>
+<span class="fc" id="L50">        decoder.setJwtValidator(new DelegatingOAuth2TokenValidator&lt;&gt;(</span>
+<span class="fc" id="L51">                JwtValidators.createDefaultWithIssuer(issuer),</span>
+<span class="nc bnc" id="L52" title="All 2 branches missed.">                jwt -&gt; audience != null &amp;&amp; jwt.getAudience().contains(audience)</span>
+<span class="nc bnc" id="L53" title="All 4 branches missed.">                        &amp;&amp; clientId.equals(jwt.getClaimAsString(&quot;azp&quot;))</span>
+<span class="nc" id="L54">                                ? OAuth2TokenValidatorResult.success()</span>
+<span class="nc" id="L55">                                : OAuth2TokenValidatorResult.failure(new OAuth2Error(</span>
+                                        &quot;invalid_token&quot;, &quot;Invalid service audience or client&quot;, null))));
+
+<span class="fc" id="L58">        http.csrf(csrf -&gt; csrf.disable())</span>
+<span class="fc" id="L59">                .sessionManagement(session -&gt; session.sessionCreationPolicy(SessionCreationPolicy.STATELESS))</span>
+<span class="fc" id="L60">                .authorizeHttpRequests(authorize -&gt; authorize</span>
+<span class="fc" id="L61">                        .requestMatchers(&quot;/error&quot;, &quot;/actuator/health&quot;, &quot;/actuator/health/**&quot;).permitAll()</span>
+<span class="fc" id="L62">                        .requestMatchers(HttpMethod.POST, &quot;/api/v1/switch-core/**&quot;)</span>
+<span class="fc" id="L63">                                .hasAuthority(&quot;SCOPE_switch:scheme-message:write&quot;)</span>
+<span class="fc" id="L64">                        .requestMatchers(HttpMethod.POST, &quot;/api/v1/connection/**&quot;)</span>
+<span class="fc" id="L65">                                .hasAuthority(&quot;SCOPE_switch:scheme-connection:manage&quot;)</span>
+<span class="fc" id="L66">                        .requestMatchers(HttpMethod.GET, &quot;/api/v1/connection/**&quot;, &quot;/api/v1/connection-status/**&quot;)</span>
+<span class="fc" id="L67">                                .hasAuthority(&quot;SCOPE_switch:scheme-status:read&quot;)</span>
+<span class="fc" id="L68">                        .requestMatchers(&quot;/actuator/prometheus&quot;, &quot;/actuator/info&quot;)</span>
+<span class="fc" id="L69">                                .hasAuthority(&quot;SCOPE_switch:metrics:read&quot;)</span>
+<span class="fc" id="L70">                        .requestMatchers(&quot;/actuator/shutdown&quot;).denyAll()</span>
+<span class="fc" id="L71">                        .anyRequest().denyAll())</span>
+<span class="fc" id="L72">                .oauth2ResourceServer(oauth -&gt; oauth.jwt(jwt -&gt; jwt.decoder(decoder)));</span>
+
+        // Spring Security deliberately rethrows AuthenticationServiceException by
+        // default. Convert identity-provider/JWK availability failures into a
+        // sanitized 503 instead of exposing them as an application 500.
+<span class="fc" id="L77">        http.addFilterBefore(new AuthenticationInfrastructureFailureFilter(objectMapper),</span>
+                BearerTokenAuthenticationFilter.class);
+
+<span class="fc" id="L80">        http.addFilterBefore(new OncePerRequestFilter() {</span>
+            @Override
+            protected boolean shouldNotFilter(HttpServletRequest request) {
+<span class="fc" id="L83">                String path = request.getRequestURI();</span>
+<span class="pc bpc" id="L84" title="2 of 4 branches missed.">                return path.equals(&quot;/error&quot;) || path.equals(&quot;/actuator/health&quot;)</span>
+<span class="pc bpc" id="L85" title="1 of 2 branches missed.">                        || path.startsWith(&quot;/actuator/health/&quot;);</span>
+            }
+
+            @Override
+            protected void doFilterInternal(HttpServletRequest request, HttpServletResponse response,
+                    FilterChain chain) throws ServletException, IOException {
+<span class="fc" id="L91">                Object certificateAttribute = request.getAttribute(&quot;jakarta.servlet.request.X509Certificate&quot;);</span>
+<span class="pc bpc" id="L92" title="5 of 6 branches missed.">                if (requireMtls &amp;&amp; (!request.isSecure()</span>
+<span class="nc bnc" id="L93" title="All 2 branches missed.">                        || !(certificateAttribute instanceof X509Certificate[] certificates)</span>
+                        || certificates.length == 0)) {
+<span class="nc" id="L95">                    response.sendError(HttpServletResponse.SC_FORBIDDEN,</span>
+                            &quot;Direct mutually authenticated TLS is required&quot;);
+<span class="nc" id="L97">                    return;</span>
+                }
+<span class="fc" id="L99">                chain.doFilter(request, response);</span>
+<span class="fc" id="L100">            }</span>
+        }, AuthorizationFilter.class);
+
+<span class="fc" id="L103">        return http.build();</span>
+    }
+
+    static final class AuthenticationInfrastructureFailureFilter extends OncePerRequestFilter {
+        private final ObjectMapper objectMapper;
+
+<span class="fc" id="L109">        AuthenticationInfrastructureFailureFilter(ObjectMapper objectMapper) {</span>
+<span class="fc" id="L110">            this.objectMapper = objectMapper;</span>
+<span class="fc" id="L111">        }</span>
+
+        @Override
+        protected void doFilterInternal(HttpServletRequest request, HttpServletResponse response,
+                FilterChain chain) throws ServletException, IOException {
+            try {
+<span class="fc" id="L117">                chain.doFilter(request, response);</span>
+<span class="fc" id="L118">            } catch (AuthenticationServiceException exception) {</span>
+<span class="pc bpc" id="L119" title="1 of 2 branches missed.">                if (response.isCommitted()) {</span>
+<span class="nc" id="L120">                    throw exception;</span>
+                }
+<span class="fc" id="L122">                response.resetBuffer();</span>
+<span class="fc" id="L123">                response.setStatus(HttpServletResponse.SC_SERVICE_UNAVAILABLE);</span>
+<span class="fc" id="L124">                response.setContentType(&quot;application/json&quot;);</span>
+<span class="fc" id="L125">                response.setCharacterEncoding(&quot;UTF-8&quot;);</span>
+<span class="fc" id="L126">                response.setHeader(&quot;Cache-Control&quot;, &quot;no-store&quot;);</span>
+<span class="fc" id="L127">                response.setHeader(&quot;Retry-After&quot;, &quot;30&quot;);</span>
+
+<span class="fc" id="L129">                Map&lt;String, Object&gt; body = new LinkedHashMap&lt;&gt;();</span>
+<span class="fc" id="L130">                body.put(&quot;timestamp&quot;, OffsetDateTime.now(ZoneOffset.UTC).toString());</span>
+<span class="fc" id="L131">                body.put(&quot;status&quot;, HttpServletResponse.SC_SERVICE_UNAVAILABLE);</span>
+<span class="fc" id="L132">                body.put(&quot;error&quot;, &quot;Service Unavailable&quot;);</span>
+<span class="fc" id="L133">                body.put(&quot;code&quot;, &quot;AUTH_SERVICE_UNAVAILABLE&quot;);</span>
+<span class="fc" id="L134">                body.put(&quot;message&quot;, &quot;Authentication service is temporarily unavailable&quot;);</span>
+<span class="fc" id="L135">                body.put(&quot;path&quot;, request.getRequestURI());</span>
+<span class="fc" id="L136">                objectMapper.writeValue(response.getOutputStream(), body);</span>
+<span class="fc" id="L137">            }</span>
+<span class="fc" id="L138">        }</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.14.202510111229</span></div></body></html>

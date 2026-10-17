@@ -1,0 +1,224 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>ApiService.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">switch</a> &gt; <a href="index.source.html" class="el_package">com.lps.isoswitch.service</a> &gt; <span class="el_source">ApiService.java</span></div><h1>ApiService.java</h1><pre class="source lang-java linenums">package com.lps.isoswitch.service;
+
+import org.springframework.beans.factory.annotation.Value;
+import org.springframework.http.MediaType;
+import org.springframework.stereotype.Service;
+import org.springframework.web.reactive.function.client.WebClient;
+import org.springframework.web.reactive.function.client.WebClientResponseException;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+import tools.jackson.databind.ObjectMapper;
+import org.jpos.iso.ISOMsg;
+import org.jpos.iso.ISOException;
+import com.lps.isoswitch.config.SchemeConfig;
+import com.lps.isoswitch.config.RawDataLogging;
+import com.lps.isoswitch.utils.Enums.SwitchDestinationEnum;
+
+import java.util.HashMap;
+import java.util.Map;
+import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import java.util.concurrent.TimeUnit;
+import java.time.Duration;
+import tools.jackson.databind.node.ObjectNode;
+import reactor.core.scheduler.Schedulers;
+import reactor.util.retry.Retry;
+
+/**
+ * Service class for handling API communications with external services.
+ * This service manages all HTTP communications with external APIs,
+ * including request/response handling, error management, and retry logic.
+ *
+ * @author Logicpoint Systems
+ * @version 1.0
+ * @since 2025-06-15
+ */
+@Service
+public final class ApiService {
+<span class="fc" id="L39">    private static final Logger log = LoggerFactory.getLogger(ApiService.class);</span>
+    private static final int API_TIMEOUT_SECONDS = 30;
+    
+    private final WebClient webClient;
+    private final ObjectMapper objectMapper;
+    private final ExecutorService executorService;
+    private final SchemeConfig schemeConfig;
+    
+    @Value(&quot;${api.service.url}&quot;)
+    private String apiServiceUrl;
+    
+    @Value(&quot;${api.service.url.dke}&quot;)
+    private String apiServiceUrlDke;
+
+    @Value(&quot;${app.site-id:}&quot;)
+    private String siteId;
+
+    @Value(&quot;${app.listener-id:switchTcpListener}&quot;)
+    private String listenerId;
+    
+    /**
+     * Constructs a new ApiService with the required dependencies.
+     *
+     * @param webClient Configured WebClient with connection pooling
+     * @param objectMapper ObjectMapper for JSON processing
+     */
+<span class="fc" id="L65">    public ApiService(WebClient webClient, ObjectMapper objectMapper, SchemeConfig schemeConfig) {</span>
+<span class="fc" id="L66">        this.webClient = webClient;</span>
+<span class="fc" id="L67">        this.objectMapper = objectMapper;</span>
+<span class="fc" id="L68">        this.schemeConfig = schemeConfig;</span>
+<span class="fc" id="L69">        this.executorService = Executors.newVirtualThreadPerTaskExecutor();</span>
+<span class="fc" id="L70">    }</span>
+    
+    /**
+     * Sends ISO8583 message to API service for processing.
+     * Uses CompletableFuture for asynchronous operation and proper timeout handling.
+     *
+     * @param isoMsg The ISO8583 message to process
+     * @param scheme The scheme name (e.g., &quot;RuPay&quot;, &quot;Visa&quot;)
+     * @return CompletableFuture containing the API response
+     * @throws ISOException if there's an error processing the ISO message
+     */
+    public CompletableFuture&lt;Map&lt;String, Object&gt;&gt; processIsoMessage(ISOMsg isoMsg, String scheme) {
+<span class="fc" id="L82">        return CompletableFuture.supplyAsync(() -&gt; {</span>
+            try {
+<span class="fc" id="L84">                boolean dkeRequest = isDkeRequest(isoMsg);</span>
+<span class="fc" id="L85">                String resolvedConnectionId = resolveConnectionId(scheme);</span>
+                // Convert ISOMsg to JSON request
+<span class="fc" id="L87">                ObjectNode jsonRequest = objectMapper.createObjectNode();</span>
+<span class="fc" id="L88">                jsonRequest.put(&quot;scheme&quot;, scheme);</span>
+<span class="fc" id="L89">                jsonRequest.put(&quot;mti&quot;, isoMsg.getMTI());</span>
+<span class="fc" id="L90">                String uniqueTxnId = isoMsg.getMTI()+isoMsg.getString(7)+isoMsg.getString(37);</span>
+<span class="fc" id="L91">                jsonRequest.put(&quot;uniqueTransactionId&quot;, uniqueTxnId);</span>
+                
+<span class="fc" id="L93">                ObjectNode fields = objectMapper.createObjectNode();</span>
+                // Add all ISO fields to JSON
+<span class="fc bfc" id="L95" title="All 2 branches covered.">                for (int i = 1; i &lt;= 128; i++) {</span>
+<span class="fc bfc" id="L96" title="All 2 branches covered.">                    if (isoMsg.hasField(i)) {</span>
+<span class="fc" id="L97">                        fields.put(String.valueOf(i), isoMsg.getString(i));</span>
+                    }
+                }
+<span class="fc" id="L100">                jsonRequest.set(&quot;fields&quot;, fields);</span>
+<span class="fc" id="L101">                RawDataLogging.object(&quot;ISO request JSON for &quot; + scheme, jsonRequest);</span>
+                //Map&lt;String, Object&gt; requestMap = convertIsoToMap(isoMsg, scheme);
+                //log.info(&quot;Sending request to API service for scheme {}: {}&quot;, scheme, requestMap);
+<span class="fc" id="L104">                String apiUrl = apiServiceUrl;</span>
+<span class="pc bpc" id="L105" title="1 of 2 branches missed.">                if (dkeRequest) {</span>
+<span class="nc" id="L106">                    apiUrl = apiServiceUrlDke+&quot;/&quot;+scheme;</span>
+                }
+                
+<span class="fc" id="L109">                return webClient.post()</span>
+<span class="fc" id="L110">                    .uri(apiUrl)</span>
+<span class="fc" id="L111">                    .contentType(MediaType.APPLICATION_JSON)</span>
+<span class="fc" id="L112">                    .header(&quot;site_id&quot;, siteId)</span>
+<span class="fc" id="L113">                    .header(&quot;listener_id&quot;, listenerId)</span>
+<span class="fc" id="L114">                    .header(&quot;connection_id&quot;, resolvedConnectionId)</span>
+<span class="fc" id="L115">                    .bodyValue(jsonRequest)</span>
+<span class="fc" id="L116">                    .retrieve()</span>
+<span class="fc" id="L117">                    .bodyToMono(Map.class)</span>
+                    //.retryWhen(Retry.backoff(3, Duration.ofSeconds(1))
+                        //.filter(throwable -&gt; !(throwable instanceof IllegalArgumentException)))
+<span class="fc" id="L120">                    .timeout(Duration.ofSeconds(API_TIMEOUT_SECONDS))</span>
+<span class="fc" id="L121">                    .doOnSuccess(response -&gt; log.info(&quot;Received response from API for scheme {}: {}&quot;, scheme, response.get(39)))</span>
+<span class="pc" id="L122">                    .doOnError(error -&gt; log.error(&quot;Error calling API service for scheme {}: {}&quot;, scheme, error.getMessage()))</span>
+<span class="fc" id="L123">                    .subscribeOn(Schedulers.boundedElastic())</span>
+<span class="fc" id="L124">                    .block();</span>
+
+                
+<span class="nc" id="L127">            } catch (WebClientResponseException e) {</span>
+<span class="nc" id="L128">                log.error(&quot;Error processing ISO message for API with scheme {}. Status={}&quot;,</span>
+                        scheme,
+<span class="nc" id="L130">                        e.getStatusCode(),</span>
+                        e);
+<span class="nc" id="L132">                throw new RuntimeException(&quot;Failed to process ISO message&quot;, e);</span>
+<span class="nc" id="L133">            } catch (Exception e) {</span>
+<span class="nc" id="L134">                log.error(&quot;Error processing ISO message for API with scheme {}&quot;, scheme, e);</span>
+<span class="nc" id="L135">                throw new RuntimeException(&quot;Failed to process ISO message&quot;, e);</span>
+            }
+        }, executorService);
+    }
+    
+    /**
+     * Converts ISOMsg to a Map representation.
+     * Uses Java 17 features for better readability and maintainability.
+     *
+     * @param isoMsg The ISO8583 message to convert
+     * @param scheme The scheme name
+     * @return Map containing the ISO message fields
+     * @throws ISOException if there's an error accessing ISO message fields
+     */
+    private Map&lt;String, Object&gt; convertIsoToMap(ISOMsg isoMsg, String scheme) throws ISOException {
+<span class="nc" id="L150">        var result = new HashMap&lt;String, Object&gt;();</span>
+        
+        // Add MTI and scheme
+<span class="nc" id="L153">        result.put(&quot;mti&quot;, isoMsg.getMTI());</span>
+<span class="nc" id="L154">        result.put(&quot;scheme&quot;, scheme);</span>
+        
+        // Add all fields using enhanced for loop
+<span class="nc bnc" id="L157" title="All 2 branches missed.">        for (int i = 1; i &lt;= 128; i++) {</span>
+<span class="nc bnc" id="L158" title="All 2 branches missed.">            if (isoMsg.hasField(i)) {</span>
+<span class="nc" id="L159">                result.put(String.valueOf(i), isoMsg.getString(i));</span>
+            }
+        }
+        
+<span class="nc" id="L163">        return result;</span>
+    }
+
+    private String resolveConnectionId(String scheme) {
+        try {
+<span class="fc" id="L168">            return schemeConfig.resolve(</span>
+<span class="fc" id="L169">                    SwitchDestinationEnum.from(scheme),</span>
+                    null,
+                    null,
+                    null,
+                    null,
+                    null,
+                    null,
+                    null,
+                    null,
+<span class="fc" id="L178">                    null).connectionId();</span>
+<span class="nc" id="L179">        } catch (Exception ex) {</span>
+<span class="nc" id="L180">            log.warn(&quot;Falling back to scheme name for connection_id because resolution failed for {}&quot;, scheme, ex);</span>
+<span class="nc" id="L181">            return scheme;</span>
+        }
+    }
+
+    private boolean isDkeRequest(ISOMsg isoMsg) throws ISOException {
+<span class="pc bpc" id="L186" title="1 of 2 branches missed.">        return &quot;0800&quot;.equals(isoMsg.getMTI())</span>
+<span class="pc bnc" id="L187" title="All 4 branches missed.">                &amp;&amp; (&quot;184&quot;.equals(isoMsg.getString(70)) || &quot;185&quot;.equals(isoMsg.getString(70)));</span>
+    }
+
+    /**
+     * Shuts down the executor service when the application stops.
+     * This method should be called during application shutdown.
+     */
+    public void shutdown() {
+        try {
+<span class="fc" id="L196">            log.info(&quot;Shutting down ApiService executor service&quot;);</span>
+<span class="fc" id="L197">            executorService.shutdown();</span>
+<span class="pc bpc" id="L198" title="1 of 2 branches missed.">            if (!executorService.awaitTermination(60, TimeUnit.SECONDS)) {</span>
+<span class="nc" id="L199">                executorService.shutdownNow();</span>
+            }
+<span class="nc" id="L201">        } catch (InterruptedException e) {</span>
+<span class="nc" id="L202">            log.error(&quot;Error shutting down executor service&quot;, e);</span>
+<span class="nc" id="L203">            Thread.currentThread().interrupt();</span>
+<span class="nc" id="L204">            executorService.shutdownNow();</span>
+<span class="fc" id="L205">        }</span>
+<span class="fc" id="L206">    }</span>
+
+    /**
+     * Processes a transaction message.
+     *
+     * @param requestMsg The ISO message to process
+     * @return The response ISO message
+     * @throws ISOException if there's an error processing the message
+     */
+    public ISOMsg processTransaction(ISOMsg requestMsg) throws ISOException {
+<span class="nc" id="L216">        log.info(&quot;Processing transaction message&quot;);</span>
+        // Add transaction processing logic here
+<span class="nc" id="L218">        ISOMsg responseMsg = new ISOMsg();</span>
+<span class="nc" id="L219">        responseMsg.setMTI(&quot;0210&quot;);</span>
+<span class="nc" id="L220">        responseMsg.set(39, &quot;00&quot;);</span>
+<span class="nc" id="L221">        return responseMsg;</span>
+    }
+} 
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.14.202510111229</span></div></body></html>

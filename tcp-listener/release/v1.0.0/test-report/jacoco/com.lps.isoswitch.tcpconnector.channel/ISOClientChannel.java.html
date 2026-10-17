@@ -1,0 +1,548 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>ISOClientChannel.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">switch</a> &gt; <a href="index.source.html" class="el_package">com.lps.isoswitch.tcpconnector.channel</a> &gt; <span class="el_source">ISOClientChannel.java</span></div><h1>ISOClientChannel.java</h1><pre class="source lang-java linenums">package com.lps.isoswitch.tcpconnector.channel;
+
+import io.netty.channel.ChannelHandlerContext;
+import io.netty.channel.ChannelPipeline;
+import io.netty.handler.codec.LengthFieldBasedFrameDecoder;
+import io.netty.handler.codec.LengthFieldPrepender;
+import io.netty.handler.codec.bytes.ByteArrayDecoder;
+import io.netty.handler.logging.LogLevel;
+import io.netty.handler.logging.LoggingHandler;
+
+import org.jpos.iso.ISOException;
+import org.jpos.iso.ISOMsg;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+import com.lps.isoswitch.config.RawDataLogging;
+
+import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.TimeUnit;
+
+/**
+ * ISO8583 Client Channel implementation that provides client connection capabilities.
+ * This class extends AbstractISOChannel and adds client-specific functionality
+ * for connecting to ISO8583 servers.
+ *
+ * Features:
+ * - Client connection management
+ * - Automatic reconnection
+ * - Length-based message framing
+ * - ISO8583 message handling
+ * - Connection status monitoring
+ * - Easy-to-use client API
+ *
+ * @author Logicpoint Systems
+ * @version 1.0
+ * @since 2025-06-15
+ */
+public abstract class ISOClientChannel extends AbstractISOChannel {
+
+<span class="fc" id="L39">    private static final Logger log = LoggerFactory.getLogger(ISOClientChannel.class);</span>
+
+    // Client-specific configuration
+    private static final int DEFAULT_MAX_FRAME_LENGTH = 8192;
+    private static final int DEFAULT_LENGTH_FIELD_OFFSET = 0;
+    private static final int DEFAULT_LENGTH_ADJUSTMENT = 0;
+    private static final int DEFAULT_INITIAL_BYTES_TO_STRIP = 0;
+    private static final boolean DEFAULT_INCLUDE_LENGTH_FIELD_LENGTH = false;
+
+    // Channel context for sending messages
+    private ChannelHandlerContext currentContext;
+
+    /**
+     * Constructs a new ISOClientChannel with default configuration.
+     */
+    public ISOClientChannel() {
+<span class="fc" id="L55">        super();</span>
+<span class="fc" id="L56">    }</span>
+
+    /**
+     * Constructs a new ISOClientChannel with specified maximum message length.
+     *
+     * @param maxMessageLength The maximum message length in bytes
+     */
+    public ISOClientChannel(int maxMessageLength) {
+<span class="fc" id="L64">        super(maxMessageLength);</span>
+<span class="fc" id="L65">    }</span>
+
+    /**
+     * Connects to the specified host and port as a client.
+     * This method provides a simplified connection interface.
+     *
+     * @param host The host address to connect to
+     * @param port The port number to connect to
+     * @return CompletableFuture that completes when connection is established
+     */
+    public CompletableFuture&lt;Boolean&gt; connectToServer(String host, int port) {
+<span class="fc" id="L76">        log.info(&quot;Connecting to ISO8583 server at {}:{}&quot;, host, port);</span>
+<span class="fc" id="L77">        return connect(host, port);</span>
+    }
+
+    /**
+     * Connects to the specified host and port with timeout.
+     *
+     * @param host The host address to connect to
+     * @param port The port number to connect to
+     * @param timeoutMs Connection timeout in milliseconds
+     * @return CompletableFuture that completes when connection is established
+     */
+    public CompletableFuture&lt;Boolean&gt; connectToServer(String host, int port, long timeoutMs) {
+<span class="fc" id="L89">        log.info(&quot;Connecting to ISO8583 server at {}:{} with timeout {}ms&quot;, host, port, timeoutMs);</span>
+
+<span class="fc" id="L91">        CompletableFuture&lt;Boolean&gt; connectFuture = connect(host, port);</span>
+
+        // Add timeout
+<span class="fc" id="L94">        CompletableFuture&lt;Boolean&gt; timeoutFuture = new CompletableFuture&lt;&gt;();</span>
+<span class="fc" id="L95">        connectFuture.orTimeout(timeoutMs, TimeUnit.MILLISECONDS)</span>
+<span class="fc" id="L96">                    .whenComplete((result, throwable) -&gt; {</span>
+<span class="fc bfc" id="L97" title="All 2 branches covered.">                        if (throwable != null) {</span>
+<span class="fc" id="L98">                            log.error(&quot;Connection timeout to {}:{}&quot;, host, port);</span>
+<span class="fc" id="L99">                            timeoutFuture.complete(false);</span>
+                        } else {
+<span class="fc" id="L101">                            timeoutFuture.complete(result);</span>
+                        }
+<span class="fc" id="L103">                    });</span>
+
+<span class="fc" id="L105">        return timeoutFuture;</span>
+    }
+
+    /**
+     * Sends an ISO8583 message to the connected server.
+     *
+     * @param isoMsg The ISO8583 message to send
+     * @return CompletableFuture that completes when message is sent
+     */
+    public CompletableFuture&lt;Boolean&gt; sendMessageAsync(ISOMsg isoMsg) {
+<span class="fc" id="L115">        CompletableFuture&lt;Boolean&gt; sendFuture = new CompletableFuture&lt;&gt;();</span>
+
+        try {
+<span class="fc bfc" id="L118" title="All 2 branches covered.">            if (!isConnected()) {</span>
+<span class="fc" id="L119">                log.error(&quot;Cannot send message - not connected to server&quot;);</span>
+<span class="fc" id="L120">                sendFuture.complete(false);</span>
+<span class="fc" id="L121">                return sendFuture;</span>
+            }
+
+<span class="pc bpc" id="L124" title="1 of 2 branches missed.">            if (currentContext == null) {</span>
+<span class="nc" id="L125">                log.error(&quot;Cannot send message - no active channel context&quot;);</span>
+<span class="nc" id="L126">                sendFuture.complete(false);</span>
+<span class="nc" id="L127">                return sendFuture;</span>
+            }
+
+            // Send the message
+<span class="fc" id="L131">            sendMessage(currentContext, isoMsg);</span>
+<span class="fc" id="L132">            log.info(&quot;Message sent successfully - MTI: {}, STAN: {}&quot;,</span>
+<span class="fc" id="L133">                    isoMsg.getMTI(), isoMsg.getString(11));</span>
+<span class="fc" id="L134">            sendFuture.complete(true);</span>
+
+<span class="nc" id="L136">        } catch (Exception e) {</span>
+<span class="nc" id="L137">            log.error(&quot;Error sending message&quot;, e);</span>
+<span class="nc" id="L138">            sendFuture.completeExceptionally(e);</span>
+<span class="fc" id="L139">        }</span>
+
+<span class="fc" id="L141">        return sendFuture;</span>
+    }
+
+    /**
+     * Sends an ISO8583 message and waits for a response.
+     *
+     * @param isoMsg The ISO8583 message to send
+     * @param timeoutMs Response timeout in milliseconds
+     * @return CompletableFuture that completes with the response message
+     */
+    public CompletableFuture&lt;ISOMsg&gt; sendMessageAndWaitForResponse(ISOMsg isoMsg, long timeoutMs) {
+<span class="fc" id="L152">        CompletableFuture&lt;ISOMsg&gt; responseFuture = new CompletableFuture&lt;&gt;();</span>
+
+        try {
+<span class="fc bfc" id="L155" title="All 2 branches covered.">            if (!isConnected()) {</span>
+<span class="fc" id="L156">                log.error(&quot;Cannot send message - not connected to server&quot;);</span>
+<span class="fc" id="L157">                responseFuture.completeExceptionally(new IllegalStateException(&quot;Not connected&quot;));</span>
+<span class="fc" id="L158">                return responseFuture;</span>
+            }
+
+            // Store the future to be completed when response is received
+<span class="fc" id="L162">            String stan = isoMsg.getString(11);</span>
+<span class="fc bfc" id="L163" title="All 2 branches covered.">            if (stan != null) {</span>
+                // This would require a response tracking mechanism
+                // For now, we'll just send the message
+<span class="fc" id="L166">                sendMessageAsync(isoMsg).thenAccept(success -&gt; {</span>
+<span class="fc bfc" id="L167" title="All 2 branches covered.">                    if (success) {</span>
+<span class="fc" id="L168">                        log.info(&quot;Message sent, waiting for response with STAN: {}&quot;, stan);</span>
+                        // In a real implementation, you'd store the future and complete it when response arrives
+                    } else {
+<span class="fc" id="L171">                        responseFuture.completeExceptionally(new RuntimeException(&quot;Failed to send message&quot;));</span>
+                    }
+<span class="fc" id="L173">                });</span>
+            } else {
+<span class="fc" id="L175">                responseFuture.completeExceptionally(new IllegalArgumentException(&quot;STAN is required for response tracking&quot;));</span>
+            }
+
+<span class="nc" id="L178">        } catch (Exception e) {</span>
+<span class="nc" id="L179">            log.error(&quot;Error sending message and waiting for response&quot;, e);</span>
+<span class="nc" id="L180">            responseFuture.completeExceptionally(e);</span>
+<span class="fc" id="L181">        }</span>
+
+<span class="fc" id="L183">        return responseFuture;</span>
+    }
+
+    /**
+     * Initiates a sign-on request to the server.
+     *
+     * @return CompletableFuture that completes when sign-on is successful
+     */
+    public CompletableFuture&lt;Boolean&gt; signOn() {
+<span class="fc" id="L192">        CompletableFuture&lt;Boolean&gt; signOnFuture = new CompletableFuture&lt;&gt;();</span>
+
+        try {
+<span class="fc" id="L195">            ISOMsg signOnMsg = createSignOnMessage();</span>
+<span class="fc" id="L196">            log.info(&quot;Initiating sign-on request&quot;);</span>
+
+<span class="fc" id="L198">            sendMessageAsync(signOnMsg).thenAccept(success -&gt; {</span>
+<span class="fc bfc" id="L199" title="All 2 branches covered.">                if (success) {</span>
+<span class="fc" id="L200">                    log.info(&quot;Sign-on request sent successfully&quot;);</span>
+                    // Response will be handled in onMessage
+<span class="fc" id="L202">                    signOnFuture.complete(true);</span>
+                } else {
+<span class="fc" id="L204">                    log.error(&quot;Failed to send sign-on request&quot;);</span>
+<span class="fc" id="L205">                    signOnFuture.complete(false);</span>
+                }
+<span class="fc" id="L207">            });</span>
+
+<span class="nc" id="L209">        } catch (Exception e) {</span>
+<span class="nc" id="L210">            log.error(&quot;Error creating sign-on message&quot;, e);</span>
+<span class="nc" id="L211">            signOnFuture.completeExceptionally(e);</span>
+<span class="fc" id="L212">        }</span>
+
+<span class="fc" id="L214">        return signOnFuture;</span>
+    }
+
+    /**
+     * Initiates a sign-off request to the server.
+     *
+     * @return CompletableFuture that completes when sign-off is successful
+     */
+    public CompletableFuture&lt;Boolean&gt; signOff() {
+<span class="fc" id="L223">        CompletableFuture&lt;Boolean&gt; signOffFuture = new CompletableFuture&lt;&gt;();</span>
+
+        try {
+<span class="fc" id="L226">            ISOMsg signOffMsg = createSignOffMessage();</span>
+<span class="fc" id="L227">            log.info(&quot;Initiating sign-off request&quot;);</span>
+
+<span class="fc" id="L229">            sendMessageAsync(signOffMsg).thenAccept(success -&gt; {</span>
+<span class="fc bfc" id="L230" title="All 2 branches covered.">                if (success) {</span>
+<span class="fc" id="L231">                    log.info(&quot;Sign-off request sent successfully&quot;);</span>
+                    // Response will be handled in onMessage
+<span class="fc" id="L233">                    signOffFuture.complete(true);</span>
+                } else {
+<span class="fc" id="L235">                    log.error(&quot;Failed to send sign-off request&quot;);</span>
+<span class="fc" id="L236">                    signOffFuture.complete(false);</span>
+                }
+<span class="fc" id="L238">            });</span>
+
+<span class="nc" id="L240">        } catch (Exception e) {</span>
+<span class="nc" id="L241">            log.error(&quot;Error creating sign-off message&quot;, e);</span>
+<span class="nc" id="L242">            signOffFuture.completeExceptionally(e);</span>
+<span class="fc" id="L243">        }</span>
+
+<span class="fc" id="L245">        return signOffFuture;</span>
+    }
+
+    /**
+     * Sends an echo request to the server.
+     *
+     * @return CompletableFuture that completes when echo is successful
+     */
+    public CompletableFuture&lt;Boolean&gt; echo() {
+<span class="fc" id="L254">        CompletableFuture&lt;Boolean&gt; echoFuture = new CompletableFuture&lt;&gt;();</span>
+
+        try {
+<span class="fc" id="L257">            ISOMsg echoMsg = createEchoMessage();</span>
+<span class="fc" id="L258">            log.info(&quot;Sending echo request&quot;);</span>
+
+<span class="fc" id="L260">            sendMessageAsync(echoMsg).thenAccept(success -&gt; {</span>
+<span class="fc bfc" id="L261" title="All 2 branches covered.">                if (success) {</span>
+<span class="fc" id="L262">                    log.info(&quot;Echo request sent successfully&quot;);</span>
+                    // Response will be handled in onMessage
+<span class="fc" id="L264">                    echoFuture.complete(true);</span>
+                } else {
+<span class="fc" id="L266">                    log.error(&quot;Failed to send echo request&quot;);</span>
+<span class="fc" id="L267">                    echoFuture.complete(false);</span>
+                }
+<span class="fc" id="L269">            });</span>
+
+<span class="nc" id="L271">        } catch (Exception e) {</span>
+<span class="nc" id="L272">            log.error(&quot;Error creating echo message&quot;, e);</span>
+<span class="nc" id="L273">            echoFuture.completeExceptionally(e);</span>
+<span class="fc" id="L274">        }</span>
+
+<span class="fc" id="L276">        return echoFuture;</span>
+    }
+
+    /**
+     * Configures the Netty pipeline for the client channel.
+     * Adds length-based framing and logging handlers.
+     *
+     * @param pipeline The channel pipeline to configure
+     */
+    @Override
+    protected void configurePipeline(ChannelPipeline pipeline) {
+        // Add length-based frame decoder
+<span class="fc" id="L288">        pipeline.addLast(new LengthFieldBasedFrameDecoder(</span>
+<span class="fc" id="L289">                getMaxFrameLength(),</span>
+<span class="fc" id="L290">                getLengthFieldOffset(),</span>
+<span class="fc" id="L291">                getLengthFieldSize(),</span>
+<span class="fc" id="L292">                getLengthAdjustment(),</span>
+<span class="fc" id="L293">                getInitialBytesToStrip()));</span>
+
+        // Add byte array decoder
+<span class="fc" id="L296">        pipeline.addLast(new ByteArrayDecoder());</span>
+
+        // Add length field prepender for outgoing messages
+<span class="fc" id="L299">        pipeline.addLast(new LengthFieldPrepender(</span>
+<span class="fc" id="L300">                getLengthFieldSize(),</span>
+<span class="fc" id="L301">                getIncludeLengthFieldLength()));</span>
+
+        // Add logging handler
+<span class="pc bpc" id="L304" title="1 of 2 branches missed.">        if (RawDataLogging.isEnabled()) {</span>
+<span class="nc" id="L305">            pipeline.addLast(new LoggingHandler(LogLevel.DEBUG));</span>
+        }
+
+        // Add this channel handler
+<span class="fc" id="L309">        pipeline.addLast(this);</span>
+<span class="fc" id="L310">    }</span>
+
+    /**
+     * Called when a connection is established.
+     * Stores the channel context for sending messages.
+     *
+     * @param ctx The channel handler context
+     */
+    @Override
+    protected void onConnect(ChannelHandlerContext ctx) {
+<span class="fc" id="L320">        this.currentContext = ctx;</span>
+<span class="fc" id="L321">        log.info(&quot;ISO8583 client channel connected to: {}&quot;, ctx.channel().remoteAddress());</span>
+<span class="fc" id="L322">    }</span>
+
+    /**
+     * Called when a connection is closed.
+     * Clears the channel context.
+     *
+     * @param ctx The channel handler context
+     */
+    @Override
+    protected void onDisconnect(ChannelHandlerContext ctx) {
+<span class="fc" id="L332">        this.currentContext = null;</span>
+<span class="fc" id="L333">        log.info(&quot;ISO8583 client channel disconnected from: {}&quot;,</span>
+<span class="pc bpc" id="L334" title="1 of 2 branches missed.">                ctx != null ? ctx.channel().remoteAddress() : &quot;unknown&quot;);</span>
+<span class="fc" id="L335">    }</span>
+
+    /**
+     * Called when a complete ISO8583 message is received.
+     *
+     * @param ctx The channel handler context
+     * @param isoMsg The received ISO8583 message
+     */
+    @Override
+    protected void onMessage(ChannelHandlerContext ctx, ISOMsg isoMsg) {
+        try {
+<span class="fc" id="L346">        log.info(&quot;Received ISO8583 message from server - MTI: {}, STAN: {}&quot;,</span>
+<span class="fc" id="L347">                isoMsg.getMTI(), isoMsg.getString(11));</span>
+
+        // Handle the message based on MTI
+<span class="fc" id="L350">        String mti = isoMsg.getMTI();</span>
+<span class="pc bpc" id="L351" title="1 of 2 branches missed.">        if (mti != null) {</span>
+<span class="fc bfc" id="L352" title="All 2 branches covered.">            if (mti.endsWith(&quot;800&quot;)) {</span>
+<span class="fc" id="L353">                handleNetworkMessage(ctx, isoMsg);</span>
+            } else {
+<span class="fc" id="L355">                handleFinancialMessage(ctx, isoMsg);</span>
+            }
+        } else {
+<span class="nc" id="L358">                log.warn(&quot;Received message without MTI&quot;);</span>
+            }
+<span class="fc" id="L360">        } catch (ISOException e) {</span>
+<span class="fc" id="L361">            log.error(&quot;Error processing ISO8583 message&quot;, e);</span>
+<span class="fc" id="L362">        }</span>
+<span class="fc" id="L363">    }</span>
+
+    /**
+     * Called when an error occurs.
+     *
+     * @param ctx The channel handler context
+     * @param cause The error
+     */
+    @Override
+    protected void onError(ChannelHandlerContext ctx, Throwable cause) {
+<span class="fc" id="L373">        log.error(&quot;ISO8583 client channel error&quot;, cause);</span>
+        // Close the connection on error
+<span class="pc bpc" id="L375" title="1 of 2 branches missed.">        if (ctx != null) {</span>
+<span class="fc" id="L376">            ctx.close();</span>
+        }
+<span class="fc" id="L378">    }</span>
+
+    // Abstract methods to be implemented by subclasses
+
+    /**
+     * Handles network messages (MTI 0800).
+     *
+     * @param ctx The channel handler context
+     * @param isoMsg The network message
+     */
+    protected abstract void handleNetworkMessage(ChannelHandlerContext ctx, ISOMsg isoMsg);
+
+    /**
+     * Handles financial messages.
+     *
+     * @param ctx The channel handler context
+     * @param isoMsg The financial message
+     */
+    protected abstract void handleFinancialMessage(ChannelHandlerContext ctx, ISOMsg isoMsg);
+
+    // Configuration methods that can be overridden
+
+    /**
+     * Gets the length field size.
+     *
+     * @return The length field size
+     */
+    protected int getLengthFieldSize() {
+<span class="fc" id="L406">        return lengthFieldSize;</span>
+    }
+
+    /**
+     * Gets the maximum frame length for the decoder.
+     *
+     * @return The maximum frame length
+     */
+    protected int getMaxFrameLength() {
+<span class="fc" id="L415">        return DEFAULT_MAX_FRAME_LENGTH;</span>
+    }
+
+    /**
+     * Gets the length field offset.
+     *
+     * @return The length field offset
+     */
+    protected int getLengthFieldOffset() {
+<span class="fc" id="L424">        return DEFAULT_LENGTH_FIELD_OFFSET;</span>
+    }
+
+    /**
+     * Gets the length adjustment.
+     *
+     * @return The length adjustment
+     */
+    protected int getLengthAdjustment() {
+<span class="fc" id="L433">        return DEFAULT_LENGTH_ADJUSTMENT;</span>
+    }
+
+    /**
+     * Gets the initial bytes to strip.
+     *
+     * @return The initial bytes to strip
+     */
+    protected int getInitialBytesToStrip() {
+<span class="fc" id="L442">        return DEFAULT_INITIAL_BYTES_TO_STRIP;</span>
+    }
+
+    /**
+     * Gets whether to include length field length.
+     *
+     * @return Whether to include length field length
+     */
+    protected boolean getIncludeLengthFieldLength() {
+<span class="fc" id="L451">        return DEFAULT_INCLUDE_LENGTH_FIELD_LENGTH;</span>
+    }
+
+    // Message creation methods that can be overridden
+
+    /**
+     * Creates a sign-on message.
+     *
+     * @return The sign-on message
+     */
+    protected ISOMsg createSignOnMessage() {
+        try {
+<span class="fc" id="L463">        ISOMsg signOnMsg = new ISOMsg();</span>
+<span class="fc" id="L464">        signOnMsg.setPackager(getPackager());</span>
+<span class="fc" id="L465">        signOnMsg.setMTI(&quot;0800&quot;);</span>
+<span class="fc" id="L466">        signOnMsg.set(70, &quot;001&quot;); // Sign-on request</span>
+<span class="fc" id="L467">        signOnMsg.set(7, getTransmissionDateTime());</span>
+<span class="fc" id="L468">        signOnMsg.set(11, getNextStan());</span>
+<span class="fc" id="L469">        return signOnMsg;</span>
+<span class="nc" id="L470">        } catch (ISOException e) {</span>
+<span class="nc" id="L471">            log.error(&quot;Error creating sign-on message&quot;, e);</span>
+<span class="nc" id="L472">            return null;</span>
+        }
+    }
+
+    /**
+     * Creates a sign-off message.
+     *
+     * @return The sign-off message
+     */
+    protected ISOMsg createSignOffMessage() {
+        try {
+<span class="fc" id="L483">        ISOMsg signOffMsg = new ISOMsg();</span>
+<span class="fc" id="L484">        signOffMsg.setPackager(getPackager());</span>
+<span class="fc" id="L485">        signOffMsg.setMTI(&quot;0800&quot;);</span>
+<span class="fc" id="L486">        signOffMsg.set(70, &quot;002&quot;); // Sign-off request</span>
+<span class="fc" id="L487">        signOffMsg.set(7, getTransmissionDateTime());</span>
+<span class="fc" id="L488">        signOffMsg.set(11, getNextStan());</span>
+<span class="fc" id="L489">        return signOffMsg;</span>
+<span class="nc" id="L490">        } catch (ISOException e) {</span>
+<span class="nc" id="L491">            log.error(&quot;Error creating sign-off message&quot;, e);</span>
+<span class="nc" id="L492">            return null;</span>
+        }
+    }
+
+    /**
+     * Creates an echo message.
+     *
+     * @return The echo message
+     */
+    protected ISOMsg createEchoMessage() {
+        try {
+<span class="fc" id="L503">        ISOMsg echoMsg = new ISOMsg();</span>
+<span class="fc" id="L504">        echoMsg.setPackager(getPackager());</span>
+<span class="fc" id="L505">        echoMsg.setMTI(&quot;0800&quot;);</span>
+<span class="fc" id="L506">        echoMsg.set(70, &quot;301&quot;); // Echo request</span>
+<span class="fc" id="L507">        echoMsg.set(7, getTransmissionDateTime());</span>
+<span class="fc" id="L508">        echoMsg.set(11, getNextStan());</span>
+<span class="fc" id="L509">        return echoMsg;</span>
+<span class="nc" id="L510">        } catch (ISOException e) {</span>
+<span class="nc" id="L511">            log.error(&quot;Error creating echo message&quot;, e);</span>
+<span class="nc" id="L512">            return null;</span>
+        }
+    }
+
+    // Utility methods
+
+    /**
+     * Gets the current transmission date and time in MMDDhhmmss format.
+     *
+     * @return The transmission date and time string
+     */
+    protected String getTransmissionDateTime() {
+<span class="fc" id="L524">        return java.time.LocalDateTime.now().format(java.time.format.DateTimeFormatter.ofPattern(&quot;MMddHHmmss&quot;));</span>
+    }
+
+    /**
+     * Gets the next System Trace Audit Number (STAN).
+     * This is a simple implementation - in production, this should be thread-safe and persistent.
+     *
+     * @return The next STAN
+     */
+    protected String getNextStan() {
+<span class="fc" id="L534">        return String.format(&quot;%06d&quot;, (int) (Math.random() * 999999));</span>
+    }
+
+    /**
+     * Gets the client connection status information.
+     *
+     * @return A string describing the client connection status
+     */
+    public String getClientStatus() {
+<span class="fc" id="L543">        return String.format(&quot;ISO8583 Client - %s, Context: %s&quot;,</span>
+<span class="fc" id="L544">                getConnectionStatus(),</span>
+<span class="fc bfc" id="L545" title="All 2 branches covered.">                currentContext != null ? &quot;Active&quot; : &quot;Inactive&quot;);</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.14.202510111229</span></div></body></html>

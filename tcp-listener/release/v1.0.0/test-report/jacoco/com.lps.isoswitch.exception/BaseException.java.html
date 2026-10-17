@@ -1,0 +1,58 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>BaseException.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">switch</a> &gt; <a href="index.source.html" class="el_package">com.lps.isoswitch.exception</a> &gt; <span class="el_source">BaseException.java</span></div><h1>BaseException.java</h1><pre class="source lang-java linenums">package com.lps.isoswitch.exception;
+
+/**
+ * Base exception class for the ISO Switch application.
+ * All application-specific exceptions should extend this class.
+ *
+ * @author Logicpoint Systems
+ * @version 1.0
+ * @since 2025-06-15
+ */
+public class BaseException extends RuntimeException {
+    private final String errorCode;
+    private final String errorMessage;
+
+    /**
+     * Creates a new BaseException with the specified error code and message.
+     *
+     * @param errorCode The error code
+     * @param errorMessage The error message
+     */
+    public BaseException(String errorCode, String errorMessage) {
+<span class="fc" id="L22">        super(errorMessage);</span>
+<span class="fc" id="L23">        this.errorCode = errorCode;</span>
+<span class="fc" id="L24">        this.errorMessage = errorMessage;</span>
+<span class="fc" id="L25">    }</span>
+
+    /**
+     * Creates a new BaseException with the specified error code, message, and cause.
+     *
+     * @param errorCode The error code
+     * @param errorMessage The error message
+     * @param cause The cause of the exception
+     */
+    public BaseException(String errorCode, String errorMessage, Throwable cause) {
+<span class="fc" id="L35">        super(errorMessage, cause);</span>
+<span class="fc" id="L36">        this.errorCode = errorCode;</span>
+<span class="fc" id="L37">        this.errorMessage = errorMessage;</span>
+<span class="fc" id="L38">    }</span>
+
+    /**
+     * Gets the error code.
+     *
+     * @return The error code
+     */
+    public String getErrorCode() {
+<span class="fc" id="L46">        return errorCode;</span>
+    }
+
+    /**
+     * Gets the error message.
+     *
+     * @return The error message
+     */
+    public String getErrorMessage() {
+<span class="fc" id="L55">        return errorMessage;</span>
+    }
+} 
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.14.202510111229</span></div></body></html>

@@ -1,0 +1,68 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>ConnectionStatusController.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">switch</a> &gt; <a href="index.source.html" class="el_package">com.lps.isoswitch.controller</a> &gt; <span class="el_source">ConnectionStatusController.java</span></div><h1>ConnectionStatusController.java</h1><pre class="source lang-java linenums">package com.lps.isoswitch.controller;
+
+import com.lps.isoswitch.service.ConnectionStatusService;
+import com.lps.isoswitch.utils.Enums.SwitchDestinationEnum;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+import org.springframework.http.ResponseEntity;
+import org.springframework.web.bind.annotation.*;
+
+import java.util.Map;
+
+/**
+ * Controller for exposing connection status and metrics.
+ * This controller provides endpoints to check connection status,
+ * sign-on status, and transaction metrics.
+ *
+ * @author Logicpoint Systems
+ * @version 1.0
+ * @since 2025-06-15
+ */
+@RestController
+@RequestMapping(&quot;/api/v1/connection-status&quot;)
+public class ConnectionStatusController {
+<span class="fc" id="L24">    private static final Logger log = LoggerFactory.getLogger(ConnectionStatusController.class);</span>
+    private final ConnectionStatusService connectionStatusService;
+
+<span class="fc" id="L27">    public ConnectionStatusController(ConnectionStatusService connectionStatusService) {</span>
+<span class="fc" id="L28">        this.connectionStatusService = connectionStatusService;</span>
+<span class="fc" id="L29">    }</span>
+
+    /**
+     * Gets the status and metrics for a specific scheme.
+     *
+     * @param scheme The scheme to get status for
+     * @return The status and metrics for the scheme
+     */
+    @GetMapping(&quot;/{scheme}&quot;)
+    public ResponseEntity&lt;Map&lt;String, Object&gt;&gt; getSchemeStatus(
+            @PathVariable(&quot;scheme&quot;) SwitchDestinationEnum scheme) {
+<span class="fc" id="L40">        log.debug(&quot;Getting status for scheme: {}&quot;, scheme);</span>
+<span class="fc" id="L41">        return ResponseEntity.ok(connectionStatusService.getMetrics(scheme));</span>
+    }
+
+    /**
+     * Gets the status and metrics for all schemes.
+     *
+     * @return The status and metrics for all schemes
+     */
+    @GetMapping
+    public ResponseEntity&lt;Map&lt;SwitchDestinationEnum, Map&lt;String, Object&gt;&gt;&gt; getAllStatus() {
+<span class="fc" id="L51">        log.debug(&quot;Getting status for all schemes&quot;);</span>
+<span class="fc" id="L52">        return ResponseEntity.ok(connectionStatusService.getAllMetrics());</span>
+    }
+
+    /**
+     * Checks if a scheme is ready for transactions.
+     *
+     * @param scheme The scheme to check
+     * @return true if ready for transactions, false otherwise
+     */
+    @GetMapping(&quot;/{scheme}/ready&quot;)
+    public ResponseEntity&lt;Boolean&gt; isReadyForTransactions(
+            @PathVariable(&quot;scheme&quot;) SwitchDestinationEnum scheme) {
+<span class="fc" id="L64">        log.debug(&quot;Checking if scheme is ready for transactions: {}&quot;, scheme);</span>
+<span class="fc" id="L65">        return ResponseEntity.ok(connectionStatusService.isReadyForTransactions(scheme));</span>
+    }
+} 
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.14.202510111229</span></div></body></html>

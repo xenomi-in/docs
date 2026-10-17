@@ -36,7 +36,7 @@ On macOS use `shasum -a 256` to inspect individual checksums. Match the loaded i
 
 ## Original pre-correction evidence
 
-Generated reports have been removed from `docs/`. A local ignored archive remains at `release-assets/v1.0.0/v1.0.0-test-reports.zip`; removing generated files from the current tree does not erase earlier Git history.
+In the source repository, generated reports have been removed from `docs/` and a local ignored archive remains at `release-assets/v1.0.0/v1.0.0-test-reports.zip`. This documentation repository includes a [copy of the original archive](test-report/v1.0.0-test-reports.zip), [JUnit results](test-report/junit/index.html), [coverage report](test-report/jacoco/index.html), and [build log](test-report/build.log) as pre-correction evidence. Removing generated files from the source tree does not erase earlier Git history.
 
 The historical test run was on `774c33a`, while tag v1.0.0 is `a4c085c`; the difference is documentation/reports only. The historical archive is not evidence for a new JAR or image. No release upload has been performed by this repository change. If retaining it in the release, label the original archive as pre-correction evidence and distinguish it from the candidate reports. Do not use this pre-correction evidence as proof of the corrected release binary; publish fresh candidate evidence from CI.
 

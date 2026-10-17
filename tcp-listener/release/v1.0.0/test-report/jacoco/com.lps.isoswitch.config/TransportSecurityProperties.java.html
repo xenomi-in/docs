@@ -1,0 +1,50 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>TransportSecurityProperties.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">switch</a> &gt; <a href="index.source.html" class="el_package">com.lps.isoswitch.config</a> &gt; <span class="el_source">TransportSecurityProperties.java</span></div><h1>TransportSecurityProperties.java</h1><pre class="source lang-java linenums">package com.lps.isoswitch.config;
+
+import org.springframework.boot.context.properties.ConfigurationProperties;
+import org.springframework.context.annotation.Configuration;
+
+/** TLS identities and trust anchors for outbound payment-data connections. */
+@Configuration
+@ConfigurationProperties(prefix = &quot;security.transport&quot;)
+<span class="fc" id="L9">public class TransportSecurityProperties {</span>
+
+<span class="fc" id="L11">    private final TlsEndpoint switchCore = new TlsEndpoint();</span>
+<span class="fc" id="L12">    private final TlsEndpoint scheme = new TlsEndpoint();</span>
+
+    public TlsEndpoint getSwitchCore() {
+<span class="fc" id="L15">        return switchCore;</span>
+    }
+
+    public TlsEndpoint getScheme() {
+<span class="fc" id="L19">        return scheme;</span>
+    }
+
+<span class="fc" id="L22">    public static class TlsEndpoint {</span>
+        private boolean enabled;
+        private String keyStore;
+        private String keyStorePassword;
+        private String keyPassword;
+<span class="fc" id="L27">        private String keyStoreType = &quot;PKCS12&quot;;</span>
+        private String trustStore;
+        private String trustStorePassword;
+<span class="fc" id="L30">        private String trustStoreType = &quot;PKCS12&quot;;</span>
+
+<span class="fc" id="L32">        public boolean isEnabled() { return enabled; }</span>
+<span class="fc" id="L33">        public void setEnabled(boolean enabled) { this.enabled = enabled; }</span>
+<span class="fc" id="L34">        public String getKeyStore() { return keyStore; }</span>
+<span class="fc" id="L35">        public void setKeyStore(String keyStore) { this.keyStore = keyStore; }</span>
+<span class="fc" id="L36">        public String getKeyStorePassword() { return keyStorePassword; }</span>
+<span class="fc" id="L37">        public void setKeyStorePassword(String keyStorePassword) { this.keyStorePassword = keyStorePassword; }</span>
+<span class="fc" id="L38">        public String getKeyPassword() { return keyPassword; }</span>
+<span class="fc" id="L39">        public void setKeyPassword(String keyPassword) { this.keyPassword = keyPassword; }</span>
+<span class="fc" id="L40">        public String getKeyStoreType() { return keyStoreType; }</span>
+<span class="fc" id="L41">        public void setKeyStoreType(String keyStoreType) { this.keyStoreType = keyStoreType; }</span>
+<span class="fc" id="L42">        public String getTrustStore() { return trustStore; }</span>
+<span class="fc" id="L43">        public void setTrustStore(String trustStore) { this.trustStore = trustStore; }</span>
+<span class="fc" id="L44">        public String getTrustStorePassword() { return trustStorePassword; }</span>
+<span class="fc" id="L45">        public void setTrustStorePassword(String trustStorePassword) { this.trustStorePassword = trustStorePassword; }</span>
+<span class="fc" id="L46">        public String getTrustStoreType() { return trustStoreType; }</span>
+<span class="fc" id="L47">        public void setTrustStoreType(String trustStoreType) { this.trustStoreType = trustStoreType; }</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.14.202510111229</span></div></body></html>

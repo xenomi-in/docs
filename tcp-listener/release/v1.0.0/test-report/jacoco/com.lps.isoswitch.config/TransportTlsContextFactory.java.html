@@ -1,0 +1,86 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>TransportTlsContextFactory.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">switch</a> &gt; <a href="index.source.html" class="el_package">com.lps.isoswitch.config</a> &gt; <span class="el_source">TransportTlsContextFactory.java</span></div><h1>TransportTlsContextFactory.java</h1><pre class="source lang-java linenums">package com.lps.isoswitch.config;
+
+import java.io.InputStream;
+import java.security.KeyStore;
+
+import javax.net.ssl.KeyManagerFactory;
+import javax.net.ssl.TrustManagerFactory;
+
+import org.springframework.core.io.Resource;
+import org.springframework.core.io.ResourceLoader;
+import org.springframework.stereotype.Component;
+
+import io.netty.handler.ssl.SslContext;
+import io.netty.handler.ssl.SslContextBuilder;
+import io.netty.handler.ssl.SslProvider;
+
+/** Builds client-side Netty TLS contexts from configured key/trust stores. */
+@Component
+public class TransportTlsContextFactory {
+
+    private final ResourceLoader resourceLoader;
+
+<span class="fc" id="L23">    public TransportTlsContextFactory(ResourceLoader resourceLoader) {</span>
+<span class="fc" id="L24">        this.resourceLoader = resourceLoader;</span>
+<span class="fc" id="L25">    }</span>
+
+    public SslContext createClientContext(
+            String connectionName,
+            TransportSecurityProperties.TlsEndpoint endpoint) {
+<span class="fc bfc" id="L30" title="All 2 branches covered.">        if (!endpoint.isEnabled()) {</span>
+<span class="fc" id="L31">            throw new IllegalStateException(connectionName + &quot; TLS is disabled&quot;);</span>
+        }
+<span class="fc" id="L33">        requireText(endpoint.getKeyStore(), connectionName + &quot; key store&quot;);</span>
+<span class="fc" id="L34">        requireText(endpoint.getKeyStorePassword(), connectionName + &quot; key-store password&quot;);</span>
+<span class="fc" id="L35">        requireText(endpoint.getTrustStore(), connectionName + &quot; trust store&quot;);</span>
+<span class="fc" id="L36">        requireText(endpoint.getTrustStorePassword(), connectionName + &quot; trust-store password&quot;);</span>
+
+        try {
+<span class="pc" id="L39">            KeyStore keyStore = loadStore(endpoint.getKeyStore(), endpoint.getKeyStoreType(),</span>
+<span class="fc" id="L40">                    endpoint.getKeyStorePassword());</span>
+<span class="nc" id="L41">            KeyManagerFactory keyManagers = KeyManagerFactory.getInstance(KeyManagerFactory.getDefaultAlgorithm());</span>
+<span class="nc bnc" id="L42" title="All 2 branches missed.">            String keyPassword = hasText(endpoint.getKeyPassword())</span>
+<span class="nc" id="L43">                    ? endpoint.getKeyPassword()</span>
+<span class="nc" id="L44">                    : endpoint.getKeyStorePassword();</span>
+<span class="nc" id="L45">            keyManagers.init(keyStore, keyPassword.toCharArray());</span>
+
+<span class="nc" id="L47">            KeyStore trustStore = loadStore(endpoint.getTrustStore(), endpoint.getTrustStoreType(),</span>
+<span class="nc" id="L48">                    endpoint.getTrustStorePassword());</span>
+<span class="nc" id="L49">            TrustManagerFactory trustManagers = TrustManagerFactory.getInstance(</span>
+<span class="nc" id="L50">                    TrustManagerFactory.getDefaultAlgorithm());</span>
+<span class="nc" id="L51">            trustManagers.init(trustStore);</span>
+
+<span class="nc" id="L53">            return SslContextBuilder.forClient()</span>
+<span class="nc" id="L54">                    .sslProvider(SslProvider.JDK)</span>
+<span class="nc" id="L55">                    .protocols(&quot;TLSv1.3&quot;, &quot;TLSv1.2&quot;)</span>
+<span class="nc" id="L56">                    .keyManager(keyManagers)</span>
+<span class="nc" id="L57">                    .trustManager(trustManagers)</span>
+<span class="nc" id="L58">                    .build();</span>
+<span class="fc" id="L59">        } catch (Exception exception) {</span>
+<span class="fc" id="L60">            throw new IllegalStateException(&quot;Unable to initialize &quot; + connectionName + &quot; TLS material&quot;, exception);</span>
+        }
+    }
+
+    private KeyStore loadStore(String location, String type, String password) throws Exception {
+<span class="fc" id="L65">        Resource resource = resourceLoader.getResource(location);</span>
+<span class="pc bpc" id="L66" title="3 of 4 branches missed.">        if (!resource.exists() || !resource.isReadable()) {</span>
+<span class="fc" id="L67">            throw new IllegalStateException(&quot;TLS store is not readable: &quot; + location);</span>
+        }
+<span class="nc" id="L69">        KeyStore store = KeyStore.getInstance(type);</span>
+<span class="nc" id="L70">        try (InputStream input = resource.getInputStream()) {</span>
+<span class="nc" id="L71">            store.load(input, password.toCharArray());</span>
+        }
+<span class="nc" id="L73">        return store;</span>
+    }
+
+    private void requireText(String value, String name) {
+<span class="fc bfc" id="L77" title="All 2 branches covered.">        if (!hasText(value)) {</span>
+<span class="fc" id="L78">            throw new IllegalStateException(name + &quot; is required&quot;);</span>
+        }
+<span class="fc" id="L80">    }</span>
+
+    private boolean hasText(String value) {
+<span class="pc bpc" id="L83" title="1 of 4 branches missed.">        return value != null &amp;&amp; !value.isBlank();</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.14.202510111229</span></div></body></html>

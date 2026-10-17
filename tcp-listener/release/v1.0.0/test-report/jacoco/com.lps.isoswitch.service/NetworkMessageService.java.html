@@ -1,0 +1,189 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>NetworkMessageService.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">switch</a> &gt; <a href="index.source.html" class="el_package">com.lps.isoswitch.service</a> &gt; <span class="el_source">NetworkMessageService.java</span></div><h1>NetworkMessageService.java</h1><pre class="source lang-java linenums">package com.lps.isoswitch.service;
+
+import com.lps.isoswitch.config.SchemeConfig;
+import com.lps.isoswitch.utils.Enums.SwitchDestinationEnum;
+import org.jpos.iso.ISOMsg;
+import org.jpos.iso.ISOException;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+import org.springframework.stereotype.Service;
+
+/**
+ * Service class for handling network messages in the ISO8583 Switch.
+ * This service manages different types of network messages (sign-on, sign-off, echo, key exchange)
+ * for various card schemes (RuPay, Visa, MasterCard).
+ *
+ * @author Logicpoint Systems
+ * @version 1.0
+ * @since 2025-06-15
+ */
+@Service
+public class NetworkMessageService {
+    
+<span class="fc" id="L23">    private static final Logger log = LoggerFactory.getLogger(NetworkMessageService.class);</span>
+    
+    // Response codes
+    private static final String RESPONSE_APPROVED = &quot;00&quot;;
+    private static final String RESPONSE_DECLINED = &quot;05&quot;;
+    
+    // Network message type field
+    private static final int NETWORK_MESSAGE_TYPE_FIELD = 70;
+    
+    private final SchemeConfig schemeConfig;
+    
+    /**
+     * Constructor receives scheme configuration so field 70 network codes can
+     * differ per scheme without changing Java code.
+     */
+<span class="fc" id="L38">    public NetworkMessageService(SchemeConfig schemeConfig) {</span>
+<span class="fc" id="L39">        this.schemeConfig = schemeConfig;</span>
+<span class="fc" id="L40">    }</span>
+    
+    /**
+     * Handles network messages based on their type and scheme.
+     * 
+     * @param requestMsg The incoming network message
+     * @param scheme The card scheme (RuPay, Visa, MasterCard)
+     * @return ISOMsg containing the response
+     * @throws ISOException if there's an error processing the message
+     */
+    public ISOMsg handleNetworkMessage(ISOMsg requestMsg, String scheme) throws ISOException {
+<span class="fc bfc" id="L51" title="All 2 branches covered.">        if (!requestMsg.hasField(NETWORK_MESSAGE_TYPE_FIELD)) {</span>
+<span class="fc" id="L52">            throw new ISOException(&quot;Network message type field (70) is missing&quot;);</span>
+        }
+        
+<span class="fc" id="L55">        SwitchDestinationEnum destination = SwitchDestinationEnum.from(scheme);</span>
+<span class="fc" id="L56">        SchemeConfig.NetworkCodes networkCodes = schemeConfig.getNetworkCodes(destination);</span>
+<span class="fc" id="L57">        String networkMessageType = requestMsg.getString(NETWORK_MESSAGE_TYPE_FIELD);</span>
+<span class="fc" id="L58">        log.info(&quot;Processing {} network message type: {}&quot;, destination, networkMessageType);</span>
+        
+<span class="fc bfc" id="L60" title="All 2 branches covered.">        if (networkCodes.getSignOn().equals(networkMessageType)) {</span>
+<span class="fc" id="L61">            return handleSignOn(requestMsg, destination);</span>
+        }
+<span class="fc bfc" id="L63" title="All 2 branches covered.">        if (networkCodes.getSignOff().equals(networkMessageType)) {</span>
+<span class="fc" id="L64">            return handleSignOff(requestMsg, destination);</span>
+        }
+<span class="fc bfc" id="L66" title="All 2 branches covered.">        if (networkCodes.getEcho().equals(networkMessageType)) {</span>
+<span class="fc" id="L67">            return handleEcho(requestMsg, destination);</span>
+        }
+<span class="fc bfc" id="L69" title="All 2 branches covered.">        if (networkCodes.getDkeZpk().equals(networkMessageType)</span>
+<span class="fc bfc" id="L70" title="All 2 branches covered.">                || networkCodes.getDkeZak().equals(networkMessageType)) {</span>
+<span class="fc" id="L71">            return handleKeyExchange(requestMsg, destination);</span>
+        }
+<span class="fc bfc" id="L73" title="All 2 branches covered.">        if (networkCodes.getCutover().equals(networkMessageType)) {</span>
+<span class="fc" id="L74">            return handleCutover(requestMsg, destination);</span>
+        }
+<span class="fc bfc" id="L76" title="All 2 branches covered.">        if (networkCodes.getNetworkManagement().equals(networkMessageType)) {</span>
+<span class="fc" id="L77">            return handleNetworkManagement(requestMsg, destination);</span>
+        }
+
+<span class="fc" id="L80">        return handleUnknownMessage(requestMsg, networkMessageType);</span>
+    }
+
+    /**
+     * Creates the response shell shared by all local network-management
+     * responses: response MTI plus fields that must be echoed back.
+     */
+    private ISOMsg createBaseResponse(ISOMsg requestMsg) throws ISOException {
+<span class="fc" id="L88">        ISOMsg responseMsg = new ISOMsg();</span>
+<span class="fc" id="L89">        responseMsg.setPackager(requestMsg.getPackager());</span>
+
+<span class="fc" id="L91">        String mti = requestMsg.getMTI();</span>
+<span class="fc" id="L92">        int mtiNumber = Integer.parseInt(mti) + 10;</span>
+<span class="fc" id="L93">        responseMsg.setMTI(&quot;0&quot; + mtiNumber);</span>
+
+<span class="fc" id="L95">        copyEssentialFields(requestMsg, responseMsg);</span>
+<span class="fc" id="L96">        return responseMsg;</span>
+    }
+
+    /**
+     * Copies fields that should be mirrored in a network-management response.
+     */
+    private void copyEssentialFields(ISOMsg requestMsg, ISOMsg responseMsg) throws ISOException {
+<span class="fc" id="L103">        int[] essentialFields = {2, 3, 4, 7, 11, 12, 13, 32, 37, 41, 42, 49, NETWORK_MESSAGE_TYPE_FIELD};</span>
+
+<span class="fc bfc" id="L105" title="All 2 branches covered.">        for (int field : essentialFields) {</span>
+<span class="fc bfc" id="L106" title="All 2 branches covered.">            if (requestMsg.hasField(field)) {</span>
+<span class="fc" id="L107">                responseMsg.set(field, requestMsg.getString(field));</span>
+            }
+        }
+<span class="fc" id="L110">    }</span>
+
+    /**
+     * Handles configured sign-on requests for the active scheme.
+     */
+    private ISOMsg handleSignOn(ISOMsg requestMsg, SwitchDestinationEnum scheme) throws ISOException {
+<span class="fc" id="L116">        log.info(&quot;Processing {} sign-on request&quot;, scheme);</span>
+<span class="fc" id="L117">        ISOMsg responseMsg = createBaseResponse(requestMsg);</span>
+<span class="fc" id="L118">        responseMsg.set(39, RESPONSE_APPROVED);</span>
+<span class="fc" id="L119">        log.info(&quot;{} SIGN-ON SUCCESSFUL&quot;, scheme);</span>
+<span class="fc" id="L120">        return responseMsg;</span>
+    }
+
+    /**
+     * Handles configured sign-off requests for the active scheme.
+     */
+    private ISOMsg handleSignOff(ISOMsg requestMsg, SwitchDestinationEnum scheme) throws ISOException {
+<span class="fc" id="L127">        log.info(&quot;Processing {} sign-off request&quot;, scheme);</span>
+<span class="fc" id="L128">        ISOMsg responseMsg = createBaseResponse(requestMsg);</span>
+<span class="fc" id="L129">        responseMsg.set(39, RESPONSE_APPROVED);</span>
+<span class="fc" id="L130">        log.info(&quot;{} SIGN-OFF SUCCESSFUL&quot;, scheme);</span>
+<span class="fc" id="L131">        return responseMsg;</span>
+    }
+
+    /**
+     * Handles configured echo requests for the active scheme.
+     */
+    private ISOMsg handleEcho(ISOMsg requestMsg, SwitchDestinationEnum scheme) throws ISOException {
+<span class="fc" id="L138">        log.info(&quot;Processing {} echo request&quot;, scheme);</span>
+<span class="fc" id="L139">        ISOMsg responseMsg = createBaseResponse(requestMsg);</span>
+<span class="fc" id="L140">        responseMsg.set(39, RESPONSE_APPROVED);</span>
+<span class="fc" id="L141">        log.info(&quot;{} ECHO RESPONSE&quot;, scheme);</span>
+<span class="fc" id="L142">        return responseMsg;</span>
+    }
+
+    /**
+     * Handles configured DKE/key-exchange requests for the active scheme.
+     */
+    private ISOMsg handleKeyExchange(ISOMsg requestMsg, SwitchDestinationEnum scheme) throws ISOException {
+<span class="fc" id="L149">        log.info(&quot;Processing {} key exchange request&quot;, scheme);</span>
+<span class="fc" id="L150">        ISOMsg responseMsg = createBaseResponse(requestMsg);</span>
+<span class="fc" id="L151">        responseMsg.set(39, RESPONSE_APPROVED);</span>
+<span class="fc" id="L152">        log.info(&quot;{} KEY EXCHANGE SUCCESSFUL&quot;, scheme);</span>
+<span class="fc" id="L153">        return responseMsg;</span>
+    }
+
+    /**
+     * Handles configured cutover requests for schemes that use them.
+     */
+    private ISOMsg handleCutover(ISOMsg requestMsg, SwitchDestinationEnum scheme) throws ISOException {
+<span class="fc" id="L160">        log.info(&quot;Processing {} cutover request&quot;, scheme);</span>
+<span class="fc" id="L161">        ISOMsg responseMsg = createBaseResponse(requestMsg);</span>
+<span class="fc" id="L162">        responseMsg.set(39, RESPONSE_APPROVED);</span>
+<span class="fc" id="L163">        log.info(&quot;{} CUTOVER SUCCESSFUL&quot;, scheme);</span>
+<span class="fc" id="L164">        return responseMsg;</span>
+    }
+
+    /**
+     * Handles configured generic network-management requests for schemes that
+     * require a separate field 70 code.
+     */
+    private ISOMsg handleNetworkManagement(ISOMsg requestMsg, SwitchDestinationEnum scheme) throws ISOException {
+<span class="fc" id="L172">        log.info(&quot;Processing {} network management request&quot;, scheme);</span>
+<span class="fc" id="L173">        ISOMsg responseMsg = createBaseResponse(requestMsg);</span>
+<span class="fc" id="L174">        responseMsg.set(39, RESPONSE_APPROVED);</span>
+<span class="fc" id="L175">        log.info(&quot;{} NETWORK MANAGEMENT SUCCESSFUL&quot;, scheme);</span>
+<span class="fc" id="L176">        return responseMsg;</span>
+    }
+
+    /**
+     * Declines unconfigured or unsupported network-management message types.
+     */
+    private ISOMsg handleUnknownMessage(ISOMsg requestMsg, String messageType) throws ISOException {
+<span class="fc" id="L183">        log.warn(&quot;Received unknown network message type: {}&quot;, messageType);</span>
+<span class="fc" id="L184">        ISOMsg responseMsg = createBaseResponse(requestMsg);</span>
+<span class="fc" id="L185">        responseMsg.set(39, RESPONSE_DECLINED);</span>
+<span class="fc" id="L186">        return responseMsg;</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.14.202510111229</span></div></body></html>

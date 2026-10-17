@@ -1,0 +1,197 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>ConnectionManagementController.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">switch</a> &gt; <a href="index.source.html" class="el_package">com.lps.isoswitch.controller</a> &gt; <span class="el_source">ConnectionManagementController.java</span></div><h1>ConnectionManagementController.java</h1><pre class="source lang-java linenums">package com.lps.isoswitch.controller;
+
+import com.lps.isoswitch.tcpconnector.SchemeManagementHandler;
+import com.lps.isoswitch.service.ConnectionStatusService;
+import com.lps.isoswitch.service.SchemeRegistryService;
+import com.lps.isoswitch.utils.Enums.SwitchDestinationEnum;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.http.ResponseEntity;
+import org.springframework.web.bind.annotation.*;
+
+import java.util.Map;
+import java.util.concurrent.CompletableFuture;
+
+/**
+ * Controller for managing connection states and sign-on/sign-off operations.
+ * Provides REST endpoints for connection management operations.
+ *
+ * @author Logicpoint Systems
+ * @version 1.0
+ * @since 2025-06-15
+ */
+@RestController
+@RequestMapping(&quot;/api/v1/connection&quot;)
+<span class="fc" id="L26">public class ConnectionManagementController {</span>
+
+<span class="fc" id="L28">    private static final Logger log = LoggerFactory.getLogger(ConnectionManagementController.class);</span>
+
+    @Autowired
+    private SchemeRegistryService schemeRegistryService;
+
+    @Autowired
+    private ConnectionStatusService connectionStatusService;
+
+    /**
+     * Initiates a sign-on request for the specified scheme.
+     *
+     * @param scheme The card scheme (e.g., RUPAY)
+     * @return ResponseEntity with operation status
+     */
+    @PostMapping(&quot;/{scheme}/sign-on&quot;)
+    public ResponseEntity&lt;Map&lt;String, Object&gt;&gt; signOn(@PathVariable String scheme) {
+        try {
+<span class="fc" id="L45">            SwitchDestinationEnum destination = SwitchDestinationEnum.from(scheme);</span>
+
+            // Check if connection is established
+<span class="fc" id="L48">            Map&lt;String, Object&gt; metrics = connectionStatusService.getMetrics(destination);</span>
+<span class="fc" id="L49">            boolean connectionStatus = (boolean) metrics.get(&quot;isConnected&quot;);</span>
+<span class="fc bfc" id="L50" title="All 2 branches covered.">            if (!connectionStatus) {</span>
+<span class="fc" id="L51">                return ResponseEntity.badRequest().body(Map.of(</span>
+                        &quot;status&quot;, &quot;error&quot;,
+                        &quot;message&quot;, &quot;Cannot initiate sign-on: Connection not established&quot;,
+                        &quot;scheme&quot;, scheme,
+<span class="fc" id="L55">                        &quot;connectionStatus&quot;, connectionStatus</span>
+                ));
+            }
+
+<span class="fc" id="L59">            SchemeManagementHandler handler = schemeRegistryService.getManagementHandler(destination);</span>
+<span class="fc" id="L60">            CompletableFuture&lt;Boolean&gt; signOnFuture = handler.initiateSignOn();</span>
+
+<span class="fc" id="L62">            return ResponseEntity.ok(Map.of(</span>
+                    &quot;status&quot;, &quot;success&quot;,
+                    &quot;message&quot;, &quot;Sign-on request initiated&quot;,
+                    &quot;scheme&quot;, scheme,
+<span class="fc" id="L66">                    &quot;connectionStatus&quot;, connectionStatus</span>
+            ));
+<span class="fc" id="L68">        } catch (IllegalArgumentException e) {</span>
+<span class="fc" id="L69">            log.error(&quot;Invalid scheme: {}&quot;, scheme);</span>
+<span class="fc" id="L70">            return ResponseEntity.badRequest().body(Map.of(</span>
+                    &quot;status&quot;, &quot;error&quot;,
+                    &quot;message&quot;, &quot;Invalid scheme: &quot; + scheme
+            ));
+<span class="fc" id="L74">        } catch (Exception e) {</span>
+<span class="fc" id="L75">            log.error(&quot;Error initiating sign-on&quot;, e);</span>
+<span class="fc" id="L76">            return ResponseEntity.internalServerError().body(Map.of(</span>
+                    &quot;status&quot;, &quot;error&quot;,
+<span class="fc" id="L78">                    &quot;message&quot;, &quot;Failed to initiate sign-on: &quot; + e.getMessage()</span>
+            ));
+        }
+    }
+
+    /**
+     * Initiates a sign-off request for the specified scheme.
+     *
+     * @param scheme The card scheme (e.g., RUPAY)
+     * @return ResponseEntity with operation status
+     */
+    @PostMapping(&quot;/{scheme}/sign-off&quot;)
+    public ResponseEntity&lt;Map&lt;String, Object&gt;&gt; signOff(@PathVariable String scheme) {
+        try {
+<span class="fc" id="L92">            SwitchDestinationEnum destination = SwitchDestinationEnum.from(scheme);</span>
+
+            // Check if connection is established
+<span class="fc" id="L95">            Map&lt;String, Object&gt; metrics = connectionStatusService.getMetrics(destination);</span>
+<span class="fc" id="L96">            boolean connectionStatus = (boolean) metrics.get(&quot;isConnected&quot;);</span>
+
+            // Handle null connection status
+<span class="fc bfc" id="L99" title="All 2 branches covered.">            if (!connectionStatus) {</span>
+<span class="fc" id="L100">                return ResponseEntity.badRequest().body(Map.of(</span>
+                        &quot;status&quot;, &quot;error&quot;,
+                        &quot;message&quot;, &quot;Cannot initiate sign-off: Connection not established&quot;,
+                        &quot;scheme&quot;, scheme,
+<span class="fc" id="L104">                        &quot;connectionStatus&quot;, connectionStatus</span>
+                ));
+            }
+
+<span class="fc" id="L108">            SchemeManagementHandler handler = schemeRegistryService.getManagementHandler(destination);</span>
+<span class="fc" id="L109">            CompletableFuture&lt;Boolean&gt; signOffFuture = handler.initiateSignOff();</span>
+
+<span class="fc" id="L111">            return ResponseEntity.ok(Map.of(</span>
+                    &quot;status&quot;, &quot;success&quot;,
+                    &quot;message&quot;, &quot;Sign-off request initiated&quot;,
+                    &quot;scheme&quot;, scheme,
+<span class="fc" id="L115">                    &quot;connectionStatus&quot;, connectionStatus</span>
+            ));
+<span class="fc" id="L117">        } catch (IllegalArgumentException e) {</span>
+<span class="fc" id="L118">            log.error(&quot;Invalid scheme: {}&quot;, scheme);</span>
+<span class="fc" id="L119">            return ResponseEntity.badRequest().body(Map.of(</span>
+                    &quot;status&quot;, &quot;error&quot;,
+                    &quot;message&quot;, &quot;Invalid scheme: &quot; + scheme
+            ));
+<span class="fc" id="L123">        } catch (Exception e) {</span>
+<span class="fc" id="L124">            log.error(&quot;Error initiating sign-off&quot;, e);</span>
+<span class="fc" id="L125">            return ResponseEntity.internalServerError().body(Map.of(</span>
+                    &quot;status&quot;, &quot;error&quot;,
+<span class="fc" id="L127">                    &quot;message&quot;, &quot;Failed to initiate sign-off: &quot; + e.getMessage()</span>
+            ));
+        }
+    }
+
+    @PostMapping(&quot;/{scheme}/dke/{dkeType}&quot;)
+    public ResponseEntity&lt;Map&lt;String, Object&gt;&gt; dke(@PathVariable String scheme, @PathVariable String dkeType) {
+        try {
+<span class="fc" id="L135">            SwitchDestinationEnum destination = SwitchDestinationEnum.from(scheme);</span>
+<span class="fc" id="L136">            Map&lt;String, Object&gt; metrics = connectionStatusService.getMetrics(destination);</span>
+<span class="fc" id="L137">            boolean connectionStatus = (boolean) metrics.get(&quot;isConnected&quot;);</span>
+<span class="fc bfc" id="L138" title="All 2 branches covered.">            if (!connectionStatus) {</span>
+<span class="fc" id="L139">                return ResponseEntity.badRequest().body(Map.of(</span>
+                        &quot;status&quot;, &quot;error&quot;,
+                        &quot;message&quot;, &quot;Cannot initiate DKE &quot; + dkeType + &quot;: Connection not established&quot;,
+                        &quot;scheme&quot;, scheme,
+<span class="fc" id="L143">                        &quot;connectionStatus&quot;, connectionStatus</span>
+                ));
+            }
+<span class="fc" id="L146">            SchemeManagementHandler handler = schemeRegistryService.getManagementHandler(destination);</span>
+<span class="fc" id="L147">            CompletableFuture&lt;Boolean&gt; dkeFuture = handler.initiateDke(dkeType);</span>
+<span class="fc" id="L148">            return ResponseEntity.ok(Map.of(</span>
+                    &quot;status&quot;, &quot;success&quot;,
+                    &quot;message&quot;, &quot;DKE &quot; + dkeType + &quot; request initiated&quot;,
+                    &quot;scheme&quot;, scheme,
+<span class="fc" id="L152">                    &quot;connectionStatus&quot;, connectionStatus</span>
+            ));
+<span class="fc" id="L154">        } catch (IllegalArgumentException e) {</span>
+<span class="fc" id="L155">            log.error(&quot;Invalid scheme: {}&quot;, scheme);</span>
+<span class="fc" id="L156">            return ResponseEntity.badRequest().body(Map.of(</span>
+                    &quot;status&quot;, &quot;error&quot;,
+                    &quot;message&quot;, &quot;Invalid scheme: &quot; + scheme
+            ));
+<span class="fc" id="L160">        } catch (Exception e) {</span>
+<span class="fc" id="L161">            log.error(&quot;Error initiating DKE &quot; + dkeType, e);</span>
+<span class="fc" id="L162">            return ResponseEntity.internalServerError().body(Map.of(</span>
+                    &quot;status&quot;, &quot;error&quot;,
+<span class="fc" id="L164">                    &quot;message&quot;, &quot;Failed to initiate DKE &quot; + dkeType + &quot;: &quot; + e.getMessage()</span>
+            ));
+        }
+    }
+
+    /**
+     * Gets the current connection and sign-on status for the specified scheme.
+     *
+     * @param scheme The card scheme (e.g., RUPAY)
+     * @return ResponseEntity with connection status
+     */
+    @GetMapping(&quot;/{scheme}/status&quot;)
+    public ResponseEntity&lt;Map&lt;String, Object&gt;&gt; getStatus(@PathVariable String scheme) {
+        try {
+<span class="fc" id="L178">            SwitchDestinationEnum destination = SwitchDestinationEnum.from(scheme);</span>
+<span class="fc" id="L179">            Map&lt;String, Object&gt; metrics = connectionStatusService.getMetrics(destination);</span>
+
+<span class="fc" id="L181">            return ResponseEntity.ok(metrics);</span>
+<span class="fc" id="L182">        } catch (IllegalArgumentException e) {</span>
+<span class="fc" id="L183">            log.error(&quot;Invalid scheme: {}&quot;, scheme);</span>
+<span class="fc" id="L184">            return ResponseEntity.badRequest().body(Map.of(</span>
+                    &quot;status&quot;, &quot;error&quot;,
+                    &quot;message&quot;, &quot;Invalid scheme: &quot; + scheme
+            ));
+<span class="fc" id="L188">        } catch (Exception e) {</span>
+<span class="fc" id="L189">            log.error(&quot;Error getting connection status&quot;, e);</span>
+<span class="fc" id="L190">            return ResponseEntity.internalServerError().body(Map.of(</span>
+                    &quot;status&quot;, &quot;error&quot;,
+<span class="fc" id="L192">                    &quot;message&quot;, &quot;Failed to get connection status: &quot; + e.getMessage()</span>
+            ));
+        }
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.14.202510111229</span></div></body></html>

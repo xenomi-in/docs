@@ -1,0 +1,111 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>IsoResponseMapper.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">switch</a> &gt; <a href="index.source.html" class="el_package">com.lps.isoswitch.service</a> &gt; <span class="el_source">IsoResponseMapper.java</span></div><h1>IsoResponseMapper.java</h1><pre class="source lang-java linenums">package com.lps.isoswitch.service;
+
+import java.util.Map;
+
+import org.jpos.iso.ISOException;
+import org.jpos.iso.ISOMsg;
+import org.jpos.iso.ISOPackager;
+import org.springframework.stereotype.Component;
+
+/**
+ * Converts outbound responses into jPOS {@link ISOMsg} instances.
+ *
+ * &lt;p&gt;This component keeps response construction out of the TCP handler. It
+ * covers two response paths:
+ * API responses returned by Switch Core and local decline responses generated
+ * by the listener when parsing, routing, or downstream calls fail.&lt;/p&gt;
+ */
+@Component
+<span class="fc" id="L19">public class IsoResponseMapper {</span>
+
+    /**
+     * Builds an ISO8583 response from the JSON-like map returned by Switch Core.
+     *
+     * &lt;p&gt;Expected shape:
+     * {@code {&quot;mti&quot;: &quot;0210&quot;, &quot;fields&quot;: {&quot;39&quot;: &quot;00&quot;, ...}}}. Field keys are
+     * converted to ISO field numbers and values are written as strings.&lt;/p&gt;
+     *
+     * @param response Switch Core response payload
+     * @param packager scheme-specific packager to attach to the response
+     * @return packed-message-ready ISO response
+     * @throws ISOException when the response does not contain a valid fields map
+     * or cannot be converted to an ISO message
+     */
+    public ISOMsg convertApiResponse(Map&lt;String, Object&gt; response, ISOPackager packager) throws ISOException {
+<span class="fc" id="L35">        ISOMsg isoMsg = new ISOMsg();</span>
+<span class="fc" id="L36">        isoMsg.setPackager(packager);</span>
+
+<span class="fc" id="L38">        Object mti = response.get(&quot;mti&quot;);</span>
+<span class="pc bpc" id="L39" title="1 of 2 branches missed.">        if (mti != null) {</span>
+<span class="fc" id="L40">            isoMsg.setMTI(String.valueOf(mti));</span>
+        }
+
+<span class="fc" id="L43">        Object fields = response.get(&quot;fields&quot;);</span>
+<span class="pc bpc" id="L44" title="1 of 2 branches missed.">        if (!(fields instanceof Map&lt;?, ?&gt; responseFields)) {</span>
+<span class="nc" id="L45">            throw new ISOException(&quot;API response does not contain a valid fields map&quot;);</span>
+        }
+
+<span class="fc bfc" id="L48" title="All 2 branches covered.">        for (Map.Entry&lt;?, ?&gt; entry : responseFields.entrySet()) {</span>
+<span class="fc" id="L49">            int fieldNumber = Integer.parseInt(String.valueOf(entry.getKey()));</span>
+<span class="fc" id="L50">            Object fieldValue = entry.getValue();</span>
+<span class="pc bpc" id="L51" title="1 of 2 branches missed.">            if (fieldValue != null) {</span>
+<span class="fc" id="L52">                isoMsg.set(fieldNumber, String.valueOf(fieldValue));</span>
+            }
+<span class="fc" id="L54">        }</span>
+
+<span class="fc" id="L56">        return isoMsg;</span>
+    }
+
+    /**
+     * Creates a local decline response using key fields from the original
+     * request so the scheme can correlate the response with the failed request.
+     *
+     * @param originalMsg original inbound ISO message
+     * @param packager scheme-specific packager to attach to the response
+     * @param responseCode ISO field 39 response code
+     * @return decline response ready to pack and send over TCP
+     * @throws ISOException when the response MTI or fields cannot be set
+     */
+    public ISOMsg createDeclineResponse(ISOMsg originalMsg, ISOPackager packager, String responseCode) throws ISOException {
+<span class="fc" id="L70">        ISOMsg responseMsg = new ISOMsg();</span>
+<span class="fc" id="L71">        responseMsg.setPackager(packager);</span>
+
+<span class="fc" id="L73">        String mti = originalMsg.getMTI();</span>
+<span class="fc" id="L74">        int mtiNumber = Integer.parseInt(mti) + 10;</span>
+<span class="fc" id="L75">        responseMsg.setMTI(&quot;0&quot; + mtiNumber);</span>
+
+<span class="fc" id="L77">        copyEssentialFields(originalMsg, responseMsg);</span>
+<span class="fc" id="L78">        responseMsg.set(39, responseCode);</span>
+<span class="fc" id="L79">        responseMsg.set(44, responseDescription(responseCode));</span>
+
+<span class="fc" id="L81">        return responseMsg;</span>
+    }
+
+    /**
+     * Copies only correlation and terminal/merchant fields that are safe and
+     * useful for error responses.
+     */
+    private void copyEssentialFields(ISOMsg originalMsg, ISOMsg responseMsg) throws ISOException {
+<span class="fc" id="L89">        int[] essentialFields = {2, 3, 4, 7, 11, 12, 13, 32, 37, 41, 42, 49};</span>
+
+<span class="fc bfc" id="L91" title="All 2 branches covered.">        for (int field : essentialFields) {</span>
+<span class="fc bfc" id="L92" title="All 2 branches covered.">            if (originalMsg.hasField(field)) {</span>
+<span class="fc" id="L93">                responseMsg.set(field, originalMsg.getString(field));</span>
+            }
+        }
+<span class="fc" id="L96">    }</span>
+
+    /**
+     * Human-readable text for field 44 on locally generated decline responses.
+     */
+    private String responseDescription(String responseCode) {
+<span class="pc bpc" id="L102" title="4 of 5 branches missed.">        return switch (responseCode) {</span>
+<span class="fc" id="L103">            case &quot;96&quot; -&gt; &quot;SYSTEM ERROR&quot;;</span>
+<span class="nc" id="L104">            case &quot;91&quot; -&gt; &quot;SERVICE UNAVAILABLE&quot;;</span>
+<span class="nc" id="L105">            case &quot;05&quot; -&gt; &quot;DECLINED&quot;;</span>
+<span class="nc" id="L106">            case &quot;12&quot; -&gt; &quot;INVALID TRANSACTION&quot;;</span>
+<span class="nc" id="L107">            default -&gt; &quot;DECLINED&quot;;</span>
+        };
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.14.202510111229</span></div></body></html>

@@ -1,0 +1,4 @@
+-------------------------------------------------------------------------------
+Test set: com.lps.isoswitch.tcpconnector.SchemesConnectorCoverageTests
+-------------------------------------------------------------------------------
+Tests run: 5, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 14.56 s -- in com.lps.isoswitch.tcpconnector.SchemesConnectorCoverageTests

@@ -1,0 +1,631 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>SchemesConnector.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">switch</a> &gt; <a href="index.source.html" class="el_package">com.lps.isoswitch.tcpconnector</a> &gt; <span class="el_source">SchemesConnector.java</span></div><h1>SchemesConnector.java</h1><pre class="source lang-java linenums">package com.lps.isoswitch.tcpconnector;
+
+import javax.net.ssl.SSLEngine;
+import javax.net.ssl.SSLParameters;
+
+import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.concurrent.atomic.AtomicReference;
+
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.beans.factory.annotation.Value;
+import org.springframework.scheduling.annotation.EnableScheduling;
+import org.springframework.scheduling.annotation.Scheduled;
+
+import com.lps.isoswitch.config.SchemeConfig;
+import com.lps.isoswitch.config.RawDataLogging;
+import com.lps.isoswitch.config.TransportSecurityProperties;
+import com.lps.isoswitch.config.TransportTlsContextFactory;
+import jakarta.annotation.PostConstruct;
+
+import com.lps.isoswitch.utils.Enums.StatusEnum;
+import com.lps.isoswitch.utils.Enums.SwitchDestinationEnum;
+import com.lps.isoswitch.helper.SchemeConnHelpr;
+
+import io.netty.bootstrap.Bootstrap;
+import io.netty.channel.ChannelFuture;
+import io.netty.channel.ChannelFutureListener;
+import io.netty.channel.ChannelInitializer;
+import io.netty.channel.ChannelOption;
+import io.netty.channel.ChannelPipeline;
+import io.netty.channel.EventLoopGroup;
+import io.netty.channel.group.ChannelGroup;
+import io.netty.channel.group.DefaultChannelGroup;
+import io.netty.channel.nio.NioEventLoopGroup;
+import io.netty.channel.socket.SocketChannel;
+import io.netty.channel.socket.nio.NioSocketChannel;
+import io.netty.util.concurrent.GlobalEventExecutor;
+import io.netty.handler.codec.LengthFieldBasedFrameDecoder;
+import io.netty.handler.codec.bytes.ByteArrayDecoder;
+import io.netty.handler.logging.LogLevel;
+import io.netty.handler.logging.LoggingHandler;
+import io.netty.handler.ssl.SslContext;
+import io.netty.handler.ssl.SslHandler;
+import io.netty.handler.timeout.IdleStateHandler;
+import io.netty.handler.timeout.ReadTimeoutHandler;
+import io.netty.handler.timeout.WriteTimeoutHandler;
+
+/**
+ * Abstract implementation of Connector for scheme connections. This class
+ * provides the base implementation for managing TCP connections to different
+ * payment schemes. It handles connection establishment, shutdown, and
+ * connection status management.
+ *
+ * @author LogicPoint Systems
+ * @version 1.0
+ */
+@EnableScheduling
+<span class="fc" id="L59">public abstract class SchemesConnector implements Connector {</span>
+
+<span class="fc" id="L61">    private static final Logger log = LoggerFactory.getLogger(SchemesConnector.class);</span>
+    private static final int MAX_FRAME_LENGTH = 8192;
+    private static final int LENGTH_FIELD_OFFSET = 0;
+    private static final int LENGTH_FIELD_LENGTH = 2;
+    private static final int LENGTH_ADJUSTMENT = 0;
+    private static final int INITIAL_BYTES_TO_STRIP = 2;
+    
+    @Autowired
+    protected SchemeConfig schemeConfig;
+
+    @Autowired
+    protected TransportSecurityProperties transportSecurity;
+
+    @Autowired
+    protected TransportTlsContextFactory tlsContextFactory;
+
+    @PostConstruct
+    public void init() {
+<span class="fc" id="L79">        SchemeConfig.ResolvedSchemeSettings settings = schemeConfig.resolve(</span>
+<span class="fc" id="L80">                getSupportedScheme(),</span>
+                host,
+                port,
+                connectionId,
+<span class="fc" id="L84">                connectTimeoutMillis,</span>
+<span class="fc" id="L85">                readTimeoutSeconds,</span>
+<span class="fc" id="L86">                writeTimeoutSeconds,</span>
+<span class="fc" id="L87">                idleTimeoutSeconds,</span>
+<span class="fc" id="L88">                keepAliveEnabled,</span>
+<span class="fc" id="L89">                reconnectDelayMillis);</span>
+<span class="fc" id="L90">        log.info(&quot;Initializing SchemesConnector for {} with host={}, port={}, connectionId={}&quot;,</span>
+<span class="fc" id="L91">                settings.scheme(), settings.host(), settings.port(), settings.connectionId());</span>
+<span class="fc" id="L92">    }</span>
+
+    /**
+     * Channel group for managing all active connections
+     */
+<span class="fc" id="L97">    private final ChannelGroup defaultGroup = new DefaultChannelGroup(GlobalEventExecutor.INSTANCE);</span>
+
+    /**
+     * Current connection status
+     */
+<span class="fc" id="L102">    protected StatusEnum connStatus = StatusEnum.INACTIVE;</span>
+
+    /**
+     * Event loop group for handling I/O operations
+     */
+<span class="fc" id="L107">    private EventLoopGroup eventLoopGroup = new NioEventLoopGroup();</span>
+
+    /**
+     * Connection parameters
+     */
+    @Value(&quot;${tcp.client.host:}&quot;)
+    protected String host;
+    @Value(&quot;${tcp.client.port:#{null}}&quot;)
+    protected Integer port;
+    @Value(&quot;${tcp.client.connectionId:}&quot;)
+    protected String connectionId;
+    
+    // Connection detection configuration
+    @Value(&quot;${tcp.client.connect.timeout:10000}&quot;)
+    private int connectTimeoutMillis;
+    @Value(&quot;${tcp.client.read.timeout:30}&quot;)
+    private int readTimeoutSeconds;
+    @Value(&quot;${tcp.client.write.timeout:30}&quot;)
+    private int writeTimeoutSeconds;
+    @Value(&quot;${tcp.client.idle.timeout:60}&quot;)
+    private int idleTimeoutSeconds;
+    @Value(&quot;${tcp.client.keepalive.enabled:true}&quot;)
+    private boolean keepAliveEnabled;
+    @Value(&quot;${tcp.client.reconnect.delay:3000}&quot;)
+    private int reconnectDelayMillis;
+    @Value(&quot;${tcp.client.connection.check.interval:7000}&quot;)
+    private long connectionCheckInterval;
+    @Value(&quot;${app.mode:client}&quot;)
+    private String appMode;
+    /**
+     * Channel future for the current connection
+     */
+    protected ChannelFuture future;
+
+    /**
+     * Helper for scheme connection management
+     */
+    @Autowired
+    protected SchemeConnHelpr schConHlpr;
+
+    /**
+     * RuPayClientHandler for handling connection
+     */
+    protected RuPayClientHandler clientHandler;
+
+    /**
+     * Bootstrap for the connection
+     */
+    protected Bootstrap bootstrap;
+<span class="fc" id="L156">    private final AtomicBoolean shuttingDown = new AtomicBoolean(false);</span>
+<span class="fc" id="L157">    private final AtomicBoolean connecting = new AtomicBoolean(false);</span>
+<span class="fc" id="L158">    private final AtomicBoolean started = new AtomicBoolean(false);</span>
+
+    public abstract SwitchDestinationEnum getSupportedScheme();
+
+    /**
+     * Gets the channel group containing all active connections.
+	 * @return ChannelGroup containing all active connections
+     */
+    public ChannelGroup getChannelGroup() {
+<span class="fc" id="L167">        return defaultGroup;</span>
+    }
+
+   public Bootstrap getBootstrap(){
+<span class="fc" id="L171">        return this.bootstrap;</span>
+   } 
+
+   protected String getHost() {
+<span class="fc" id="L175">        return host;</span>
+   }
+
+   protected Integer getPort() {
+<span class="fc" id="L179">        return port;</span>
+   }
+
+    /**
+     * {@inheritDoc} Establishes a TCP connection to the specified host and
+     * port.
+     */
+    @Override
+    public void connect(String host, Integer port, String connectionId) throws InterruptedException {
+<span class="fc" id="L188">        started.set(true);</span>
+<span class="fc bfc" id="L189" title="All 2 branches covered.">        if (shuttingDown.get()) {</span>
+<span class="fc" id="L190">            log.info(&quot;Skipping connect for {} because shutdown is in progress&quot;, connectionId);</span>
+<span class="fc" id="L191">            return;</span>
+        }
+<span class="pc bpc" id="L193" title="1 of 2 branches missed.">        if (!connecting.compareAndSet(false, true)) {</span>
+<span class="nc" id="L194">            log.info(&quot;Connection attempt already in progress for {}&quot;, connectionId);</span>
+<span class="nc" id="L195">            return;</span>
+        }
+<span class="pc bpc" id="L197" title="1 of 4 branches missed.">        if (host == null || port == null) {</span>
+<span class="fc" id="L198">            log.error(&quot;Invalid connection parameters: host={}, port={}&quot;, host, port);</span>
+<span class="fc" id="L199">            connecting.set(false);</span>
+<span class="fc" id="L200">            return;</span>
+        }
+
+<span class="fc" id="L203">        SchemeConfig.ResolvedSchemeSettings settings = schemeConfig.resolve(</span>
+<span class="fc" id="L204">                getSupportedScheme(),</span>
+                host,
+                port,
+                connectionId,
+<span class="fc" id="L208">                connectTimeoutMillis,</span>
+<span class="fc" id="L209">                readTimeoutSeconds,</span>
+<span class="fc" id="L210">                writeTimeoutSeconds,</span>
+<span class="fc" id="L211">                idleTimeoutSeconds,</span>
+<span class="fc" id="L212">                keepAliveEnabled,</span>
+<span class="fc" id="L213">                reconnectDelayMillis);</span>
+
+<span class="pc bpc" id="L215" title="1 of 2 branches missed.">        int effectiveConnectTimeoutMillis = settings.connectTimeout() != null</span>
+<span class="fc" id="L216">                ? settings.connectTimeout()</span>
+<span class="pc" id="L217">                : connectTimeoutMillis;</span>
+<span class="pc bpc" id="L218" title="1 of 2 branches missed.">        int effectiveReadTimeoutSeconds = settings.readTimeout() != null</span>
+<span class="fc" id="L219">                ? settings.readTimeout()</span>
+<span class="pc" id="L220">                : readTimeoutSeconds;</span>
+<span class="pc bpc" id="L221" title="1 of 2 branches missed.">        int effectiveWriteTimeoutSeconds = settings.writeTimeout() != null</span>
+<span class="fc" id="L222">                ? settings.writeTimeout()</span>
+<span class="pc" id="L223">                : writeTimeoutSeconds;</span>
+<span class="pc bpc" id="L224" title="1 of 2 branches missed.">        int effectiveIdleTimeoutSeconds = settings.idleTimeout() != null</span>
+<span class="fc" id="L225">                ? settings.idleTimeout()</span>
+<span class="pc" id="L226">                : idleTimeoutSeconds;</span>
+<span class="pc bpc" id="L227" title="1 of 2 branches missed.">        boolean effectiveKeepAliveEnabled = settings.keepAliveEnabled() != null</span>
+<span class="fc" id="L228">                ? settings.keepAliveEnabled()</span>
+<span class="pc" id="L229">                : keepAliveEnabled;</span>
+<span class="pc bpc" id="L230" title="1 of 2 branches missed.">        int effectiveReconnectDelayMillis = settings.reconnectDelay() != null</span>
+<span class="fc" id="L231">                ? settings.reconnectDelay()</span>
+<span class="pc" id="L232">                : reconnectDelayMillis;</span>
+
+<span class="fc" id="L234">        this.host = settings.host();</span>
+<span class="fc" id="L235">        this.port = settings.port();</span>
+<span class="fc" id="L236">        this.connectionId = settings.connectionId();</span>
+<span class="fc" id="L237">        this.reconnectDelayMillis = effectiveReconnectDelayMillis;</span>
+        
+<span class="fc" id="L239">        log.info(&quot;Connecting to {}:{}&quot;, this.host, this.port);</span>
+        
+        // Check if already connected
+<span class="pc bpc" id="L242" title="1 of 2 branches missed.">        if (connStatus == StatusEnum.ACTIVE) {</span>
+<span class="fc" id="L243">            log.info(&quot;Already Connected.&quot;);</span>
+<span class="fc" id="L244">            connecting.set(false);</span>
+<span class="fc" id="L245">            return;</span>
+        }
+
+        try {
+<span class="nc bnc" id="L249" title="All 2 branches missed.">            final SslContext schemeSslContext = transportSecurity.getScheme().isEnabled()</span>
+<span class="nc" id="L250">                    ? tlsContextFactory.createClientContext(&quot;Scheme&quot;, transportSecurity.getScheme())</span>
+<span class="nc" id="L251">                    : null;</span>
+            // Create a new Bootstrap instance with enhanced connection detection
+<span class="nc" id="L253">            bootstrap = new Bootstrap();</span>
+<span class="nc" id="L254">            bootstrap.group(this.eventLoopGroup)</span>
+<span class="nc" id="L255">                    .remoteAddress(this.host, this.port)</span>
+<span class="nc" id="L256">                    .channel(NioSocketChannel.class)</span>
+                    // Configure TCP options for better connection detection
+<span class="nc" id="L258">                    .option(ChannelOption.SO_KEEPALIVE, effectiveKeepAliveEnabled)</span>
+<span class="nc" id="L259">                    .option(ChannelOption.TCP_NODELAY, true)</span>
+<span class="nc" id="L260">                    .option(ChannelOption.CONNECT_TIMEOUT_MILLIS, effectiveConnectTimeoutMillis)</span>
+<span class="nc" id="L261">                    .handler(new ChannelInitializer&lt;SocketChannel&gt;() {</span>
+                        @Override
+                        protected void initChannel(SocketChannel socketChannel) throws Exception {
+<span class="nc" id="L264">                            ChannelPipeline pipeline = socketChannel.pipeline();</span>
+
+<span class="nc bnc" id="L266" title="All 2 branches missed.">                            if (schemeSslContext != null) {</span>
+<span class="nc" id="L267">                                SSLEngine sslEngine = schemeSslContext.newEngine(</span>
+<span class="nc" id="L268">                                        socketChannel.alloc(), SchemesConnector.this.host, SchemesConnector.this.port);</span>
+<span class="nc" id="L269">                                SSLParameters sslParameters = sslEngine.getSSLParameters();</span>
+<span class="nc" id="L270">                                sslParameters.setEndpointIdentificationAlgorithm(&quot;HTTPS&quot;);</span>
+<span class="nc" id="L271">                                sslEngine.setSSLParameters(sslParameters);</span>
+<span class="nc" id="L272">                                pipeline.addFirst(&quot;schemeTls&quot;, new SslHandler(sslEngine));</span>
+                            }
+                            
+                            // Add timeout handlers for connection detection
+<span class="nc bnc" id="L276" title="All 2 branches missed.">                            if (effectiveReadTimeoutSeconds &gt; 0) {</span>
+<span class="nc" id="L277">                                pipeline.addLast(new ReadTimeoutHandler(effectiveReadTimeoutSeconds));</span>
+                            }
+<span class="nc bnc" id="L279" title="All 2 branches missed.">                            if (effectiveWriteTimeoutSeconds &gt; 0) {</span>
+<span class="nc" id="L280">                                pipeline.addLast(new WriteTimeoutHandler(effectiveWriteTimeoutSeconds));</span>
+                            }
+<span class="nc bnc" id="L282" title="All 2 branches missed.">                            if (effectiveIdleTimeoutSeconds &gt; 0) {</span>
+<span class="nc" id="L283">                                pipeline.addLast(new IdleStateHandler(</span>
+                                        effectiveIdleTimeoutSeconds,
+                                        effectiveIdleTimeoutSeconds,
+                                        effectiveIdleTimeoutSeconds));
+                            }
+
+<span class="nc" id="L289">                            addPipelines(pipeline);</span>
+<span class="nc" id="L290">                        }</span>
+                    });
+
+            // Establish the connection
+<span class="nc" id="L294">            this.future = bootstrap.connect().sync();</span>
+            
+<span class="nc" id="L296">            defaultGroup.add(future.channel());</span>
+            
+            // Add a listener to handle connection success or failure
+<span class="nc" id="L299">            future.addListener((ChannelFutureListener) channelFuture -&gt; {</span>
+<span class="nc" id="L300">                log.info(&quot;Connection attempt result: {}&quot;, channelFuture.isSuccess());</span>
+<span class="nc bnc" id="L301" title="All 2 branches missed.">                if (channelFuture.isSuccess()) {</span>
+<span class="nc" id="L302">                    connectionSucess(future, connectionId);</span>
+                } else {
+<span class="nc" id="L304">                    connectionFailed(future, connectionId);</span>
+                }
+<span class="nc" id="L306">                connecting.set(false);</span>
+<span class="nc" id="L307">            });</span>
+<span class="nc" id="L308">        } catch (Exception e) {</span>
+<span class="nc" id="L309">            log.error(&quot;Connection error: {}&quot;, e.getMessage());</span>
+<span class="nc" id="L310">            connectionFailed(null, connectionId);</span>
+<span class="nc" id="L311">            connecting.set(false);</span>
+<span class="nc" id="L312">        }</span>
+<span class="nc" id="L313">    }</span>
+
+    /**
+     * Adds necessary channel handlers to the pipeline. This method must be
+     * implemented by concrete classes to add scheme-specific handlers.
+     *
+     * @param pipeline The channel pipeline to add handlers to
+     */
+    @Override
+    public void addPipelines(ChannelPipeline pipeline) {
+<span class="fc" id="L323">        pipeline.addLast(createFrameDecoder(</span>
+                MAX_FRAME_LENGTH,
+                LENGTH_FIELD_OFFSET,
+                LENGTH_FIELD_LENGTH,
+                LENGTH_ADJUSTMENT,
+                INITIAL_BYTES_TO_STRIP));
+<span class="fc" id="L329">        pipeline.addLast(createByteArrayDecoder());</span>
+<span class="pc bpc" id="L330" title="1 of 2 branches missed.">        if (RawDataLogging.isEnabled()) {</span>
+<span class="nc" id="L331">            pipeline.addLast(createLoggingHandler());</span>
+        }
+<span class="fc" id="L333">        pipeline.addLast(this.clientHandler);</span>
+<span class="fc" id="L334">    }</span>
+
+    protected LengthFieldBasedFrameDecoder createFrameDecoder(
+            int maxFrameLength,
+            int lengthFieldOffset,
+            int lengthFieldLength,
+            int lengthAdjustment,
+            int initialBytesToStrip) {
+<span class="fc" id="L342">        return new LengthFieldBasedFrameDecoder(</span>
+                maxFrameLength,
+                lengthFieldOffset,
+                lengthFieldLength,
+                lengthAdjustment,
+                initialBytesToStrip);
+    }
+
+    protected ByteArrayDecoder createByteArrayDecoder() {
+<span class="fc" id="L351">        return new ByteArrayDecoder();</span>
+    }
+
+    protected LoggingHandler createLoggingHandler() {
+<span class="fc" id="L355">        return new LoggingHandler(LogLevel.INFO);</span>
+    }
+
+    /**
+     * {@inheritDoc} Gracefully shuts down the connection and releases
+     * resources.
+     */
+    @Override
+    public void shutdown() throws InterruptedException {
+<span class="fc" id="L364">        shuttingDown.set(true);</span>
+<span class="fc" id="L365">        closeResources();</span>
+<span class="fc" id="L366">        this.connStatus = StatusEnum.INACTIVE;</span>
+<span class="fc" id="L367">    }</span>
+
+    private void closeResources() throws InterruptedException {
+        try {
+<span class="pc bpc" id="L371" title="5 of 6 branches missed.">            if (future != null &amp;&amp; future.channel() != null &amp;&amp; future.channel().isOpen()) {</span>
+<span class="nc" id="L372">                future.channel().close().sync();</span>
+            }
+<span class="fc" id="L374">            defaultGroup.close().awaitUninterruptibly();</span>
+<span class="fc" id="L375">            this.eventLoopGroup.shutdownGracefully().sync();</span>
+<span class="nc" id="L376">        } catch (InterruptedException e) {</span>
+<span class="nc" id="L377">            log.info(&quot;Exception caught:{}&quot;, e);</span>
+<span class="nc" id="L378">            throw e;</span>
+<span class="fc" id="L379">        }</span>
+<span class="fc" id="L380">    }</span>
+
+    /**
+     * {@inheritDoc} Handles successful connection establishment.
+     */
+    @Override
+    public void connectionSucess(ChannelFuture future, String connectionId) {
+
+<span class="fc" id="L388">        log.info(&quot;Successfully connect.{}&quot;, connectionId);</span>
+
+<span class="fc" id="L390">        this.connStatus = StatusEnum.ACTIVE;</span>
+<span class="fc" id="L391">        connecting.set(false);</span>
+
+        //schConHlpr.updateStatus(connectionId, this.connStatus);
+<span class="fc" id="L394">    }</span>
+
+    /**
+     * {@inheritDoc} Handles connection failure and attempts reconnection.
+     */
+    @Override
+    public void connectionFailed(ChannelFuture future, String connectionId) {
+<span class="fc bfc" id="L401" title="All 2 branches covered.">        if (shuttingDown.get()) {</span>
+<span class="fc" id="L402">            log.info(&quot;Skipping reconnect for {} because shutdown is in progress&quot;, connectionId);</span>
+<span class="fc" id="L403">            return;</span>
+        }
+
+<span class="fc" id="L406">        log.error(&quot;Failed to connect.{}&quot;, connectionId);</span>
+
+<span class="fc" id="L408">        this.connStatus = StatusEnum.INACTIVE;</span>
+<span class="fc" id="L409">        connecting.set(false);</span>
+
+<span class="fc" id="L411">        schConHlpr.updateStatus(connectionId, this.connStatus);</span>
+
+<span class="fc" id="L413">        int effectiveReconnectDelayMillis = Math.max(0, reconnectDelayMillis);</span>
+<span class="fc" id="L414">        log.info(&quot;Trying to re-connect after {} ms.&quot;, effectiveReconnectDelayMillis);</span>
+
+        try {
+<span class="fc" id="L417">            Thread.sleep(effectiveReconnectDelayMillis);</span>
+<span class="nc" id="L418">        } catch (Exception e) {</span>
+<span class="nc" id="L419">            log.error(&quot;Exception caught:{}&quot;, e);</span>
+<span class="fc" id="L420">        }</span>
+
+        try {
+<span class="fc" id="L423">            this.connect(this.host, this.port, this.connectionId);</span>
+<span class="nc" id="L424">        } catch (Exception e) {</span>
+<span class="nc" id="L425">            log.error(&quot;Exception caught:{}&quot;, e);</span>
+<span class="fc" id="L426">        }</span>
+<span class="fc" id="L427">    }</span>
+
+    /**
+     * Reconnects to the specified host and port.
+     *
+     * @param host The host address to connect to
+     * @param port The port number to connect to
+     * @param connectionId Unique identifier for this connection
+     */
+    public void reconnect(String host, Integer port, String connectionId) {
+<span class="fc bfc" id="L437" title="All 2 branches covered.">        if (shuttingDown.get()) {</span>
+<span class="fc" id="L438">            log.info(&quot;Skipping reconnect for {} because shutdown is in progress&quot;, connectionId);</span>
+<span class="fc" id="L439">            return;</span>
+        }
+<span class="fc bfc" id="L441" title="All 2 branches covered.">        if (connecting.get()) {</span>
+<span class="fc" id="L442">            log.debug(&quot;Skipping reconnect for {} because another connect is already in progress&quot;, connectionId);</span>
+<span class="fc" id="L443">            return;</span>
+        }
+
+        try {
+<span class="fc" id="L447">            closeResources();</span>
+<span class="nc" id="L448">        } catch (Exception e) {</span>
+<span class="nc" id="L449">            log.info(&quot;Exception caught:{}&quot;, e);</span>
+<span class="fc" id="L450">        }</span>
+
+        try {
+<span class="fc" id="L453">            cleanData();</span>
+<span class="nc" id="L454">        } catch (Exception e) {</span>
+<span class="nc" id="L455">            log.info(&quot;Exception caught:{}&quot;, e);</span>
+<span class="fc" id="L456">        }</span>
+
+        try {
+<span class="fc" id="L459">            this.connect(host, port, connectionId);</span>
+<span class="nc" id="L460">        } catch (Exception e) {</span>
+<span class="nc" id="L461">            log.info(&quot;Exception caught:{}&quot;, e);</span>
+<span class="fc" id="L462">        }</span>
+<span class="fc" id="L463">    }</span>
+
+    /**
+     * Cleans up connection-related data. Resets the connection status and
+     * creates a new event loop group.
+     */
+    protected void cleanData() {
+<span class="fc" id="L470">        connStatus = StatusEnum.INACTIVE;</span>
+<span class="fc" id="L471">        eventLoopGroup = new NioEventLoopGroup();</span>
+<span class="fc" id="L472">        future = null;</span>
+<span class="fc" id="L473">    }</span>
+
+    /**
+     * Attempts to reconnect using the current connection parameters.
+     */
+    public void reconnect() {
+<span class="fc bfc" id="L479" title="All 2 branches covered.">        if (shuttingDown.get()) {</span>
+<span class="fc" id="L480">            log.info(&quot;Skipping reconnect because shutdown is in progress&quot;);</span>
+<span class="fc" id="L481">            return;</span>
+        }
+<span class="fc bfc" id="L483" title="All 2 branches covered.">        if (connecting.get()) {</span>
+<span class="fc" id="L484">            log.debug(&quot;Skipping reconnect because another connect is already in progress&quot;);</span>
+<span class="fc" id="L485">            return;</span>
+        }
+
+        try {
+<span class="fc" id="L489">            closeResources();</span>
+<span class="nc" id="L490">        } catch (Exception e) {</span>
+<span class="nc" id="L491">            log.info(&quot;Exception caught:{}&quot;, e);</span>
+<span class="fc" id="L492">        }</span>
+
+        try {
+<span class="fc" id="L495">            cleanData();</span>
+<span class="nc" id="L496">        } catch (Exception e) {</span>
+<span class="nc" id="L497">            log.info(&quot;Exception caught:{}&quot;, e);</span>
+<span class="fc" id="L498">        }</span>
+
+        try {
+<span class="fc" id="L501">            this.connect(this.host, this.port, this.connectionId);</span>
+<span class="nc" id="L502">        } catch (Exception e) {</span>
+<span class="nc" id="L503">            log.info(&quot;Exception caught:{}&quot;, e);</span>
+<span class="fc" id="L504">        }</span>
+<span class="fc" id="L505">    }</span>
+
+    /**
+     * Sends a message through the connection. This method must be implemented
+     * by concrete classes to handle scheme-specific message sending.
+     *
+     * @param msg The message to send
+     * @return StatusEnum indicating the result of the send operation
+     */
+    protected abstract StatusEnum sendMsg(byte[] msg);
+
+    /**
+     * Periodically checks the connection status and attempts reconnection if
+     * necessary. This method runs at configurable intervals.
+     */
+    @Scheduled(
+            initialDelayString = &quot;${tcp.client.connection.check.initial.delay:30000}&quot;,
+            fixedDelayString = &quot;${tcp.client.connection.check.interval:30000}&quot;)
+    public void doCheckConnStatus() {
+        try {
+<span class="fc bfc" id="L525" title="All 2 branches covered.">            if (shuttingDown.get()) {</span>
+<span class="fc" id="L526">                return;</span>
+            }
+<span class="fc bfc" id="L528" title="All 2 branches covered.">            if (!started.get()) {</span>
+<span class="fc" id="L529">                log.debug(&quot;Skipping connection status check because connector startup has not begun&quot;);</span>
+<span class="fc" id="L530">                return;</span>
+            }
+<span class="fc bfc" id="L532" title="All 2 branches covered.">            if (!&quot;client&quot;.equalsIgnoreCase(appMode)) {</span>
+<span class="fc" id="L533">                return;</span>
+            }
+<span class="pc bpc" id="L535" title="1 of 2 branches missed.">            if (connecting.get()) {</span>
+<span class="nc" id="L536">                log.debug(&quot;Skipping connection status check because a connection attempt is already in progress&quot;);</span>
+<span class="nc" id="L537">                return;</span>
+            }
+<span class="fc" id="L539">            log.debug(&quot;Checking for connection status.......&quot;);</span>
+
+            // Check if future is null or not successful
+<span class="fc bfc" id="L542" title="All 4 branches covered.">            if (this.future == null || !this.future.isSuccess()) {</span>
+<span class="fc" id="L543">                log.warn(&quot;Connection future is null or not successful - attempting reconnection&quot;);</span>
+<span class="fc" id="L544">                this.reconnect();</span>
+<span class="fc" id="L545">                return;</span>
+            }
+
+            // Check if channel is registered and active
+<span class="pc bpc" id="L549" title="1 of 4 branches missed.">            if (!this.future.channel().isRegistered() || !this.future.channel().isActive()) {</span>
+<span class="fc" id="L550">                log.warn(&quot;Channel is not registered or not active - attempting reconnection&quot;);</span>
+<span class="fc" id="L551">                this.reconnect();</span>
+<span class="fc" id="L552">                return;</span>
+            }
+
+            // Check if channel is writable (indicates connection health)
+<span class="fc bfc" id="L556" title="All 2 branches covered.">            if (!this.future.channel().isWritable()) {</span>
+<span class="fc" id="L557">                log.warn(&quot;Channel is not writable - connection may be dead&quot;);</span>
+<span class="fc" id="L558">                this.reconnect();</span>
+<span class="fc" id="L559">                return;</span>
+            }
+
+            // Additional socket-level health check
+<span class="pc bpc" id="L563" title="1 of 2 branches missed.">            if (!isSocketConnected()) {</span>
+<span class="nc" id="L564">                log.warn(&quot;Socket-level check indicates connection is dead - attempting reconnection&quot;);</span>
+<span class="nc" id="L565">                this.reconnect();</span>
+<span class="nc" id="L566">                return;</span>
+            }
+
+<span class="fc" id="L569">            log.debug(&quot;Connection status check passed - connection appears healthy&quot;);</span>
+
+<span class="nc" id="L571">        } catch (Exception e) {</span>
+<span class="nc" id="L572">            log.error(&quot;Error during connection status check&quot;, e);</span>
+            // If there's an exception during status check, assume connection is dead
+<span class="nc" id="L574">            this.reconnect();</span>
+<span class="fc" id="L575">        }</span>
+<span class="fc" id="L576">    }</span>
+
+    /**
+     * Performs a socket-level connection health check.
+     * This method attempts to determine if the underlying socket is still connected
+     * by checking various socket properties and attempting a lightweight operation.
+     *
+     * @return true if the socket appears to be connected, false otherwise
+     */
+    private boolean isSocketConnected() {
+        try {
+<span class="pc bpc" id="L587" title="2 of 4 branches missed.">            if (this.future == null || this.future.channel() == null) {</span>
+<span class="nc" id="L588">                return false;</span>
+            }
+
+            // Check if channel is open and active
+<span class="pc bpc" id="L592" title="2 of 4 branches missed.">            if (!this.future.channel().isOpen() || !this.future.channel().isActive()) {</span>
+<span class="nc" id="L593">                return false;</span>
+            }
+
+            // Check if channel is writable
+<span class="pc bpc" id="L597" title="1 of 2 branches missed.">            if (!this.future.channel().isWritable()) {</span>
+<span class="nc" id="L598">                return false;</span>
+            }
+
+            // Additional check: try to get remote address
+            // If this throws an exception, the connection is likely dead
+            try {
+<span class="fc" id="L604">                this.future.channel().remoteAddress();</span>
+<span class="nc" id="L605">            } catch (Exception e) {</span>
+<span class="nc" id="L606">                log.debug(&quot;Remote address check failed - connection may be dead&quot;, e);</span>
+<span class="nc" id="L607">                return false;</span>
+<span class="fc" id="L608">            }</span>
+
+<span class="fc" id="L610">            return true;</span>
+
+<span class="nc" id="L612">        } catch (Exception e) {</span>
+<span class="nc" id="L613">            log.debug(&quot;Socket health check failed&quot;, e);</span>
+<span class="nc" id="L614">            return false;</span>
+        }
+    }
+
+    /**
+     * Sets the scheme connection helper
+     * @param helper The helper to set
+     */
+    public void setSchemeConnHelper(SchemeConnHelpr helper) {
+<span class="nc" id="L623">        this.schConHlpr = helper;</span>
+<span class="nc" id="L624">    }</span>
+
+    public void setShuttingDown(boolean shuttingDown) {
+<span class="fc" id="L627">        this.shuttingDown.set(shuttingDown);</span>
+<span class="fc" id="L628">    }</span>
+
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.14.202510111229</span></div></body></html>

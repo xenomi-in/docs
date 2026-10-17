@@ -1,0 +1,308 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>ChannelConfig.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">switch</a> &gt; <a href="index.source.html" class="el_package">com.lps.isoswitch.tcpconnector.channel</a> &gt; <span class="el_source">ChannelConfig.java</span></div><h1>ChannelConfig.java</h1><pre class="source lang-java linenums">package com.lps.isoswitch.tcpconnector.channel;
+
+/**
+ * Configuration class for different channel types and their length-based message reading settings.
+ * This class provides predefined configurations for various ISO8583 channel types similar to jPOS.
+ * 
+ * @author Logicpoint Systems
+ * @version 1.0
+ * @since 2025-06-15
+ */
+<span class="nc" id="L11">public class ChannelConfig {</span>
+
+    /**
+     * Channel type enumeration for different message framing protocols.
+     */
+<span class="fc" id="L16">    public enum ChannelType {</span>
+<span class="fc" id="L17">        ASCII_LENGTH(&quot;ASCII Length Channel&quot;, 4, false, false, true),</span>
+<span class="fc" id="L18">        HEX_LENGTH(&quot;HEX Length Channel&quot;, 4, false, true, false),</span>
+<span class="fc" id="L19">        BINARY_2BYTE(&quot;Binary 2-byte Length Channel&quot;, 2, false, false, false),</span>
+<span class="fc" id="L20">        BINARY_4BYTE(&quot;Binary 4-byte Length Channel&quot;, 4, false, false, false),</span>
+<span class="fc" id="L21">        RUPAY(&quot;RuPay Channel&quot;, 2, false, false, false),</span>
+<span class="fc" id="L22">        VISA(&quot;Visa Channel&quot;, 2, false, false, false),</span>
+<span class="fc" id="L23">        MASTERCARD(&quot;MasterCard Channel&quot;, 2, false, false, false);</span>
+
+        private final String description;
+        private final int lengthFieldSize;
+        private final boolean includeLengthField;
+        private final boolean lengthInHex;
+        private final boolean lengthInAscii;
+
+        ChannelType(String description, int lengthFieldSize, boolean includeLengthField, 
+<span class="fc" id="L32">                   boolean lengthInHex, boolean lengthInAscii) {</span>
+<span class="fc" id="L33">            this.description = description;</span>
+<span class="fc" id="L34">            this.lengthFieldSize = lengthFieldSize;</span>
+<span class="fc" id="L35">            this.includeLengthField = includeLengthField;</span>
+<span class="fc" id="L36">            this.lengthInHex = lengthInHex;</span>
+<span class="fc" id="L37">            this.lengthInAscii = lengthInAscii;</span>
+<span class="fc" id="L38">        }</span>
+
+        public String getDescription() {
+<span class="fc" id="L41">            return description;</span>
+        }
+
+        public int getLengthFieldSize() {
+<span class="fc" id="L45">            return lengthFieldSize;</span>
+        }
+
+        public boolean isIncludeLengthField() {
+<span class="fc" id="L49">            return includeLengthField;</span>
+        }
+
+        public boolean isLengthInHex() {
+<span class="fc" id="L53">            return lengthInHex;</span>
+        }
+
+        public boolean isLengthInAscii() {
+<span class="fc" id="L57">            return lengthInAscii;</span>
+        }
+    }
+
+    /**
+     * Default configuration values for different channel types.
+     */
+<span class="nc" id="L64">    public static class Defaults {</span>
+        // Maximum message lengths
+        public static final int DEFAULT_MAX_MESSAGE_LENGTH = 8192;
+        public static final int RUPAY_MAX_MESSAGE_LENGTH = 6144;
+        public static final int VISA_MAX_MESSAGE_LENGTH = 8192;
+        public static final int MASTERCARD_MAX_MESSAGE_LENGTH = 8192;
+        
+        // Timeouts
+        public static final int DEFAULT_READ_TIMEOUT = 30000;
+        public static final int DEFAULT_WRITE_TIMEOUT = 30000;
+        public static final int DEFAULT_CONNECT_TIMEOUT = 10000;
+        
+        // Thread pool settings
+        public static final int DEFAULT_CORE_POOL_SIZE = 10;
+        public static final int DEFAULT_MAX_POOL_SIZE = 20;
+        public static final int DEFAULT_QUEUE_CAPACITY = 100;
+        public static final long DEFAULT_KEEP_ALIVE_TIME = 60L;
+    }
+
+    /**
+     * Creates a channel configuration for the specified channel type.
+     *
+     * @param channelType The type of channel
+     * @return The channel configuration
+     */
+    public static ChannelConfiguration createConfiguration(ChannelType channelType) {
+<span class="fc" id="L90">        return new ChannelConfiguration(channelType);</span>
+    }
+
+    /**
+     * Creates a RuPay-specific channel configuration.
+     *
+     * @return The RuPay channel configuration
+     */
+    public static ChannelConfiguration createRuPayConfiguration() {
+<span class="fc" id="L99">        return new ChannelConfiguration(ChannelType.RUPAY)</span>
+<span class="fc" id="L100">                .withMaxMessageLength(Defaults.RUPAY_MAX_MESSAGE_LENGTH)</span>
+<span class="fc" id="L101">                .withReadTimeout(Defaults.DEFAULT_READ_TIMEOUT)</span>
+<span class="fc" id="L102">                .withWriteTimeout(Defaults.DEFAULT_WRITE_TIMEOUT);</span>
+    }
+
+    /**
+     * Creates a Visa-specific channel configuration.
+     *
+     * @return The Visa channel configuration
+     */
+    public static ChannelConfiguration createVisaConfiguration() {
+<span class="fc" id="L111">        return new ChannelConfiguration(ChannelType.VISA)</span>
+<span class="fc" id="L112">                .withMaxMessageLength(Defaults.VISA_MAX_MESSAGE_LENGTH)</span>
+<span class="fc" id="L113">                .withReadTimeout(Defaults.DEFAULT_READ_TIMEOUT)</span>
+<span class="fc" id="L114">                .withWriteTimeout(Defaults.DEFAULT_WRITE_TIMEOUT);</span>
+    }
+
+    /**
+     * Creates a MasterCard-specific channel configuration.
+     *
+     * @return The MasterCard channel configuration
+     */
+    public static ChannelConfiguration createMasterCardConfiguration() {
+<span class="fc" id="L123">        return new ChannelConfiguration(ChannelType.MASTERCARD)</span>
+<span class="fc" id="L124">                .withMaxMessageLength(Defaults.MASTERCARD_MAX_MESSAGE_LENGTH)</span>
+<span class="fc" id="L125">                .withReadTimeout(Defaults.DEFAULT_READ_TIMEOUT)</span>
+<span class="fc" id="L126">                .withWriteTimeout(Defaults.DEFAULT_WRITE_TIMEOUT);</span>
+    }
+
+    /**
+     * Creates an ASCII length channel configuration.
+     *
+     * @return The ASCII length channel configuration
+     */
+    public static ChannelConfiguration createAsciiLengthConfiguration() {
+<span class="fc" id="L135">        return new ChannelConfiguration(ChannelType.ASCII_LENGTH)</span>
+<span class="fc" id="L136">                .withMaxMessageLength(Defaults.DEFAULT_MAX_MESSAGE_LENGTH)</span>
+<span class="fc" id="L137">                .withReadTimeout(Defaults.DEFAULT_READ_TIMEOUT)</span>
+<span class="fc" id="L138">                .withWriteTimeout(Defaults.DEFAULT_WRITE_TIMEOUT);</span>
+    }
+
+    /**
+     * Creates a HEX length channel configuration.
+     *
+     * @return The HEX length channel configuration
+     */
+    public static ChannelConfiguration createHexLengthConfiguration() {
+<span class="fc" id="L147">        return new ChannelConfiguration(ChannelType.HEX_LENGTH)</span>
+<span class="fc" id="L148">                .withMaxMessageLength(Defaults.DEFAULT_MAX_MESSAGE_LENGTH)</span>
+<span class="fc" id="L149">                .withReadTimeout(Defaults.DEFAULT_READ_TIMEOUT)</span>
+<span class="fc" id="L150">                .withWriteTimeout(Defaults.DEFAULT_WRITE_TIMEOUT);</span>
+    }
+
+    /**
+     * Channel configuration builder class.
+     */
+    public static class ChannelConfiguration {
+        private final ChannelType channelType;
+<span class="fc" id="L158">        private int maxMessageLength = Defaults.DEFAULT_MAX_MESSAGE_LENGTH;</span>
+<span class="fc" id="L159">        private int readTimeout = Defaults.DEFAULT_READ_TIMEOUT;</span>
+<span class="fc" id="L160">        private int writeTimeout = Defaults.DEFAULT_WRITE_TIMEOUT;</span>
+<span class="fc" id="L161">        private int connectTimeout = Defaults.DEFAULT_CONNECT_TIMEOUT;</span>
+<span class="fc" id="L162">        private int corePoolSize = Defaults.DEFAULT_CORE_POOL_SIZE;</span>
+<span class="fc" id="L163">        private int maxPoolSize = Defaults.DEFAULT_MAX_POOL_SIZE;</span>
+<span class="fc" id="L164">        private int queueCapacity = Defaults.DEFAULT_QUEUE_CAPACITY;</span>
+<span class="fc" id="L165">        private long keepAliveTime = Defaults.DEFAULT_KEEP_ALIVE_TIME;</span>
+
+<span class="fc" id="L167">        public ChannelConfiguration(ChannelType channelType) {</span>
+<span class="fc" id="L168">            this.channelType = channelType;</span>
+<span class="fc" id="L169">        }</span>
+
+        public ChannelConfiguration withMaxMessageLength(int maxMessageLength) {
+<span class="fc" id="L172">            this.maxMessageLength = maxMessageLength;</span>
+<span class="fc" id="L173">            return this;</span>
+        }
+
+        public ChannelConfiguration withReadTimeout(int readTimeout) {
+<span class="fc" id="L177">            this.readTimeout = readTimeout;</span>
+<span class="fc" id="L178">            return this;</span>
+        }
+
+        public ChannelConfiguration withWriteTimeout(int writeTimeout) {
+<span class="fc" id="L182">            this.writeTimeout = writeTimeout;</span>
+<span class="fc" id="L183">            return this;</span>
+        }
+
+        public ChannelConfiguration withConnectTimeout(int connectTimeout) {
+<span class="fc" id="L187">            this.connectTimeout = connectTimeout;</span>
+<span class="fc" id="L188">            return this;</span>
+        }
+
+        public ChannelConfiguration withCorePoolSize(int corePoolSize) {
+<span class="fc" id="L192">            this.corePoolSize = corePoolSize;</span>
+<span class="fc" id="L193">            return this;</span>
+        }
+
+        public ChannelConfiguration withMaxPoolSize(int maxPoolSize) {
+<span class="fc" id="L197">            this.maxPoolSize = maxPoolSize;</span>
+<span class="fc" id="L198">            return this;</span>
+        }
+
+        public ChannelConfiguration withQueueCapacity(int queueCapacity) {
+<span class="fc" id="L202">            this.queueCapacity = queueCapacity;</span>
+<span class="fc" id="L203">            return this;</span>
+        }
+
+        public ChannelConfiguration withKeepAliveTime(long keepAliveTime) {
+<span class="fc" id="L207">            this.keepAliveTime = keepAliveTime;</span>
+<span class="fc" id="L208">            return this;</span>
+        }
+
+        // Getters
+        public ChannelType getChannelType() {
+<span class="fc" id="L213">            return channelType;</span>
+        }
+
+        public int getMaxMessageLength() {
+<span class="fc" id="L217">            return maxMessageLength;</span>
+        }
+
+        public int getReadTimeout() {
+<span class="fc" id="L221">            return readTimeout;</span>
+        }
+
+        public int getWriteTimeout() {
+<span class="fc" id="L225">            return writeTimeout;</span>
+        }
+
+        public int getConnectTimeout() {
+<span class="fc" id="L229">            return connectTimeout;</span>
+        }
+
+        public int getCorePoolSize() {
+<span class="fc" id="L233">            return corePoolSize;</span>
+        }
+
+        public int getMaxPoolSize() {
+<span class="fc" id="L237">            return maxPoolSize;</span>
+        }
+
+        public int getQueueCapacity() {
+<span class="fc" id="L241">            return queueCapacity;</span>
+        }
+
+        public long getKeepAliveTime() {
+<span class="fc" id="L245">            return keepAliveTime;</span>
+        }
+
+        public int getLengthFieldSize() {
+<span class="fc" id="L249">            return channelType.getLengthFieldSize();</span>
+        }
+
+        public boolean isIncludeLengthField() {
+<span class="fc" id="L253">            return channelType.isIncludeLengthField();</span>
+        }
+
+        public boolean isLengthInHex() {
+<span class="fc" id="L257">            return channelType.isLengthInHex();</span>
+        }
+
+        public boolean isLengthInAscii() {
+<span class="fc" id="L261">            return channelType.isLengthInAscii();</span>
+        }
+
+        public String getDescription() {
+<span class="fc" id="L265">            return channelType.getDescription();</span>
+        }
+
+        @Override
+        public String toString() {
+<span class="fc" id="L270">            return String.format(&quot;ChannelConfiguration{type=%s, maxLength=%d, readTimeout=%d, writeTimeout=%d}&quot;,</span>
+<span class="fc" id="L271">                    channelType.getDescription(), maxMessageLength, readTimeout, writeTimeout);</span>
+        }
+    }
+
+    /**
+     * Utility method to get channel configuration description.
+     *
+     * @param channelType The channel type
+     * @return A formatted description of the channel configuration
+     */
+    public static String getChannelDescription(ChannelType channelType) {
+<span class="fc" id="L282">        return String.format(&quot;%s - Length: %d bytes, Format: %s, Include: %s&quot;,</span>
+<span class="fc" id="L283">                channelType.getDescription(),</span>
+<span class="fc" id="L284">                channelType.getLengthFieldSize(),</span>
+<span class="fc bfc" id="L285" title="All 2 branches covered.">                channelType.isLengthInAscii() ? &quot;ASCII&quot; : </span>
+<span class="fc bfc" id="L286" title="All 2 branches covered.">                channelType.isLengthInHex() ? &quot;HEX&quot; : &quot;BINARY&quot;,</span>
+<span class="pc bpc" id="L287" title="1 of 2 branches missed.">                channelType.isIncludeLengthField() ? &quot;Yes&quot; : &quot;No&quot;);</span>
+    }
+
+    /**
+     * Utility method to validate channel configuration.
+     *
+     * @param config The channel configuration to validate
+     * @return true if valid, false otherwise
+     */
+    public static boolean isValidConfiguration(ChannelConfiguration config) {
+<span class="fc bfc" id="L297" title="All 2 branches covered.">        if (config == null) return false;</span>
+<span class="fc bfc" id="L298" title="All 2 branches covered.">        if (config.getMaxMessageLength() &lt;= 0) return false;</span>
+<span class="fc bfc" id="L299" title="All 2 branches covered.">        if (config.getReadTimeout() &lt;= 0) return false;</span>
+<span class="fc bfc" id="L300" title="All 2 branches covered.">        if (config.getWriteTimeout() &lt;= 0) return false;</span>
+<span class="fc bfc" id="L301" title="All 2 branches covered.">        if (config.getCorePoolSize() &lt;= 0) return false;</span>
+<span class="fc bfc" id="L302" title="All 2 branches covered.">        if (config.getMaxPoolSize() &lt; config.getCorePoolSize()) return false;</span>
+<span class="fc bfc" id="L303" title="All 2 branches covered.">        if (config.getQueueCapacity() &lt;= 0) return false;</span>
+<span class="fc bfc" id="L304" title="All 2 branches covered.">        if (config.getKeepAliveTime() &lt;= 0) return false;</span>
+<span class="fc" id="L305">        return true;</span>
+    }
+} 
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.14.202510111229</span></div></body></html>

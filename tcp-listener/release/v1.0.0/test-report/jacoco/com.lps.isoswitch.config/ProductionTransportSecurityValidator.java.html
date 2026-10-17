@@ -1,0 +1,58 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>ProductionTransportSecurityValidator.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">switch</a> &gt; <a href="index.source.html" class="el_package">com.lps.isoswitch.config</a> &gt; <span class="el_source">ProductionTransportSecurityValidator.java</span></div><h1>ProductionTransportSecurityValidator.java</h1><pre class="source lang-java linenums">package com.lps.isoswitch.config;
+
+import java.net.URI;
+
+import org.springframework.beans.factory.annotation.Value;
+import org.springframework.boot.ApplicationArguments;
+import org.springframework.boot.ApplicationRunner;
+import org.springframework.context.annotation.Profile;
+import org.springframework.stereotype.Component;
+
+/** Prevents a production listener from starting with plaintext payment paths. */
+@Component
+@Profile(&quot;prod&quot;)
+public class ProductionTransportSecurityValidator implements ApplicationRunner {
+
+    private final TransportSecurityProperties properties;
+    private final TransportTlsContextFactory tlsContextFactory;
+    private final String transactionUrl;
+    private final String keyExchangeUrl;
+
+    public ProductionTransportSecurityValidator(
+            TransportSecurityProperties properties,
+            TransportTlsContextFactory tlsContextFactory,
+            @Value(&quot;${api.service.url}&quot;) String transactionUrl,
+<span class="fc" id="L25">            @Value(&quot;${api.service.url.dke}&quot;) String keyExchangeUrl) {</span>
+<span class="fc" id="L26">        this.properties = properties;</span>
+<span class="fc" id="L27">        this.tlsContextFactory = tlsContextFactory;</span>
+<span class="fc" id="L28">        this.transactionUrl = transactionUrl;</span>
+<span class="fc" id="L29">        this.keyExchangeUrl = keyExchangeUrl;</span>
+<span class="fc" id="L30">    }</span>
+
+    @Override
+    public void run(ApplicationArguments args) {
+<span class="fc" id="L34">        requireHttps(transactionUrl, &quot;Switch-core transaction URL&quot;);</span>
+<span class="fc" id="L35">        requireHttps(keyExchangeUrl, &quot;Switch-core key-exchange URL&quot;);</span>
+<span class="pc bpc" id="L36" title="1 of 2 branches missed.">        if (!properties.getSwitchCore().isEnabled()) {</span>
+<span class="nc" id="L37">            throw new IllegalStateException(&quot;Switch-core mTLS must be enabled in production&quot;);</span>
+        }
+<span class="fc bfc" id="L39" title="All 2 branches covered.">        if (!properties.getScheme().isEnabled()) {</span>
+<span class="fc" id="L40">            throw new IllegalStateException(&quot;Scheme TLS must be enabled in production&quot;);</span>
+        }
+        // Read and parse both identities and trust stores during startup. This
+        // prevents a production instance from becoming ready with unusable TLS.
+<span class="fc" id="L44">        tlsContextFactory.createClientContext(&quot;Switch-core&quot;, properties.getSwitchCore());</span>
+<span class="fc" id="L45">        tlsContextFactory.createClientContext(&quot;Scheme&quot;, properties.getScheme());</span>
+<span class="fc" id="L46">    }</span>
+
+    private void requireHttps(String value, String name) {
+        try {
+<span class="fc bfc" id="L50" title="All 2 branches covered.">            if (!&quot;https&quot;.equalsIgnoreCase(URI.create(value).getScheme())) {</span>
+<span class="fc" id="L51">                throw new IllegalStateException(name + &quot; must use HTTPS in production&quot;);</span>
+            }
+<span class="nc" id="L53">        } catch (IllegalArgumentException exception) {</span>
+<span class="nc" id="L54">            throw new IllegalStateException(name + &quot; is invalid&quot;, exception);</span>
+<span class="fc" id="L55">        }</span>
+<span class="fc" id="L56">    }</span>
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.14.202510111229</span></div></body></html>

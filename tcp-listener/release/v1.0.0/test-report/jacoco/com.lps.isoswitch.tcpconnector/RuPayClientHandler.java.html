@@ -1,0 +1,764 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>RuPayClientHandler.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">switch</a> &gt; <a href="index.source.html" class="el_package">com.lps.isoswitch.tcpconnector</a> &gt; <span class="el_source">RuPayClientHandler.java</span></div><h1>RuPayClientHandler.java</h1><pre class="source lang-java linenums">package com.lps.isoswitch.tcpconnector;
+
+import io.netty.buffer.ByteBuf;
+import io.netty.buffer.Unpooled;
+import io.netty.channel.ChannelHandler;
+import io.netty.channel.ChannelHandlerContext;
+import io.netty.channel.ChannelInboundHandlerAdapter;
+import io.netty.handler.timeout.IdleStateEvent;
+import io.netty.handler.timeout.ReadTimeoutException;
+import io.netty.handler.timeout.WriteTimeoutException;
+
+import com.lps.isoswitch.utils.Enums.SwitchDestinationEnum;
+import com.lps.isoswitch.config.SchemeConfig;
+import com.lps.isoswitch.config.RawDataLogging;
+import com.lps.isoswitch.service.ApiService;
+import com.lps.isoswitch.service.IsoResponseMapper;
+import com.lps.isoswitch.service.SchemeNetworkMessageProcessor;
+
+import org.jpos.iso.ISOPackager;
+import org.jpos.iso.ISOException;
+import org.jpos.iso.ISOMsg;
+import org.jpos.iso.packager.GenericPackager;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
+import java.io.InputStream;
+import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.TimeUnit;
+import java.util.concurrent.TimeoutException;
+import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.concurrent.atomic.AtomicInteger;
+import java.util.concurrent.atomic.AtomicReference;
+
+import org.springframework.beans.factory.annotation.Qualifier;
+import org.springframework.stereotype.Component;
+import org.springframework.beans.factory.annotation.Value;
+import com.lps.isoswitch.exception.ApiException;
+import com.lps.isoswitch.exception.NetworkException;
+
+import com.lps.isoswitch.service.ConnectionStatusService;
+import com.lps.isoswitch.utils.AppConstants;
+
+/**
+ * RuPayClientHandler is responsible for handling TCP connections and processing
+ * ISO8583 messages for RuPay transactions. It implements concurrent message
+ * processing with proper error handling and response management using virtual
+ * threads for improved scalability.
+ *
+ * Key features: - Concurrent message processing using virtual threads -
+ * Automatic reconnection handling - ISO8583 message parsing and response
+ * generation - Error handling with appropriate decline responses - Network
+ * message (0800) handling - Graceful shutdown support
+ *
+ * @author Logicpoint Systems
+ * @version 2.0
+ * @since 2025-06-15
+ */
+@Component
+@ChannelHandler.Sharable
+public class RuPayClientHandler extends ChannelInboundHandlerAdapter implements SchemeManagementHandler {
+
+<span class="fc" id="L63">    private static final Logger log = LoggerFactory.getLogger(RuPayClientHandler.class);</span>
+    private final SwitchDestinationEnum destination;
+    private final ISOPackager packager;
+    private volatile ChannelHandlerContext currentContext;
+
+    // Virtual thread executor for handling concurrent requests
+    private final ExecutorService requestExecutor;
+    @Value(&quot;${max.concurrent.requests:1000}&quot;)
+    private int MAX_CONCURRENT_REQUESTS; // Increased for virtual threads
+    @Value(&quot;${request.timeout.seconds:30}&quot;)
+    private int REQUEST_TIMEOUT_SECONDS;
+
+    // Counter for active requests
+<span class="fc" id="L76">    private final AtomicInteger activeRequests = new AtomicInteger(0);</span>
+
+    // Response codes for different scenarios
+    private static final String RESPONSE_CODE_SYSTEM_ERROR = &quot;96&quot;;  // System malfunction
+    private static final String RESPONSE_CODE_TIMEOUT = &quot;91&quot;;       // Issuer or switch inoperative
+    private static final String RESPONSE_CODE_DECLINE = &quot;05&quot;;       // Do not honor
+    private static final String RESPONSE_CODE_INVALID_TRANSACTION = &quot;12&quot;; // Invalid transaction
+
+    private final ApiService apiService;
+    private final IsoResponseMapper responseMapper;
+    private final SchemeNetworkMessageProcessor networkMessageProcessor;
+    private final ConnectionStatusService connectionStatusService;
+
+    // Shutdown related fields
+<span class="fc" id="L90">    private final AtomicBoolean isShuttingDown = new AtomicBoolean(false);</span>
+<span class="fc" id="L91">    private final AtomicReference&lt;CompletableFuture&lt;Void&gt;&gt; shutdownFuture = new AtomicReference&lt;&gt;();</span>
+    private static final int SHUTDOWN_TIMEOUT_SECONDS = 30;
+    private static final int SHUTDOWN_CHECK_INTERVAL_MS = 100;
+
+    /**
+     * Constructs a new RuPayClientHandler. Initializes virtual thread executor
+     * for concurrent request processing.
+     *
+     * @param apiService The API service for processing ISO messages
+     * @param isoMessageExecutor Virtual thread executor for ISO message
+     * processing
+     */
+    public RuPayClientHandler(
+            ApiService apiService,
+            IsoResponseMapper responseMapper,
+            SchemeNetworkMessageProcessor networkMessageProcessor,
+            ConnectionStatusService connectionStatusService,
+            SchemeConfig schemeConfig,
+<span class="fc" id="L109">            @Qualifier(&quot;isoMessageExecutor&quot;) ExecutorService isoMessageExecutor) {</span>
+<span class="fc" id="L110">        this.apiService = apiService;</span>
+<span class="fc" id="L111">        this.responseMapper = responseMapper;</span>
+<span class="fc" id="L112">        this.networkMessageProcessor = networkMessageProcessor;</span>
+<span class="fc" id="L113">        this.connectionStatusService = connectionStatusService;</span>
+<span class="fc" id="L114">        this.destination = SwitchDestinationEnum.RUPAY;</span>
+<span class="fc" id="L115">        this.requestExecutor = isoMessageExecutor;</span>
+        try {
+<span class="fc" id="L117">            String packagerPath = schemeConfig.resolve(</span>
+                    destination,
+                    null,
+                    null,
+                    null,
+                    null,
+                    null,
+                    null,
+                    null,
+                    null,
+<span class="fc" id="L127">                    null).packager();</span>
+<span class="fc" id="L128">            InputStream is = getClass().getResourceAsStream(packagerPath);</span>
+<span class="pc bpc" id="L129" title="1 of 2 branches missed.">            if (is == null) {</span>
+<span class="nc" id="L130">                log.error(&quot;Could not find {} in classpath&quot;, packagerPath);</span>
+<span class="nc" id="L131">                throw new ISOException(&quot;Packager configuration file not found&quot;);</span>
+            }
+<span class="fc" id="L133">            packager = new GenericPackager(is);</span>
+<span class="fc" id="L134">            is.close();</span>
+<span class="nc" id="L135">        } catch (ISOException e) {</span>
+<span class="nc" id="L136">            log.error(&quot;Error initializing ISO8583 packager&quot;, e);</span>
+<span class="nc" id="L137">            throw new RuntimeException(&quot;Failed to initialize ISO8583 packager&quot;, e);</span>
+<span class="nc" id="L138">        } catch (Exception e) {</span>
+<span class="nc" id="L139">            log.error(&quot;Error loading packager configuration&quot;, e);</span>
+<span class="nc" id="L140">            throw new RuntimeException(&quot;Failed to load packager configuration&quot;, e);</span>
+<span class="fc" id="L141">        }</span>
+<span class="fc" id="L142">    }</span>
+
+    @Override
+    public SwitchDestinationEnum getSupportedScheme() {
+<span class="fc" id="L146">        return destination;</span>
+    }
+
+    /**
+     * Called when a connection is established with the server. Resets the
+     * reconnection flag and logs the connection status.
+     *
+     * @param ctx The channel handler context
+     */
+    @Override
+    public void channelActive(ChannelHandlerContext ctx) {
+<span class="fc" id="L157">        this.currentContext = ctx;</span>
+<span class="fc" id="L158">        connectionStatusService.updateConnectionStatus(destination, true);</span>
+<span class="fc" id="L159">        log.info(&quot;Connection established with server&quot;);</span>
+<span class="fc" id="L160">    }</span>
+
+    /**
+     * Called when the connection with the server is lost. Initiates
+     * reconnection process if not already reconnecting.
+     *
+     * @param ctx The channel handler context
+     */
+    @Override
+    public void channelInactive(ChannelHandlerContext ctx) {
+<span class="fc" id="L170">        log.info(&quot;Connection lost with server&quot;);</span>
+<span class="fc" id="L171">        connectionStatusService.updateConnectionStatus(destination, false);</span>
+
+<span class="fc bfc" id="L173" title="All 2 branches covered.">        if (isShuttingDown.get()) {</span>
+<span class="fc" id="L174">            shutdownThreadPool();</span>
+        }
+<span class="fc" id="L176">    }</span>
+
+    /**
+     * Processes incoming messages from the TCP connection. Handles concurrent
+     * message processing using virtual threads for improved scalability.
+     *
+     * @param ctx The channel handler context
+     * @param msg The received message
+     */
+    @Override
+    public void channelRead(ChannelHandlerContext ctx, Object msg) {
+        // Check if shutdown is in progress
+<span class="fc bfc" id="L188" title="All 2 branches covered.">        if (isShuttingDown.get()) {</span>
+<span class="fc" id="L189">            log.warn(&quot;Rejecting new request as shutdown is in progress&quot;);</span>
+<span class="fc" id="L190">            return;</span>
+        }
+
+<span class="fc bfc" id="L193" title="All 2 branches covered.">        if (activeRequests.get() &gt;= MAX_CONCURRENT_REQUESTS) {</span>
+<span class="fc" id="L194">            log.warn(&quot;Maximum concurrent requests limit reached. Rejecting new request.&quot;);</span>
+<span class="fc" id="L195">            return;</span>
+        }
+
+<span class="fc" id="L198">        ByteBuf buf = Unpooled.wrappedBuffer((byte[]) msg);</span>
+<span class="fc" id="L199">        byte[] data = new byte[buf.readableBytes()];</span>
+<span class="fc" id="L200">        buf.getBytes(0, data);</span>
+<span class="fc" id="L201">        RawDataLogging.bytes(&quot;Inbound RuPay frame&quot;, data);</span>
+        try {
+<span class="fc" id="L203">            activeRequests.incrementAndGet();</span>
+<span class="fc" id="L204">            log.info(&quot;Received message in RuPayClientHandler. Active requests: {}&quot;, activeRequests.get());</span>
+
+            // Process message using virtual threads for improved scalability
+<span class="fc" id="L207">            CompletableFuture.runAsync(() -&gt; processMessage(ctx, data), requestExecutor)</span>
+<span class="fc" id="L208">                    .orTimeout(REQUEST_TIMEOUT_SECONDS, TimeUnit.SECONDS)</span>
+<span class="fc" id="L209">                    .whenComplete((result, error) -&gt; {</span>
+<span class="pc bpc" id="L210" title="1 of 2 branches missed.">                        if (error != null) {</span>
+<span class="nc" id="L211">                            log.error(&quot;Error processing message&quot;, error);</span>
+<span class="nc bnc" id="L212" title="All 2 branches missed.">                            if (error instanceof TimeoutException) {</span>
+<span class="nc" id="L213">                                log.error(&quot;Request timed out after {} seconds&quot;, REQUEST_TIMEOUT_SECONDS);</span>
+                            }
+                        }
+<span class="fc" id="L216">                        activeRequests.decrementAndGet();</span>
+<span class="fc" id="L217">                    });</span>
+<span class="nc" id="L218">        } catch (Exception e) {</span>
+<span class="nc" id="L219">            log.error(&quot;Error in channelRead&quot;, e);</span>
+<span class="nc" id="L220">            activeRequests.decrementAndGet();</span>
+        } finally {
+<span class="fc" id="L222">            buf.release();</span>
+        }
+<span class="fc" id="L224">    }</span>
+
+    /**
+     * Processes an ISO8583 message, handling both financial and network
+     * messages. For financial messages, it calls the API service; for network
+     * messages (0800), it handles them directly.
+     *
+     * @param ctx The channel handler context
+     * @param data The raw message data
+     */
+    private void processMessage(ChannelHandlerContext ctx, byte[] data) {
+<span class="fc" id="L235">        ISOMsg isoMsg = new ISOMsg();</span>
+        try {
+<span class="fc" id="L237">            isoMsg.setPackager(packager);</span>
+<span class="fc" id="L238">            isoMsg.unpack(data);</span>
+<span class="fc" id="L239">            RawDataLogging.isoMessage(&quot;Inbound RuPay ISO message&quot;, isoMsg);</span>
+
+<span class="fc bfc" id="L241" title="All 2 branches covered.">            if (networkMessageProcessor.shouldRouteToSwitchCore(isoMsg, destination)) {</span>
+<span class="fc" id="L242">                processMessage(ctx, isoMsg);</span>
+            } else {
+<span class="fc" id="L244">                handleLocalNetworkMessage(ctx, isoMsg);</span>
+            }
+<span class="fc" id="L246">        } catch (ISOException e) {</span>
+<span class="fc" id="L247">            log.error(&quot;Error processing ISO8583 message&quot;, e);</span>
+<span class="fc" id="L248">            RawDataLogging.isoMessage(&quot;Invalid inbound RuPay ISO message&quot;, isoMsg);</span>
+<span class="fc" id="L249">            sendDeclineResponse(ctx, isoMsg, RESPONSE_CODE_INVALID_TRANSACTION,</span>
+<span class="fc" id="L250">                    &quot;Invalid ISO message format: &quot; + e.getMessage());</span>
+<span class="nc" id="L251">        } catch (Exception e) {</span>
+<span class="nc" id="L252">            log.error(&quot;Error processing message&quot;, e);</span>
+<span class="nc" id="L253">            sendDeclineResponse(ctx, isoMsg, RESPONSE_CODE_SYSTEM_ERROR,</span>
+<span class="nc" id="L254">                    &quot;System error: &quot; + e.getMessage());</span>
+<span class="fc" id="L255">        }</span>
+<span class="fc" id="L256">    }</span>
+
+    /**
+     * Processes an ISO8583 message, handling both financial and network
+     * messages. For financial messages, it calls the API service; for network
+     * messages (0800), it handles them directly.
+     *
+     * @param ctx The channel handler context
+     * @param isoMsg The received ISO message
+     */
+    private void processMessage(ChannelHandlerContext ctx, ISOMsg isoMsg) {
+        try {
+<span class="pc bpc" id="L268" title="1 of 2 branches missed.">            if (!connectionStatusService.isReadyForTransactions(destination)) {</span>
+<span class="fc" id="L269">                log.error(&quot;Not ready for transactions. Connection or sign-on not established.&quot;);</span>
+<span class="fc" id="L270">                sendDeclineResponse(ctx, isoMsg, RESPONSE_CODE_SYSTEM_ERROR, &quot;Not ready for transactions&quot;);</span>
+<span class="fc" id="L271">                return;</span>
+            }
+
+<span class="nc" id="L274">            log.info(&quot;Processing financial message&quot;);</span>
+<span class="nc" id="L275">            apiService.processIsoMessage(isoMsg, destination.name())</span>
+<span class="nc" id="L276">                    .thenAcceptAsync(response -&gt; {</span>
+                        try {
+<span class="nc" id="L278">                            ISOMsg responseMsg = responseMapper.convertApiResponse(response, packager);</span>
+<span class="nc" id="L279">                            byte[] responseBytes = responseMsg.pack();</span>
+<span class="nc" id="L280">                            RawDataLogging.bytes(&quot;Outbound RuPay response frame&quot;, responseBytes);</span>
+<span class="nc" id="L281">                            RawDataLogging.isoMessage(&quot;Outbound RuPay ISO response&quot;, responseMsg);</span>
+<span class="nc" id="L282">                            ChannelHandlerContext activeContext = resolveContext(ctx);</span>
+<span class="nc bnc" id="L283" title="All 2 branches missed.">                            if (activeContext == null) {</span>
+<span class="nc" id="L284">                                throw new IllegalStateException(&quot;No active channel available to send financial response&quot;);</span>
+                            }
+<span class="nc" id="L286">                            activeContext.writeAndFlush(frameMessage(activeContext, responseBytes));</span>
+<span class="nc" id="L287">                            connectionStatusService.recordTransaction(destination, true);</span>
+<span class="nc" id="L288">                            log.info(&quot;Financial message response sent successfully&quot;);</span>
+<span class="nc" id="L289">                        } catch (Exception e) {</span>
+<span class="nc" id="L290">                            log.error(&quot;Error sending response&quot;, e);</span>
+<span class="nc" id="L291">                            handleError(ctx, e, isoMsg);</span>
+<span class="nc" id="L292">                        }</span>
+<span class="nc" id="L293">                    }, requestExecutor)</span>
+<span class="nc" id="L294">                    .exceptionally(throwable -&gt; {</span>
+<span class="nc" id="L295">                        log.error(&quot;Error processing message - API&quot;, throwable);</span>
+<span class="nc" id="L296">                        handleError(ctx, throwable, isoMsg);</span>
+<span class="nc" id="L297">                        return null;</span>
+                    });
+<span class="nc" id="L299">        } catch (Exception e) {</span>
+<span class="nc" id="L300">            log.error(&quot;Error processing message&quot;, e);</span>
+<span class="nc" id="L301">            handleError(ctx, e, isoMsg);</span>
+<span class="nc" id="L302">        }</span>
+<span class="nc" id="L303">    }</span>
+
+    /**
+     * Handles local network messages and writes generated responses to the
+     * active channel.
+     *
+     * @param ctx The channel handler context
+     * @param isoMsg The ISO message to process
+     */
+    private void handleLocalNetworkMessage(ChannelHandlerContext ctx, ISOMsg isoMsg) {
+        try {
+<span class="fc" id="L314">            log.info(&quot;Processing network message in RuPayClientHandler&quot;);</span>
+<span class="fc" id="L315">            var response = networkMessageProcessor.handleLocalNetworkMessage(isoMsg, destination);</span>
+<span class="pc bpc" id="L316" title="1 of 2 branches missed.">            if (response.isPresent()) {</span>
+<span class="fc" id="L317">                ISOMsg responseMsg = response.get();</span>
+<span class="fc" id="L318">                byte[] responseData = responseMsg.pack();</span>
+<span class="fc" id="L319">                RawDataLogging.isoMessage(&quot;Outbound local network ISO response&quot;, responseMsg);</span>
+<span class="fc" id="L320">                ChannelHandlerContext activeContext = resolveContext(ctx);</span>
+<span class="pc bpc" id="L321" title="1 of 2 branches missed.">                if (activeContext == null) {</span>
+<span class="nc" id="L322">                    log.error(&quot;No active channel available to send network message response&quot;);</span>
+<span class="nc" id="L323">                    return;</span>
+                }
+<span class="fc" id="L325">                activeContext.writeAndFlush(frameMessage(activeContext, responseData))</span>
+<span class="fc" id="L326">                        .addListener(future -&gt; {</span>
+<span class="pc bpc" id="L327" title="1 of 2 branches missed.">                            if (!future.isSuccess()) {</span>
+<span class="nc" id="L328">                                log.error(&quot;Failed to send network message response&quot;, future.cause());</span>
+                            } else {
+<span class="fc" id="L330">                                log.info(&quot;Successfully sent network message response&quot;);</span>
+                            }
+<span class="fc" id="L332">                        });</span>
+            }
+<span class="nc" id="L334">        } catch (ISOException e) {</span>
+<span class="nc" id="L335">            log.error(&quot;Error processing network message&quot;, e);</span>
+            try {
+<span class="nc" id="L337">                sendDeclineResponse(ctx, isoMsg, RESPONSE_CODE_SYSTEM_ERROR,</span>
+<span class="nc" id="L338">                        &quot;Error processing network message: &quot; + e.getMessage());</span>
+<span class="nc" id="L339">            } catch (Exception ex) {</span>
+<span class="nc" id="L340">                log.error(&quot;Error sending decline response for network message&quot;, ex);</span>
+<span class="nc" id="L341">            }</span>
+<span class="fc" id="L342">        }</span>
+<span class="fc" id="L343">    }</span>
+
+    /**
+     * Sends a decline response when the API service is unavailable or
+     * encounters an error. Creates a proper ISO response message with
+     * appropriate response code and error details.
+     *
+     * @param ctx The channel handler context
+     * @param originalMsg The original ISO message
+     * @param responseCode The response code to send
+     * @param errorMessage The error message for logging
+     */
+    private void sendDeclineResponse(ChannelHandlerContext ctx, ISOMsg originalMsg, String responseCode, String errorMessage) {
+        try {
+<span class="fc" id="L357">            log.error(&quot;Sending decline response. Error: {}&quot;, errorMessage);</span>
+<span class="fc" id="L358">            ChannelHandlerContext activeContext = resolveContext(ctx);</span>
+<span class="pc bpc" id="L359" title="1 of 2 branches missed.">            if (activeContext == null) {</span>
+<span class="nc" id="L360">                log.error(&quot;No active channel available to send decline response&quot;);</span>
+<span class="nc" id="L361">                return;</span>
+            }
+
+<span class="fc" id="L364">            ISOMsg responseMsg = responseMapper.createDeclineResponse(originalMsg, packager, responseCode);</span>
+<span class="fc" id="L365">            byte[] responseData = responseMsg.pack();</span>
+<span class="fc" id="L366">            RawDataLogging.isoMessage(&quot;Outbound decline ISO response&quot;, responseMsg);</span>
+<span class="fc" id="L367">            activeContext.writeAndFlush(frameMessage(activeContext, responseData))</span>
+<span class="fc" id="L368">                    .addListener(future -&gt; {</span>
+<span class="pc bpc" id="L369" title="1 of 2 branches missed.">                        if (!future.isSuccess()) {</span>
+<span class="nc" id="L370">                            log.error(&quot;Failed to send decline response&quot;, future.cause());</span>
+                        } else {
+<span class="fc" id="L372">                            log.info(&quot;Successfully sent decline response with code: {}&quot;, responseCode);</span>
+                        }
+<span class="fc" id="L374">                    });</span>
+<span class="nc" id="L375">        } catch (ISOException e) {</span>
+<span class="nc" id="L376">            log.error(&quot;Error creating decline response&quot;, e);</span>
+<span class="fc" id="L377">        }</span>
+<span class="fc" id="L378">    }</span>
+
+    /**
+     * Handles exceptions that occur during channel operations. Logs the error
+     * and attempts reconnection if appropriate.
+     *
+     * @param ctx The channel handler context
+     * @param cause The exception that occurred
+     */
+    @Override
+    public void exceptionCaught(ChannelHandlerContext ctx, Throwable cause) {
+<span class="fc" id="L389">        log.error(&quot;Channel exception&quot;, cause);</span>
+        
+        // Handle specific timeout exceptions
+<span class="fc bfc" id="L392" title="All 2 branches covered.">        if (cause instanceof ReadTimeoutException) {</span>
+<span class="fc" id="L393">            log.error(&quot;Read timeout detected - connection may be dead&quot;);</span>
+<span class="fc" id="L394">            connectionStatusService.updateConnectionStatus(destination, false);</span>
+<span class="pc bpc" id="L395" title="1 of 2 branches missed.">        } else if (cause instanceof WriteTimeoutException) {</span>
+<span class="fc" id="L396">            log.error(&quot;Write timeout detected - connection may be dead&quot;);</span>
+<span class="fc" id="L397">            connectionStatusService.updateConnectionStatus(destination, false);</span>
+        }
+<span class="fc" id="L399">        ctx.close();</span>
+<span class="fc" id="L400">    }</span>
+    
+    /**
+     * Handles idle state events for connection monitoring.
+     *
+     * @param ctx The channel handler context
+     * @param evt The idle state event
+     */
+    @Override
+    public void userEventTriggered(ChannelHandlerContext ctx, Object evt) {
+<span class="pc bpc" id="L410" title="1 of 2 branches missed.">        if (evt instanceof IdleStateEvent) {</span>
+<span class="fc" id="L411">            IdleStateEvent idleEvent = (IdleStateEvent) evt;</span>
+<span class="fc" id="L412">            log.warn(&quot;Idle state detected: {}&quot;, idleEvent.state());</span>
+            
+<span class="pc bpc" id="L414" title="1 of 4 branches missed.">            switch (idleEvent.state()) {</span>
+                case READER_IDLE:
+<span class="fc" id="L416">                    log.warn(&quot;Reader idle - no data received for 60 seconds&quot;);</span>
+                    // Connection appears to be dead, close it
+<span class="fc" id="L418">                    connectionStatusService.updateConnectionStatus(destination, false);</span>
+<span class="fc" id="L419">                    ctx.close();</span>
+<span class="fc" id="L420">                    break;</span>
+                case WRITER_IDLE:
+<span class="fc" id="L422">                    log.warn(&quot;Writer idle - no data sent for 60 seconds&quot;);</span>
+                    // Send a ping to check if connection is alive
+<span class="fc" id="L424">                    sendConnectionTest(ctx);</span>
+<span class="fc" id="L425">                    break;</span>
+                case ALL_IDLE:
+<span class="fc" id="L427">                    log.warn(&quot;All idle - no activity for 60 seconds&quot;);</span>
+                    // Connection appears to be dead, close it
+<span class="fc" id="L429">                    connectionStatusService.updateConnectionStatus(destination, false);</span>
+<span class="fc" id="L430">                    ctx.close();</span>
+                    break;
+            }
+        }
+<span class="fc" id="L434">    }</span>
+    
+    /**
+     * Sends a connection test message to verify the connection is still alive.
+     *
+     * @param ctx The channel handler context
+     */
+    private void sendConnectionTest(ChannelHandlerContext ctx) {
+        try {
+<span class="pc bpc" id="L443" title="1 of 2 branches missed.">            if (!ctx.channel().isActive()) {</span>
+<span class="nc" id="L444">                log.warn(&quot;Cannot send connection test - channel is not active&quot;);</span>
+<span class="nc" id="L445">                return;</span>
+            }
+            
+<span class="fc" id="L448">            ISOMsg testMsg = networkMessageProcessor.createEchoTestRequest(packager, destination);</span>
+<span class="fc" id="L449">            byte[] testData = testMsg.pack();</span>
+            
+<span class="fc" id="L451">            log.debug(&quot;Sending connection test message&quot;);</span>
+<span class="fc" id="L452">            ctx.writeAndFlush(frameMessage(ctx, testData))</span>
+<span class="fc" id="L453">                .addListener(future -&gt; {</span>
+<span class="pc bpc" id="L454" title="1 of 2 branches missed.">                    if (!future.isSuccess()) {</span>
+<span class="nc" id="L455">                        log.error(&quot;Failed to send connection test&quot;, future.cause());</span>
+<span class="nc" id="L456">                        connectionStatusService.updateConnectionStatus(destination, false);</span>
+<span class="nc" id="L457">                        ctx.close();</span>
+                    } else {
+<span class="fc" id="L459">                        log.debug(&quot;Connection test sent successfully&quot;);</span>
+                    }
+<span class="fc" id="L461">                });</span>
+                
+<span class="nc" id="L463">        } catch (Exception e) {</span>
+<span class="nc" id="L464">            log.error(&quot;Error sending connection test&quot;, e);</span>
+<span class="nc" id="L465">            connectionStatusService.updateConnectionStatus(destination, false);</span>
+<span class="nc" id="L466">            ctx.close();</span>
+<span class="fc" id="L467">        }</span>
+<span class="fc" id="L468">    }</span>
+
+    /**
+     * Initiates a graceful shutdown of the handler. This method will: 1. Stop
+     * accepting new requests 2. Wait for existing requests to complete 3. Close
+     * the connection 4. Shutdown the thread pool
+     *
+     * @return CompletableFuture that completes when shutdown is finished
+     */
+    public CompletableFuture&lt;Void&gt; shutdown() {
+<span class="fc bfc" id="L478" title="All 2 branches covered.">        if (isShuttingDown.compareAndSet(false, true)) {</span>
+<span class="fc" id="L479">            log.info(&quot;Initiating graceful shutdown of RuPayClientHandler&quot;);</span>
+
+<span class="fc" id="L481">            CompletableFuture&lt;Void&gt; future = new CompletableFuture&lt;&gt;();</span>
+<span class="fc" id="L482">            shutdownFuture.set(future);</span>
+
+            // Stop accepting new requests
+<span class="fc" id="L485">            log.info(&quot;Stopping acceptance of new requests&quot;);</span>
+
+            // Wait for active requests to complete
+<span class="fc" id="L488">            CompletableFuture.runAsync(() -&gt; {</span>
+                try {
+<span class="fc" id="L490">                    waitForActiveRequests();</span>
+
+                    // Close the channel if it's still open
+<span class="fc" id="L493">                    ChannelHandlerContext activeContext = resolveContext(null);</span>
+<span class="pc bpc" id="L494" title="1 of 4 branches missed.">                    if (activeContext != null &amp;&amp; activeContext.channel().isActive()) {</span>
+<span class="fc" id="L495">                        log.info(&quot;Closing active channel&quot;);</span>
+<span class="fc" id="L496">                        activeContext.close().sync();</span>
+                    }
+
+                    // Shutdown the thread pool
+<span class="fc" id="L500">                    shutdownThreadPool();</span>
+
+<span class="fc" id="L502">                    log.info(&quot;Graceful shutdown completed successfully&quot;);</span>
+<span class="fc" id="L503">                    future.complete(null);</span>
+<span class="nc" id="L504">                } catch (Exception e) {</span>
+<span class="nc" id="L505">                    log.error(&quot;Error during graceful shutdown&quot;, e);</span>
+<span class="nc" id="L506">                    future.completeExceptionally(e);</span>
+<span class="fc" id="L507">                }</span>
+<span class="fc" id="L508">            });</span>
+
+<span class="fc" id="L510">            return future;</span>
+        }
+
+<span class="fc" id="L513">        return shutdownFuture.get();</span>
+    }
+
+    /**
+     * Waits for all active requests to complete or timeout.
+     *
+     * @throws InterruptedException if the wait is interrupted
+     */
+    private void waitForActiveRequests() throws InterruptedException {
+<span class="fc" id="L522">        long startTime = System.currentTimeMillis();</span>
+<span class="fc" id="L523">        long timeoutTime = startTime + (SHUTDOWN_TIMEOUT_SECONDS * 1000);</span>
+
+<span class="pc bpc" id="L525" title="1 of 2 branches missed.">        while (activeRequests.get() &gt; 0) {</span>
+<span class="nc bnc" id="L526" title="All 2 branches missed.">            if (System.currentTimeMillis() &gt; timeoutTime) {</span>
+<span class="nc" id="L527">                log.warn(&quot;Timeout waiting for active requests to complete. Active requests: {}&quot;,</span>
+<span class="nc" id="L528">                        activeRequests.get());</span>
+<span class="nc" id="L529">                break;</span>
+            }
+
+<span class="nc" id="L532">            log.info(&quot;Waiting for {} active requests to complete&quot;, activeRequests.get());</span>
+<span class="nc" id="L533">            Thread.sleep(SHUTDOWN_CHECK_INTERVAL_MS);</span>
+        }
+<span class="fc" id="L535">    }</span>
+
+    /**
+     * Shuts down the thread pool gracefully.
+     */
+    private void shutdownThreadPool() {
+<span class="fc" id="L541">        log.info(&quot;Request executor is managed by Spring and will be closed during application shutdown&quot;);</span>
+<span class="fc" id="L542">    }</span>
+
+    /**
+     * Checks if the handler is currently shutting down.
+     *
+     * @return true if shutdown is in progress, false otherwise
+     */
+    public boolean isShuttingDown() {
+<span class="fc" id="L550">        return isShuttingDown.get();</span>
+    }
+
+    /**
+     * Gets the current number of active requests.
+     *
+     * @return number of active requests
+     */
+    public int getActiveRequestCount() {
+<span class="fc" id="L559">        return activeRequests.get();</span>
+    }
+
+    /**
+     * Handles errors by sending a decline response and updating transaction
+     * metrics.
+     *
+     * @param ctx The channel handler context
+     * @param error The error that occurred
+     */
+    private void handleError(ChannelHandlerContext ctx, Throwable error, ISOMsg isoMsg) {
+        try {
+<span class="fc bfc" id="L571" title="All 2 branches covered.">            if (error instanceof ApiException) {</span>
+<span class="fc" id="L572">                sendDeclineResponse(ctx, isoMsg, &quot;05&quot;, &quot;API Error&quot;);</span>
+<span class="fc bfc" id="L573" title="All 2 branches covered.">            } else if (error instanceof NetworkException) {</span>
+<span class="fc" id="L574">                sendDeclineResponse(ctx, isoMsg, &quot;91&quot;, &quot;Network Error&quot;);</span>
+            } else {
+<span class="fc" id="L576">                sendDeclineResponse(ctx, isoMsg, &quot;96&quot;, &quot;System Error&quot;);</span>
+            }
+<span class="fc" id="L578">            connectionStatusService.recordTransaction(destination, false);</span>
+<span class="nc" id="L579">        } catch (Exception e) {</span>
+<span class="nc" id="L580">            log.error(&quot;Error handling error response&quot;, e);</span>
+<span class="fc" id="L581">        }</span>
+<span class="fc" id="L582">    }</span>
+
+    /**
+     * Initiates a sign-on request to the server. This method creates and sends
+     * a network management message (0800) with sign-on type.
+     *
+     * @return CompletableFuture&lt;Boolean&gt; that completes with true if sign-on
+     * was successful
+     */
+    public CompletableFuture&lt;Boolean&gt; initiateSignOn() {
+<span class="fc" id="L592">        CompletableFuture&lt;Boolean&gt; signOnFuture = new CompletableFuture&lt;&gt;();</span>
+
+        try {
+<span class="fc" id="L595">            ChannelHandlerContext activeContext = resolveContext(null);</span>
+<span class="fc bfc" id="L596" title="All 2 branches covered.">            if (activeContext == null) {</span>
+<span class="fc" id="L597">                log.error(&quot;Cannot initiate sign-on without an active channel&quot;);</span>
+<span class="fc" id="L598">                signOnFuture.complete(false);</span>
+<span class="fc" id="L599">                return signOnFuture;</span>
+            }
+<span class="fc" id="L601">            ISOMsg signOnMsg = networkMessageProcessor.createSignOnRequest(packager, destination);</span>
+<span class="fc" id="L602">            log.info(&quot;Initiating sign-on request&quot;);</span>
+<span class="fc" id="L603">            byte[] requestData = signOnMsg.pack();</span>
+
+<span class="fc" id="L605">            activeContext.writeAndFlush(frameMessage(activeContext, requestData))</span>
+<span class="fc" id="L606">                    .addListener(future -&gt; {</span>
+<span class="pc bpc" id="L607" title="1 of 2 branches missed.">                        if (!future.isSuccess()) {</span>
+<span class="nc" id="L608">                            log.error(&quot;Failed to send sign-on request&quot;, future.cause());</span>
+<span class="nc" id="L609">                            signOnFuture.complete(false);</span>
+                        } else {
+<span class="fc" id="L611">                            log.info(&quot;Sign-on request sent successfully&quot;);</span>
+                            // Response will be handled in channelRead
+                        }
+<span class="fc" id="L614">                    });</span>
+<span class="nc" id="L615">        } catch (Exception e) {</span>
+<span class="nc" id="L616">            log.error(&quot;Error initiating sign-on&quot;, e);</span>
+<span class="nc" id="L617">            signOnFuture.complete(false);</span>
+<span class="fc" id="L618">        }</span>
+
+<span class="fc" id="L620">        return signOnFuture;</span>
+    }
+
+    /**
+     * Initiates a DKE ZPK request to the server. This method creates and sends
+     * a network management message (0800) with DKE ZPK type.
+     *
+     * @return CompletableFuture&lt;Boolean&gt; that completes with true if DKE ZPK
+     * was successful
+     */
+    public CompletableFuture&lt;Boolean&gt; initiateDke(String dkeType) {
+<span class="fc" id="L631">        CompletableFuture&lt;Boolean&gt; signOnFuture = new CompletableFuture&lt;&gt;();</span>
+
+        try {
+<span class="fc" id="L634">            ChannelHandlerContext activeContext = resolveContext(null);</span>
+<span class="fc bfc" id="L635" title="All 2 branches covered.">            if (activeContext == null) {</span>
+<span class="fc" id="L636">                log.error(&quot;Cannot initiate DKE without an active channel&quot;);</span>
+<span class="fc" id="L637">                signOnFuture.complete(false);</span>
+<span class="fc" id="L638">                return signOnFuture;</span>
+            }
+<span class="fc" id="L640">            ISOMsg signOnMsg = networkMessageProcessor.createDkeRequest(packager, dkeType, destination);</span>
+<span class="fc" id="L641">            log.info(&quot;Initiating DKE &quot; + dkeType + &quot; request&quot;);</span>
+<span class="fc" id="L642">            byte[] requestData = signOnMsg.pack();</span>
+
+<span class="fc" id="L644">            activeContext.writeAndFlush(frameMessage(activeContext, requestData))</span>
+<span class="fc" id="L645">                    .addListener(future -&gt; {</span>
+<span class="pc bpc" id="L646" title="1 of 2 branches missed.">                        if (!future.isSuccess()) {</span>
+<span class="nc" id="L647">                            log.error(&quot;Failed to send sign-on request&quot;, future.cause());</span>
+<span class="nc" id="L648">                            signOnFuture.complete(false);</span>
+                        } else {
+<span class="fc" id="L650">                            log.info(&quot;Sign-on request sent successfully&quot;);</span>
+                            // Response will be handled in channelRead
+                        }
+<span class="fc" id="L653">                    });</span>
+<span class="nc" id="L654">        } catch (Exception e) {</span>
+<span class="nc" id="L655">            log.error(&quot;Error initiating sign-on&quot;, e);</span>
+<span class="nc" id="L656">            signOnFuture.complete(false);</span>
+<span class="fc" id="L657">        }</span>
+
+<span class="fc" id="L659">        return signOnFuture;</span>
+    }
+
+    @Override
+    public CompletableFuture&lt;Boolean&gt; sendIsoMessage(ISOMsg isoMsg) {
+<span class="fc" id="L664">        CompletableFuture&lt;Boolean&gt; sendFuture = new CompletableFuture&lt;&gt;();</span>
+
+        try {
+<span class="fc" id="L667">            ChannelHandlerContext activeContext = resolveContext(null);</span>
+<span class="fc bfc" id="L668" title="All 2 branches covered.">            if (activeContext == null) {</span>
+<span class="fc" id="L669">                log.error(&quot;Cannot send ISO message without an active channel&quot;);</span>
+<span class="fc" id="L670">                sendFuture.complete(false);</span>
+<span class="fc" id="L671">                return sendFuture;</span>
+            }
+
+<span class="fc" id="L674">            isoMsg.setPackager(packager);</span>
+<span class="fc" id="L675">            byte[] requestData = isoMsg.pack();</span>
+
+<span class="fc" id="L677">            activeContext.writeAndFlush(frameMessage(activeContext, requestData))</span>
+<span class="fc" id="L678">                    .addListener(future -&gt; {</span>
+<span class="pc bpc" id="L679" title="1 of 2 branches missed.">                        if (!future.isSuccess()) {</span>
+<span class="nc" id="L680">                            log.error(&quot;Failed to send ISO message&quot;, future.cause());</span>
+<span class="nc" id="L681">                            connectionStatusService.recordTransaction(destination, false);</span>
+<span class="nc" id="L682">                            sendFuture.complete(false);</span>
+                        } else {
+<span class="fc" id="L684">                            log.info(&quot;ISO message sent successfully&quot;);</span>
+<span class="fc" id="L685">                            connectionStatusService.recordTransaction(destination, true);</span>
+<span class="fc" id="L686">                            sendFuture.complete(true);</span>
+                        }
+<span class="fc" id="L688">                    });</span>
+<span class="nc" id="L689">        } catch (Exception e) {</span>
+<span class="nc" id="L690">            log.error(&quot;Error sending ISO message&quot;, e);</span>
+<span class="nc" id="L691">            connectionStatusService.recordTransaction(destination, false);</span>
+<span class="nc" id="L692">            sendFuture.complete(false);</span>
+<span class="fc" id="L693">        }</span>
+
+<span class="fc" id="L695">        return sendFuture;</span>
+    }
+
+
+    /**
+     * Initiates a sign-off request to the server. This method creates and sends
+     * a network management message (0800) with sign-off type.
+     *
+     * @return CompletableFuture&lt;Boolean&gt; that completes with true if sign-off
+     * was successful
+     */
+    public CompletableFuture&lt;Boolean&gt; initiateSignOff() {
+<span class="fc" id="L707">        CompletableFuture&lt;Boolean&gt; signOffFuture = new CompletableFuture&lt;&gt;();</span>
+
+        try {
+<span class="fc" id="L710">            ChannelHandlerContext activeContext = resolveContext(null);</span>
+<span class="fc bfc" id="L711" title="All 2 branches covered.">            if (activeContext == null) {</span>
+<span class="fc" id="L712">                log.error(&quot;Cannot initiate sign-off without an active channel&quot;);</span>
+<span class="fc" id="L713">                signOffFuture.complete(false);</span>
+<span class="fc" id="L714">                return signOffFuture;</span>
+            }
+<span class="fc" id="L716">            ISOMsg signOffMsg = networkMessageProcessor.createSignOffRequest(packager, destination);</span>
+<span class="fc" id="L717">            log.info(&quot;Initiating sign-off request&quot;);</span>
+<span class="fc" id="L718">            byte[] requestData = signOffMsg.pack();</span>
+
+<span class="fc" id="L720">            activeContext.writeAndFlush(frameMessage(activeContext, requestData))</span>
+<span class="fc" id="L721">                    .addListener(future -&gt; {</span>
+<span class="pc bpc" id="L722" title="1 of 2 branches missed.">                        if (!future.isSuccess()) {</span>
+<span class="nc" id="L723">                            log.error(&quot;Failed to send sign-off request&quot;, future.cause());</span>
+<span class="nc" id="L724">                            signOffFuture.complete(false);</span>
+                        } else {
+<span class="fc" id="L726">                            log.info(&quot;Sign-off request sent successfully&quot;);</span>
+                            // Response will be handled in channelRead
+                        }
+<span class="fc" id="L729">                    });</span>
+<span class="nc" id="L730">        } catch (Exception e) {</span>
+<span class="nc" id="L731">            log.error(&quot;Error initiating sign-off&quot;, e);</span>
+<span class="nc" id="L732">            signOffFuture.complete(false);</span>
+<span class="fc" id="L733">        }</span>
+
+<span class="fc" id="L735">        return signOffFuture;</span>
+    }
+
+    /**
+     * Sets the shutting down flag.
+     *
+     * @param shuttingDown The new shutting down flag value
+     */
+    public void setShuttingDown(boolean shuttingDown) {
+<span class="fc" id="L744">        this.isShuttingDown.set(shuttingDown);</span>
+<span class="fc" id="L745">    }</span>
+
+    private ChannelHandlerContext resolveContext(ChannelHandlerContext preferredContext) {
+<span class="pc bpc" id="L748" title="1 of 4 branches missed.">        if (preferredContext != null &amp;&amp; preferredContext.channel().isActive()) {</span>
+<span class="fc" id="L749">            return preferredContext;</span>
+        }
+<span class="pc bpc" id="L751" title="1 of 4 branches missed.">        if (currentContext != null &amp;&amp; currentContext.channel().isActive()) {</span>
+<span class="fc" id="L752">            return currentContext;</span>
+        }
+<span class="fc" id="L754">        return null;</span>
+    }
+
+    private ByteBuf frameMessage(ChannelHandlerContext ctx, byte[] payload) {
+<span class="fc" id="L758">        ByteBuf framed = ctx.alloc().buffer(AppConstants.RuPay_FIELD_LEGTH_PREPEND + payload.length);</span>
+<span class="fc" id="L759">        framed.writeShort(payload.length);</span>
+<span class="fc" id="L760">        framed.writeBytes(payload);</span>
+<span class="fc" id="L761">        return framed;</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.14.202510111229</span></div></body></html>

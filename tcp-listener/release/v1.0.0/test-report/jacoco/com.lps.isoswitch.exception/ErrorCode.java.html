@@ -1,0 +1,60 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>ErrorCode.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">switch</a> &gt; <a href="index.source.html" class="el_package">com.lps.isoswitch.exception</a> &gt; <span class="el_source">ErrorCode.java</span></div><h1>ErrorCode.java</h1><pre class="source lang-java linenums">package com.lps.isoswitch.exception;
+
+/**
+ * Enumeration of error codes used throughout the application.
+ */
+<span class="fc" id="L6">public enum ErrorCode {</span>
+    // Network-related errors (1000-1999)
+<span class="fc" id="L8">    NETWORK_CONNECTION_FAILED(&quot;1000&quot;, &quot;Failed to establish network connection&quot;),</span>
+<span class="fc" id="L9">    NETWORK_TIMEOUT(&quot;1001&quot;, &quot;Network operation timed out&quot;),</span>
+<span class="fc" id="L10">    NETWORK_DISCONNECTED(&quot;1002&quot;, &quot;Network connection was disconnected&quot;),</span>
+<span class="fc" id="L11">    NETWORK_INVALID_RESPONSE(&quot;1003&quot;, &quot;Invalid response received from network&quot;),</span>
+<span class="fc" id="L12">    NETWORK_SEND_FAILED(&quot;1004&quot;, &quot;Failed to send message over network&quot;),</span>
+<span class="fc" id="L13">    NETWORK_RECEIVE_FAILED(&quot;1005&quot;, &quot;Failed to receive message from network&quot;),</span>
+
+    // Message processing errors (2000-2999)
+<span class="fc" id="L16">    MESSAGE_PACKING_FAILED(&quot;2000&quot;, &quot;Failed to pack ISO message&quot;),</span>
+<span class="fc" id="L17">    MESSAGE_UNPACKING_FAILED(&quot;2001&quot;, &quot;Failed to unpack ISO message&quot;),</span>
+<span class="fc" id="L18">    MESSAGE_VALIDATION_FAILED(&quot;2002&quot;, &quot;Message validation failed&quot;),</span>
+<span class="fc" id="L19">    MESSAGE_FIELD_MISSING(&quot;2003&quot;, &quot;Required field is missing in message&quot;),</span>
+<span class="fc" id="L20">    MESSAGE_FIELD_INVALID(&quot;2004&quot;, &quot;Invalid field value in message&quot;),</span>
+<span class="fc" id="L21">    MESSAGE_TYPE_UNKNOWN(&quot;2005&quot;, &quot;Unknown message type&quot;),</span>
+<span class="fc" id="L22">    MESSAGE_FORMAT_INVALID(&quot;2006&quot;, &quot;Invalid message format&quot;),</span>
+<span class="fc" id="L23">    MESSAGE_PROCESSING_FAILED(&quot;2007&quot;, &quot;Failed to process message&quot;),</span>
+
+    // API-related errors (3000-3999)
+<span class="fc" id="L26">    API_CALL_FAILED(&quot;3000&quot;, &quot;API call failed&quot;),</span>
+<span class="fc" id="L27">    API_TIMEOUT(&quot;3001&quot;, &quot;API call timed out&quot;),</span>
+<span class="fc" id="L28">    API_INVALID_RESPONSE(&quot;3002&quot;, &quot;Invalid response from API&quot;),</span>
+<span class="fc" id="L29">    API_AUTHENTICATION_FAILED(&quot;3003&quot;, &quot;API authentication failed&quot;),</span>
+<span class="fc" id="L30">    API_RATE_LIMIT_EXCEEDED(&quot;3004&quot;, &quot;API rate limit exceeded&quot;),</span>
+<span class="fc" id="L31">    API_SERVICE_UNAVAILABLE(&quot;3005&quot;, &quot;API service is unavailable&quot;),</span>
+
+    // Configuration errors (4000-4999)
+<span class="fc" id="L34">    CONFIG_INVALID(&quot;4000&quot;, &quot;Invalid configuration&quot;),</span>
+<span class="fc" id="L35">    CONFIG_MISSING(&quot;4001&quot;, &quot;Required configuration is missing&quot;),</span>
+<span class="fc" id="L36">    CONFIG_LOAD_FAILED(&quot;4002&quot;, &quot;Failed to load configuration&quot;),</span>
+
+    // System errors (5000-5999)
+<span class="fc" id="L39">    SYSTEM_ERROR(&quot;5000&quot;, &quot;Internal system error&quot;),</span>
+<span class="fc" id="L40">    SYSTEM_RESOURCE_UNAVAILABLE(&quot;5001&quot;, &quot;Required system resource is unavailable&quot;),</span>
+<span class="fc" id="L41">    SYSTEM_INITIALIZATION_FAILED(&quot;5002&quot;, &quot;System initialization failed&quot;),</span>
+<span class="fc" id="L42">    SYSTEM_SHUTDOWN_FAILED(&quot;5003&quot;, &quot;System shutdown failed&quot;);</span>
+
+    private final String code;
+    private final String message;
+
+<span class="fc" id="L47">    ErrorCode(String code, String message) {</span>
+<span class="fc" id="L48">        this.code = code;</span>
+<span class="fc" id="L49">        this.message = message;</span>
+<span class="fc" id="L50">    }</span>
+
+    public String getCode() {
+<span class="fc" id="L53">        return code;</span>
+    }
+
+    public String getMessage() {
+<span class="fc" id="L57">        return message;</span>
+    }
+} 
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.14.202510111229</span></div></body></html>

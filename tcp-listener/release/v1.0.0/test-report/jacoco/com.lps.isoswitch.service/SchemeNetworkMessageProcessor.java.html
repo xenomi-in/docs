@@ -1,0 +1,220 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>SchemeNetworkMessageProcessor.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">switch</a> &gt; <a href="index.source.html" class="el_package">com.lps.isoswitch.service</a> &gt; <span class="el_source">SchemeNetworkMessageProcessor.java</span></div><h1>SchemeNetworkMessageProcessor.java</h1><pre class="source lang-java linenums">package com.lps.isoswitch.service;
+
+import com.lps.isoswitch.config.SchemeConfig;
+import com.lps.isoswitch.utils.Enums.SwitchDestinationEnum;
+import org.jpos.iso.ISOException;
+import org.jpos.iso.ISOMsg;
+import org.jpos.iso.ISOPackager;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+import org.springframework.stereotype.Service;
+
+import java.text.SimpleDateFormat;
+import java.util.Date;
+import java.util.Optional;
+
+/**
+ * Encapsulates scheme network-management decisions for the TCP listener.
+ *
+ * &lt;p&gt;The Netty handler should only parse bytes, dispatch messages, frame
+ * responses, and write to the socket. This service owns the business rules for
+ * network-management MTIs: whether a message is handled locally, whether it is
+ * routed to Switch Core, how local sign-on/sign-off responses update listener
+ * readiness, and how outbound sign-on/sign-off/DKE/echo requests are built.&lt;/p&gt;
+ */
+@Service
+public class SchemeNetworkMessageProcessor {
+
+<span class="fc" id="L28">    private static final Logger log = LoggerFactory.getLogger(SchemeNetworkMessageProcessor.class);</span>
+
+    private static final String MTI_NETWORK_REQUEST_SUFFIX = &quot;800&quot;;
+    private static final String MTI_NETWORK_RESPONSE_SUFFIX = &quot;810&quot;;
+    private static final String RESPONSE_APPROVED = &quot;00&quot;;
+    private static final int FIELD_RESPONSE_CODE = 39;
+    private static final int FIELD_NETWORK_CODE = 70;
+
+    private final SchemeConfig schemeConfig;
+    private final NetworkMessageService networkMessageService;
+    private final ConnectionStatusService connectionStatusService;
+
+    public SchemeNetworkMessageProcessor(
+            SchemeConfig schemeConfig,
+            NetworkMessageService networkMessageService,
+<span class="fc" id="L43">            ConnectionStatusService connectionStatusService) {</span>
+<span class="fc" id="L44">        this.schemeConfig = schemeConfig;</span>
+<span class="fc" id="L45">        this.networkMessageService = networkMessageService;</span>
+<span class="fc" id="L46">        this.connectionStatusService = connectionStatusService;</span>
+<span class="fc" id="L47">    }</span>
+
+    /**
+     * Decides whether an inbound ISO message should go to Switch Core.
+     *
+     * &lt;p&gt;Financial messages always go to Switch Core. Network-management DKE
+     * requests configured as switch-core DKE codes also go to Switch Core.
+     * Other network-management messages are handled locally by this listener.&lt;/p&gt;
+     *
+     * @param isoMsg inbound ISO message
+     * @param scheme active scheme used to resolve field 70 code values
+     * @return true when the handler should invoke the API path
+     * @throws ISOException when MTI or field access fails
+     */
+    public boolean shouldRouteToSwitchCore(ISOMsg isoMsg, SwitchDestinationEnum scheme) throws ISOException {
+<span class="pc bpc" id="L62" title="1 of 4 branches missed.">        return !isNetworkMessage(isoMsg) || isSwitchCoreDkeRequest(isoMsg, scheme);</span>
+    }
+
+    /**
+     * Handles a locally processed network-management message.
+     *
+     * &lt;p&gt;For request MTIs, this delegates to {@link NetworkMessageService} and
+     * returns a response for the TCP handler to write. For response MTIs, it
+     * updates connection/sign-on state and returns empty because no socket
+     * response is required.&lt;/p&gt;
+     *
+     * @param isoMsg inbound network-management message
+     * @param scheme active scheme
+     * @return optional response message to send back over TCP
+     * @throws ISOException when network-message processing fails
+     */
+    public Optional&lt;ISOMsg&gt; handleLocalNetworkMessage(ISOMsg isoMsg, SwitchDestinationEnum scheme) throws ISOException {
+<span class="pc bpc" id="L79" title="1 of 2 branches missed.">        if (isoMsg.getMTI().endsWith(MTI_NETWORK_REQUEST_SUFFIX)) {</span>
+<span class="fc" id="L80">            ISOMsg responseMsg = networkMessageService.handleNetworkMessage(isoMsg, scheme.name());</span>
+<span class="fc" id="L81">            updateSignOnStatusFromNetworkResult(isoMsg, responseMsg, scheme);</span>
+<span class="fc" id="L82">            return Optional.of(responseMsg);</span>
+        }
+
+<span class="nc" id="L85">        updateStatusFromNetworkResponse(isoMsg, scheme);</span>
+<span class="nc" id="L86">        return Optional.empty();</span>
+    }
+
+    /**
+     * Creates an outbound sign-on request using the scheme-specific field 70 code.
+     */
+    public ISOMsg createSignOnRequest(ISOPackager packager, SwitchDestinationEnum scheme) throws ISOException {
+<span class="fc" id="L93">        return createNetworkRequest(packager, schemeConfig.getNetworkCodes(scheme).getSignOn());</span>
+    }
+
+    /**
+     * Creates an outbound sign-off request using the scheme-specific field 70 code.
+     */
+    public ISOMsg createSignOffRequest(ISOPackager packager, SwitchDestinationEnum scheme) throws ISOException {
+<span class="nc" id="L100">        return createNetworkRequest(packager, schemeConfig.getNetworkCodes(scheme).getSignOff());</span>
+    }
+
+    /**
+     * Creates an outbound echo-test request using the scheme-specific field 70 code.
+     */
+    public ISOMsg createEchoTestRequest(ISOPackager packager, SwitchDestinationEnum scheme) throws ISOException {
+<span class="nc" id="L107">        return createNetworkRequest(packager, schemeConfig.getNetworkCodes(scheme).getEcho());</span>
+    }
+
+    /**
+     * Creates an outbound DKE request for supported key types.
+     *
+     * @param packager scheme-specific packager
+     * @param dkeType ZPK or ZAK
+     * @return network-management request with the correct field 70 value
+     */
+    public ISOMsg createDkeRequest(ISOPackager packager, String dkeType, SwitchDestinationEnum scheme) throws ISOException {
+<span class="fc" id="L118">        SchemeConfig.NetworkCodes networkCodes = schemeConfig.getNetworkCodes(scheme);</span>
+<span class="fc bfc" id="L119" title="All 2 branches covered.">        if (&quot;ZPK&quot;.equalsIgnoreCase(dkeType)) {</span>
+<span class="fc" id="L120">            return createNetworkRequest(packager, networkCodes.getDkeZpk());</span>
+        }
+<span class="pc bpc" id="L122" title="1 of 2 branches missed.">        if (&quot;ZAK&quot;.equalsIgnoreCase(dkeType)) {</span>
+<span class="fc" id="L123">            return createNetworkRequest(packager, networkCodes.getDkeZak());</span>
+        }
+<span class="nc" id="L125">        throw new IllegalArgumentException(&quot;Invalid DKE type: &quot; + dkeType);</span>
+    }
+
+    /**
+     * Network-management MTIs end with 800 for requests or 810 for responses.
+     */
+    private boolean isNetworkMessage(ISOMsg isoMsg) throws ISOException {
+<span class="fc" id="L132">        String mti = isoMsg.getMTI();</span>
+<span class="pc bpc" id="L133" title="3 of 4 branches missed.">        return mti.endsWith(MTI_NETWORK_REQUEST_SUFFIX) || mti.endsWith(MTI_NETWORK_RESPONSE_SUFFIX);</span>
+    }
+
+    /**
+     * Configured switch-core DKE field 70 values are passed to Switch Core.
+     */
+    private boolean isSwitchCoreDkeRequest(ISOMsg isoMsg, SwitchDestinationEnum scheme) throws ISOException {
+<span class="fc" id="L140">        SchemeConfig.NetworkCodes networkCodes = schemeConfig.getNetworkCodes(scheme);</span>
+<span class="fc" id="L141">        String networkCode = isoMsg.getString(FIELD_NETWORK_CODE);</span>
+<span class="fc bfc" id="L142" title="All 2 branches covered.">        return networkCodes.getSwitchCoreDkeZpk().equals(networkCode)</span>
+<span class="pc bpc" id="L143" title="1 of 2 branches missed.">                || networkCodes.getSwitchCoreDkeZak().equals(networkCode);</span>
+    }
+
+    /**
+     * Builds the common ISO0800 skeleton used by sign-on, sign-off, DKE, and
+     * echo-test requests.
+     */
+    private ISOMsg createNetworkRequest(ISOPackager packager, String networkCode) throws ISOException {
+<span class="fc" id="L151">        ISOMsg networkMsg = new ISOMsg();</span>
+<span class="fc" id="L152">        networkMsg.setPackager(packager);</span>
+<span class="fc" id="L153">        networkMsg.setMTI(&quot;0800&quot;);</span>
+<span class="fc" id="L154">        networkMsg.set(7, transmissionDateTime());</span>
+<span class="fc" id="L155">        networkMsg.set(11, nextStan());</span>
+<span class="fc" id="L156">        networkMsg.set(FIELD_NETWORK_CODE, networkCode);</span>
+<span class="fc" id="L157">        return networkMsg;</span>
+    }
+
+    /**
+     * Updates listener readiness after locally answering sign-on/sign-off
+     * requests from the scheme.
+     */
+    private void updateSignOnStatusFromNetworkResult(
+            ISOMsg requestMsg,
+            ISOMsg responseMsg,
+            SwitchDestinationEnum scheme) throws ISOException {
+<span class="pc bpc" id="L168" title="1 of 2 branches missed.">        if (!RESPONSE_APPROVED.equals(responseMsg.getString(FIELD_RESPONSE_CODE))) {</span>
+<span class="nc" id="L169">            return;</span>
+        }
+
+<span class="fc" id="L172">        SchemeConfig.NetworkCodes networkCodes = schemeConfig.getNetworkCodes(scheme);</span>
+<span class="fc" id="L173">        String networkCode = requestMsg.getString(FIELD_NETWORK_CODE);</span>
+<span class="pc bpc" id="L174" title="1 of 2 branches missed.">        if (networkCodes.getSignOn().equals(networkCode)) {</span>
+<span class="fc" id="L175">            log.info(&quot;Updating sign-on status for {}&quot;, scheme);</span>
+<span class="fc" id="L176">            connectionStatusService.updateSignOnStatus(scheme, true);</span>
+<span class="nc bnc" id="L177" title="All 2 branches missed.">        } else if (networkCodes.getSignOff().equals(networkCode)) {</span>
+<span class="nc" id="L178">            log.info(&quot;Updating sign-off status for {}&quot;, scheme);</span>
+<span class="nc" id="L179">            connectionStatusService.updateSignOnStatus(scheme, false);</span>
+        }
+<span class="fc" id="L181">    }</span>
+
+    /**
+     * Updates listener state when the scheme sends a network-management response
+     * to a request initiated by this listener.
+     */
+    private void updateStatusFromNetworkResponse(ISOMsg isoMsg, SwitchDestinationEnum scheme) throws ISOException {
+<span class="nc bnc" id="L188" title="All 2 branches missed.">        if (!RESPONSE_APPROVED.equals(isoMsg.getString(FIELD_RESPONSE_CODE))) {</span>
+<span class="nc" id="L189">            return;</span>
+        }
+
+<span class="nc" id="L192">        SchemeConfig.NetworkCodes networkCodes = schemeConfig.getNetworkCodes(scheme);</span>
+<span class="nc" id="L193">        String networkCode = isoMsg.getString(FIELD_NETWORK_CODE);</span>
+<span class="nc bnc" id="L194" title="All 2 branches missed.">        if (networkCodes.getSignOn().equals(networkCode)) {</span>
+<span class="nc" id="L195">            log.info(&quot;Updating sign-on status for {}&quot;, scheme);</span>
+<span class="nc" id="L196">            connectionStatusService.updateSignOnStatus(scheme, true);</span>
+<span class="nc bnc" id="L197" title="All 2 branches missed.">        } else if (networkCodes.getSignOff().equals(networkCode)) {</span>
+<span class="nc" id="L198">            log.info(&quot;Updating sign-off status for {}&quot;, scheme);</span>
+<span class="nc" id="L199">            connectionStatusService.updateSignOnStatus(scheme, false);</span>
+<span class="nc bnc" id="L200" title="All 2 branches missed.">        } else if (networkCodes.getEcho().equals(networkCode)) {</span>
+<span class="nc" id="L201">            log.debug(&quot;Received echo test response for {} - connection is healthy&quot;, scheme);</span>
+<span class="nc" id="L202">            connectionStatusService.updateConnectionStatus(scheme, true);</span>
+        }
+<span class="nc" id="L204">    }</span>
+
+    /**
+     * ISO8583 transmission date/time format: MMDDhhmmss.
+     */
+    private String transmissionDateTime() {
+<span class="fc" id="L210">        return new SimpleDateFormat(&quot;MMddHHmmss&quot;).format(new Date());</span>
+    }
+
+    /**
+     * Generates a six-digit STAN for listener-initiated network messages.
+     */
+    private String nextStan() {
+<span class="fc" id="L217">        return String.format(&quot;%06d&quot;, (int) (Math.random() * 1000000));</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.14.202510111229</span></div></body></html>

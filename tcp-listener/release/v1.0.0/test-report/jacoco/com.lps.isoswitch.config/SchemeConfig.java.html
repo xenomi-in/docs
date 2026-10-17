@@ -1,0 +1,428 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>SchemeConfig.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">switch</a> &gt; <a href="index.source.html" class="el_package">com.lps.isoswitch.config</a> &gt; <span class="el_source">SchemeConfig.java</span></div><h1>SchemeConfig.java</h1><pre class="source lang-java linenums">package com.lps.isoswitch.config;
+
+import lombok.Data;
+import org.springframework.boot.context.properties.ConfigurationProperties;
+import org.springframework.context.annotation.Configuration;
+import java.util.List;
+
+import com.lps.isoswitch.utils.Enums.SwitchDestinationEnum;
+
+/**
+ * Configuration class for card scheme settings.
+ * This class provides configuration for different card schemes
+ * (RuPay, Visa, MasterCard) including their specific settings
+ * and connection parameters.
+ *
+ * @author Logicpoint Systems
+ * @version 1.0
+ * @since 2025-06-15
+ */
+@Data
+@Configuration
+@ConfigurationProperties(prefix = &quot;scheme&quot;)
+<span class="fc" id="L23">public class SchemeConfig {</span>
+<span class="fc" id="L24">    private String active = &quot;RUPAY&quot;;</span>
+    private RuPayConfig rupay;
+    private VisaConfig visa;
+    private McConfig mc;
+
+    public void setRupay(RuPayConfig rupay) {
+<span class="fc" id="L30">        this.rupay = rupay;</span>
+<span class="fc" id="L31">    }</span>
+
+    public void setVisa(VisaConfig visa) {
+<span class="fc" id="L34">        this.visa = visa;</span>
+<span class="fc" id="L35">    }</span>
+    public RuPayConfig getRupay() {
+<span class="fc" id="L37">        return  this.rupay;</span>
+    }
+
+    public VisaConfig getVisa() {
+<span class="fc" id="L41">        return this.visa;</span>
+    }
+
+    public void setMc(McConfig mc) {
+<span class="fc" id="L45">        this.mc = mc;</span>
+<span class="fc" id="L46">    }</span>
+
+    public McConfig getMc() {
+<span class="fc" id="L49">        return this.mc;</span>
+    }
+
+    public SwitchDestinationEnum getActiveScheme() {
+<span class="fc" id="L53">        return SwitchDestinationEnum.from(active);</span>
+    }
+
+    public BaseConfig getConfig(SwitchDestinationEnum scheme) {
+<span class="fc bfc" id="L57" title="All 3 branches covered.">        return switch (scheme) {</span>
+<span class="fc" id="L58">            case RUPAY -&gt; rupay;</span>
+<span class="fc" id="L59">            case VISA -&gt; visa;</span>
+<span class="fc" id="L60">            case MC -&gt; mc;</span>
+        };
+    }
+
+    public NetworkCodes getNetworkCodes(SwitchDestinationEnum scheme) {
+<span class="fc" id="L65">        BaseConfig config = getConfig(scheme);</span>
+<span class="fc bfc" id="L66" title="All 2 branches covered.">        if (config == null) {</span>
+<span class="fc" id="L67">            throw new IllegalStateException(&quot;No configuration found for scheme: &quot; + scheme);</span>
+        }
+<span class="fc" id="L69">        return config.getNetworkCodes().withDefaults(defaultNetworkCodes());</span>
+    }
+
+    public ResolvedSchemeSettings resolve(
+            SwitchDestinationEnum scheme,
+            String fallbackHost,
+            Integer fallbackPort,
+            String fallbackConnectionId,
+            Integer fallbackConnectTimeout,
+            Integer fallbackReadTimeout,
+            Integer fallbackWriteTimeout,
+            Integer fallbackIdleTimeout,
+            Boolean fallbackKeepAliveEnabled,
+            Integer fallbackReconnectDelay) {
+<span class="fc" id="L83">        BaseConfig config = getConfig(scheme);</span>
+<span class="fc bfc" id="L84" title="All 2 branches covered.">        if (config == null) {</span>
+<span class="fc" id="L85">            throw new IllegalStateException(&quot;No configuration found for scheme: &quot; + scheme);</span>
+        }
+
+<span class="fc bfc" id="L88" title="All 2 branches covered.">        String resolvedConnectionId = isBlank(config.getConnectionId())</span>
+<span class="fc bfc" id="L89" title="All 2 branches covered.">                ? (isBlank(fallbackConnectionId) ? scheme.name() : fallbackConnectionId)</span>
+<span class="fc" id="L90">                : config.getConnectionId();</span>
+
+<span class="fc" id="L92">        return new ResolvedSchemeSettings(</span>
+                scheme,
+<span class="fc" id="L94">                firstNonBlank(config.getHost(), fallbackHost),</span>
+<span class="fc bfc" id="L95" title="All 2 branches covered.">                config.getPort() != null ? config.getPort() : fallbackPort,</span>
+                resolvedConnectionId,
+<span class="fc" id="L97">                firstNonBlank(config.getPackager(), defaultPackagerPath(scheme)),</span>
+<span class="fc" id="L98">                firstNonNull(config.getConnectTimeout(), fallbackConnectTimeout),</span>
+<span class="fc" id="L99">                firstNonNull(config.getReadTimeout(), fallbackReadTimeout),</span>
+<span class="fc" id="L100">                firstNonNull(config.getWriteTimeout(), fallbackWriteTimeout),</span>
+<span class="fc" id="L101">                firstNonNull(config.getIdleTimeout(), fallbackIdleTimeout),</span>
+<span class="fc" id="L102">                firstNonNull(config.getKeepAliveEnabled(), fallbackKeepAliveEnabled),</span>
+<span class="fc" id="L103">                firstNonNull(config.getReconnectDelay(), fallbackReconnectDelay));</span>
+    }
+
+    private String firstNonBlank(String primary, String fallback) {
+<span class="fc bfc" id="L107" title="All 2 branches covered.">        return isBlank(primary) ? fallback : primary;</span>
+    }
+
+    private &lt;T&gt; T firstNonNull(T primary, T fallback) {
+<span class="fc bfc" id="L111" title="All 2 branches covered.">        return primary != null ? primary : fallback;</span>
+    }
+
+    private boolean isBlank(String value) {
+<span class="fc bfc" id="L115" title="All 4 branches covered.">        return value == null || value.isBlank();</span>
+    }
+
+    private String defaultPackagerPath(SwitchDestinationEnum scheme) {
+<span class="fc bfc" id="L119" title="All 3 branches covered.">        return switch (scheme) {</span>
+<span class="fc" id="L120">            case RUPAY -&gt; &quot;/RuPayISO8583.xml&quot;;</span>
+<span class="fc" id="L121">            case VISA -&gt; &quot;/VisaISO8583.xml&quot;;</span>
+<span class="fc" id="L122">            case MC -&gt; &quot;/MasterCardISO8583.xml&quot;;</span>
+        };
+    }
+
+    private NetworkCodes defaultNetworkCodes() {
+<span class="fc" id="L127">        NetworkCodes defaults = new NetworkCodes();</span>
+<span class="fc" id="L128">        defaults.setSignOn(&quot;001&quot;);</span>
+<span class="fc" id="L129">        defaults.setSignOff(&quot;002&quot;);</span>
+<span class="fc" id="L130">        defaults.setEcho(&quot;301&quot;);</span>
+<span class="fc" id="L131">        defaults.setCutover(&quot;201&quot;);</span>
+<span class="fc" id="L132">        defaults.setDkeZpk(&quot;164&quot;);</span>
+<span class="fc" id="L133">        defaults.setDkeZak(&quot;165&quot;);</span>
+<span class="fc" id="L134">        defaults.setNetworkManagement(&quot;181&quot;);</span>
+<span class="fc" id="L135">        defaults.setSwitchCoreDkeZpk(&quot;184&quot;);</span>
+<span class="fc" id="L136">        defaults.setSwitchCoreDkeZak(&quot;185&quot;);</span>
+<span class="fc" id="L137">        return defaults;</span>
+    }
+
+    @Data
+<span class="fc" id="L141">    public static class BaseConfig {</span>
+        private String host;
+        private Integer port;
+        private String connectionId;
+        private String packager;
+        private Integer connectTimeout;
+        private Integer readTimeout;
+        private Integer writeTimeout;
+        private Integer idleTimeout;
+        private Boolean keepAliveEnabled;
+        private Integer reconnectDelay;
+        private String header;
+        private String mti;
+        private String processingCode;
+        private String responseCode;
+        private String responseMti;
+        private List&lt;String&gt; validMtis;
+<span class="fc" id="L158">        private NetworkCodes networkCodes = new NetworkCodes();</span>
+        
+        public void setHeader(String header) {
+<span class="fc" id="L161">            this.header = header;</span>
+<span class="fc" id="L162">        }</span>
+
+        public String getHost() {
+<span class="fc" id="L165">            return host;</span>
+        }
+
+        public void setHost(String host) {
+<span class="fc" id="L169">            this.host = host;</span>
+<span class="fc" id="L170">        }</span>
+
+        public Integer getPort() {
+<span class="fc" id="L173">            return port;</span>
+        }
+
+        public void setPort(Integer port) {
+<span class="fc" id="L177">            this.port = port;</span>
+<span class="fc" id="L178">        }</span>
+
+        public String getConnectionId() {
+<span class="fc" id="L181">            return connectionId;</span>
+        }
+
+        public void setConnectionId(String connectionId) {
+<span class="fc" id="L185">            this.connectionId = connectionId;</span>
+<span class="fc" id="L186">        }</span>
+
+        public String getPackager() {
+<span class="fc" id="L189">            return packager;</span>
+        }
+
+        public void setPackager(String packager) {
+<span class="fc" id="L193">            this.packager = packager;</span>
+<span class="fc" id="L194">        }</span>
+
+        public Integer getConnectTimeout() {
+<span class="fc" id="L197">            return connectTimeout;</span>
+        }
+
+        public void setConnectTimeout(Integer connectTimeout) {
+<span class="fc" id="L201">            this.connectTimeout = connectTimeout;</span>
+<span class="fc" id="L202">        }</span>
+
+        public Integer getReadTimeout() {
+<span class="fc" id="L205">            return readTimeout;</span>
+        }
+
+        public void setReadTimeout(Integer readTimeout) {
+<span class="fc" id="L209">            this.readTimeout = readTimeout;</span>
+<span class="fc" id="L210">        }</span>
+
+        public Integer getWriteTimeout() {
+<span class="fc" id="L213">            return writeTimeout;</span>
+        }
+
+        public void setWriteTimeout(Integer writeTimeout) {
+<span class="nc" id="L217">            this.writeTimeout = writeTimeout;</span>
+<span class="nc" id="L218">        }</span>
+
+        public Integer getIdleTimeout() {
+<span class="fc" id="L221">            return idleTimeout;</span>
+        }
+
+        public void setIdleTimeout(Integer idleTimeout) {
+<span class="fc" id="L225">            this.idleTimeout = idleTimeout;</span>
+<span class="fc" id="L226">        }</span>
+
+        public Boolean getKeepAliveEnabled() {
+<span class="fc" id="L229">            return keepAliveEnabled;</span>
+        }
+
+        public void setKeepAliveEnabled(Boolean keepAliveEnabled) {
+<span class="fc" id="L233">            this.keepAliveEnabled = keepAliveEnabled;</span>
+<span class="fc" id="L234">        }</span>
+
+        public Integer getReconnectDelay() {
+<span class="fc" id="L237">            return reconnectDelay;</span>
+        }
+
+        public void setReconnectDelay(Integer reconnectDelay) {
+<span class="fc" id="L241">            this.reconnectDelay = reconnectDelay;</span>
+<span class="fc" id="L242">        }</span>
+
+        public void setMti(String mti) {
+<span class="fc" id="L245">            this.mti = mti;</span>
+<span class="fc" id="L246">        }</span>
+
+        public void setProcessingCode(String processingCode) {
+<span class="fc" id="L249">            this.processingCode = processingCode;</span>
+<span class="fc" id="L250">        }</span>
+
+        public void setResponseCode(String responseCode) {
+<span class="fc" id="L253">            this.responseCode = responseCode;</span>
+<span class="fc" id="L254">        }</span>
+
+        public void setResponseMti(String responseMti) {
+<span class="fc" id="L257">            this.responseMti = responseMti;</span>
+<span class="fc" id="L258">        }</span>
+
+        public void setValidMtis(List&lt;String&gt; validMtis) {
+<span class="fc" id="L261">            this.validMtis = validMtis;</span>
+<span class="fc" id="L262">        }</span>
+
+        public List&lt;String&gt; getValidMtis() {
+<span class="nc" id="L265">            return this.validMtis;</span>
+        }
+
+        public NetworkCodes getNetworkCodes() {
+<span class="fc" id="L269">            return networkCodes;</span>
+        }
+
+        public void setNetworkCodes(NetworkCodes networkCodes) {
+<span class="fc" id="L273">            this.networkCodes = networkCodes;</span>
+<span class="fc" id="L274">        }</span>
+    }
+
+    @Data
+<span class="fc" id="L278">    public static class NetworkCodes {</span>
+        private String signOn;
+        private String signOff;
+        private String echo;
+        private String cutover;
+        private String dkeZpk;
+        private String dkeZak;
+        private String networkManagement;
+        private String switchCoreDkeZpk;
+        private String switchCoreDkeZak;
+
+        public String getSignOn() {
+<span class="fc" id="L290">            return signOn;</span>
+        }
+
+        public void setSignOn(String signOn) {
+<span class="fc" id="L294">            this.signOn = signOn;</span>
+<span class="fc" id="L295">        }</span>
+
+        public String getSignOff() {
+<span class="fc" id="L298">            return signOff;</span>
+        }
+
+        public void setSignOff(String signOff) {
+<span class="fc" id="L302">            this.signOff = signOff;</span>
+<span class="fc" id="L303">        }</span>
+
+        public String getEcho() {
+<span class="fc" id="L306">            return echo;</span>
+        }
+
+        public void setEcho(String echo) {
+<span class="fc" id="L310">            this.echo = echo;</span>
+<span class="fc" id="L311">        }</span>
+
+        public String getCutover() {
+<span class="fc" id="L314">            return cutover;</span>
+        }
+
+        public void setCutover(String cutover) {
+<span class="fc" id="L318">            this.cutover = cutover;</span>
+<span class="fc" id="L319">        }</span>
+
+        public String getDkeZpk() {
+<span class="fc" id="L322">            return dkeZpk;</span>
+        }
+
+        public void setDkeZpk(String dkeZpk) {
+<span class="fc" id="L326">            this.dkeZpk = dkeZpk;</span>
+<span class="fc" id="L327">        }</span>
+
+        public String getDkeZak() {
+<span class="fc" id="L330">            return dkeZak;</span>
+        }
+
+        public void setDkeZak(String dkeZak) {
+<span class="fc" id="L334">            this.dkeZak = dkeZak;</span>
+<span class="fc" id="L335">        }</span>
+
+        public String getNetworkManagement() {
+<span class="fc" id="L338">            return networkManagement;</span>
+        }
+
+        public void setNetworkManagement(String networkManagement) {
+<span class="fc" id="L342">            this.networkManagement = networkManagement;</span>
+<span class="fc" id="L343">        }</span>
+
+        public String getSwitchCoreDkeZpk() {
+<span class="fc" id="L346">            return switchCoreDkeZpk;</span>
+        }
+
+        public void setSwitchCoreDkeZpk(String switchCoreDkeZpk) {
+<span class="fc" id="L350">            this.switchCoreDkeZpk = switchCoreDkeZpk;</span>
+<span class="fc" id="L351">        }</span>
+
+        public String getSwitchCoreDkeZak() {
+<span class="fc" id="L354">            return switchCoreDkeZak;</span>
+        }
+
+        public void setSwitchCoreDkeZak(String switchCoreDkeZak) {
+<span class="fc" id="L358">            this.switchCoreDkeZak = switchCoreDkeZak;</span>
+<span class="fc" id="L359">        }</span>
+
+        public NetworkCodes withDefaults(NetworkCodes defaults) {
+<span class="fc" id="L362">            NetworkCodes resolved = new NetworkCodes();</span>
+<span class="fc" id="L363">            resolved.setSignOn(firstNonBlank(signOn, defaults.getSignOn()));</span>
+<span class="fc" id="L364">            resolved.setSignOff(firstNonBlank(signOff, defaults.getSignOff()));</span>
+<span class="fc" id="L365">            resolved.setEcho(firstNonBlank(echo, defaults.getEcho()));</span>
+<span class="fc" id="L366">            resolved.setCutover(firstNonBlank(cutover, defaults.getCutover()));</span>
+<span class="fc" id="L367">            resolved.setDkeZpk(firstNonBlank(dkeZpk, defaults.getDkeZpk()));</span>
+<span class="fc" id="L368">            resolved.setDkeZak(firstNonBlank(dkeZak, defaults.getDkeZak()));</span>
+<span class="fc" id="L369">            resolved.setNetworkManagement(firstNonBlank(networkManagement, defaults.getNetworkManagement()));</span>
+<span class="fc" id="L370">            resolved.setSwitchCoreDkeZpk(firstNonBlank(switchCoreDkeZpk, defaults.getSwitchCoreDkeZpk()));</span>
+<span class="fc" id="L371">            resolved.setSwitchCoreDkeZak(firstNonBlank(switchCoreDkeZak, defaults.getSwitchCoreDkeZak()));</span>
+<span class="fc" id="L372">            return resolved;</span>
+        }
+
+        private String firstNonBlank(String primary, String fallback) {
+<span class="fc bfc" id="L376" title="All 4 branches covered.">            return primary == null || primary.isBlank() ? fallback : primary;</span>
+        }
+    }
+
+    @Data
+    public static class RuPayConfig extends BaseConfig {
+<span class="fc" id="L382">        public RuPayConfig() {</span>
+<span class="fc" id="L383">            setValidMtis(List.of(</span>
+                &quot;0200&quot;, // Financial request
+                &quot;0110&quot;, // Authorization request
+                &quot;0420&quot;, // Reversal request
+                &quot;0800&quot;  // Network management request
+            ));
+<span class="fc" id="L389">        }</span>
+    }
+
+    @Data
+    public static class VisaConfig extends BaseConfig {
+<span class="fc" id="L394">        public VisaConfig() {</span>
+<span class="fc" id="L395">            setValidMtis(List.of(</span>
+                &quot;0200&quot;, // Financial request
+                &quot;0420&quot;, // Reversal request
+                &quot;0800&quot;  // Network management request
+            ));
+<span class="fc" id="L400">        }</span>
+    }
+
+    @Data
+    public static class McConfig extends BaseConfig {
+<span class="fc" id="L405">        public McConfig() {</span>
+<span class="fc" id="L406">            setValidMtis(List.of(</span>
+                &quot;0200&quot;,
+                &quot;0420&quot;,
+                &quot;0800&quot;
+            ));
+<span class="fc" id="L411">        }</span>
+    }
+
+<span class="fc" id="L414">    public record ResolvedSchemeSettings(</span>
+            SwitchDestinationEnum scheme,
+            String host,
+            Integer port,
+            String connectionId,
+            String packager,
+            Integer connectTimeout,
+            Integer readTimeout,
+            Integer writeTimeout,
+            Integer idleTimeout,
+            Boolean keepAliveEnabled,
+            Integer reconnectDelay) {
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.14.202510111229</span></div></body></html>
