@@ -1,3 +1,8 @@
+---
+layout: default
+title: "ISO8583 TCP Listener — v1.0.0"
+---
+
 # ISO8583 TCP Listener — v1.0.0
 
 **Version:** `1.0.0` — initial release candidate, not yet distributed to the client.
@@ -8,12 +13,12 @@
 | Item | Status |
 | --- | --- |
 | Version | Maven `1.0.0`; executable `switch-1.0.0.jar` |
-| Build identity | Local candidate identity and results: [verification evidence](VERIFICATION_v1.0.0.md). Committed CI build remains pending |
+| Build identity | Local candidate identity and results: [verification evidence](VERIFICATION_v1.0.0.html). Committed CI build remains pending |
 | Switch Core requirement | Requires authenticated mandate-revocation calls; minimum compatible release is **not yet confirmed**. Reviewed source `a33b3a4` does not attach a token |
 | RuPay requirement | Production requires a TLS/mTLS endpoint; NPCI/Falcon link confirmation remains outstanding (T-TCP-10) |
 | UAT / production readiness | **Not approved by the available evidence**; complete service compatibility and environment acceptance remain open |
 
-Health endpoints are public; business and management APIs require authentication in every profile. Switch Core at `a33b3a4` does not attach a bearer token in `HttpIssuerActionMessageGateway`, so mandate-revocation calls cannot succeed against the protected listener API as implemented. With direct mTLS enforced, missing transport credentials may cause rejection before token validation. Record the minimum compatible release in the [cross-service release list](RELEASE_COMPATIBILITY.md) after the fix and joint verification.
+Health endpoints are public; business and management APIs require authentication in every profile. Switch Core at `a33b3a4` does not attach a bearer token in `HttpIssuerActionMessageGateway`, so mandate-revocation calls cannot succeed against the protected listener API as implemented. With direct mTLS enforced, missing transport credentials may cause rejection before token validation. Record the minimum compatible release in the [cross-service release list](RELEASE_COMPATIBILITY.html) after the fix and joint verification.
 
 Production requires scheme TLS and validates certificate stores even in `server` mode. A plaintext-only leased line is incompatible with this production profile. Obtain NPCI/Falcon confirmation of the actual TLS termination point, hostname, trust anchors, and client-certificate requirements before rollout.
 
@@ -62,7 +67,7 @@ These are implemented security controls, not a statement of PCI DSS certificatio
 
 ## JUnit test results
 
-Candidate results, exact artifact SHA-256, and local image identity are recorded in the [local verification report](VERIFICATION_v1.0.0.md). CI identity is assigned only after a successful workflow run on the committed candidate.
+Candidate results, exact artifact SHA-256, and local image identity are recorded in the [local verification report](VERIFICATION_v1.0.0.html). CI identity is assigned only after a successful workflow run on the committed candidate.
 
 The original review used source `774c33a12e1d9c7e959f6e12d46784f2f79f9042`: 24 suites, 85 tests passed, zero failures/errors/skips, completed on 17 October 2026 at 06:31:37 IST using Maven 3.9.10 and OpenJDK 25.0.2 on macOS aarch64. The existing `v1.0.0` tag points to `a4c085c`, two documentation/report-only commits later. Those original results apply to that source baseline; they do not identify the corrected candidate's binary.
 
@@ -74,7 +79,7 @@ Original report evidence is retained locally in the source repository under igno
 
 The local verification report records candidate JaCoCo metrics. The original reviewed source measured **80.00% line coverage** and **64.66% branch coverage** with JaCoCo 0.8.14; those metrics are historical comparison evidence, not an enforced quality gate.
 
-Generate fresh reports for this candidate with `mvn clean verify`. Surefire XML is under `target/surefire-reports/`; JaCoCo HTML/XML/CSV is under `target/site/jacoco/`. See the [release process](RELEASE_PROCESS.md) for CI artifacts and build identity.
+Generate fresh reports for this candidate with `mvn clean verify`. Surefire XML is under `target/surefire-reports/`; JaCoCo HTML/XML/CSV is under `target/site/jacoco/`. See the [release process](RELEASE_PROCESS.html) for CI artifacts and build identity.
 
 ## Requirements and compatibility
 
@@ -145,10 +150,10 @@ No earlier client deployment is confirmed. Retain the accepted artifact/image an
 
 Implementation guides below are maintained on the source repository’s `refactor` branch and may change independently of this candidate. Access requires permission to that repository.
 
-- [Candidate verification and build identity](VERIFICATION_v1.0.0.md)
+- [Candidate verification and build identity](VERIFICATION_v1.0.0.html)
 - [Deployment, configuration, and setup](https://github.com/lps-pavangutha/tcp-listner/blob/refactor/docs/DEPLOYMENT_CONFIGURATION_SETUP.md)
-- [Cross-service release compatibility](RELEASE_COMPATIBILITY.md)
-- [Release build and evidence](RELEASE_PROCESS.md)
+- [Cross-service release compatibility](RELEASE_COMPATIBILITY.html)
+- [Release build and evidence](RELEASE_PROCESS.html)
 - [Setup, configuration, and API scopes](https://github.com/lps-pavangutha/tcp-listner/blob/refactor/README.md)
 - [Keycloak service authentication and pending integration](https://github.com/lps-pavangutha/tcp-listner/blob/refactor/docs/KEYCLOAK_AUTHENTICATION.md)
 - [Production implementation guide](https://github.com/lps-pavangutha/tcp-listner/blob/refactor/docs/CHANNEL_CLIENT_USAGE.md)

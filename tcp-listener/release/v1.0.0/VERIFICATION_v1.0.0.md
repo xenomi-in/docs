@@ -1,3 +1,8 @@
+---
+layout: default
+title: "Local verification — v1.0.0 candidate"
+---
+
 # Local verification — v1.0.0 candidate
 
 This is local working-tree evidence, not a refreshed tag or a successful GitHub CI run. The base commit is `a4c085cd968b1d511a87a0779f451971022d9662` with uncommitted pre-release corrections. The client has not received v1.0.0; the corrected candidate retains that version. Commit and refresh the undistributed tag before running release CI.
@@ -27,4 +32,4 @@ The container used the `test` profile and `app.mode=server`. It did not contact 
 
 In the source repository, local generated evidence is under `target/release/`: `build-manifest.json`, `SHA256SUMS`, the JAR, `test-reports.tar.gz`, Maven output, image-build metadata, image-check output, image identity, and application smoke-test logs. It is ignored by Git and deleted by `mvn clean`; retain or upload it separately if needed. Earlier pre-correction evidence remains under ignored `release-assets/v1.0.0/` in the source repository; a [copy is bundled here](test-report/v1.0.0-test-reports.zip) and must not be confused with this candidate's results.
 
-The workflow bundles equivalent evidence with the committed revision and CI run URL, saves an image archive, and attaches successful tag builds to a draft GitHub Release. Its GitHub execution has not yet been verified. Review the [release process](RELEASE_PROCESS.md) and [compatibility register](RELEASE_COMPATIBILITY.md) before promotion.
+The workflow bundles equivalent evidence with the committed revision and CI run URL, saves an image archive, and attaches successful tag builds to a draft GitHub Release. Its GitHub execution has not yet been verified. Review the [release process](RELEASE_PROCESS.html) and [compatibility register](RELEASE_COMPATIBILITY.html) before promotion.

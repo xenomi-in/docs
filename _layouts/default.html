@@ -1,0 +1,30 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>{{ page.title | escape }} | {{ site.title | escape }}</title>
+  <style>
+    * { box-sizing: border-box; }
+    body { font: 16px/1.65 system-ui, sans-serif; margin: 0; background: #f5f7fb; color: #1e293b; overflow-wrap: anywhere; }
+    main { max-width: 1100px; margin: 32px auto; padding: 32px; background: white; border: 1px solid #e2e8f0; border-radius: 10px; }
+    nav { margin-bottom: 24px; }
+    a { color: #2563eb; }
+    h1, h2, h3 { line-height: 1.25; color: #1e3a8a; }
+    h2 { margin-top: 2em; border-bottom: 1px solid #e2e8f0; padding-bottom: .4em; }
+    table { display: block; width: 100%; overflow-x: auto; border-collapse: collapse; margin: 20px 0; }
+    th, td { border: 1px solid #cbd5e1; padding: 10px 12px; text-align: left; vertical-align: top; }
+    th { background: #edf2f7; }
+    code { background: #f1f5f9; padding: 2px 5px; border-radius: 3px; }
+    pre { background: #f1f5f9; padding: 16px; overflow-x: auto; }
+    pre code { padding: 0; }
+    @media (max-width: 640px) { main { margin: 0; padding: 20px; border: 0; border-radius: 0; } }
+  </style>
+</head>
+<body>
+  <main>
+    <nav><a href="{{ '/' | relative_url }}">Xenomi Engineering Hub</a></nav>
+    <article>{{ content }}</article>
+  </main>
+</body>
+</html>

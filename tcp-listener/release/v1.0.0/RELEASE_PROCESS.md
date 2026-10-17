@@ -1,10 +1,15 @@
+---
+layout: default
+title: "Release build and evidence"
+---
+
 # Release build and evidence
 
 ## Release policy
 
 The release owner confirmed that v1.0.0 has not been distributed to the client. Keep this corrected initial release at Maven version `1.0.0`. The existing tag points to the pre-correction commit `a4c085c`; it has not been changed by these working-tree updates. After review and commit, refresh the local/remote v1.0.0 tag to the approved commit so CI verifies that exact source. Record both old and new tag targets when replacing the pre-release tag. Keep tags immutable after client distribution; subsequent shipped changes require a new version.
 
-Use the same release-note structure for every service: Falcon summary, version/build identity, required service versions, UAT/production status and blockers, exact test scope, known limitations, deployment configuration, and rollback. Include migration instructions only when an earlier deployed version is confirmed. Record tested combinations in the [release compatibility list](RELEASE_COMPATIBILITY.md).
+Use the same release-note structure for every service: Falcon summary, version/build identity, required service versions, UAT/production status and blockers, exact test scope, known limitations, deployment configuration, and rollback. Include migration instructions only when an earlier deployed version is confirmed. Record tested combinations in the [release compatibility list](RELEASE_COMPATIBILITY.html).
 
 ## Automated build
 

@@ -1,0 +1,8 @@
+title: Xenomi Engineering Hub
+url: "https://xenomi-in.github.io"
+baseurl: "/docs"
+markdown: kramdown
+kramdown:
+  input: GFM
+exclude:
+  - AGENTS.md
