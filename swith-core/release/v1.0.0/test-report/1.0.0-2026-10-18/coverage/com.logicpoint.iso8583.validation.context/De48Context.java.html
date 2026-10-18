@@ -1,0 +1,102 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>De48Context.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">iso8583-processor</a> &gt; <a href="index.source.html" class="el_package">com.logicpoint.iso8583.validation.context</a> &gt; <span class="el_source">De48Context.java</span></div><h1>De48Context.java</h1><pre class="source lang-java linenums">package com.logicpoint.iso8583.validation.context;
+
+import java.util.Map;
+import java.util.HashMap;
+import java.util.concurrent.ConcurrentHashMap;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+import com.logicpoint.iso8583.validation.TlvUtils;
+
+/**
+ * Context object to hold parsed DE48 data and avoid multiple parsing
+ */
+public class De48Context {
+<span class="fc" id="L14">    private static final Logger logger = LoggerFactory.getLogger(De48Context.class);</span>
+    
+    private final String originalDe48;
+    private final Map&lt;String, String&gt; tlvMap;
+    private final boolean isValid;
+    private final String parseError;
+<span class="fc" id="L20">    private volatile boolean modified = false;</span>
+    
+<span class="fc" id="L22">    private De48Context(String originalDe48, Map&lt;String, String&gt; tlvMap, boolean isValid, String parseError) {</span>
+<span class="fc" id="L23">        this.originalDe48 = originalDe48;</span>
+<span class="fc bfc" id="L24" title="All 2 branches covered.">        this.tlvMap = tlvMap != null ? new ConcurrentHashMap&lt;&gt;(tlvMap) : new ConcurrentHashMap&lt;&gt;();</span>
+<span class="fc" id="L25">        this.isValid = isValid;</span>
+<span class="fc" id="L26">        this.parseError = parseError;</span>
+<span class="fc" id="L27">    }</span>
+    
+    /**
+     * Factory method to parse DE48 once and create context
+     */
+    public static De48Context parse(String de48) {
+<span class="fc bfc" id="L33" title="All 4 branches covered.">        if (de48 == null || de48.trim().isEmpty()) {</span>
+<span class="fc" id="L34">            return new De48Context(de48, null, false, &quot;DE48 is null or empty&quot;);</span>
+        }
+        
+        try {
+<span class="fc" id="L38">            Map&lt;String, String&gt; tlvMap = TlvUtils.parseTlv(de48);</span>
+<span class="fc" id="L39">            logger.debug(&quot;DE48 parsed successfully with {} tags&quot;, tlvMap.size());</span>
+<span class="fc" id="L40">            return new De48Context(de48, tlvMap, true, null);</span>
+<span class="fc" id="L41">        } catch (Exception e) {</span>
+<span class="fc" id="L42">            logger.error(&quot;Failed to parse DE48: {}&quot;, e.getMessage());</span>
+<span class="fc" id="L43">            return new De48Context(de48, null, false, e.getMessage());</span>
+        }
+    }
+    
+    // Getters
+<span class="fc" id="L48">    public String getOriginalDe48() { return originalDe48; }</span>
+<span class="fc" id="L49">    public Map&lt;String, String&gt; getTlvMap() { return tlvMap; }</span>
+<span class="fc" id="L50">    public boolean isValid() { return isValid; }</span>
+<span class="fc" id="L51">    public String getParseError() { return parseError; }</span>
+<span class="fc" id="L52">    public boolean isModified() { return modified; }</span>
+    
+    // Tag access methods
+    public String getTag(String tagId) {
+<span class="fc bfc" id="L56" title="All 2 branches covered.">        return isValid ? tlvMap.get(tagId) : null;</span>
+    }
+    
+    public boolean hasTag(String tagId) {
+<span class="fc bfc" id="L60" title="All 4 branches covered.">        return isValid &amp;&amp; tlvMap.containsKey(tagId);</span>
+    }
+    
+    public void setTag(String tagId, String value) {
+<span class="fc bfc" id="L64" title="All 2 branches covered.">        if (isValid) {</span>
+<span class="fc" id="L65">            tlvMap.put(tagId, value);</span>
+<span class="fc" id="L66">            modified = true;</span>
+<span class="fc" id="L67">            logger.debug(&quot;Tag {} set to: {}&quot;, tagId, value);</span>
+        }
+<span class="fc" id="L69">    }</span>
+    
+    public void removeTag(String tagId) {
+<span class="fc bfc" id="L72" title="All 4 branches covered.">        if (isValid &amp;&amp; tlvMap.remove(tagId) != null) {</span>
+<span class="fc" id="L73">            modified = true;</span>
+<span class="fc" id="L74">            logger.debug(&quot;Tag {} removed&quot;, tagId);</span>
+        }
+<span class="fc" id="L76">    }</span>
+    
+    /**
+     * Rebuilds DE48 string if modified
+     */
+    public String buildDe48() {
+<span class="fc bfc" id="L82" title="All 2 branches covered.">        if (!isValid) {</span>
+<span class="fc" id="L83">            return originalDe48;</span>
+        }
+        
+<span class="fc bfc" id="L86" title="All 2 branches covered.">        if (!modified) {</span>
+<span class="fc" id="L87">            return originalDe48;</span>
+        }
+        
+<span class="fc" id="L90">        StringBuilder sb = new StringBuilder();</span>
+<span class="fc bfc" id="L91" title="All 2 branches covered.">        for (Map.Entry&lt;String, String&gt; entry : tlvMap.entrySet()) {</span>
+<span class="fc" id="L92">            String tag = entry.getKey();</span>
+<span class="fc" id="L93">            String value = entry.getValue();</span>
+<span class="fc" id="L94">            String length = String.format(&quot;%03d&quot;, value.length());</span>
+<span class="fc" id="L95">            sb.append(tag).append(length).append(value);</span>
+<span class="fc" id="L96">        }</span>
+        
+<span class="fc" id="L98">        logger.debug(&quot;DE48 rebuilt with {} tags&quot;, tlvMap.size());</span>
+<span class="fc" id="L99">        return sb.toString();</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.14.202510111229</span></div></body></html>

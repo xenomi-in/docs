@@ -1,0 +1,139 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>IssuerMandateRevocationMessageFactory.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">iso8583-processor</a> &gt; <a href="index.source.html" class="el_package">com.logicpoint.iso8583.service</a> &gt; <span class="el_source">IssuerMandateRevocationMessageFactory.java</span></div><h1>IssuerMandateRevocationMessageFactory.java</h1><pre class="source lang-java linenums">package com.logicpoint.iso8583.service;
+
+import com.logicpoint.iso8583.config.IssuerMandateRevocationProperties;
+import com.logicpoint.iso8583.entity.StandingInstructionMandate;
+import com.logicpoint.iso8583.model.Iso8583Message;
+import com.logicpoint.iso8583.model.IssuerMandateRevocationRequest;
+import java.math.BigDecimal;
+import java.math.RoundingMode;
+import java.time.LocalDate;
+import java.time.LocalDateTime;
+import java.time.format.DateTimeFormatter;
+import java.util.LinkedHashMap;
+import java.util.Map;
+import java.util.UUID;
+import java.util.concurrent.atomic.AtomicLong;
+import org.springframework.stereotype.Component;
+
+/** Builds a network-configured issuer-originated mandate revocation message. */
+@Component
+public class IssuerMandateRevocationMessageFactory {
+
+<span class="fc" id="L22">    private static final DateTimeFormatter DE7_FORMAT = DateTimeFormatter.ofPattern(&quot;MMddHHmmss&quot;);</span>
+<span class="fc" id="L23">    private static final DateTimeFormatter SI_DATE_FORMAT = DateTimeFormatter.ofPattern(&quot;ddMMyyyy&quot;);</span>
+<span class="fc" id="L24">    private static final DateTimeFormatter RRN_PREFIX_FORMAT = DateTimeFormatter.ofPattern(&quot;yyDDDHH&quot;);</span>
+<span class="fc" id="L25">    private final AtomicLong traceSequence = new AtomicLong(System.currentTimeMillis() % 1_000_000L);</span>
+    private final IssuerMandateRevocationProperties properties;
+
+<span class="fc" id="L28">    public IssuerMandateRevocationMessageFactory(IssuerMandateRevocationProperties properties) {</span>
+<span class="fc" id="L29">        this.properties = properties;</span>
+<span class="fc" id="L30">    }</span>
+
+    public Iso8583Message create(StandingInstructionMandate mandate,
+                                 IssuerMandateRevocationRequest command) {
+<span class="fc" id="L34">        String scheme = command.scheme().name();</span>
+<span class="fc" id="L35">        IssuerMandateRevocationProperties.SchemeRule rule = requireRule(scheme);</span>
+<span class="pc bpc" id="L36" title="1 of 2 branches missed.">        if (!rule.getAllowedPosConditionCodes().contains(command.posConditionCode())) {</span>
+<span class="nc" id="L37">            throw new IllegalArgumentException(&quot;Unsupported POS condition code for &quot; + scheme);</span>
+        }
+
+<span class="fc" id="L40">        LocalDateTime now = LocalDateTime.now();</span>
+<span class="fc" id="L41">        String stan = String.format(&quot;%06d&quot;, Math.floorMod(traceSequence.incrementAndGet(), 1_000_000L));</span>
+<span class="fc" id="L42">        String rrn = now.format(RRN_PREFIX_FORMAT) + stan.substring(1);</span>
+<span class="fc" id="L43">        String commandId = UUID.randomUUID().toString();</span>
+
+<span class="fc" id="L45">        Iso8583Message message = new Iso8583Message();</span>
+<span class="fc" id="L46">        message.setScheme(command.scheme());</span>
+<span class="fc" id="L47">        message.setMti(rule.getRequestMti());</span>
+<span class="fc" id="L48">        message.setUniqueTransactionId(commandId);</span>
+<span class="fc" id="L49">        message.setField(7, now.format(DE7_FORMAT));</span>
+<span class="fc" id="L50">        message.setField(11, stan);</span>
+<span class="fc" id="L51">        message.setField(22, rule.getPosEntryMode());</span>
+<span class="fc" id="L52">        message.setField(25, command.posConditionCode());</span>
+<span class="fc" id="L53">        message.setField(37, rrn);</span>
+<span class="fc" id="L54">        putIfPresent(message, 41, mandate.getTerminalId());</span>
+<span class="fc" id="L55">        putIfPresent(message, 42, mandate.getCardAcceptorId());</span>
+<span class="fc" id="L56">        putIfPresent(message, 49, mandate.getCurrencyCode());</span>
+
+<span class="fc" id="L58">        Map&lt;String, String&gt; tags = new LinkedHashMap&lt;&gt;();</span>
+<span class="fc" id="L59">        tags.put(rule.getEciTag(), rule.getEciValue());</span>
+<span class="fc" id="L60">        tags.put(rule.getSiDataTag(), buildSiData(mandate));</span>
+<span class="fc" id="L61">        tags.put(rule.getMandateIdTag(), mandate.getMandateId());</span>
+<span class="fc" id="L62">        message.setField(rule.getPrivateDataField(), packTlv(tags));</span>
+<span class="fc" id="L63">        message.setMetadata(Map.of(</span>
+                &quot;source&quot;, &quot;CMS_CRM&quot;,
+<span class="fc" id="L65">                &quot;requested_by&quot;, command.requestedBy(),</span>
+<span class="pc bpc" id="L66" title="1 of 2 branches missed.">                &quot;reason&quot;, command.reason() == null ? &quot;&quot; : command.reason()));</span>
+<span class="fc" id="L67">        return message;</span>
+    }
+
+    private IssuerMandateRevocationProperties.SchemeRule requireRule(String scheme) {
+<span class="fc" id="L71">        IssuerMandateRevocationProperties.SchemeRule rule = properties.getRule(scheme);</span>
+<span class="pc bpc" id="L72" title="3 of 6 branches missed.">        if (!properties.isEnabled() || rule == null || !rule.isEnabled()) {</span>
+<span class="nc" id="L73">            throw new IllegalStateException(&quot;Issuer mandate revocation is not enabled for &quot; + scheme);</span>
+        }
+<span class="fc" id="L75">        return rule;</span>
+    }
+
+    private String buildSiData(StandingInstructionMandate mandate) {
+<span class="fc" id="L79">        String value = &quot;02&quot;</span>
+<span class="fc" id="L80">                + fixedDigits(mandate.getNumberOfInstallments(), 3, &quot;000&quot;)</span>
+<span class="fc" id="L81">                + fixedDigits(mandate.getPreferredDay(), 2, &quot;01&quot;)</span>
+<span class="fc" id="L82">                + amount(mandate.getMinAmount())</span>
+<span class="fc" id="L83">                + amount(mandate.getMaxAmount())</span>
+<span class="fc" id="L84">                + date(mandate.getStartDate())</span>
+<span class="fc" id="L85">                + date(mandate.getEndDate())</span>
+<span class="fc" id="L86">                + fixedValue(mandate.getNotificationMode(), &quot;0&quot;)</span>
+<span class="fc" id="L87">                + fixedValue(mandate.getFrequencyIndicator(), &quot;6&quot;);</span>
+<span class="pc bpc" id="L88" title="1 of 2 branches missed.">        if (value.length() != 49) {</span>
+<span class="nc" id="L89">            throw new IllegalStateException(&quot;Generated DE48 tag 085 must be 49 characters&quot;);</span>
+        }
+<span class="fc" id="L91">        return value;</span>
+    }
+
+    private String amount(BigDecimal value) {
+<span class="pc bpc" id="L95" title="1 of 2 branches missed.">        if (value == null) {</span>
+<span class="nc" id="L96">            return &quot;000000000000&quot;;</span>
+        }
+<span class="fc" id="L98">        long minorUnits = value.setScale(2, RoundingMode.UNNECESSARY).movePointRight(2).longValueExact();</span>
+<span class="pc bpc" id="L99" title="2 of 4 branches missed.">        if (minorUnits &lt; 0 || minorUnits &gt; 999_999_999_999L) {</span>
+<span class="nc" id="L100">            throw new IllegalArgumentException(&quot;Mandate amount cannot be represented in tag 085&quot;);</span>
+        }
+<span class="fc" id="L102">        return String.format(&quot;%012d&quot;, minorUnits);</span>
+    }
+
+    private String date(LocalDate value) {
+<span class="pc bpc" id="L106" title="1 of 2 branches missed.">        return value == null ? &quot;00000000&quot; : value.format(SI_DATE_FORMAT);</span>
+    }
+
+    private String fixedDigits(String value, int length, String defaultValue) {
+<span class="pc bpc" id="L110" title="2 of 4 branches missed.">        String resolved = value == null || value.isBlank() ? defaultValue : value;</span>
+<span class="pc bpc" id="L111" title="1 of 2 branches missed.">        if (!resolved.matches(&quot;\\d{&quot; + length + &quot;}&quot;)) {</span>
+<span class="nc" id="L112">            throw new IllegalArgumentException(&quot;Invalid persisted mandate fixed-position value: &quot; + resolved);</span>
+        }
+<span class="fc" id="L114">        return resolved;</span>
+    }
+
+    private String fixedValue(String value, String defaultValue) {
+<span class="pc bpc" id="L118" title="2 of 4 branches missed.">        String resolved = value == null || value.isBlank() ? defaultValue : value;</span>
+<span class="pc bpc" id="L119" title="1 of 2 branches missed.">        if (resolved.length() != 1) {</span>
+<span class="nc" id="L120">            throw new IllegalArgumentException(&quot;Invalid persisted mandate indicator: &quot; + resolved);</span>
+        }
+<span class="fc" id="L122">        return resolved;</span>
+    }
+
+    private String packTlv(Map&lt;String, String&gt; tags) {
+<span class="fc" id="L126">        StringBuilder packed = new StringBuilder();</span>
+<span class="fc" id="L127">        tags.forEach((tag, value) -&gt; packed.append(tag)</span>
+<span class="fc" id="L128">                .append(String.format(&quot;%03d&quot;, value.length()))</span>
+<span class="fc" id="L129">                .append(value));</span>
+<span class="fc" id="L130">        return packed.toString();</span>
+    }
+
+    private void putIfPresent(Iso8583Message message, int field, String value) {
+<span class="pc bpc" id="L134" title="2 of 4 branches missed.">        if (value != null &amp;&amp; !value.isBlank()) {</span>
+<span class="fc" id="L135">            message.setField(field, value);</span>
+        }
+<span class="fc" id="L137">    }</span>
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.14.202510111229</span></div></body></html>

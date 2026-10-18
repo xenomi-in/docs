@@ -1,0 +1,160 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>CardDataContext.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">iso8583-processor</a> &gt; <a href="index.source.html" class="el_package">com.logicpoint.iso8583.validation.orchestrator</a> &gt; <span class="el_source">CardDataContext.java</span></div><h1>CardDataContext.java</h1><pre class="source lang-java linenums">package com.logicpoint.iso8583.validation.orchestrator;
+
+import com.logicpoint.iso8583.entity.CardData;
+import lombok.Data;
+import lombok.Builder;
+import lombok.NoArgsConstructor;
+import lombok.AllArgsConstructor;
+
+/**
+ * Context class to hold all card data fetched once from the database.
+ * This prevents multiple database calls during transaction validation.
+ * 
+ * @author LogicPoint Systems
+ * @version 1.0
+ * @since 2025-01-27
+ */
+@Data
+@Builder
+@NoArgsConstructor
+@AllArgsConstructor
+public class CardDataContext {
+    
+    /**
+     * The card data entity containing all card information
+     */
+    private CardData cardData;
+    
+    /**
+     * Flag indicating if card data was successfully fetched
+     */
+    private boolean cardDataFetched;
+    
+    /**
+     * Error message if card data fetching failed
+     */
+    private String fetchError;
+    
+    /**
+     * Timestamp when card data was fetched (for cache invalidation)
+     */
+    private long fetchTimestamp;
+    
+    /**
+     * Creates a successful card data context
+     */
+    public static CardDataContext success(CardData cardData) {
+<span class="fc" id="L47">        return CardDataContext.builder()</span>
+<span class="fc" id="L48">                .cardData(cardData)</span>
+<span class="fc" id="L49">                .cardDataFetched(true)</span>
+<span class="fc" id="L50">                .fetchTimestamp(System.currentTimeMillis())</span>
+<span class="fc" id="L51">                .build();</span>
+    }
+    
+    /**
+     * Creates a failed card data context
+     */
+    public static CardDataContext failure(String error) {
+<span class="fc" id="L58">        return CardDataContext.builder()</span>
+<span class="fc" id="L59">                .cardDataFetched(false)</span>
+<span class="fc" id="L60">                .fetchError(error)</span>
+<span class="fc" id="L61">                .fetchTimestamp(System.currentTimeMillis())</span>
+<span class="fc" id="L62">                .build();</span>
+    }
+    
+    /**
+     * Checks if card data is available and valid
+     */
+    public boolean isValid() {
+<span class="pc bpc" id="L69" title="1 of 4 branches missed.">        return cardDataFetched &amp;&amp; cardData != null;</span>
+    }
+    
+    /**
+     * Gets the card status safely
+     */
+    public String getCardStatus() {
+<span class="fc bfc" id="L76" title="All 2 branches covered.">        return isValid() ? cardData.getStatus() : null;</span>
+    }
+    
+    /**
+     * Gets the expiry date safely
+     */
+    public String getExpiryDate() {
+<span class="fc bfc" id="L83" title="All 2 branches covered.">        return isValid() ? cardData.getExpiryDate() : null;</span>
+    }
+    
+    /**
+     * Gets the PVV offset safely
+     */
+    public String getPvvOffset() {
+<span class="fc bfc" id="L90" title="All 2 branches covered.">        return isValid() ? cardData.getPvv_offest() : null;</span>
+    }
+    
+    /**
+     * Gets the key reference safely
+     */
+    public String getKeyRef() {
+<span class="fc bfc" id="L97" title="All 2 branches covered.">        return isValid() ? cardData.getKey_ref() : null;</span>
+    }
+    
+    /**
+     * Gets the CVV key reference safely
+     */
+    public String getCvvKeyRef() {
+<span class="fc bfc" id="L104" title="All 2 branches covered.">        return isValid() ? cardData.getCvv_key_ref() : null;</span>
+    }
+    
+    /**
+     * Gets the EMV AIP safely
+     */
+    public String getEmvAip() {
+<span class="fc bfc" id="L111" title="All 2 branches covered.">        return isValid() ? cardData.getEmv_aip() : null;</span>
+    }
+
+    public String getCvv(){
+<span class="fc bfc" id="L115" title="All 2 branches covered.">    return isValid() ? cardData.getCvv() : null;</span>
+    }
+    
+    /**
+     * Gets the EMV CAPK ID safely
+     */
+    public String getEmvCapkId() {
+<span class="fc bfc" id="L122" title="All 2 branches covered.">        return isValid() ? cardData.getEmv_capk_id() : null;</span>
+    }
+    
+    /**
+     * Gets the ARQC validation required flag safely
+     */
+    public Boolean isArqcValidationRequired() {
+<span class="fc bfc" id="L129" title="All 2 branches covered.">        return isValid() ? cardData.getArqc_validation_required() : null;</span>
+    }
+    
+    /**
+     * Gets the ATC safely
+     */
+    public Integer getAtc() {
+<span class="fc bfc" id="L136" title="All 2 branches covered.">        return isValid() ? cardData.getAtc() : null;</span>
+    }
+    
+    /**
+     * Gets the PIN retry count safely
+     */
+    public Integer getPinRetryCount() {
+<span class="fc bfc" id="L143" title="All 2 branches covered.">        return isValid() ? cardData.getPin_retry_count() : null;</span>
+    }
+    
+    /**
+     * Gets the max PIN retry safely
+     */
+    public Integer getMaxPinRetry() {
+<span class="fc bfc" id="L150" title="All 2 branches covered.">        return isValid() ? cardData.getMax_pin_retry() : null;</span>
+    }
+    
+    /**
+     * Gets the PIN blocked flag safely
+     */
+    public Boolean isPinBlocked() {
+<span class="fc bfc" id="L157" title="All 2 branches covered.">        return isValid() ? cardData.getPin_blocked() : null;</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.14.202510111229</span></div></body></html>

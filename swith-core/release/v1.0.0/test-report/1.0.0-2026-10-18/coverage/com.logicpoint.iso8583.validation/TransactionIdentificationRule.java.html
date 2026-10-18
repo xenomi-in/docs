@@ -1,0 +1,62 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>TransactionIdentificationRule.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">iso8583-processor</a> &gt; <a href="index.source.html" class="el_package">com.logicpoint.iso8583.validation</a> &gt; <span class="el_source">TransactionIdentificationRule.java</span></div><h1>TransactionIdentificationRule.java</h1><pre class="source lang-java linenums">package com.logicpoint.iso8583.validation;
+import java.util.List;
+import java.util.Map;
+import java.util.ArrayList;
+
+/**
+ * Represents a rule for identifying and validating ISO 8583 transactions.
+ * Each rule defines the conditions that must be met to identify a specific
+ * transaction type and the fields that are required for that transaction.
+ *
+ * @author LogicPoint Systems
+ * @version 1.0
+ */
+<span class="fc" id="L14">public class TransactionIdentificationRule {</span>
+    public String processingCode;
+    public List&lt;String&gt; posEntryMode;
+    public List&lt;String&gt; posConditionCode;
+    public TransactionType transactionType;
+    public List&lt;String&gt; requiredFields;
+    public List&lt;TlvCondition&gt; tlvConditions;
+    public List&lt;TlvCondition&gt; requiredTlvTags;
+
+    public boolean matches(Map&lt;String, String&gt; fields) {
+<span class="pc bpc" id="L24" title="1 of 4 branches missed.">        if (processingCode != null &amp;&amp; !processingCode.equals(fields.get(&quot;3&quot;))) return false;</span>
+<span class="fc bfc" id="L25" title="All 4 branches covered.">        if (!(posEntryMode.isEmpty() || posEntryMode.contains(fields.get(&quot;22&quot;)))) return false;</span>
+<span class="pc bpc" id="L26" title="1 of 4 branches missed.">        if (!(posConditionCode.isEmpty() || posConditionCode.contains(fields.get(&quot;25&quot;)))) return false;</span>
+        
+<span class="fc bfc" id="L28" title="All 2 branches covered.">        if (tlvConditions != null) {</span>
+<span class="fc bfc" id="L29" title="All 2 branches covered.">            for (TlvCondition cond : tlvConditions) {</span>
+<span class="fc bfc" id="L30" title="All 2 branches covered.">                if (!cond.matches(fields)) return false;</span>
+<span class="fc" id="L31">            }</span>
+        }
+
+<span class="fc" id="L34">        return true;</span>
+    }
+
+     /**
+     * Validates that all required fields are present in the message.
+     *
+     * @param fields Map of field numbers to their values
+     * @return List of missing required fields, or empty list if all required fields are present
+     */
+    public List&lt;String&gt; validateFields(Map&lt;String, String&gt; fields) {
+<span class="fc" id="L44">        List&lt;String&gt; missingFields = new ArrayList&lt;&gt;();</span>
+<span class="pc bpc" id="L45" title="1 of 2 branches missed.">        if (requiredFields != null) {</span>
+<span class="fc bfc" id="L46" title="All 2 branches covered.">            for (String field : requiredFields) {</span>
+<span class="pc bpc" id="L47" title="2 of 6 branches missed.">                if (!fields.containsKey(field) || fields.get(field) == null || fields.get(field).trim().isEmpty()) {</span>
+<span class="fc" id="L48">                    missingFields.add(field);</span>
+                }
+<span class="fc" id="L50">            }</span>
+        }
+<span class="fc bfc" id="L52" title="All 2 branches covered.">        if (requiredTlvTags != null) {</span>
+<span class="fc bfc" id="L53" title="All 2 branches covered.">            for (TlvCondition requiredTag : requiredTlvTags) {</span>
+<span class="fc bfc" id="L54" title="All 2 branches covered.">                if (!requiredTag.matches(fields)) {</span>
+<span class="fc" id="L55">                    missingFields.add(requiredTag.getField() + &quot;.&quot; + requiredTag.getTag());</span>
+                }
+<span class="fc" id="L57">            }</span>
+        }
+<span class="fc" id="L59">        return missingFields;</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.14.202510111229</span></div></body></html>

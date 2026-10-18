@@ -1,0 +1,124 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>SimpleNettyHsmClientTest.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">iso8583-processor</a> &gt; <a href="index.source.html" class="el_package">com.logicpoint.iso8583.hsm</a> &gt; <span class="el_source">SimpleNettyHsmClientTest.java</span></div><h1>SimpleNettyHsmClientTest.java</h1><pre class="source lang-java linenums">package com.logicpoint.iso8583.hsm;
+
+import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.TimeUnit;
+
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
+/**
+ * Simple test class for the Netty HSM client.
+ * 
+ * @author LogicPoint Systems
+ * @version 1.0
+ */
+<span class="nc" id="L15">public class SimpleNettyHsmClientTest {</span>
+    
+<span class="nc" id="L17">    private static final Logger logger = LoggerFactory.getLogger(SimpleNettyHsmClientTest.class);</span>
+    
+    public static void main(String[] args) {
+<span class="nc" id="L20">        String p12Path = &quot;src/main/resources/Falcon_Test-YY1T4ZOT.p12&quot;;</span>
+<span class="nc" id="L21">        String p12Password = &quot;Falcon@2025&quot;;</span>
+        
+<span class="nc" id="L23">        SimpleNettyHsmClient client = null;</span>
+        
+        try {
+<span class="nc" id="L26">            logger.info(&quot;=== Starting Netty HSM Client Test ===&quot;);</span>
+<span class="nc" id="L27">            logger.info(&quot;Initializing Netty HSM client...&quot;);</span>
+<span class="nc" id="L28">            client = new SimpleNettyHsmClient(</span>
+                &quot;ap-india-central-crypto-uat.virtucrypt.com&quot;, 4121, p12Path, p12Password);
+            
+            // Test connection with shorter timeout
+<span class="nc" id="L32">            logger.info(&quot;Testing connection with echo command...&quot;);</span>
+           // String response = client.sendMessage(&quot;[AOECHO;BJ0;AGEcho Test connection.;]&quot;);
+            //logger.info(&quot;Connection test response: {}&quot;, response);
+            
+            //if (response != null &amp;&amp; !response.isEmpty()) { 
+<span class="nc" id="L37">                logger.info(&quot;✅ Connection test successful!&quot;);</span>
+            //} else {
+            //    logger.warn(&quot;⚠️ Connection test returned null or empty response&quot;);
+            //}
+            
+            // Test async operations
+<span class="nc" id="L43">            logger.info(&quot;Testing async operations...&quot;);</span>
+            //CompletableFuture&lt;String&gt; future1 = client.sendMessageAsync(&quot;[AOECHO;BJ0;AGEcho Async test 1.;]&quot;);  // Echo test
+            //CompletableFuture&lt;String&gt; future2 = client.sendMessageAsync(&quot;[AOSKEY;FS2;]&quot;);
+            //CompletableFuture&lt;String&gt; future2 = client.sendMessageAsync(&quot;[AOGWKS;ASA0088P0TE00E0000;APA0088K0TB00E000057FBBE38E6FE2F81EA586352184116746914B2BC5135075E4C26ABA9E6ABC16812FE5205;FS2;]&quot;);
+            //CompletableFuture&lt;String&gt; future2 = client.sendMessageAsync(&quot;[AOGWKS;AS9;FS2;]&quot;);
+            //CompletableFuture&lt;String&gt; future1 = client.sendMessageAsync(&quot;[AOLKEY;BJ1;AK4FCD6B1AC843A2F8BF13F2E53DD5C154;]&quot;);  // loaging clear key to buffer
+           // CompletableFuture&lt;String&gt; future2 = client.sendMessageAsync(&quot;[AOCWKS;AS1;]&quot;);  // creating key from buffer AS0 - KEK/ZMK
+           //CompletableFuture&lt;String&gt; future1 = client.sendMessageAsync(&quot;[AOTVWK;AS1;FD79994A6EF73DA76CC518446F8B73627B;AP5EA734F4919BA6550AF9A99B7A12DEB4;]&quot;);  // importing zpk under ZMK/KEK
+            //CompletableFuture&lt;String&gt; future1 = client.sendMessageAsync(&quot;[AOEPIN;FS1;AW4;AF1234;AXB41AF6C89B8509CA2A8DDA27F18F86AB;AK319312087747;]&quot;);  // Encrypt clear PIN (generating encrypted PINBLOCK with PEK/ZPK)
+           // CompletableFuture&lt;String&gt; future1 = client.sendMessageAsync(&quot;[AOGWKS;AS9;FS2;]&quot;);  // Generating PIN Generation Key 
+          // CompletableFuture&lt;String&gt; future1 = client.sendMessageAsync(&quot;[AOGOFC;BF3;AF1234;AX5CEA600A11C246F35CEA600A11C246F35CEA600A11C246F3;CA7C2F09C04E63558BF1D80E171EEC0A58;BY0;BZ19312087747;]&quot;);  // pvv generation using clear pin
+           // CompletableFuture&lt;String&gt; future1 = client.sendMessageAsync(&quot;[AOGOFF;BF3;ALCD8ACB7F985FD380;AXB41AF6C89B8509CA2A8DDA27F18F86AB;CA7C2F09C04E63558BF1D80E171EEC0A58;BY0;BZ19312087747;AK319312087747;]&quot;); // PVV Generation using ency pinlock (visa method)
+           //CompletableFuture&lt;String&gt; future1 = client.sendMessageAsync(&quot;[AORPIN;BF3;AW1;ALCD8ACB7F985FD380;AXB41AF6C89B8509CA2A8DDA27F18F86AB;CA7C2F09C04E63558BF1D80E171EEC0A58;BX5801;BY0;BZ19312087747;AK319312087747;FWCD8ACB7F985FD380]&quot;);  // PIN verification
+         
+
+           //importing IMK(ency under ZMK/KEK) to  MFK
+           //CompletableFuture&lt;String&gt; future1 = client.sendMessageAsync(&quot;[AOTVWK;AS9;FD4ADA57C8A0F0240C3ECF175250E75756;AP5EA734F4919BA6550AF9A99B7A12DEB4;]&quot;);  // PIN verification
+        //ARQC verification and arpc generation
+            //CompletableFuture&lt;String&gt; future1 = client.sendMessageAsync(&quot;[AOEMVA;MK1;FS2;KM1;CH1;KP3DB5BBAAE7CE75C3B276422113AD03BC;KQ8173193120877474;KR01;KS0001;KT00000000010000000000000003560000048000035625081100C99152E2790000010105A00000000000;BO35D7AB0041D0ED0B;CA80000000;BJ0000]&quot;);
+        //CompletableFuture&lt;String&gt; future1 = client.sendMessageAsync(&quot;[AOEMVA;MK1;FS2;KM2;CH1;KP3DB5BBAAE7CE75C3B276422113AD03BC;KQ8173193120877474;KR01;KS0001;KT00000000010000000000000003560000048000035625081100;BO35D7AB0041D0ED0B;CB0105A00000000000;KUC99152E2;CA80000000]&quot;);
+        //CompletableFuture&lt;String&gt; future1 = client.sendMessageAsync(&quot;[AOGWKS;AS2;FS2;]&quot;);//DEK generation
+        //CompletableFuture&lt;String&gt; future1 = client.sendMessageAsync(&quot;[AOCBCE;GG1359A80321788857A18A79888F9CB1E6;GH9C2260A89A83D353;BOBE19312087747D34;]&quot;);  /Data encryption 
+       //CompletableFuture&lt;String&gt; future1 = client.sendMessageAsync(&quot;[AOCBCD;GG1359A80321788857A18A79888F9CB1E6;GH9C2260A89A83D353;BOE604F69040B7D132647D4CA6ED841635;]&quot;);  // Data Dcryption
+       // CompletableFuture&lt;String&gt; future1 = client.sendMessageAsync(&quot;[AOGWKS;AS4;FS2;]&quot;);  // CVK generation
+       //CompletableFuture&lt;String&gt; future1 = client.sendMessageAsync(&quot;[AOGCVC;AV8173193120877474;CAB9381732EB907253611FFD54159116BD;FA3012;FB620;FT1;]&quot;);  // Mastercard cvc generation
+       //CompletableFuture&lt;String&gt; future1 = client.sendMessageAsync(&quot;[AOVCVC;AV8173193120877474;CAB9381732EB907253611FFD54159116BD;FA3012;FB620;FC403;FT272]&quot;);  // Verify cvc generation
+       //CompletableFuture&lt;String&gt; future1 = client.sendMessageAsync(&quot;[AOGCVV;AV8173193120877474;CAB9381732EB907253611FFD54159116BD;FA3012;FB620;FT1]&quot;);  // VISA cvv generation 
+       //CompletableFuture&lt;String&gt; future1 = client.sendMessageAsync(&quot;[AOGPIN;BF3;BTB41AF6C89B8509CA2A8DDA27F18F86AB;CA7C2F09C04E63558BF1D80E171EEC0A58;BY1;BZ19312087747;AK319312087747;CM4;]&quot;);  // VISA random pin(pinblock) generation using GPIN
+      //CompletableFuture&lt;String&gt; future1 = client.sendMessageAsync(&quot;[AORPIN;BF3;AW1;AL4950D3DD0AEAA120;FW4950D3DD0AEAA120;AXB41AF6C89B8509CA2A8DDA27F18F86AB;CA7C2F09C04E63558BF1D80E171EEC0A58;BX7047;BY1;BZ19312087747;AK319312087747;]&quot;);  // VISA pin(pinblock) verification using GPIN
+     //CompletableFuture&lt;String&gt; future1 = client.sendMessageAsync(&quot;[AOGOFC;BF2;AF1234;BS0123456789012345;BE8173193120877474;ATF;COA3812AEA41340F0AEB896DCE63F3F58D;CN2;AX0000000000000000;]&quot;);  // Offset generation using IBM3624     using clear pin
+     //CompletableFuture&lt;String&gt; future1 = client.sendMessageAsync(&quot;[AOEMVA;MK1;FS2;KM1;CH1;KP3DB5BBAAE7CE75C3B276422113AD03BC;KQ8173193120877474;KR01;KS0001;KT00000000020000000000000003560000048000035625081400A63341CB190000010FB501A000000000000000000000000000000000000000000000000000000000;BO57113389E0B938C1;CA80000000;BJ0000;]&quot;);  // ARPC generation
+     //CompletableFuture&lt;String&gt; future1 = client.sendMessageAsync(&quot;[AOGPIN;RE1;BF2;BTB41AF6C89B8509CA2A8DDA27F18F86AB;BS0123456789012345;BE8173193120877474;ATF;COA3812AEA41340F0AEB896DCE63F3F58D;AK319312087747;CM4;CN0;]&quot;);  // Random pin generation (iBM offset)
+     //CompletableFuture&lt;String&gt; future1 = client.sendMessageAsync(&quot;[AOEPIN;FS1;AW4;AF1234;AXB41AF6C89B8509CA2A8DDA27F18F86AB;AK319312087747;]&quot;);  // Encrypt clear PIN (generating encrypted PINBLOCK with PEK/ZPK)
+     //CompletableFuture&lt;String&gt; future1 = client.sendMessageAsync(&quot;  [AOTVWK;AS4;FD4ADA57C8A0F0240C3ECF175250E75756;AP5EA734F4919BA6550AF9A99B7A12DEB4;]&quot;);  // Importing ZMK/KEK
+     // CompletableFuture&lt;String&gt; future1 = client.sendMessageAsync(&quot;[AORPIN;BF2;AW1;ATF;BE8173193120877474;BS0123456789012345;AY1410;AD4;ALCB437A46FCAE561C;AZ7C2F09C04E63558BF1D80E171EEC0A58;AXB41AF6C89B8509CA2A8DDA27F18F86AB;AK319312087747;FWCB437A46FCAE561C;]&quot;);  // PIN verification
+     // CompletableFuture&lt;String&gt; future1 = client.sendMessageAsync(&quot;[AOGVDC;CAB9381732EB907253611FFD54159116BD;BZ8173193120877474;KR01;KS0001;DE3012;FB620;]&quot;); // generate dCVV
+     //CompletableFuture&lt;String&gt; future1 = client.sendMessageAsync(&quot;[AOVVDC;CAB9381732EB907253611FFD54159116BD;BZ8173193120877474;KR01;KS0001;DE3012;FB620;FC167;]&quot;); // Verify dCVV
+     //CompletableFuture&lt;String&gt; future1 = client.sendMessageAsync(&quot;[AOGDCV;CAB9381732EB907253611FFD54159116BD;BZ8173193120877474;KR01;FYC99152E2;KS0001;CM3;]&quot;); // Generate DCV
+     //CompletableFuture&lt;String&gt; future1 = client.sendMessageAsync(&quot;[AOEMVA;MK1;FS1;KM1;CH1;KP3DB5BBAAE7CE75C3B276422113AD03BC;KQ8173193120877474;KR01;KS0001;BO85B8C70D8E00505E;CA80800000;KT00000000010000000000000003560000048000035625082700A81F2BCC790000010105A00000000000;BJ0000;]&quot;);
+    // CompletableFuture&lt;String&gt; future1 = client.sendMessageAsync(&quot;[AOTVWK;AS1;FDB68B3C3F8AADD1FE91A810162FBBE081;AP5EA734F4919BA6550AF9A99B7A12DEB4;]&quot;);
+<span class="nc" id="L83">     CompletableFuture&lt;String&gt; future1 = client.sendMessageAsync(&quot;[AOGOFC;BF3;AF1232;AX5CEA600A11C246F35CEA600A11C246F35CEA600A11C246F3;CA7C2F09C04E63558BF1D80E171EEC0A58;BY0;BZ19312087747;]&quot;);</span>
+<span class="nc" id="L84">     CompletableFuture.allOf(future1)</span>
+<span class="nc" id="L85">                .orTimeout(1000, TimeUnit.SECONDS)</span>
+<span class="nc" id="L86">                .thenRun(() -&gt; {</span>
+                    try {
+<span class="nc" id="L88">                        String response1 = future1.get(5, TimeUnit.SECONDS);</span>
+                       // String response2 = future2.get(5, TimeUnit.SECONDS);
+<span class="nc" id="L90">                        logger.info(&quot;✅ Async response 1: {}&quot;, response1);</span>
+                       // logger.info(&quot;✅ Async response 2: {}&quot;, response2);
+<span class="nc" id="L92">                    } catch (Exception e) {</span>
+<span class="nc" id="L93">                        logger.error(&quot;❌ Error getting async responses: {}&quot;, e.getMessage());</span>
+<span class="nc" id="L94">                    }</span>
+<span class="nc" id="L95">                }).exceptionally(throwable -&gt; {</span>
+<span class="nc" id="L96">                    logger.error(&quot;❌ Async operations failed: {}&quot;, throwable.getMessage());</span>
+<span class="nc" id="L97">                    return null;</span>
+                });
+            
+            // Wait a bit for async operations to complete
+<span class="nc" id="L101">            Thread.sleep(3000);</span>
+            
+            // Print pool stats
+<span class="nc" id="L104">            logger.info(&quot;Pool stats: {}&quot;, client.getPoolStats());</span>
+            
+<span class="nc" id="L106">        } catch (Exception e) {</span>
+<span class="nc" id="L107">            logger.error(&quot;❌ Test failed: {}&quot;, e.getMessage(), e);</span>
+            
+            // Additional debugging information
+<span class="nc bnc" id="L110" title="All 2 branches missed.">            if (e.getCause() != null) {</span>
+<span class="nc" id="L111">                logger.error(&quot;Root cause: {}&quot;, e.getCause().getMessage());</span>
+            }
+         } 
+         
+        finally {
+<span class="nc bnc" id="L116" title="All 2 branches missed.">            if (client != null) {</span>
+<span class="nc" id="L117">                logger.info(&quot;Shutting down client...&quot;);</span>
+<span class="nc" id="L118">                client.shutdown();</span>
+            }
+<span class="nc" id="L120">            logger.info(&quot;=== Test completed ===&quot;);</span>
+        }
+<span class="nc" id="L122">    }</span>
+} 
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.14.202510111229</span></div></body></html>

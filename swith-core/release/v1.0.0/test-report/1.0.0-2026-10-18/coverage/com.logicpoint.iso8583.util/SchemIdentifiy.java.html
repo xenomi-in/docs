@@ -1,0 +1,41 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>SchemIdentifiy.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">iso8583-processor</a> &gt; <a href="index.source.html" class="el_package">com.logicpoint.iso8583.util</a> &gt; <span class="el_source">SchemIdentifiy.java</span></div><h1>SchemIdentifiy.java</h1><pre class="source lang-java linenums">package com.logicpoint.iso8583.util;
+
+<span class="nc" id="L3">public class SchemIdentifiy {</span>
+    
+    private String identifyNetwork(String pan) {
+<span class="nc bnc" id="L6" title="All 4 branches missed.">        if (pan == null || pan.length() &lt; 6) {</span>
+<span class="nc" id="L7">            return &quot;UNKNOWN&quot;;</span>
+        }
+
+<span class="nc" id="L10">        String bin = pan.substring(0, 6);</span>
+        // RuPay BIN ranges
+<span class="nc bnc" id="L12" title="All 4 branches missed.">        if (bin.startsWith(&quot;60&quot;) || bin.startsWith(&quot;65&quot;) || </span>
+<span class="nc bnc" id="L13" title="All 4 branches missed.">            bin.startsWith(&quot;81&quot;) || bin.startsWith(&quot;82&quot;) || </span>
+<span class="nc bnc" id="L14" title="All 4 branches missed.">            bin.startsWith(&quot;508&quot;) || bin.startsWith(&quot;353&quot;) || </span>
+<span class="nc bnc" id="L15" title="All 2 branches missed.">            bin.startsWith(&quot;356&quot;)) {</span>
+<span class="nc" id="L16">            return &quot;RUPAY&quot;;</span>
+        }
+        // Visa BIN ranges
+<span class="nc bnc" id="L19" title="All 2 branches missed.">        else if (bin.startsWith(&quot;4&quot;)) {</span>
+<span class="nc" id="L20">            return &quot;VISA&quot;;</span>
+        }
+        // Mastercard BIN ranges
+<span class="nc bnc" id="L23" title="All 4 branches missed.">        else if (bin.startsWith(&quot;51&quot;) || bin.startsWith(&quot;52&quot;) || </span>
+<span class="nc bnc" id="L24" title="All 4 branches missed.">                 bin.startsWith(&quot;53&quot;) || bin.startsWith(&quot;54&quot;) || </span>
+<span class="nc bnc" id="L25" title="All 4 branches missed.">                 bin.startsWith(&quot;55&quot;) || bin.startsWith(&quot;2221&quot;) || </span>
+<span class="nc bnc" id="L26" title="All 4 branches missed.">                 bin.startsWith(&quot;2222&quot;) || bin.startsWith(&quot;2223&quot;) || </span>
+<span class="nc bnc" id="L27" title="All 4 branches missed.">                 bin.startsWith(&quot;2224&quot;) || bin.startsWith(&quot;2225&quot;) || </span>
+<span class="nc bnc" id="L28" title="All 4 branches missed.">                 bin.startsWith(&quot;2226&quot;) || bin.startsWith(&quot;2227&quot;) || </span>
+<span class="nc bnc" id="L29" title="All 4 branches missed.">                 bin.startsWith(&quot;2228&quot;) || bin.startsWith(&quot;2229&quot;) || </span>
+<span class="nc bnc" id="L30" title="All 4 branches missed.">                 bin.startsWith(&quot;223&quot;) || bin.startsWith(&quot;224&quot;) || </span>
+<span class="nc bnc" id="L31" title="All 4 branches missed.">                 bin.startsWith(&quot;225&quot;) || bin.startsWith(&quot;226&quot;) || </span>
+<span class="nc bnc" id="L32" title="All 4 branches missed.">                 bin.startsWith(&quot;227&quot;) || bin.startsWith(&quot;228&quot;) || </span>
+<span class="nc bnc" id="L33" title="All 4 branches missed.">                 bin.startsWith(&quot;229&quot;) || bin.startsWith(&quot;23&quot;) || </span>
+<span class="nc bnc" id="L34" title="All 4 branches missed.">                 bin.startsWith(&quot;24&quot;) || bin.startsWith(&quot;25&quot;) || </span>
+<span class="nc bnc" id="L35" title="All 4 branches missed.">                 bin.startsWith(&quot;26&quot;) || bin.startsWith(&quot;27&quot;)) {</span>
+<span class="nc" id="L36">            return &quot;MASTERCARD&quot;;</span>
+        }
+<span class="nc" id="L38">        return &quot;UNKNOWN&quot;;</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.14.202510111229</span></div></body></html>

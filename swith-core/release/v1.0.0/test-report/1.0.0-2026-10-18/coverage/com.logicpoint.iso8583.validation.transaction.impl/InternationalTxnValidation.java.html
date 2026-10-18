@@ -1,0 +1,71 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>InternationalTxnValidation.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">iso8583-processor</a> &gt; <a href="index.source.html" class="el_package">com.logicpoint.iso8583.validation.transaction.impl</a> &gt; <span class="el_source">InternationalTxnValidation.java</span></div><h1>InternationalTxnValidation.java</h1><pre class="source lang-java linenums">package com.logicpoint.iso8583.validation.transaction.impl;
+
+import com.logicpoint.iso8583.context.RequestContext;
+import com.logicpoint.iso8583.util.rupay.CardAcceptorLocation;
+import com.logicpoint.iso8583.validation.TlvUtils;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
+import java.util.Map;
+
+/*
+ * International transaction validation
+ * @author LogicPoint Systems
+ * @version 1.0
+ */
+<span class="nc" id="L16">public class InternationalTxnValidation {</span>
+    
+<span class="fc" id="L18">    private static final Logger logger = LoggerFactory.getLogger(InternationalTxnValidation.class);</span>
+    private static final String BASE_COUNTRY_CODE = &quot;IN&quot;;
+    private static final String BASE_CURRENCY_CODE = &quot;356&quot;;
+    public static int isInternationalTransaction(RequestContext requestContext){
+<span class="pc bpc" id="L22" title="1 of 2 branches missed.">        if (requestContext == null) {</span>
+<span class="nc" id="L23">            return 0;</span>
+        }
+<span class="fc" id="L25">        return isInternationalTransaction(requestContext.getFields(), requestContext.getParsedTlv(48));</span>
+    }
+
+    public static int isInternationalTransaction(Map&lt;Integer, String&gt; transactionData){
+<span class="fc bfc" id="L29" title="All 2 branches covered.">        String de48 = transactionData != null ? transactionData.get(48) : null;</span>
+<span class="pc bpc" id="L30" title="3 of 4 branches missed.">        Map&lt;String, String&gt; de48Map = de48 == null || de48.isBlank()</span>
+<span class="fc" id="L31">                ? Map.of()</span>
+<span class="pc" id="L32">                : TlvUtils.parseTlv(de48);</span>
+<span class="fc" id="L33">        return isInternationalTransaction(transactionData, de48Map);</span>
+    }
+
+    private static int isInternationalTransaction(Map&lt;Integer, String&gt; transactionData, Map&lt;String, String&gt; de48Map){
+    try{
+<span class="fc" id="L38">        String acquiringCountryCode = transactionData.get(19); // Acquiring Country Code</span>
+<span class="fc" id="L39">        String terminalLocation = transactionData.get(43); // Terminal Location</span>
+<span class="fc" id="L40">        String txnCurrencyCode = transactionData.get(49); // Transaction Currency Code</span>
+<span class="fc" id="L41">        String txnBillingCurrencyCode = transactionData.get(51); // Billing Currency Code</span>
+<span class="fc" id="L42">        String dcc = de48Map.get(&quot;088&quot;);</span>
+<span class="fc" id="L43">        CardAcceptorLocation cardAcceptorLocation = CardAcceptorLocation.parse(terminalLocation);</span>
+<span class="fc" id="L44">        String terminalCountryCode = cardAcceptorLocation.getTerminalCountryCode();</span>
+<span class="fc bfc" id="L45" title="All 2 branches covered.">        if(!terminalCountryCode.equals(BASE_COUNTRY_CODE)){</span>
+<span class="fc" id="L46">            logger.info(&quot;International transaction , Terminal country code is not IN&quot;);</span>
+            
+<span class="fc bfc" id="L48" title="All 2 branches covered.">            if(txnCurrencyCode.equals(txnBillingCurrencyCode)){</span>
+<span class="fc" id="L49">                logger.info(&quot;International transaction(Cross border) , With DCC  &quot;);</span>
+                // check DE48 tag 88  validation need to check for dcc
+<span class="fc" id="L51">                return 2; // Cross border transaction without DCC</span>
+            }else {
+                // check DE48 tag 88 
+               /*  if(dcc != null &amp;&amp;  dcc.equals(&quot;1&quot;)){
+                    logger.info(&quot;International transaction(Cross border) , With out DCC &quot;);
+                    return 3; // Cross border transaction with DCC
+                }else {*/
+<span class="fc" id="L58">                    logger.info(&quot;International transaction(Cross border) ,With out DCC &quot;);</span>
+<span class="fc" id="L59">                    return 3; // Cross border transaction with out DCC validation </span>
+            }
+        }else{
+<span class="fc" id="L62">            logger.info(&quot;Domestic transaction , Terminal country code is {}&quot;, terminalCountryCode);</span>
+<span class="fc" id="L63">            return 1; // Domestic transaction</span>
+        }
+<span class="fc" id="L65">    }catch(Exception e){</span>
+<span class="fc" id="L66">        logger.error(&quot;Error in isInternationalTransaction: {}&quot;, e.getMessage());</span>
+<span class="fc" id="L67">        return 0;</span>
+    }
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.14.202510111229</span></div></body></html>

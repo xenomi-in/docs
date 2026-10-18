@@ -1,0 +1,980 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>SimpleNettyHsmClient.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">iso8583-processor</a> &gt; <a href="index.source.html" class="el_package">com.logicpoint.iso8583.hsm</a> &gt; <span class="el_source">SimpleNettyHsmClient.java</span></div><h1>SimpleNettyHsmClient.java</h1><pre class="source lang-java linenums">package com.logicpoint.iso8583.hsm;
+
+import java.io.File;
+import java.io.FileInputStream;
+import java.io.InputStream;
+import java.security.KeyStore;
+import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.ConcurrentLinkedQueue;
+import java.util.concurrent.ExecutionException;
+import java.util.concurrent.RejectedExecutionException;
+import java.util.concurrent.ScheduledFuture;
+import java.util.concurrent.Semaphore;
+import java.util.concurrent.TimeUnit;
+import java.util.concurrent.TimeoutException;
+import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.concurrent.atomic.AtomicInteger;
+
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.beans.factory.annotation.Value;
+import org.springframework.stereotype.Component;
+
+import com.logicpoint.iso8583.service.HsmKeepAliveServiceInterface;
+
+import io.netty.bootstrap.Bootstrap;
+import io.netty.buffer.ByteBuf;
+import io.netty.buffer.Unpooled;
+import io.netty.channel.Channel;
+import io.netty.channel.ChannelException;
+import io.netty.channel.ChannelFutureListener;
+import io.netty.channel.ChannelHandlerContext;
+import io.netty.channel.ChannelInitializer;
+import io.netty.channel.ChannelOption;
+import io.netty.channel.ChannelPipeline;
+import io.netty.channel.EventLoopGroup;
+import io.netty.channel.SimpleChannelInboundHandler;
+import io.netty.channel.nio.NioEventLoopGroup;
+import io.netty.channel.socket.SocketChannel;
+import io.netty.channel.socket.nio.NioSocketChannel;
+import io.netty.handler.ssl.SslContext;
+import io.netty.handler.ssl.SslContextBuilder;
+import io.netty.handler.ssl.util.InsecureTrustManagerFactory;
+import jakarta.annotation.PostConstruct;
+import java.security.cert.Certificate;
+import java.security.cert.X509Certificate;
+
+/**
+ * Simplified Netty-based HSM client with connection pooling.
+ * Provides async communication with SSL/TLS support.
+ * 
+ * @author LogicPoint Systems
+ * @version 1.0
+ */
+@Component
+public class SimpleNettyHsmClient {
+    
+<span class="fc" id="L58">    private static final Logger logger = LoggerFactory.getLogger(SimpleNettyHsmClient.class);</span>
+    private static final int DEFAULT_MAX_CONNECTIONS = 10;
+    private static final int DEFAULT_TIMEOUT = 30000;
+    private static final long CONNECTION_MAX_AGE_MS = 300000; // 5 minutes - recycle old connections
+    
+    @Value(&quot;${hsm.futurex.host:ap-india-central-crypto-uat.virtucrypt.com}&quot;)
+    private String host;
+    
+    @Value(&quot;${hsm.futurex.port:4121}&quot;)
+    private int port;
+    
+    @Value(&quot;${hsm.futurex.p12-path:}&quot;)
+    private String p12Path;
+    
+    @Value(&quot;${hsm.futurex.p12-password:Falcon@2025}&quot;)
+    private String p12Password;
+    
+    @Value(&quot;${hsm.futurex.max-connections:10}&quot;)
+    private int maxConnections;
+    
+    @Value(&quot;${hsm.futurex.connection-timeout:30000}&quot;)
+    private int timeout;
+    
+    @Value(&quot;${hsm.futurex.test-on-borrow:true}&quot;)
+    private boolean testOnBorrow;
+    
+    @Value(&quot;${hsm.futurex.max-idle-time:45000}&quot;)
+    private long maxIdleTime;
+    
+    // Keep-alive service reference (will be injected)
+    private HsmKeepAliveServiceInterface keepAliveService;
+    
+    private EventLoopGroup eventLoopGroup;
+    private Bootstrap bootstrap;
+    private SslContext sslContext;
+<span class="fc" id="L93">    private static final ConcurrentLinkedQueue&lt;Channel&gt; connectionPool = new ConcurrentLinkedQueue&lt;&gt;();</span>
+<span class="fc" id="L94">    private final AtomicInteger activeConnections = new AtomicInteger(0);</span>
+    private Semaphore connectionSemaphore;
+<span class="fc" id="L96">    private volatile boolean isShutdown = false;</span>
+    
+    // Add connection state tracking
+<span class="fc" id="L99">    private static final io.netty.util.AttributeKey&lt;AtomicBoolean&gt; CONNECTION_RETURNED = </span>
+<span class="fc" id="L100">        io.netty.util.AttributeKey.valueOf(&quot;connectionReturned&quot;);</span>
+<span class="fc" id="L101">    private static final io.netty.util.AttributeKey&lt;Long&gt; CONNECTION_CREATED_TIME = </span>
+<span class="fc" id="L102">        io.netty.util.AttributeKey.valueOf(&quot;connectionCreatedTime&quot;);</span>
+<span class="fc" id="L103">    private static final io.netty.util.AttributeKey&lt;Long&gt; CONNECTION_LAST_USED_TIME = </span>
+<span class="fc" id="L104">        io.netty.util.AttributeKey.valueOf(&quot;connectionLastUsedTime&quot;);</span>
+<span class="fc" id="L105">    private static final io.netty.util.AttributeKey&lt;CompletableFuture&lt;String&gt;&gt; RESPONSE_FUTURE =</span>
+<span class="fc" id="L106">        io.netty.util.AttributeKey.valueOf(&quot;responseFuture&quot;);</span>
+<span class="fc" id="L107">    private static final io.netty.util.AttributeKey&lt;ScheduledFuture&lt;?&gt;&gt; RESPONSE_TIMEOUT_FUTURE =</span>
+<span class="fc" id="L108">        io.netty.util.AttributeKey.valueOf(&quot;responseTimeoutFuture&quot;);</span>
+
+    /**
+     * Default constructor for Spring dependency injection.
+     * Spring will inject values via @Value annotations and call @PostConstruct.
+     */
+<span class="fc" id="L114">    public SimpleNettyHsmClient() {</span>
+        // Empty constructor - Spring will handle initialization via @PostConstruct
+<span class="fc" id="L116">    }</span>
+
+    @PostConstruct
+    public void initialize() {
+<span class="fc" id="L120">        this.connectionSemaphore = new Semaphore(maxConnections);</span>
+<span class="fc" id="L121">        initializeNetty();</span>
+<span class="fc" id="L122">        startIdleConnectionCleanup();</span>
+<span class="fc" id="L123">        logger.info(&quot;SimpleNettyHsmClient initialized with host: {}, port: {}, p12Path: {}, testOnBorrow: {}, maxIdleTime: {}ms&quot;, </span>
+<span class="fc" id="L124">                   host, port, p12Path, testOnBorrow, maxIdleTime);</span>
+<span class="fc" id="L125">    }</span>
+    
+    /**
+     * Starts a periodic task to cleanup idle connections from the pool.
+     */
+    private void startIdleConnectionCleanup() {
+<span class="pc bpc" id="L131" title="2 of 4 branches missed.">        if (eventLoopGroup != null &amp;&amp; !eventLoopGroup.isShutdown()) {</span>
+<span class="fc" id="L132">            eventLoopGroup.scheduleAtFixedRate(() -&gt; {</span>
+<span class="nc bnc" id="L133" title="All 2 branches missed.">                if (!isShutdown) {</span>
+<span class="nc" id="L134">                    cleanupIdleConnections();</span>
+                }
+<span class="nc" id="L136">            }, 30, 30, TimeUnit.SECONDS);</span>
+<span class="fc" id="L137">            logger.info(&quot;Started idle connection cleanup task (runs every 30 seconds)&quot;);</span>
+        }
+<span class="fc" id="L139">    }</span>
+    
+    /**
+     * Cleans up idle or stale connections from the pool.
+     */
+    private void cleanupIdleConnections() {
+        try {
+<span class="fc" id="L146">            int initialSize = connectionPool.size();</span>
+<span class="fc" id="L147">            int removedCount = 0;</span>
+            
+            // Create a temporary list to hold valid connections
+<span class="fc" id="L150">            ConcurrentLinkedQueue&lt;Channel&gt; validConnections = new ConcurrentLinkedQueue&lt;&gt;();</span>
+            
+            Channel channel;
+<span class="fc bfc" id="L153" title="All 2 branches covered.">            while ((channel = connectionPool.poll()) != null) {</span>
+<span class="fc bfc" id="L154" title="All 2 branches covered.">                if (isConnectionValid(channel)) {</span>
+                    // Connection is still valid, keep it
+<span class="fc" id="L156">                    validConnections.offer(channel);</span>
+                } else {
+                    // Connection is stale, close it
+<span class="fc" id="L159">                    logger.debug(&quot;Removing stale connection from pool (age: {}ms, idle: {}ms)&quot;, </span>
+<span class="fc" id="L160">                        getConnectionAge(channel), getConnectionIdleTime(channel));</span>
+<span class="fc" id="L161">                    closeConnection(channel);</span>
+<span class="fc" id="L162">                    removedCount++;</span>
+                }
+            }
+            
+            // Put valid connections back into the pool
+            Channel validChannel;
+<span class="fc bfc" id="L168" title="All 2 branches covered.">            while ((validChannel = validConnections.poll()) != null) {</span>
+<span class="fc" id="L169">                connectionPool.offer(validChannel);</span>
+            }
+            
+<span class="fc bfc" id="L172" title="All 2 branches covered.">            if (removedCount &gt; 0) {</span>
+<span class="fc" id="L173">                logger.info(&quot;Cleaned up {} stale connections from pool (pool size: {} -&gt; {})&quot;, </span>
+<span class="fc" id="L174">                    removedCount, initialSize, connectionPool.size());</span>
+            } else {
+<span class="fc" id="L176">                logger.debug(&quot;Idle connection cleanup: no stale connections found (pool size: {})&quot;, </span>
+<span class="fc" id="L177">                    connectionPool.size());</span>
+            }
+            
+<span class="nc" id="L180">        } catch (Exception e) {</span>
+<span class="nc" id="L181">            logger.error(&quot;Error during idle connection cleanup: {}&quot;, e.getMessage(), e);</span>
+<span class="fc" id="L182">        }</span>
+<span class="fc" id="L183">    }</span>
+    
+    /**
+     * Constructs a SimpleNettyHsmClient with default settings.
+     */
+    public SimpleNettyHsmClient(String host, int port, String p12Path, String p12Password) {
+<span class="fc" id="L189">        this(host, port, p12Path, p12Password, DEFAULT_MAX_CONNECTIONS, DEFAULT_TIMEOUT);</span>
+<span class="fc" id="L190">    }</span>
+    
+    /**
+     * Constructs a SimpleNettyHsmClient with custom settings.
+     */
+    public SimpleNettyHsmClient(String host, int port, String p12Path, String p12Password,
+<span class="fc" id="L196">                               int maxConnections, int timeout) {</span>
+<span class="fc" id="L197">        this.host = host;</span>
+<span class="fc" id="L198">        this.port = port;</span>
+<span class="fc" id="L199">        this.p12Path = p12Path;</span>
+<span class="fc" id="L200">        this.p12Password = p12Password;</span>
+<span class="fc" id="L201">        this.maxConnections = maxConnections;</span>
+<span class="fc" id="L202">        this.timeout = timeout;</span>
+<span class="fc" id="L203">        this.connectionSemaphore = new Semaphore(maxConnections);</span>
+        
+<span class="fc" id="L205">        initializeNetty();</span>
+<span class="fc" id="L206">    }</span>
+    
+    /**
+     * Initializes Netty components.
+     */
+    private void initializeNetty() {
+        try {
+<span class="fc" id="L213">            eventLoopGroup = new NioEventLoopGroup();</span>
+            
+            // Create SSL context
+<span class="fc" id="L216">            sslContext = createSslContext();</span>
+            
+            // Create bootstrap
+<span class="fc" id="L219">            bootstrap = new Bootstrap();</span>
+<span class="fc" id="L220">            bootstrap.group(eventLoopGroup)</span>
+<span class="fc" id="L221">                    .channel(NioSocketChannel.class)</span>
+<span class="fc" id="L222">                    .option(ChannelOption.CONNECT_TIMEOUT_MILLIS, timeout)</span>
+<span class="fc" id="L223">                    .option(ChannelOption.SO_KEEPALIVE, true)</span>
+<span class="fc" id="L224">                    .option(ChannelOption.TCP_NODELAY, true)</span>
+<span class="fc" id="L225">                    .handler(new ChannelInitializer&lt;SocketChannel&gt;() {</span>
+                        @Override
+                        protected void initChannel(SocketChannel ch) {
+<span class="fc" id="L228">                            ChannelPipeline pipeline = ch.pipeline();</span>
+                            
+                            // Add SSL handler if SSL is enabled
+<span class="pc bpc" id="L231" title="1 of 2 branches missed.">                            if (sslContext != null) {</span>
+<span class="fc" id="L232">                                pipeline.addLast(sslContext.newHandler(ch.alloc(), host, port));</span>
+                            }
+                            
+                            // Add simple handler for echo protocol
+<span class="fc" id="L236">                            pipeline.addLast(new SimpleHsmHandler());</span>
+<span class="fc" id="L237">                        }</span>
+                    });
+            
+<span class="fc" id="L240">            logger.info(&quot;Simple Netty HSM client initialized for {}:{}&quot;, host, port);</span>
+            
+<span class="fc" id="L242">        } catch (Exception e) {</span>
+<span class="fc" id="L243">            logger.error(&quot;Failed to initialize Netty client: {}&quot;, e.getMessage());</span>
+<span class="fc" id="L244">            throw new RuntimeException(&quot;Failed to initialize Netty client&quot;, e);</span>
+<span class="fc" id="L245">        }</span>
+<span class="fc" id="L246">    }</span>
+    
+    /**
+     * Creates SSL context from PKCS#12 certificate.
+     */
+    private SslContext createSslContext() throws Exception {
+        // Check if certificate path is empty or file doesn't exist
+<span class="pc bpc" id="L253" title="1 of 4 branches missed.">        if (p12Path == null || p12Path.trim().isEmpty()) {</span>
+<span class="fc" id="L254">            logger.info(&quot;No certificate path provided. Using trust-all SSL context without client certificate.&quot;);</span>
+<span class="fc" id="L255">            return createTrustAllSslContext();</span>
+        }
+        
+        // Load PKCS#12 keystore from either filesystem path (Docker/EC2) or classpath resource (local/dev).
+<span class="fc" id="L259">        try (InputStream in = openP12InputStream(p12Path)) {</span>
+<span class="fc" id="L260">            KeyStore keyStore = KeyStore.getInstance(&quot;PKCS12&quot;);</span>
+<span class="fc" id="L261">            keyStore.load(in, p12Password.toCharArray());</span>
+        
+<span class="fc bfc" id="L263" title="All 2 branches covered.">            for (String alias : java.util.Collections.list(keyStore.aliases())) {</span>
+<span class="fc" id="L264">                Certificate cert = keyStore.getCertificate(alias);</span>
+
+<span class="pc bpc" id="L266" title="1 of 2 branches missed.">                if (cert instanceof X509Certificate) {</span>
+<span class="fc" id="L267">                    X509Certificate x509Cert = (X509Certificate) cert;</span>
+
+<span class="fc" id="L269">                    logger.info(&quot;Loaded HSM client certificate alias={}, subject={}, issuer={}, validFrom={}, validTo={}&quot;,</span>
+                            alias,
+<span class="fc" id="L271">                            x509Cert.getSubjectDN(),</span>
+<span class="fc" id="L272">                            x509Cert.getIssuerDN(),</span>
+<span class="fc" id="L273">                            x509Cert.getNotBefore(),</span>
+<span class="fc" id="L274">                            x509Cert.getNotAfter());</span>
+                }
+<span class="fc" id="L276">            }</span>
+            // Create KeyManager for client authentication
+<span class="fc" id="L278">            javax.net.ssl.KeyManagerFactory kmf = javax.net.ssl.KeyManagerFactory.getInstance(&quot;SunX509&quot;);</span>
+<span class="fc" id="L279">            kmf.init(keyStore, p12Password.toCharArray());</span>
+
+            // Build Netty SSL context with client certificate
+<span class="fc" id="L282">            return SslContextBuilder.forClient()</span>
+<span class="fc" id="L283">                    .keyManager(kmf)</span>
+<span class="fc" id="L284">                    .trustManager(InsecureTrustManagerFactory.INSTANCE)</span>
+<span class="fc" id="L285">                    .build();</span>
+        }
+    }
+
+    private InputStream openP12InputStream(String configuredPath) throws Exception {
+<span class="fc" id="L290">        String normalizedPath = configuredPath.trim();</span>
+
+<span class="fc" id="L292">        File certFile = new File(normalizedPath);</span>
+<span class="fc bfc" id="L293" title="All 2 branches covered.">        if (certFile.isFile()) {</span>
+<span class="fc" id="L294">            logger.info(&quot;Loading HSM client certificate from filesystem path: {}&quot;, certFile.getAbsolutePath());</span>
+<span class="fc" id="L295">            return new FileInputStream(certFile);</span>
+        }
+
+<span class="pc bpc" id="L298" title="1 of 2 branches missed.">        String classpathPath = normalizedPath.startsWith(&quot;classpath:&quot;)</span>
+<span class="fc" id="L299">                ? normalizedPath.substring(&quot;classpath:&quot;.length())</span>
+<span class="pc" id="L300">                : normalizedPath;</span>
+<span class="pc bpc" id="L301" title="1 of 2 branches missed.">        while (classpathPath.startsWith(&quot;/&quot;)) {</span>
+<span class="nc" id="L302">            classpathPath = classpathPath.substring(1);</span>
+        }
+
+<span class="fc" id="L305">        InputStream classpathResource = getClass().getClassLoader().getResourceAsStream(classpathPath);</span>
+<span class="fc bfc" id="L306" title="All 2 branches covered.">        if (classpathResource != null) {</span>
+<span class="fc" id="L307">            logger.info(&quot;Loading HSM client certificate from classpath resource: {}&quot;, classpathPath);</span>
+<span class="fc" id="L308">            return classpathResource;</span>
+        }
+
+<span class="fc" id="L311">        throw new IllegalStateException(&quot;HSM client certificate not found at filesystem path or classpath resource: &quot; + configuredPath);</span>
+    }
+    
+    /**
+     * Creates a trust-all SSL context without client certificate.
+     * Used when certificate file is not available.
+     */
+    private SslContext createTrustAllSslContext() throws Exception {
+<span class="fc" id="L319">        logger.info(&quot;Creating trust-all SSL context without client certificate&quot;);</span>
+        
+        // Create trust-all TrustManager to ignore server certificate validation
+<span class="fc" id="L322">        javax.net.ssl.TrustManager[] trustAllCerts = new javax.net.ssl.TrustManager[] {</span>
+<span class="fc" id="L323">            new javax.net.ssl.X509TrustManager() {</span>
+                public java.security.cert.X509Certificate[] getAcceptedIssuers() {
+<span class="nc" id="L325">                    return new java.security.cert.X509Certificate[0];</span>
+                }
+                public void checkClientTrusted(java.security.cert.X509Certificate[] certs, String authType) {
+                    // Trust all client certificates
+<span class="nc" id="L329">                }</span>
+                public void checkServerTrusted(java.security.cert.X509Certificate[] certs, String authType) {
+                    // Trust all server certificates
+<span class="nc" id="L332">                }</span>
+            }
+        };
+        
+        // Create SSL context with trust-all configuration only
+<span class="fc" id="L337">        javax.net.ssl.SSLContext sslContext = javax.net.ssl.SSLContext.getInstance(&quot;TLS&quot;);</span>
+<span class="fc" id="L338">        sslContext.init(null, trustAllCerts, new java.security.SecureRandom());</span>
+        
+        // Build Netty SSL context
+<span class="fc" id="L341">        return SslContextBuilder.forClient()</span>
+<span class="fc" id="L342">                .trustManager(InsecureTrustManagerFactory.INSTANCE)</span>
+<span class="fc" id="L343">                .build();</span>
+    }
+    
+    /**
+     * Gets a connection from the pool or creates a new one.
+     */
+    private CompletableFuture&lt;Channel&gt; getConnection() {
+<span class="fc" id="L350">        return getConnection(0);</span>
+    }
+    
+    /**
+     * Gets a connection from the pool or creates a new one with retry capability.
+     * 
+     * @param retryCount Number of retries attempted
+     */
+    private CompletableFuture&lt;Channel&gt; getConnection(int retryCount) {
+<span class="fc" id="L359">        CompletableFuture&lt;Channel&gt; future = new CompletableFuture&lt;&gt;();</span>
+        
+        // Check if client is shutdown
+<span class="pc bpc" id="L362" title="1 of 2 branches missed.">        if (isShutdown) {</span>
+<span class="nc" id="L363">            future.completeExceptionally(new IllegalStateException(&quot;Client is shutdown&quot;));</span>
+<span class="nc" id="L364">            return future;</span>
+        }
+        
+        // Check if event loop group is available
+<span class="pc bpc" id="L368" title="2 of 4 branches missed.">        if (eventLoopGroup == null || eventLoopGroup.isShutdown()) {</span>
+<span class="nc" id="L369">            future.completeExceptionally(new IllegalStateException(&quot;EventLoopGroup is not available&quot;));</span>
+<span class="nc" id="L370">            return future;</span>
+        }
+        
+        // Try to get from pool first
+<span class="fc" id="L374">        logger.debug(&quot;Getting connection from pool (pool size: {})&quot;, connectionPool.size());</span>
+<span class="fc" id="L375">        Channel pooledChannel = connectionPool.poll();</span>
+<span class="fc bfc" id="L376" title="All 2 branches covered.">        if (pooledChannel != null) {</span>
+            // Validate the connection before using it
+<span class="fc bfc" id="L378" title="All 2 branches covered.">            if (isConnectionValid(pooledChannel)) {</span>
+                // Update last used time
+<span class="fc" id="L380">                pooledChannel.attr(CONNECTION_LAST_USED_TIME).set(System.currentTimeMillis());</span>
+                
+                // Reset the connection state for reuse
+<span class="fc" id="L383">                AtomicBoolean returned = pooledChannel.attr(CONNECTION_RETURNED).get();</span>
+<span class="pc bpc" id="L384" title="1 of 2 branches missed.">                if (returned != null) {</span>
+<span class="fc" id="L385">                    returned.set(false);</span>
+                }
+                
+<span class="fc" id="L388">                logger.debug(&quot;Reusing pooled connection (age: {}ms, idle: {}ms) pooled channel size: {}&quot;, </span>
+<span class="fc" id="L389">                    getConnectionAge(pooledChannel), getConnectionIdleTime(pooledChannel), connectionPool.size());</span>
+<span class="fc" id="L390">                future.complete(pooledChannel);</span>
+<span class="fc" id="L391">                return future;</span>
+            } else {
+                // Connection is stale or invalid, close it and try again
+<span class="fc" id="L394">                logger.warn(&quot;Pooled connection is stale or invalid, discarding and getting new connection&quot;);</span>
+<span class="fc" id="L395">                closeConnection(pooledChannel);</span>
+                
+                // Retry with a new connection (limit retries to avoid infinite loop)
+<span class="pc bpc" id="L398" title="1 of 2 branches missed.">                if (retryCount &lt; 3) {</span>
+<span class="fc" id="L399">                    return getConnection(retryCount + 1);</span>
+                } else {
+                    // Force create new connection after retries
+<span class="nc" id="L402">                    logger.warn(&quot;Max retries reached for pooled connections, creating fresh connection&quot;);</span>
+                }
+            }
+        }
+        
+        // Create new connection if pool is empty or all pooled connections are invalid
+<span class="fc bfc" id="L408" title="All 2 branches covered.">        if (activeConnections.get() &lt; maxConnections) {</span>
+<span class="fc" id="L409">            createNewConnection(future);</span>
+        } else {
+            // Wait for available connection
+            try {
+<span class="fc" id="L413">                eventLoopGroup.schedule(() -&gt; {</span>
+<span class="pc bpc" id="L414" title="1 of 2 branches missed.">                    if (!future.isDone()) {</span>
+<span class="fc" id="L415">                        getConnection(retryCount).thenAccept(future::complete)</span>
+<span class="fc" id="L416">                            .exceptionally(throwable -&gt; {</span>
+<span class="nc" id="L417">                                future.completeExceptionally(throwable);</span>
+<span class="nc" id="L418">                                return null;</span>
+                            });
+                    }
+<span class="fc" id="L421">                }, 100, TimeUnit.MILLISECONDS);</span>
+<span class="nc" id="L422">            } catch (RejectedExecutionException e) {</span>
+<span class="nc" id="L423">                future.completeExceptionally(new IllegalStateException(&quot;Executor not accepting tasks&quot;, e));</span>
+<span class="fc" id="L424">            }</span>
+        }
+        
+<span class="fc" id="L427">        return future;</span>
+    }
+    
+    /**
+     * Validates if a connection is still usable.
+     * Checks: active, writable, not too old, not idle too long, and optionally tests with echo.
+     * 
+     * @param channel The channel to validate
+     * @return true if connection is valid and usable
+     */
+    private boolean isConnectionValid(Channel channel) {
+<span class="pc bpc" id="L438" title="1 of 2 branches missed.">        if (channel == null) {</span>
+<span class="nc" id="L439">            return false;</span>
+        }
+        
+        // Check if channel is active and writable
+<span class="pc bpc" id="L443" title="2 of 6 branches missed.">        if (!channel.isActive() || !channel.isWritable() || !channel.isOpen()) {</span>
+<span class="fc" id="L444">            logger.debug(&quot;Connection validation failed: active={}, writable={}, open={}&quot;, </span>
+<span class="fc" id="L445">                channel.isActive(), channel.isWritable(), channel.isOpen());</span>
+<span class="fc" id="L446">            return false;</span>
+        }
+        
+<span class="fc" id="L449">        long now = System.currentTimeMillis();</span>
+        
+        // Check connection age
+<span class="fc" id="L452">        Long createdTime = channel.attr(CONNECTION_CREATED_TIME).get();</span>
+<span class="pc bpc" id="L453" title="1 of 4 branches missed.">        if (createdTime != null &amp;&amp; (now - createdTime) &gt; CONNECTION_MAX_AGE_MS) {</span>
+<span class="fc" id="L454">            logger.debug(&quot;Connection too old (age: {}ms), discarding&quot;, (now - createdTime));</span>
+<span class="fc" id="L455">            return false;</span>
+        }
+        
+        // Check idle time
+<span class="fc" id="L459">        Long lastUsedTime = channel.attr(CONNECTION_LAST_USED_TIME).get();</span>
+<span class="pc bpc" id="L460" title="1 of 2 branches missed.">        if (lastUsedTime != null) {</span>
+<span class="fc" id="L461">            long idleTime = now - lastUsedTime;</span>
+<span class="fc bfc" id="L462" title="All 2 branches covered.">            if (idleTime &gt; maxIdleTime) {</span>
+<span class="fc" id="L463">                logger.debug(&quot;Connection idle too long (idle: {}ms), discarding&quot;, idleTime);</span>
+<span class="fc" id="L464">                return false;</span>
+            }
+        }
+        
+        // If test-on-borrow is enabled, perform a quick validation
+<span class="pc bpc" id="L469" title="1 of 2 branches missed.">        if (testOnBorrow) {</span>
+<span class="nc" id="L470">            return validateConnectionWithEcho(channel);</span>
+        }
+        
+<span class="fc" id="L473">        return true;</span>
+    }
+    
+    /**
+     * Validates a connection by sending a quick echo command.
+     * This is a lightweight test to ensure the connection is responsive.
+     * 
+     * @param channel The channel to test
+     * @return true if the connection responds successfully
+     */
+    private boolean validateConnectionWithEcho(Channel channel) {
+        try {
+            // For test-on-borrow, we do a quick channel state check instead of full echo
+            // to avoid performance overhead. Full echo tests are done by keep-alive service.
+            // Just verify the channel can accept writes and hasn't been closed remotely
+<span class="nc bnc" id="L488" title="All 6 branches missed.">            return channel.isActive() &amp;&amp; channel.isOpen() &amp;&amp; channel.isWritable();</span>
+<span class="nc" id="L489">        } catch (Exception e) {</span>
+<span class="nc" id="L490">            logger.debug(&quot;Connection validation failed: {}&quot;, e.getMessage());</span>
+<span class="nc" id="L491">            return false;</span>
+        }
+    }
+    
+    /**
+     * Gets the age of a connection in milliseconds.
+     */
+    private long getConnectionAge(Channel channel) {
+<span class="fc" id="L499">        Long createdTime = channel.attr(CONNECTION_CREATED_TIME).get();</span>
+<span class="pc bpc" id="L500" title="1 of 2 branches missed.">        if (createdTime != null) {</span>
+<span class="fc" id="L501">            return System.currentTimeMillis() - createdTime;</span>
+        }
+<span class="nc" id="L503">        return 0;</span>
+    }
+    
+    /**
+     * Gets the idle time of a connection in milliseconds.
+     */
+    private long getConnectionIdleTime(Channel channel) {
+<span class="fc" id="L510">        Long lastUsedTime = channel.attr(CONNECTION_LAST_USED_TIME).get();</span>
+<span class="pc bpc" id="L511" title="1 of 2 branches missed.">        if (lastUsedTime != null) {</span>
+<span class="fc" id="L512">            return System.currentTimeMillis() - lastUsedTime;</span>
+        }
+<span class="nc" id="L514">        return 0;</span>
+    }
+    
+    /**
+     * Closes a connection and updates counters.
+     */
+    private void closeConnection(Channel channel) {
+<span class="pc bpc" id="L521" title="1 of 2 branches missed.">        if (channel != null) {</span>
+            try {
+<span class="fc" id="L523">                activeConnections.decrementAndGet();</span>
+<span class="fc" id="L524">                connectionSemaphore.release();</span>
+<span class="fc" id="L525">                unregisterConnectionFromKeepAlive(channel);</span>
+<span class="fc" id="L526">                channel.close();</span>
+<span class="fc" id="L527">                logger.debug(&quot;Closed connection. Active connections: {}&quot;, activeConnections.get());</span>
+<span class="nc" id="L528">            } catch (Exception e) {</span>
+<span class="nc" id="L529">                logger.warn(&quot;Error closing connection: {}&quot;, e.getMessage());</span>
+<span class="fc" id="L530">            }</span>
+        }
+<span class="fc" id="L532">    }</span>
+    
+    /**
+     * Creates a new connection.
+     */
+    private void createNewConnection(CompletableFuture&lt;Channel&gt; future) {
+        try {
+<span class="fc" id="L539">            connectionSemaphore.acquire();</span>
+<span class="fc" id="L540">            activeConnections.incrementAndGet();</span>
+            
+<span class="fc" id="L542">            bootstrap.connect(host, port).addListener((ChannelFutureListener) channelFuture -&gt; {</span>
+<span class="fc bfc" id="L543" title="All 2 branches covered.">                if (channelFuture.isSuccess()) {</span>
+<span class="fc" id="L544">                    Channel channel = channelFuture.channel();</span>
+                    
+                    // Set connection timestamps
+<span class="fc" id="L547">                    long now = System.currentTimeMillis();</span>
+<span class="fc" id="L548">                    channel.attr(CONNECTION_CREATED_TIME).set(now);</span>
+<span class="fc" id="L549">                    channel.attr(CONNECTION_LAST_USED_TIME).set(now);</span>
+<span class="fc" id="L550">                    channel.attr(CONNECTION_RETURNED).set(new AtomicBoolean(false));</span>
+                    
+<span class="fc" id="L552">                    logger.info(&quot;Created new connection to {}:{} (total active: {})&quot;, </span>
+<span class="fc" id="L553">                        host, port, activeConnections.get());</span>
+                    
+                    // Register connection with keep-alive service if available
+<span class="fc" id="L556">                    registerConnectionWithKeepAlive(channel);</span>
+                    
+<span class="fc" id="L558">                    future.complete(channel);</span>
+<span class="fc" id="L559">                } else {</span>
+<span class="fc" id="L560">                    activeConnections.decrementAndGet();</span>
+<span class="fc" id="L561">                    connectionSemaphore.release();</span>
+<span class="fc" id="L562">                    logger.error(&quot;Failed to create connection: {}&quot;, channelFuture.cause().getMessage());</span>
+<span class="fc" id="L563">                    future.completeExceptionally(channelFuture.cause());</span>
+                }
+<span class="fc" id="L565">            });</span>
+            
+<span class="nc" id="L567">        } catch (InterruptedException e) {</span>
+<span class="nc" id="L568">            Thread.currentThread().interrupt();</span>
+<span class="nc" id="L569">            future.completeExceptionally(e);</span>
+<span class="fc" id="L570">        }</span>
+<span class="fc" id="L571">    }</span>
+    
+    /**
+     * Returns a connection to the pool.
+     */
+    private void returnConnection(Channel channel) {
+<span class="pc bpc" id="L577" title="2 of 4 branches missed.">        if (channel != null &amp;&amp; channel.isActive()) {</span>
+            // Check if the connection has already been returned
+<span class="fc" id="L579">            AtomicBoolean returned = channel.attr(CONNECTION_RETURNED).get();</span>
+<span class="pc bpc" id="L580" title="1 of 2 branches missed.">            if (returned == null) {</span>
+<span class="nc" id="L581">                returned = new AtomicBoolean(false);</span>
+<span class="nc" id="L582">                channel.attr(CONNECTION_RETURNED).set(returned);</span>
+            }
+            
+<span class="pc bpc" id="L585" title="1 of 2 branches missed.">            if (returned.compareAndSet(false, true)) {</span>
+                // Update last used time before returning to pool
+<span class="fc" id="L587">                channel.attr(CONNECTION_LAST_USED_TIME).set(System.currentTimeMillis());</span>
+                
+                // Validate before returning to pool
+<span class="pc bpc" id="L590" title="1 of 2 branches missed.">                if (isConnectionValid(channel)) {</span>
+<span class="fc" id="L591">                    connectionPool.offer(channel);</span>
+<span class="fc" id="L592">                    logger.debug(&quot;Returned connection to pool. Pool size: {}, Active: {}&quot;, </span>
+<span class="fc" id="L593">                        connectionPool.size(), activeConnections.get());</span>
+                } else {
+                    // Don't return invalid connections to pool
+<span class="nc" id="L596">                    logger.debug(&quot;Connection validation failed on return, closing instead of pooling&quot;);</span>
+<span class="nc" id="L597">                    closeConnection(channel);</span>
+                }
+            } else {
+<span class="nc" id="L600">                logger.debug(&quot;Connection {} already returned, skipping return.&quot;, channel.remoteAddress());</span>
+            }
+<span class="fc" id="L602">        } else {</span>
+            // Connection is not active, close it properly
+<span class="nc" id="L604">            logger.debug(&quot;Connection not active on return, closing&quot;);</span>
+<span class="nc" id="L605">            closeConnection(channel);</span>
+        }
+<span class="fc" id="L607">    }</span>
+    
+    /**
+     * Sends a message asynchronously.
+     */
+    public CompletableFuture&lt;String&gt; sendMessageAsync(String message) {
+<span class="fc" id="L613">        return sendMessageAsyncWithRetry(message, 0);</span>
+    }
+    
+    /**
+     * Sends a message asynchronously with retry capability.
+     * 
+     * @param message The message to send
+     * @param retryCount Number of retries attempted
+     * @return CompletableFuture with the response
+     */
+    private CompletableFuture&lt;String&gt; sendMessageAsyncWithRetry(String message, int retryCount) {
+<span class="fc" id="L624">        CompletableFuture&lt;String&gt; responseFuture = new CompletableFuture&lt;&gt;();</span>
+        
+        // Check if client is shutdown
+<span class="fc bfc" id="L627" title="All 2 branches covered.">        if (isShutdown) {</span>
+<span class="fc" id="L628">            responseFuture.completeExceptionally(new IllegalStateException(&quot;Client is shutdown&quot;));</span>
+<span class="fc" id="L629">            return responseFuture;</span>
+        }
+        
+        // Check if event loop group is available
+<span class="pc bpc" id="L633" title="1 of 4 branches missed.">        if (eventLoopGroup == null || eventLoopGroup.isShutdown()) {</span>
+<span class="fc" id="L634">            responseFuture.completeExceptionally(new IllegalStateException(&quot;EventLoopGroup is not available&quot;));</span>
+<span class="fc" id="L635">            return responseFuture;</span>
+        }
+        
+<span class="fc" id="L638">        getConnection().thenAccept(channel -&gt; {</span>
+<span class="fc" id="L639">            logger.debug(&quot;Sending HSM request (attempt {})&quot;, (retryCount + 1));</span>
+            
+            // Verify channel is still valid before using
+<span class="pc bpc" id="L642" title="2 of 4 branches missed.">            if (!channel.isActive() || !channel.isWritable()) {</span>
+<span class="nc" id="L643">                logger.warn(&quot;Channel not ready for write (active: {}, writable: {}), getting new connection&quot;, </span>
+<span class="nc" id="L644">                    channel.isActive(), channel.isWritable());</span>
+<span class="nc" id="L645">                closeConnection(channel);</span>
+                
+                // Retry with a new connection if within retry limit
+<span class="nc bnc" id="L648" title="All 2 branches missed.">                if (retryCount &lt; 2) {</span>
+<span class="nc" id="L649">                    sendMessageAsyncWithRetry(message, retryCount + 1)</span>
+<span class="nc" id="L650">                        .thenAccept(responseFuture::complete)</span>
+<span class="nc" id="L651">                        .exceptionally(throwable -&gt; {</span>
+<span class="nc" id="L652">                            responseFuture.completeExceptionally(throwable);</span>
+<span class="nc" id="L653">                            return null;</span>
+                        });
+                } else {
+<span class="nc" id="L656">                    responseFuture.completeExceptionally(</span>
+                        new IllegalStateException(&quot;Channel not ready after retries&quot;));
+                }
+<span class="nc" id="L659">                return;</span>
+            }
+            
+            // Update connection activity with keep-alive service
+<span class="fc" id="L663">            updateConnectionActivity(channel);</span>
+<span class="fc" id="L664">            channel.attr(RESPONSE_FUTURE).set(responseFuture);</span>
+            
+            // Send message
+<span class="fc" id="L667">            ByteBuf messageBuf = Unpooled.copiedBuffer(message, java.nio.charset.StandardCharsets.UTF_8);</span>
+<span class="fc" id="L668">            channel.writeAndFlush(messageBuf).addListener((ChannelFutureListener) writeFuture -&gt; {</span>
+<span class="pc bpc" id="L669" title="1 of 2 branches missed.">                if (!writeFuture.isSuccess()) {</span>
+<span class="nc" id="L670">                    Throwable cause = writeFuture.cause();</span>
+<span class="nc" id="L671">                    logger.error(&quot;Failed to send message (attempt {}): {}&quot;, (retryCount + 1), cause.getMessage());</span>
+                    
+                    // Close the failed connection
+<span class="nc" id="L674">                    closeConnection(channel);</span>
+                    
+                    // Retry with a new connection if it's a connection issue and within retry limit
+<span class="nc bnc" id="L677" title="All 4 branches missed.">                    if (retryCount &lt; 2 &amp;&amp; isConnectionError(cause)) {</span>
+<span class="nc" id="L678">                        logger.info(&quot;Retrying with fresh connection due to connection error&quot;);</span>
+<span class="nc" id="L679">                        sendMessageAsyncWithRetry(message, retryCount + 1)</span>
+<span class="nc" id="L680">                            .thenAccept(responseFuture::complete)</span>
+<span class="nc" id="L681">                            .exceptionally(throwable -&gt; {</span>
+<span class="nc" id="L682">                                responseFuture.completeExceptionally(throwable);</span>
+<span class="nc" id="L683">                                return null;</span>
+                            });
+                    } else {
+<span class="nc" id="L686">                        responseFuture.completeExceptionally(cause);</span>
+                    }
+<span class="nc" id="L688">                    channel.attr(RESPONSE_FUTURE).set(null);</span>
+<span class="nc" id="L689">                    channel.attr(RESPONSE_TIMEOUT_FUTURE).set(null);</span>
+<span class="nc" id="L690">                } else {</span>
+<span class="fc" id="L691">                    logger.info(&quot;Message sent successfully to HSM (attempt {})&quot;, (retryCount + 1));</span>
+                }
+<span class="fc" id="L693">            });</span>
+            
+            // Set timeout and response handler
+<span class="fc" id="L696">            ScheduledFuture&lt;?&gt; timeoutFuture = channel.eventLoop().schedule(() -&gt; {</span>
+<span class="pc bpc" id="L697" title="1 of 2 branches missed.">                if (!responseFuture.isDone()) {</span>
+<span class="fc" id="L698">                    logger.warn(&quot;HSM response timeout (attempt {})&quot;, (retryCount + 1));</span>
+<span class="fc" id="L699">                    responseFuture.completeExceptionally(new TimeoutException(&quot;Response timeout&quot;));</span>
+<span class="fc" id="L700">                    channel.attr(RESPONSE_FUTURE).set(null);</span>
+<span class="fc" id="L701">                    channel.attr(RESPONSE_TIMEOUT_FUTURE).set(null);</span>
+<span class="fc" id="L702">                    closeConnection(channel);</span>
+                }
+<span class="fc" id="L704">            }, timeout, TimeUnit.MILLISECONDS);</span>
+<span class="fc" id="L705">            channel.attr(RESPONSE_TIMEOUT_FUTURE).set(timeoutFuture);</span>
+            
+<span class="fc" id="L707">        }).exceptionally(throwable -&gt; {</span>
+<span class="fc" id="L708">            logger.error(&quot;Connection acquisition failed (attempt {}): {}&quot;, (retryCount + 1), throwable.getMessage());</span>
+            
+            // Retry if within retry limit
+<span class="fc bfc" id="L711" title="All 2 branches covered.">            if (retryCount &lt; 2) {</span>
+<span class="fc" id="L712">                logger.info(&quot;Retrying connection acquisition&quot;);</span>
+<span class="fc" id="L713">                sendMessageAsyncWithRetry(message, retryCount + 1)</span>
+<span class="fc" id="L714">                    .thenAccept(responseFuture::complete)</span>
+<span class="fc" id="L715">                    .exceptionally(error -&gt; {</span>
+<span class="fc" id="L716">                        responseFuture.completeExceptionally(error);</span>
+<span class="fc" id="L717">                        return null;</span>
+                    });
+            } else {
+<span class="fc" id="L720">                responseFuture.completeExceptionally(throwable);</span>
+            }
+<span class="fc" id="L722">            return null;</span>
+        });
+        
+<span class="fc" id="L725">        return responseFuture;</span>
+    }
+    
+    /**
+     * Checks if an exception is a connection-related error that warrants retry.
+     * 
+     * @param throwable The exception to check
+     * @return true if it's a connection error
+     */
+    private boolean isConnectionError(Throwable throwable) {
+<span class="nc bnc" id="L735" title="All 2 branches missed.">        if (throwable == null) {</span>
+<span class="nc" id="L736">            return false;</span>
+        }
+        
+<span class="nc" id="L739">        String message = throwable.getMessage();</span>
+<span class="nc bnc" id="L740" title="All 2 branches missed.">        if (message != null) {</span>
+<span class="nc" id="L741">            message = message.toLowerCase();</span>
+<span class="nc bnc" id="L742" title="All 2 branches missed.">            return message.contains(&quot;connection&quot;) || </span>
+<span class="nc bnc" id="L743" title="All 2 branches missed.">                   message.contains(&quot;broken pipe&quot;) ||</span>
+<span class="nc bnc" id="L744" title="All 2 branches missed.">                   message.contains(&quot;socket closed&quot;) ||</span>
+<span class="nc bnc" id="L745" title="All 2 branches missed.">                   message.contains(&quot;channel closed&quot;) ||</span>
+<span class="nc bnc" id="L746" title="All 2 branches missed.">                   message.contains(&quot;reset by peer&quot;);</span>
+        }
+        
+<span class="nc bnc" id="L749" title="All 6 branches missed.">        return throwable instanceof java.io.IOException ||</span>
+               throwable instanceof java.net.SocketException ||
+               throwable instanceof ChannelException;
+    }
+    
+    /**
+     * Sends a message synchronously.
+     */
+    public String sendMessage(String message) throws Exception {
+        try {
+<span class="fc" id="L759">            logger.info(&quot;hsm cmd: {} &quot;,message);</span>
+<span class="fc" id="L760">            return sendMessageAsync(message).get(timeout, TimeUnit.MILLISECONDS);</span>
+<span class="nc" id="L761">        } catch (TimeoutException e) {</span>
+<span class="nc" id="L762">            logger.error(&quot;Request timeout: {}&quot;, e.getMessage());</span>
+<span class="nc" id="L763">            return null;</span>
+            //throw new IOException(&quot;Request timeout&quot;, e);
+<span class="fc" id="L765">        } catch (ExecutionException e) {</span>
+<span class="fc" id="L766">            logger.error(&quot;Communication failed: {}&quot;, e.getMessage());</span>
+<span class="fc" id="L767">            return null;</span>
+            //throw new IOException(&quot;Communication failed&quot;, e.getCause());
+        }
+    }
+    
+    /**
+     * Gets connection pool statistics.
+     */
+    public String getPoolStats() {
+<span class="fc" id="L776">        return String.format(&quot;Active: %d, Pooled: %d, Max: %d&quot;, </span>
+<span class="fc" id="L777">                           activeConnections.get(), connectionPool.size(), maxConnections);</span>
+    }
+
+    /** Number of open HSM connections (borrowed and idle). */
+    public int getTotalConnectionCount() {
+<span class="fc" id="L782">        return activeConnections.get();</span>
+    }
+
+    /** Number of connections currently available in the pool. */
+    public int getIdleConnectionCount() {
+<span class="fc" id="L787">        return connectionPool.size();</span>
+    }
+
+    /** Number of connections currently borrowed by callers. */
+    public int getBorrowedConnectionCount() {
+<span class="fc" id="L792">        return Math.max(0, activeConnections.get() - connectionPool.size());</span>
+    }
+
+    public int getMaxConnectionCount() {
+<span class="fc" id="L796">        return maxConnections;</span>
+    }
+
+    /** Number of callers waiting for a pool permit. */
+    public int getPendingConnectionCount() {
+<span class="fc bfc" id="L801" title="All 2 branches covered.">        return connectionSemaphore == null ? 0 : connectionSemaphore.getQueueLength();</span>
+    }
+    
+    /**
+     * Shuts down the client.
+     */
+    public void shutdown() {
+<span class="fc" id="L808">        logger.info(&quot;Shutting down Simple Netty HSM client&quot;);</span>
+<span class="fc" id="L809">        isShutdown = true;</span>
+        
+        // Close pooled connections
+        Channel channel;
+<span class="fc bfc" id="L813" title="All 2 branches covered.">        while ((channel = connectionPool.poll()) != null) {</span>
+            // Unregister from keep-alive service before closing
+<span class="fc" id="L815">            unregisterConnectionFromKeepAlive(channel);</span>
+<span class="fc" id="L816">            channel.close();</span>
+        }
+        
+        // Shutdown event loop group gracefully
+<span class="fc bfc" id="L820" title="All 4 branches covered.">        if (eventLoopGroup != null &amp;&amp; !eventLoopGroup.isShutdown()) {</span>
+            try {
+                // Wait for graceful shutdown
+<span class="fc" id="L823">                eventLoopGroup.shutdownGracefully(0, 5, TimeUnit.SECONDS).sync();</span>
+<span class="fc" id="L824">                logger.info(&quot;EventLoopGroup shutdown completed&quot;);</span>
+<span class="nc" id="L825">            } catch (InterruptedException e) {</span>
+<span class="nc" id="L826">                logger.warn(&quot;EventLoopGroup shutdown interrupted&quot;);</span>
+<span class="nc" id="L827">                Thread.currentThread().interrupt();</span>
+<span class="fc" id="L828">            }</span>
+        }
+        
+<span class="fc" id="L831">        logger.info(&quot;Simple Netty HSM client shutdown completed&quot;);</span>
+<span class="fc" id="L832">    }</span>
+    
+    /**
+     * Registers a connection with the keep-alive service.
+     * 
+     * @param channel The connection channel to register
+     */
+    private void registerConnectionWithKeepAlive(Channel channel) {
+<span class="fc bfc" id="L840" title="All 2 branches covered.">        if (keepAliveService != null) {</span>
+            try {
+<span class="fc" id="L842">                keepAliveService.registerConnection(channel);</span>
+<span class="fc" id="L843">                logger.debug(&quot;Registered connection {} with keep-alive service&quot;, channel.remoteAddress());</span>
+<span class="fc" id="L844">            } catch (Exception e) {</span>
+<span class="fc" id="L845">                logger.debug(&quot;Could not register connection with keep-alive service: {}&quot;, e.getMessage());</span>
+<span class="fc" id="L846">            }</span>
+        }
+<span class="fc" id="L848">    }</span>
+    
+    /**
+     * Unregisters a connection from the keep-alive service.
+     * 
+     * @param channel The connection channel to unregister
+     */
+    private void unregisterConnectionFromKeepAlive(Channel channel) {
+<span class="fc bfc" id="L856" title="All 2 branches covered.">        if (keepAliveService != null) {</span>
+            try {
+<span class="fc" id="L858">                keepAliveService.unregisterConnection(channel);</span>
+<span class="fc" id="L859">                logger.debug(&quot;Unregistered connection {} from keep-alive service&quot;, channel.remoteAddress());</span>
+<span class="fc" id="L860">            } catch (Exception e) {</span>
+<span class="fc" id="L861">                logger.debug(&quot;Could not unregister connection from keep-alive service: {}&quot;, e.getMessage());</span>
+<span class="fc" id="L862">            }</span>
+        }
+<span class="fc" id="L864">    }</span>
+    
+    /**
+     * Updates connection activity with the keep-alive service.
+     * 
+     * @param channel The connection channel that was used
+     */
+    private void updateConnectionActivity(Channel channel) {
+<span class="fc bfc" id="L872" title="All 2 branches covered.">        if (keepAliveService != null) {</span>
+            try {
+<span class="fc" id="L874">                keepAliveService.updateConnectionActivity(channel);</span>
+<span class="fc" id="L875">            } catch (Exception e) {</span>
+<span class="fc" id="L876">                logger.debug(&quot;Could not update connection activity with keep-alive service: {}&quot;, e.getMessage());</span>
+<span class="fc" id="L877">            }</span>
+        }
+<span class="fc" id="L879">    }</span>
+    
+    /**
+     * Sets the keep-alive service reference.
+     * This method will be called by Spring to inject the keep-alive service.
+     * 
+     * @param keepAliveService The keep-alive service instance
+     */
+    @Autowired(required = false)
+    public void setKeepAliveService(HsmKeepAliveServiceInterface keepAliveService) {
+<span class="fc" id="L889">        this.keepAliveService = keepAliveService;</span>
+<span class="fc bfc" id="L890" title="All 2 branches covered.">        if (keepAliveService != null) {</span>
+<span class="fc" id="L891">            logger.debug(&quot;Keep-alive service injected into SimpleNettyHsmClient&quot;);</span>
+        }
+<span class="fc" id="L893">    }</span>
+    
+    /**
+     * Simple channel handler for HSM communication.
+     */
+<span class="fc" id="L898">    private class SimpleHsmHandler extends SimpleChannelInboundHandler&lt;ByteBuf&gt; {</span>
+        
+        @Override
+        protected void channelRead0(ChannelHandlerContext ctx, ByteBuf msg) {
+<span class="fc" id="L902">            String response = msg.toString(java.nio.charset.StandardCharsets.UTF_8);</span>
+<span class="fc" id="L903">            logger.debug(&quot;Received HSM response&quot;);</span>
+
+<span class="fc" id="L905">            ScheduledFuture&lt;?&gt; timeoutFuture = ctx.channel().attr(RESPONSE_TIMEOUT_FUTURE).getAndSet(null);</span>
+<span class="pc bpc" id="L906" title="1 of 2 branches missed.">            if (timeoutFuture != null) {</span>
+<span class="fc" id="L907">                timeoutFuture.cancel(false);</span>
+            }
+
+<span class="fc" id="L910">            CompletableFuture&lt;String&gt; responseFuture = ctx.channel().attr(RESPONSE_FUTURE).getAndSet(null);</span>
+<span class="pc bpc" id="L911" title="2 of 4 branches missed.">            if (responseFuture != null &amp;&amp; !responseFuture.isDone()) {</span>
+<span class="fc" id="L912">                responseFuture.complete(response);</span>
+            }
+
+<span class="fc" id="L915">            returnConnection(ctx.channel());</span>
+<span class="fc" id="L916">        }</span>
+        
+        @Override
+        public void exceptionCaught(ChannelHandlerContext ctx, Throwable cause) {
+<span class="nc" id="L920">            logger.error(&quot;Channel exception: {}&quot;, cause.getMessage());</span>
+<span class="nc" id="L921">            ctx.close();</span>
+<span class="nc" id="L922">        }</span>
+        
+        @Override
+        public void channelActive(ChannelHandlerContext ctx) {
+<span class="fc" id="L926">            logger.info(&quot;Channel connected to HSM: {}&quot;, ctx.channel().remoteAddress());</span>
+<span class="fc" id="L927">        }</span>
+        
+        @Override
+        public void channelInactive(ChannelHandlerContext ctx) {
+<span class="fc" id="L931">            logger.info(&quot;Channel disconnected from HSM: {}&quot;, ctx.channel().remoteAddress());</span>
+<span class="fc" id="L932">        }</span>
+    }
+    
+    /**
+     * Example usage method.
+     */
+    public static void main(String[] args) {
+<span class="nc" id="L939">        String p12Path = &quot;src/main/resources/Falcon_Test-YY1T4ZOT.p12&quot;;</span>
+<span class="nc" id="L940">        String p12Password = &quot;Falcon@2025&quot;;</span>
+        
+<span class="nc" id="L942">        SimpleNettyHsmClient client = new SimpleNettyHsmClient(</span>
+            &quot;ap-india-central-crypto-uat.virtucrypt.com&quot;, 4121, p12Path, p12Password);
+        
+        try {
+            // Print initial pool stats
+<span class="nc" id="L947">            System.out.println(&quot;Initial Pool Stats: &quot; + client.getPoolStats());</span>
+            
+            // Test multiple async sends
+<span class="nc bnc" id="L950" title="All 2 branches missed.">            for (int i = 0; i &lt; 5; i++) {</span>
+<span class="nc" id="L951">                final int messageIndex = i;</span>
+<span class="nc" id="L952">                client.sendMessageAsync(&quot;[AOSKEY;]&quot;)  //Key status test</span>
+<span class="nc" id="L953">                    .thenAccept(response -&gt; {</span>
+<span class="nc" id="L954">                        System.out.println(&quot;Async Response &quot; + messageIndex + &quot;: &quot; + response);</span>
+<span class="nc" id="L955">                        System.out.println(&quot;Pool Stats after response &quot; + messageIndex + &quot;: &quot; + client.getPoolStats());</span>
+<span class="nc" id="L956">                    })</span>
+<span class="nc" id="L957">                    .exceptionally(throwable -&gt; {</span>
+<span class="nc" id="L958">                        System.err.println(&quot;Async Error &quot; + messageIndex + &quot;: &quot; + throwable.getCause().getMessage());</span>
+<span class="nc" id="L959">                        System.out.println(&quot;Pool Stats after error &quot; + messageIndex + &quot;: &quot; + client.getPoolStats());</span>
+<span class="nc" id="L960">                        return null;</span>
+                    });
+                
+                // Small delay between requests
+<span class="nc" id="L964">                Thread.sleep(1000);</span>
+            }
+            
+            // Wait for all responses
+<span class="nc" id="L968">            Thread.sleep(10000);</span>
+            
+            // Print final pool stats
+<span class="nc" id="L971">            System.out.println(&quot;Final Pool Stats: &quot; + client.getPoolStats());</span>
+            
+<span class="nc" id="L973">        } catch (Exception e) {</span>
+<span class="nc" id="L974">            logger.error(&quot;Communication error: {}&quot;, e.getMessage());</span>
+        } finally {
+<span class="nc" id="L976">            client.shutdown();</span>
+        }
+<span class="nc" id="L978">    }</span>
+} 
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.14.202510111229</span></div></body></html>

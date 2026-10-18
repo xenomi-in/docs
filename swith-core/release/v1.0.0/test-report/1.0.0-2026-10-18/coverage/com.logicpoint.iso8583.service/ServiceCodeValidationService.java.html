@@ -1,0 +1,395 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>ServiceCodeValidationService.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">iso8583-processor</a> &gt; <a href="index.source.html" class="el_package">com.logicpoint.iso8583.service</a> &gt; <span class="el_source">ServiceCodeValidationService.java</span></div><h1>ServiceCodeValidationService.java</h1><pre class="source lang-java linenums">package com.logicpoint.iso8583.service;
+
+import com.logicpoint.iso8583.entity.ServiceCode;
+import com.logicpoint.iso8583.repository.ServiceCodeRepository;
+import com.logicpoint.iso8583.util.Scheme;
+import com.logicpoint.iso8583.validation.ValidationResult;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.cache.annotation.Cacheable;
+import org.springframework.stereotype.Service;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+import com.logicpoint.iso8583.validation.TransactionType;
+
+import java.util.Arrays;
+import java.util.List;
+import java.util.Map;
+import java.util.ArrayList;
+import java.util.HashMap;
+import java.util.Optional;
+
+/**
+ * @author LogicPoint Systems
+ * Service for validating service codes based on payment schemes.
+ * Service codes determine card capabilities and transaction restrictions.
+ */
+@Service
+public class ServiceCodeValidationService {
+    
+<span class="fc" id="L29">    private static final Logger log = LoggerFactory.getLogger(ServiceCodeValidationService.class);</span>
+    
+    private final ServiceCodeRepository serviceCodeRepository;
+    //private final ResponseCodeMapper responseCodeMapper;
+    
+    /**
+     * Constructs the service with injected repository.
+     *
+     * @param serviceCodeRepository Service code repository
+     */
+    @Autowired
+    public ServiceCodeValidationService(
+            ServiceCodeRepository serviceCodeRepository
+            //ResponseCodeMapper responseCodeMapper
+<span class="fc" id="L43">            ) {</span>
+<span class="fc" id="L44">        this.serviceCodeRepository = serviceCodeRepository;</span>
+        //this.responseCodeMapper = responseCodeMapper;
+<span class="fc" id="L46">    }</span>
+    
+    /**
+     * Validates service code for a transaction.
+     * 
+     * @param serviceCode The 3-digit service code
+     * @param scheme The payment scheme
+     * @param transactionType The transaction type
+     * @param transactionData The transaction data
+     * @return ValidationResult with validation status
+     */
+    @Cacheable(value = &quot;serviceCodeCache&quot;, key = &quot;#serviceCode + '_' + #scheme.name() + '_' + #transactionType.name()&quot;)
+    public ValidationResult validateServiceCode(
+            String serviceCode,
+            Scheme scheme,
+            TransactionType transactionType,
+            Map&lt;Integer, String&gt; transactionData) {
+        
+<span class="fc" id="L64">        log.debug(&quot;Validating service code: {} for scheme: {}, transactionType: {}&quot;, </span>
+            serviceCode, scheme, transactionType);
+        
+        // Basic validation
+<span class="pc bpc" id="L68" title="2 of 4 branches missed.">        if (serviceCode == null || serviceCode.trim().isEmpty()) {</span>
+<span class="nc" id="L69">            log.warn(&quot;Service code is null or empty&quot;);</span>
+<span class="nc" id="L70">            return createFailureResult(&quot;INVALID_SERVICE_CODE: Service code is required&quot;, scheme, transactionType);</span>
+        }
+        
+<span class="pc bpc" id="L73" title="1 of 2 branches missed.">        if (!serviceCode.matches(&quot;\\d{3}&quot;)) {</span>
+<span class="nc" id="L74">            log.warn(&quot;Invalid service code format: {}&quot;, serviceCode);</span>
+<span class="nc" id="L75">            return createFailureResult(&quot;INVALID_SERVICE_CODE: Service code must be 3 digits&quot;, scheme, transactionType);</span>
+        }
+        
+<span class="fc" id="L78">        Optional&lt;ServiceCode&gt; serviceCodeConfig = findServiceCodeConfig(serviceCode, scheme);</span>
+        
+<span class="pc bpc" id="L80" title="1 of 2 branches missed.">        if (serviceCodeConfig.isEmpty()) {</span>
+<span class="nc" id="L81">            log.warn(&quot;Service code not found: {} for scheme: {}&quot;, serviceCode, scheme);</span>
+<span class="nc" id="L82">            return createFailureResult(&quot;INVALID_SERVICE_CODE: Service code not supported&quot;, scheme, transactionType);</span>
+        }
+        
+<span class="fc" id="L85">        ServiceCode config = serviceCodeConfig.get();</span>
+        
+        // Validate service code capabilities
+<span class="fc" id="L88">        ValidationResult capabilityResult = validateServiceCodeCapabilities(config, transactionData, transactionType);</span>
+<span class="pc bpc" id="L89" title="1 of 2 branches missed.">        if (!capabilityResult.isValid()) {</span>
+<span class="nc" id="L90">            return capabilityResult;</span>
+        }
+        
+        // Validate transaction restrictions
+<span class="fc" id="L94">        ValidationResult restrictionResult = validateTransactionRestrictions(config, transactionType, transactionData);</span>
+<span class="pc bpc" id="L95" title="1 of 2 branches missed.">        if (!restrictionResult.isValid()) {</span>
+<span class="nc" id="L96">            return restrictionResult;</span>
+        }
+        
+<span class="fc" id="L99">        log.debug(&quot;Service code validation successful: {}&quot;, serviceCode);</span>
+<span class="fc" id="L100">        return new ValidationResult(new ArrayList&lt;&gt;(), new ArrayList&lt;&gt;());</span>
+    }
+
+    private Optional&lt;ServiceCode&gt; findServiceCodeConfig(String serviceCode, Scheme scheme) {
+<span class="fc" id="L104">        Optional&lt;ServiceCode&gt; configuredServiceCode = serviceCodeRepository.findByServiceCodeAndScheme(</span>
+<span class="fc" id="L105">            serviceCode, scheme.name());</span>
+<span class="pc bpc" id="L106" title="1 of 2 branches missed.">        if (configuredServiceCode.isPresent()) {</span>
+<span class="nc" id="L107">            return configuredServiceCode;</span>
+        }
+
+<span class="pc bpc" id="L110" title="1 of 2 branches missed.">        if (scheme == Scheme.RUPAY) {</span>
+<span class="fc" id="L111">            return deriveStandardRuPayServiceCode(serviceCode);</span>
+        }
+
+<span class="nc" id="L114">        return Optional.empty();</span>
+    }
+
+    private Optional&lt;ServiceCode&gt; deriveStandardRuPayServiceCode(String serviceCode) {
+<span class="fc" id="L118">        char interchange = serviceCode.charAt(0);</span>
+<span class="fc" id="L119">        char authorizationProcessing = serviceCode.charAt(1);</span>
+<span class="fc" id="L120">        char rangeOfServices = serviceCode.charAt(2);</span>
+
+<span class="pc bpc" id="L122" title="1 of 2 branches missed.">        if (!isKnownInterchangeQualifier(interchange)</span>
+<span class="pc bpc" id="L123" title="1 of 2 branches missed.">                || !isKnownAuthorizationProcessing(authorizationProcessing)</span>
+<span class="pc bpc" id="L124" title="1 of 2 branches missed.">                || !isKnownRangeOfServices(rangeOfServices)) {</span>
+<span class="nc" id="L125">            return Optional.empty();</span>
+        }
+
+<span class="fc" id="L128">        ServiceCode config = new ServiceCode(serviceCode, Scheme.RUPAY.name());</span>
+<span class="fc" id="L129">        config.setInterchangeQualifier(String.valueOf(interchange));</span>
+<span class="fc" id="L130">        config.setAuthorizationProcessing(String.valueOf(authorizationProcessing));</span>
+<span class="fc" id="L131">        config.setRangeOfServices(String.valueOf(rangeOfServices));</span>
+<span class="fc" id="L132">        config.setDescription(&quot;Derived standard RuPay service code&quot;);</span>
+<span class="pc bpc" id="L133" title="2 of 4 branches missed.">        config.setIsInternational(interchange == '1' || interchange == '2');</span>
+<span class="pc bpc" id="L134" title="3 of 4 branches missed.">        config.setIsChip(interchange == '2' || interchange == '6');</span>
+<span class="pc bpc" id="L135" title="1 of 2 branches missed.">        config.setIsMagneticStripe(interchange != '6');</span>
+<span class="fc" id="L136">        config.setIsContactless(false);</span>
+<span class="pc bpc" id="L137" title="4 of 8 branches missed.">        config.setIsOnlinePin(rangeOfServices == '0' || rangeOfServices == '3'</span>
+                || rangeOfServices == '5' || rangeOfServices == '6');
+<span class="fc" id="L139">        config.setIsOfflinePin(false);</span>
+<span class="pc bpc" id="L140" title="5 of 8 branches missed.">        config.setIsSignature(rangeOfServices == '1' || rangeOfServices == '2'</span>
+                || rangeOfServices == '6' || rangeOfServices == '7');
+<span class="fc" id="L142">        config.setIsNoCvm(false);</span>
+<span class="fc" id="L143">        config.setIsActive(true);</span>
+<span class="fc" id="L144">        return Optional.of(config);</span>
+    }
+
+    private boolean isKnownInterchangeQualifier(char digit) {
+<span class="pc bpc" id="L148" title="10 of 12 branches missed.">        return digit == '1' || digit == '2' || digit == '5'</span>
+                || digit == '6' || digit == '7' || digit == '9';
+    }
+
+    private boolean isKnownAuthorizationProcessing(char digit) {
+<span class="pc bpc" id="L153" title="6 of 8 branches missed.">        return digit == '0' || digit == '2' || digit == '4' || digit == '6';</span>
+    }
+
+    private boolean isKnownRangeOfServices(char digit) {
+<span class="pc bpc" id="L157" title="2 of 4 branches missed.">        return digit &gt;= '0' &amp;&amp; digit &lt;= '7';</span>
+    }
+    
+    /**
+     * Validates service code capabilities against transaction requirements.
+     *
+     * @param config Service code configuration
+     * @param transactionData Transaction data
+     * @param transactionType Transaction type
+     * @return Validation result
+     */
+    private ValidationResult validateServiceCodeCapabilities(ServiceCode config, Map&lt;Integer, String&gt; transactionData,TransactionType transactionType) {
+<span class="fc" id="L169">        String posEntryMode = transactionData.get(22); // POS Entry Mode</span>
+<span class="fc" id="L170">        String posConditionCode = transactionData.get(25); // POS Condition Code</span>
+        
+        // Check contactless capability
+<span class="pc bpc" id="L173" title="3 of 4 branches missed.">        if (isContactlessTransaction(posEntryMode, posConditionCode) &amp;&amp; !config.getIsContactless()) {</span>
+<span class="nc" id="L174">            log.warn(&quot;Contactless transaction attempted with non-contactless card: {}&quot;, config.getServiceCode());</span>
+<span class="nc" id="L175">            return createFailureResult(&quot;INVALID_SERVICE_CODE: Card does not support contactless&quot;, </span>
+<span class="nc" id="L176">                Scheme.valueOf(config.getScheme()), transactionType);</span>
+        }
+        
+        // Check chip capability
+<span class="pc bpc" id="L180" title="2 of 4 branches missed.">        if (isChipTransaction(posEntryMode) &amp;&amp; !config.getIsChip()) {</span>
+<span class="nc" id="L181">            log.warn(&quot;Chip transaction attempted with non-chip card: {}&quot;, config.getServiceCode());</span>
+<span class="nc" id="L182">            return createFailureResult(&quot;INVALID_SERVICE_CODE: Card does not support chip&quot;, </span>
+<span class="nc" id="L183">                Scheme.valueOf(config.getScheme()), transactionType);</span>
+        }
+        
+        // Check magnetic stripe capability
+<span class="pc bpc" id="L187" title="3 of 4 branches missed.">        if (isMagneticStripeTransaction(posEntryMode) &amp;&amp; !config.getIsMagneticStripe()) {</span>
+<span class="nc" id="L188">            log.warn(&quot;Magnetic stripe transaction attempted with non-magnetic stripe card: {}&quot;, config.getServiceCode());</span>
+<span class="nc" id="L189">            return createFailureResult(&quot;INVALID_SERVICE_CODE: Card does not support magnetic stripe&quot;, </span>
+<span class="nc" id="L190">                Scheme.valueOf(config.getScheme()), transactionType);</span>
+        }
+        
+<span class="fc" id="L193">        return new ValidationResult(new ArrayList&lt;&gt;(), new ArrayList&lt;&gt;());</span>
+    }
+    
+    /**
+     * Validates transaction restrictions based on service code.
+     *
+     * @param config Service code configuration
+     * @param transactionType Transaction type
+     * @param transactionData Transaction data
+     * @return Validation result
+     */
+    private ValidationResult validateTransactionRestrictions(ServiceCode config, TransactionType transactionType, 
+                                                        Map&lt;Integer, String&gt; transactionData) {
+        
+        // Check international transaction restrictions
+<span class="pc bpc" id="L208" title="3 of 4 branches missed.">        if (isInternationalTransaction(transactionData) &amp;&amp; !config.getIsInternational()) {</span>
+<span class="nc" id="L209">            log.warn(&quot;International transaction attempted with domestic-only card: {}&quot;, config.getServiceCode());</span>
+<span class="nc" id="L210">            return createFailureResult(&quot;INVALID_SERVICE_CODE: Card does not support international transactions&quot;, </span>
+<span class="nc" id="L211">                Scheme.valueOf(config.getScheme()), transactionType);</span>
+        }
+        
+        // Check CVM (Cardholder Verification Method) requirements
+<span class="fc" id="L215">        ValidationResult cvmResult = validateCvmRequirements(config, transactionData);</span>
+<span class="pc bpc" id="L216" title="1 of 2 branches missed.">        if (!cvmResult.isValid()) {</span>
+<span class="nc" id="L217">            return cvmResult;</span>
+        }
+        
+<span class="fc" id="L220">        return new ValidationResult(new ArrayList&lt;&gt;(), new ArrayList&lt;&gt;());</span>
+    }
+    
+    /**
+     * Validates CVM requirements based on service code.
+     *
+     * @param config Service code configuration
+     * @param transactionData Transaction data
+     * @return Validation result
+     */
+    private ValidationResult validateCvmRequirements(ServiceCode config, Map&lt;Integer, String&gt; transactionData) {
+<span class="fc" id="L231">        String posEntryMode = transactionData.get(22);</span>
+<span class="fc" id="L232">        String posConditionCode = transactionData.get(25);</span>
+        
+        // Check if PIN is required but not supported
+<span class="pc bpc" id="L235" title="1 of 2 branches missed.">        if (isPinRequired(posEntryMode, posConditionCode)) {</span>
+<span class="nc bnc" id="L236" title="All 4 branches missed.">            if (!config.getIsOnlinePin() &amp;&amp; !config.getIsOfflinePin()) {</span>
+<span class="nc" id="L237">                log.warn(&quot;PIN required but card does not support PIN: {}&quot;, config.getServiceCode());</span>
+<span class="nc" id="L238">                return createFailureResult(&quot;INVALID_SERVICE_CODE: Card does not support PIN&quot;, </span>
+<span class="nc" id="L239">                    Scheme.valueOf(config.getScheme()), TransactionType.PURCHASE);</span>
+            }
+        }
+        
+        // Check if signature is required but not supported
+<span class="pc bpc" id="L244" title="1 of 2 branches missed.">        if (isSignatureRequired(posEntryMode, posConditionCode)) {</span>
+<span class="nc bnc" id="L245" title="All 2 branches missed.">            if (!config.getIsSignature()) {</span>
+<span class="nc" id="L246">                log.warn(&quot;Signature required but card does not support signature: {}&quot;, config.getServiceCode());</span>
+<span class="nc" id="L247">                return createFailureResult(&quot;INVALID_SERVICE_CODE: Card does not support signature&quot;, </span>
+<span class="nc" id="L248">                    Scheme.valueOf(config.getScheme()), TransactionType.PURCHASE);</span>
+            }
+        }
+        
+<span class="fc" id="L252">        return new ValidationResult(new ArrayList&lt;&gt;(), new ArrayList&lt;&gt;());</span>
+    }
+    
+    /**
+     * Determines if transaction is contactless.
+     *
+     * @param posEntryMode POS entry mode
+     * @param posConditionCode POS condition code
+     * @return true if contactless
+     */
+    private boolean isContactlessTransaction(String posEntryMode, String posConditionCode) {
+<span class="pc bpc" id="L263" title="1 of 2 branches missed.">        if (posEntryMode == null) return false;</span>
+        
+        // Contactless entry modes: 07, 91
+<span class="pc bpc" id="L266" title="2 of 4 branches missed.">        return posEntryMode.equals(&quot;07&quot;) || posEntryMode.equals(&quot;91&quot;) || </span>
+<span class="pc bpc" id="L267" title="2 of 4 branches missed.">               (posEntryMode.length() &gt;= 2 &amp;&amp; posEntryMode.substring(0, 2).equals(&quot;07&quot;));</span>
+    }
+    
+    /**
+     * Determines if transaction is chip-based.
+     *
+     * @param posEntryMode POS entry mode
+     * @return true if chip-based
+     */
+    private boolean isChipTransaction(String posEntryMode) {
+<span class="pc bpc" id="L277" title="1 of 2 branches missed.">        if (posEntryMode == null) return false;</span>
+        
+        // Chip entry modes: 05, 07, 95
+<span class="pc bpc" id="L280" title="3 of 6 branches missed.">        return posEntryMode.equals(&quot;05&quot;) || posEntryMode.equals(&quot;07&quot;) || posEntryMode.equals(&quot;95&quot;) ||</span>
+<span class="pc bpc" id="L281" title="1 of 2 branches missed.">               (posEntryMode.length() &gt;= 2 &amp;&amp; </span>
+<span class="pc bpc" id="L282" title="3 of 4 branches missed.">                (posEntryMode.substring(0, 2).equals(&quot;05&quot;) || posEntryMode.substring(0, 2).equals(&quot;07&quot;)));</span>
+    }
+    
+    /**
+     * Determines if transaction is magnetic stripe-based.
+     *
+     * @param posEntryMode POS entry mode
+     * @return true if magnetic stripe
+     */
+    private boolean isMagneticStripeTransaction(String posEntryMode) {
+<span class="pc bpc" id="L292" title="1 of 2 branches missed.">        if (posEntryMode == null) return false;</span>
+        
+        // Magnetic stripe entry modes: 01, 02
+<span class="pc bpc" id="L295" title="2 of 4 branches missed.">        return posEntryMode.equals(&quot;01&quot;) || posEntryMode.equals(&quot;02&quot;) ||</span>
+<span class="pc bpc" id="L296" title="1 of 2 branches missed.">               (posEntryMode.length() &gt;= 2 &amp;&amp; </span>
+<span class="pc bpc" id="L297" title="2 of 4 branches missed.">                (posEntryMode.substring(0, 2).equals(&quot;01&quot;) || posEntryMode.substring(0, 2).equals(&quot;02&quot;)));</span>
+    }
+    
+    /**
+     * Determines if transaction is international.
+     *
+     * @param transactionData Transaction data
+     * @return true if international
+     */
+    private boolean isInternationalTransaction(Map&lt;Integer, String&gt; transactionData) {
+<span class="fc" id="L307">        String acquiringCountry = transactionData.get(19); // Acquiring Country Code</span>
+<span class="fc" id="L308">        String panCountry = transactionData.get(20); // PAN Extended Country Code</span>
+        
+        // Simple logic - in real implementation, you'd check against card's country
+<span class="pc bpc" id="L311" title="5 of 6 branches missed.">        return acquiringCountry != null &amp;&amp; panCountry != null &amp;&amp; !acquiringCountry.equals(panCountry);</span>
+    }
+    
+    /**
+     * Determines if PIN is required.
+     *
+     * @param posEntryMode POS entry mode
+     * @param posConditionCode POS condition code
+     * @return true if PIN required
+     */
+    private boolean isPinRequired(String posEntryMode, String posConditionCode) {
+        // PIN required for ATM transactions (01) and some POS transactions
+<span class="pc bpc" id="L323" title="2 of 4 branches missed.">        return &quot;01&quot;.equals(posEntryMode) || &quot;02&quot;.equals(posEntryMode);</span>
+    }
+    
+    /**
+     * Determines if signature is required.
+     *
+     * @param posEntryMode POS entry mode
+     * @param posConditionCode POS condition code
+     * @return true if signature required
+     */
+    private boolean isSignatureRequired(String posEntryMode, String posConditionCode) {
+        // Signature typically required for manual entry and some POS transactions
+<span class="pc bpc" id="L335" title="2 of 4 branches missed.">        return &quot;01&quot;.equals(posEntryMode) || &quot;03&quot;.equals(posEntryMode);</span>
+    }
+    
+    /**
+     * Creates failure result with scheme-specific response code.
+     *
+     * @param error Error message
+     * @param scheme Payment scheme
+     * @param transactionType Transaction type
+     * @return Failure validation result
+     */
+    private ValidationResult createFailureResult(String error, Scheme scheme, TransactionType transactionType) {
+        //ResponseCodeMapper.ResponseCodeMapping mapping = responseCodeMapper.mapErrorToResponseCode(
+        //    error, scheme, transactionType);
+        
+<span class="nc" id="L350">        return new ValidationResult(new ArrayList&lt;&gt;(Arrays.asList(error)), new ArrayList&lt;&gt;());</span>
+    }
+    
+    /**
+     * Gets service code information.
+     *
+     * @param serviceCode Service code
+     * @param scheme Scheme
+     * @return Optional service code info
+     */
+    @Cacheable(value = &quot;serviceCodeCache&quot;, key = &quot;#serviceCode + '_' + #scheme&quot;)
+    public Optional&lt;ServiceCode&gt; getServiceCodeInfo(String serviceCode, String scheme) {
+<span class="nc" id="L362">        return serviceCodeRepository.findByServiceCodeAndScheme(serviceCode, scheme);</span>
+    }
+    
+    /**
+     * Gets all service codes for a scheme.
+     *
+     * @param scheme Scheme
+     * @return List of service codes
+     */
+    public List&lt;ServiceCode&gt; getServiceCodesByScheme(String scheme) {
+<span class="nc" id="L372">        return serviceCodeRepository.findBySchemeAndIsActiveTrue(scheme);</span>
+    }
+    
+    /**
+     * Gets contactless service codes for a scheme.
+     *
+     * @param scheme Scheme
+     * @return List of contactless service codes
+     */
+    public List&lt;ServiceCode&gt; getContactlessServiceCodes(String scheme) {
+<span class="nc" id="L382">        return serviceCodeRepository.findContactlessByScheme(scheme);</span>
+    }
+    
+    /**
+     * Gets chip service codes for a scheme.
+     *
+     * @param scheme Scheme
+     * @return List of chip service codes
+     */
+    public List&lt;ServiceCode&gt; getChipServiceCodes(String scheme) {
+<span class="nc" id="L392">        return serviceCodeRepository.findChipByScheme(scheme);</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.14.202510111229</span></div></body></html>

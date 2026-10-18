@@ -1,0 +1,114 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>TokenAuthorizationValidationService.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">iso8583-processor</a> &gt; <a href="index.source.html" class="el_package">com.logicpoint.iso8583.service</a> &gt; <span class="el_source">TokenAuthorizationValidationService.java</span></div><h1>TokenAuthorizationValidationService.java</h1><pre class="source lang-java linenums">package com.logicpoint.iso8583.service;
+
+import com.logicpoint.iso8583.config.TokenAuthorizationProperties;
+import com.logicpoint.iso8583.context.RequestContext;
+import com.logicpoint.iso8583.util.Scheme;
+import com.logicpoint.iso8583.validation.TransactionType;
+import java.util.ArrayList;
+import java.util.List;
+import java.util.Map;
+import java.util.Set;
+import org.springframework.stereotype.Service;
+
+/**
+ * Validates tokenized ISO8583 authorization indicators without depending on TSP APIs.
+ */
+@Service
+public class TokenAuthorizationValidationService {
+
+    public static final String ATTR_TOKENIZED_AUTHORIZATION = &quot;tokenized_authorization&quot;;
+    public static final String ATTR_TOKEN_VALIDATION_RESULT = &quot;token_validation_result&quot;;
+
+    private final TokenAuthorizationProperties properties;
+
+<span class="fc" id="L24">    public TokenAuthorizationValidationService(TokenAuthorizationProperties properties) {</span>
+<span class="fc" id="L25">        this.properties = properties;</span>
+<span class="fc" id="L26">    }</span>
+
+    public List&lt;String&gt; validate(RequestContext requestContext, Scheme scheme, TransactionType transactionType) {
+<span class="fc" id="L29">        List&lt;String&gt; errors = new ArrayList&lt;&gt;();</span>
+<span class="pc bpc" id="L30" title="4 of 8 branches missed.">        if (!properties.isEnabled() || requestContext == null || scheme == null || transactionType == null) {</span>
+<span class="nc" id="L31">            return errors;</span>
+        }
+
+<span class="fc" id="L34">        TokenAuthorizationProperties.SchemeRule rule = properties.getRule(scheme.name());</span>
+<span class="pc bpc" id="L35" title="1 of 6 branches missed.">        if (rule == null || !rule.isEnabled() || !rule.getTransactionTypes().contains(transactionType)) {</span>
+<span class="fc" id="L36">            return errors;</span>
+        }
+
+<span class="fc" id="L39">        boolean tokenized = isTokenized(requestContext, rule);</span>
+<span class="fc" id="L40">        requestContext.setAttribute(ATTR_TOKENIZED_AUTHORIZATION, tokenized);</span>
+<span class="pc bpc" id="L41" title="1 of 4 branches missed.">        if (!tokenized &amp;&amp; !rule.isValidateWhenTokenDataPresent()) {</span>
+<span class="fc" id="L42">            return errors;</span>
+        }
+
+<span class="fc" id="L45">        String tokenData = requestContext.getFields().get(rule.getTokenDataField());</span>
+<span class="fc bfc" id="L46" title="All 2 branches covered.">        if (isBlank(tokenData)) {</span>
+<span class="pc bpc" id="L47" title="2 of 4 branches missed.">            if (tokenized &amp;&amp; rule.isRequireTokenValidationResult()) {</span>
+<span class="fc" id="L48">                errors.add(&quot;MISSING_TOKEN_DATA: DE&quot; + rule.getTokenDataField()</span>
+                        + &quot; is required for tokenized &quot; + scheme + &quot; &quot; + transactionType);
+            }
+<span class="fc" id="L51">            return errors;</span>
+        }
+
+        Map&lt;String, String&gt; tokenTags;
+        try {
+<span class="fc" id="L56">            tokenTags = requestContext.getParsedTlv(rule.getTokenDataField());</span>
+<span class="fc" id="L57">        } catch (Exception ex) {</span>
+<span class="fc" id="L58">            errors.add(&quot;INVALID_TOKEN_DATA_FORMAT: Unable to parse DE&quot; + rule.getTokenDataField()</span>
+                    + &quot; token data as TLV&quot;);
+<span class="fc" id="L60">            return errors;</span>
+<span class="fc" id="L61">        }</span>
+
+<span class="fc" id="L63">        String tokenValidationResult = normalize(tokenTags.get(rule.getTokenValidationResultTag()));</span>
+<span class="fc" id="L64">        requestContext.setAttribute(ATTR_TOKEN_VALIDATION_RESULT, tokenValidationResult);</span>
+<span class="fc bfc" id="L65" title="All 2 branches covered.">        if (isBlank(tokenValidationResult)) {</span>
+<span class="fc" id="L66">            errors.add(&quot;MISSING_TOKEN_VALIDATION_RESULT: DE&quot; + rule.getTokenDataField()</span>
+<span class="fc" id="L67">                    + &quot; tag &quot; + rule.getTokenValidationResultTag()</span>
+                    + &quot; is required when token data is present for &quot; + scheme + &quot; &quot; + transactionType);
+<span class="fc" id="L69">            return errors;</span>
+        }
+
+<span class="pc bpc" id="L72" title="1 of 2 branches missed.">        if (!isBlank(tokenValidationResult)) {</span>
+<span class="fc" id="L73">            validateTokenResult(rule, tokenValidationResult, errors);</span>
+        }
+
+<span class="fc" id="L76">        return errors;</span>
+    }
+
+    private boolean isTokenized(RequestContext requestContext, TokenAuthorizationProperties.SchemeRule rule) {
+<span class="fc" id="L80">        String posData = requestContext.getFields().get(rule.getPosDataField());</span>
+<span class="fc" id="L81">        int position = rule.getTokenIndicatorPosition();</span>
+<span class="pc bpc" id="L82" title="3 of 6 branches missed.">        if (isBlank(posData) || position &lt; 0 || position &gt;= posData.length()) {</span>
+<span class="nc" id="L83">            return false;</span>
+        }
+<span class="fc" id="L85">        String indicator = String.valueOf(posData.charAt(position)).toUpperCase();</span>
+<span class="fc" id="L86">        return rule.getTokenIndicatorValues().contains(indicator);</span>
+    }
+
+    private void validateTokenResult(TokenAuthorizationProperties.SchemeRule rule,
+                                     String tokenValidationResult,
+                                     List&lt;String&gt; errors) {
+<span class="fc" id="L92">        Set&lt;String&gt; approvedValues = rule.getApprovedTokenValidationValues();</span>
+<span class="fc" id="L93">        Set&lt;String&gt; declinedValues = rule.getDeclinedTokenValidationValues();</span>
+<span class="fc bfc" id="L94" title="All 2 branches covered.">        if (declinedValues.contains(tokenValidationResult)) {</span>
+<span class="fc" id="L95">            errors.add(&quot;TOKEN_VALIDATION_FAILED: Token validation result &quot; + tokenValidationResult</span>
+                    + &quot; indicates token validation failure&quot;);
+<span class="fc" id="L97">            return;</span>
+        }
+
+<span class="pc bpc" id="L100" title="1 of 4 branches missed.">        if (!approvedValues.isEmpty() &amp;&amp; !approvedValues.contains(tokenValidationResult)) {</span>
+<span class="fc" id="L101">            errors.add(&quot;INVALID_TOKEN_VALIDATION_RESULT: Token validation result &quot; + tokenValidationResult</span>
+                    + &quot; is not configured as an approved value&quot;);
+        }
+<span class="fc" id="L104">    }</span>
+
+    private String normalize(String value) {
+<span class="fc bfc" id="L107" title="All 2 branches covered.">        return isBlank(value) ? null : value.trim().toUpperCase();</span>
+    }
+
+    private boolean isBlank(String value) {
+<span class="pc bpc" id="L111" title="1 of 4 branches missed.">        return value == null || value.trim().isEmpty();</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.14.202510111229</span></div></body></html>

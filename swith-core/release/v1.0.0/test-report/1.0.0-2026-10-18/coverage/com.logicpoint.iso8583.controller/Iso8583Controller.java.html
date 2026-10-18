@@ -1,0 +1,267 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>Iso8583Controller.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">iso8583-processor</a> &gt; <a href="index.source.html" class="el_package">com.logicpoint.iso8583.controller</a> &gt; <span class="el_source">Iso8583Controller.java</span></div><h1>Iso8583Controller.java</h1><pre class="source lang-java linenums">package com.logicpoint.iso8583.controller;
+
+import com.logicpoint.iso8583.model.Iso8583Message;
+import com.logicpoint.iso8583.model.DownstreamHealthResponse;
+import com.logicpoint.iso8583.config.RawDataLogging;
+import com.logicpoint.iso8583.service.Iso8583ProcessorService;
+import com.logicpoint.iso8583.service.RoutingHealthCheckService;
+import io.swagger.v3.oas.annotations.Operation;
+import io.swagger.v3.oas.annotations.Parameter;
+import io.swagger.v3.oas.annotations.media.Content;
+import io.swagger.v3.oas.annotations.media.Schema;
+import io.swagger.v3.oas.annotations.responses.ApiResponse;
+import io.swagger.v3.oas.annotations.responses.ApiResponses;
+import io.swagger.v3.oas.annotations.tags.Tag;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.http.ResponseEntity;
+import org.springframework.scheduling.annotation.Async;
+import org.springframework.web.bind.annotation.*;
+import org.springframework.util.StringUtils;
+
+import java.util.HashMap;
+import java.util.Map;
+import java.util.concurrent.CompletableFuture;
+/*
+ * The controller uses asynchronous processing with CompletableFuture to handle high throughput.
+ * It validates incoming ISO 8583 messages, routes them to appropriate processors based on transaction type,
+ * and handles responses asynchronously using Spring's @Async capabilities.
+ * The controller also exposes health check endpoints for monitoring service status.
+ */
+@RestController
+@RequestMapping(&quot;/api/v1/iso8583&quot;)
+@Tag(name = &quot;ISO 8583 Message Processing&quot;, description = &quot;APIs for processing ISO 8583 financial messages&quot;)
+public class Iso8583Controller {
+
+<span class="fc" id="L37">    private static final Logger log = LoggerFactory.getLogger(Iso8583Controller.class);</span>
+    private final Iso8583ProcessorService processorService;
+    private final RoutingHealthCheckService routingHealthCheckService;
+
+    /**
+     * Constructs the controller with injected processor service.
+     *
+     * @param processorService The ISO8583 processor service
+     */
+    @Autowired
+    public Iso8583Controller(Iso8583ProcessorService processorService,
+<span class="fc" id="L48">                             RoutingHealthCheckService routingHealthCheckService) {</span>
+<span class="fc" id="L49">        this.processorService = processorService;</span>
+<span class="fc" id="L50">        this.routingHealthCheckService = routingHealthCheckService;</span>
+<span class="fc" id="L51">    }</span>
+
+    /**
+     * Processes an ISO 8583 message asynchronously.
+     *
+     * @param request The ISO8583 message request
+     * @param apiVersion API version header (default 1.0)
+     * @return CompletableFuture with response entity
+     */
+    @PostMapping(&quot;/transaction&quot;)
+    @Operation(
+        summary = &quot;Process ISO 8583 message&quot;,
+        description = &quot;Processes an ISO 8583 financial message and returns the response&quot;
+    )
+    @ApiResponses(value = {
+        @ApiResponse(
+            responseCode = &quot;200&quot;,
+            description = &quot;Message processed successfully&quot;,
+            content = @Content(schema = @Schema(implementation = Iso8583Message.class))
+        ),
+        @ApiResponse(
+            responseCode = &quot;400&quot;,
+            description = &quot;Invalid message format&quot;
+        ),
+        @ApiResponse(
+            responseCode = &quot;500&quot;,
+            description = &quot;Internal server error&quot;
+        )
+    })
+    @Async(&quot;iso8583TxnExecutor&quot;)
+    public CompletableFuture&lt;ResponseEntity&lt;Iso8583Message&gt;&gt; processMessage(
+            @Parameter(description = &quot;ISO 8583 message to process&quot;, required = true)
+            @RequestBody Iso8583Message request,
+            @RequestHeader(value = &quot;X-API-Version&quot;, defaultValue = &quot;1.0&quot;) String apiVersion,
+            @RequestHeader(value = &quot;X-Site-Id&quot;, required = false) String siteId,
+            @RequestHeader(value = &quot;X-Listener-Id&quot;, required = false) String listenerId,
+            @RequestHeader(value = &quot;X-Connection-Id&quot;, required = false) String connectionId,
+            @RequestHeader Map&lt;String, String&gt; headers) {
+<span class="fc" id="L89">        enrichRequestMetadata(request, siteId, listenerId, connectionId, headers);</span>
+<span class="fc" id="L90">        log.info(&quot;Received ISO8583 request mti={} txnId={} apiVersion={}&quot;,</span>
+<span class="fc bfc" id="L91" title="All 2 branches covered.">                request == null ? null : request.getMti(),</span>
+<span class="fc bfc" id="L92" title="All 2 branches covered.">                request == null ? null : request.getUniqueTransactionId(), apiVersion);</span>
+<span class="fc" id="L93">        RawDataLogging.value(&quot;Inbound ISO8583 transaction&quot;, request);</span>
+<span class="fc" id="L94">        return processorService.processMessage(request)</span>
+<span class="fc" id="L95">                .thenApply(ResponseEntity::ok)</span>
+<span class="fc" id="L96">                .exceptionally(throwable -&gt; {</span>
+<span class="fc" id="L97">                    log.error(&quot;Error processing message&quot;, throwable);</span>
+<span class="fc" id="L98">                    return ResponseEntity.internalServerError().build();</span>
+                });
+    }
+
+    /**
+     * Health check endpoint.
+     *
+     * @return ResponseEntity with health status
+     */
+    @GetMapping(&quot;/health&quot;)
+    @Operation(
+        summary = &quot;Health check endpoint&quot;,
+        description = &quot;Returns the health status of the ISO 8583 processing service&quot;
+    )
+    @ApiResponses(value = {
+        @ApiResponse(
+            responseCode = &quot;200&quot;,
+            description = &quot;Service is healthy&quot;
+        )
+    })
+    public ResponseEntity&lt;String&gt; healthCheck() {
+<span class="fc" id="L119">        return ResponseEntity.ok(&quot;ISO 8583 Processing Service is healthy&quot;);</span>
+    }
+
+    @GetMapping(&quot;/health/routing&quot;)
+    @Operation(
+        summary = &quot;Routing readiness endpoint&quot;,
+        description = &quot;Returns machine-readable readiness so the upstream listener can decide whether to route transactions&quot;
+    )
+    @ApiResponses(value = {
+        @ApiResponse(
+            responseCode = &quot;200&quot;,
+            description = &quot;Service is routable&quot;,
+            content = @Content(schema = @Schema(implementation = DownstreamHealthResponse.class))
+        ),
+        @ApiResponse(
+            responseCode = &quot;503&quot;,
+            description = &quot;Service is not routable&quot;,
+            content = @Content(schema = @Schema(implementation = DownstreamHealthResponse.class))
+        )
+    })
+    public ResponseEntity&lt;DownstreamHealthResponse&gt; routingHealthCheck() {
+<span class="fc" id="L140">        DownstreamHealthResponse response = routingHealthCheckService.getRoutingHealth();</span>
+<span class="fc bfc" id="L141" title="All 2 branches covered.">        return response.isRoutable()</span>
+<span class="fc" id="L142">                ? ResponseEntity.ok(response)</span>
+<span class="fc" id="L143">                : ResponseEntity.status(503).body(response);</span>
+    }
+
+    /**
+     * Gets the service version.
+     *
+     * @return ResponseEntity with version string
+     */
+    @GetMapping(&quot;/version&quot;)
+    public ResponseEntity&lt;String&gt; getVersion() {
+<span class="fc" id="L153">        return ResponseEntity.ok(&quot;1.0.0&quot;);</span>
+    }
+    /**
+     * Handles the ISO 8583 network message for dynamic key exchange.
+     * This endpoint can be used by network participants to exchange keys.
+     *
+     * @param request The incoming ISO8583 message containing the key exchange data
+     * @return The response ISO8583 message with the result of the key exchange
+     */
+    @PostMapping(&quot;/key-exchange/{scheme}&quot;)
+    @Operation(
+        summary = &quot;Network message handler for dynamic key exchange&quot;,
+        description = &quot;Processes an ISO8583 network message to facilitate dynamic key exchange&quot;
+    )
+    @ApiResponses(value = {
+        @ApiResponse(
+            responseCode = &quot;200&quot;,
+            description = &quot;Key exchange processed successfully&quot;
+        ),
+        @ApiResponse(
+            responseCode = &quot;400&quot;,
+            description = &quot;Bad request or key exchange error&quot;
+        ),
+        @ApiResponse(
+            responseCode = &quot;500&quot;,
+            description = &quot;Internal server error&quot;
+        )
+    })
+    public ResponseEntity&lt;Iso8583Message&gt; handleKeyExchange(
+            @Parameter(description = &quot;Network ISO8583 key exchange message&quot;, required = true)
+            @RequestBody Iso8583Message request,
+            @PathVariable(value = &quot;scheme&quot;) String scheme,
+            @RequestHeader(value = &quot;X-API-Version&quot;, defaultValue = &quot;1.0&quot;) String apiVersion,
+            @RequestHeader(value = &quot;X-Site-Id&quot;, required = false) String siteId,
+            @RequestHeader(value = &quot;X-Listener-Id&quot;, required = false) String listenerId,
+            @RequestHeader(value = &quot;X-Connection-Id&quot;, required = false) String connectionId,
+            @RequestHeader Map&lt;String, String&gt; headers) {
+<span class="fc" id="L190">        enrichRequestMetadata(request, siteId, listenerId, connectionId, headers);</span>
+<span class="fc" id="L191">        log.info(&quot;Received network key exchange mti={} txnId={} scheme={} apiVersion={}&quot;,</span>
+<span class="fc bfc" id="L192" title="All 2 branches covered.">                request == null ? null : request.getMti(),</span>
+<span class="fc bfc" id="L193" title="All 2 branches covered.">                request == null ? null : request.getUniqueTransactionId(), scheme, apiVersion);</span>
+<span class="fc" id="L194">        RawDataLogging.value(&quot;Inbound ISO8583 network key exchange&quot;, request);</span>
+        try {
+<span class="fc" id="L196">            Iso8583Message response = processorService.processNetworkKeyExchange(request, scheme);</span>
+<span class="fc" id="L197">            return ResponseEntity.ok(response);</span>
+<span class="fc" id="L198">        } catch (IllegalArgumentException ex) {</span>
+<span class="fc" id="L199">            log.error(&quot;Key exchange failed due to bad request: {}&quot;, ex.getMessage());</span>
+<span class="fc" id="L200">            return ResponseEntity.badRequest().build();</span>
+<span class="fc" id="L201">        } catch (Exception ex) {</span>
+<span class="fc" id="L202">            log.error(&quot;Internal error during dynamic key exchange&quot;, ex);</span>
+<span class="fc" id="L203">            return ResponseEntity.internalServerError().build();</span>
+        }
+    }
+
+    private void enrichRequestMetadata(Iso8583Message request,
+                                       String siteId,
+                                       String listenerId,
+                                       String connectionId,
+                                       Map&lt;String, String&gt; headers) {
+<span class="fc bfc" id="L212" title="All 2 branches covered.">        if (request == null) {</span>
+<span class="fc" id="L213">            return;</span>
+        }
+
+<span class="pc bpc" id="L216" title="1 of 2 branches missed.">        Map&lt;String, String&gt; metadata = request.getMetadata() == null</span>
+<span class="nc" id="L217">                ? new HashMap&lt;&gt;()</span>
+<span class="fc" id="L218">                : new HashMap&lt;&gt;(request.getMetadata());</span>
+
+<span class="fc" id="L220">        putIfAbsent(metadata, &quot;site_id&quot;, firstNonBlank(</span>
+                siteId,
+<span class="fc" id="L222">                resolveHeader(headers, &quot;X-Site-Id&quot;, &quot;site_id&quot;, &quot;site-id&quot;, &quot;siteid&quot;)</span>
+        ));
+<span class="fc" id="L224">        putIfAbsent(metadata, &quot;listener_id&quot;, firstNonBlank(</span>
+                listenerId,
+<span class="fc" id="L226">                resolveHeader(headers, &quot;X-Listener-Id&quot;, &quot;listener_id&quot;, &quot;listener-id&quot;, &quot;listenerid&quot;)</span>
+        ));
+<span class="fc" id="L228">        putIfAbsent(metadata, &quot;connection_id&quot;, firstNonBlank(</span>
+                connectionId,
+<span class="fc" id="L230">                resolveHeader(headers, &quot;X-Connection-Id&quot;, &quot;connection_id&quot;, &quot;connection-id&quot;, &quot;connectionid&quot;, &quot;tcp_connection_id&quot;, &quot;tcp-connection-id&quot;)</span>
+        ));
+<span class="fc" id="L232">        request.setMetadata(metadata);</span>
+<span class="fc" id="L233">    }</span>
+
+    private void putIfAbsent(Map&lt;String, String&gt; metadata, String key, String value) {
+<span class="pc bpc" id="L236" title="1 of 6 branches missed.">        if (value != null &amp;&amp; !value.isBlank() &amp;&amp; !metadata.containsKey(key)) {</span>
+<span class="fc" id="L237">            metadata.put(key, value);</span>
+        }
+<span class="fc" id="L239">    }</span>
+
+    private String firstNonBlank(String... values) {
+<span class="pc bpc" id="L242" title="1 of 2 branches missed.">        if (values == null) {</span>
+<span class="nc" id="L243">            return null;</span>
+        }
+<span class="fc bfc" id="L245" title="All 2 branches covered.">        for (String value : values) {</span>
+<span class="fc bfc" id="L246" title="All 2 branches covered.">            if (StringUtils.hasText(value)) {</span>
+<span class="fc" id="L247">                return value;</span>
+            }
+        }
+<span class="fc" id="L250">        return null;</span>
+    }
+
+    private String resolveHeader(Map&lt;String, String&gt; headers, String... names) {
+<span class="pc bpc" id="L254" title="1 of 6 branches missed.">        if (headers == null || headers.isEmpty() || names == null) {</span>
+<span class="fc" id="L255">            return null;</span>
+        }
+<span class="fc bfc" id="L257" title="All 2 branches covered.">        for (String name : names) {</span>
+<span class="fc bfc" id="L258" title="All 2 branches covered.">            for (Map.Entry&lt;String, String&gt; entry : headers.entrySet()) {</span>
+<span class="pc bpc" id="L259" title="2 of 6 branches missed.">                if (entry.getKey() != null &amp;&amp; entry.getKey().equalsIgnoreCase(name) &amp;&amp; StringUtils.hasText(entry.getValue())) {</span>
+<span class="fc" id="L260">                    return entry.getValue();</span>
+                }
+<span class="fc" id="L262">            }</span>
+        }
+<span class="fc" id="L264">        return null;</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.14.202510111229</span></div></body></html>

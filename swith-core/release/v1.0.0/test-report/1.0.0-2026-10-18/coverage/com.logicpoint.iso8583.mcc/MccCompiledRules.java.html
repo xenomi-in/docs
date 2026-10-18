@@ -1,0 +1,72 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>MccCompiledRules.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">iso8583-processor</a> &gt; <a href="index.source.html" class="el_package">com.logicpoint.iso8583.mcc</a> &gt; <span class="el_source">MccCompiledRules.java</span></div><h1>MccCompiledRules.java</h1><pre class="source lang-java linenums">package com.logicpoint.iso8583.mcc;
+
+final class MccCompiledRules {
+<span class="fc" id="L4">    static final MccCompiledRules EMPTY = new MccCompiledRules(</span>
+            new int[0],
+            new int[0],
+            new long[0],
+            new long[0],
+            new int[0],
+            new int[0],
+            new int[0]
+    );
+
+    private final int[] ruleIds;
+    private final int[] opcodes;
+    private final long[] longArg0;
+    private final long[] longArg1;
+    private final int[] action;
+    private final int[] reasonCodes;
+    private final int[] exactMcc;
+
+    MccCompiledRules(
+            int[] ruleIds,
+            int[] opcodes,
+            long[] longArg0,
+            long[] longArg1,
+            int[] action,
+            int[] reasonCodes,
+            int[] exactMcc
+<span class="fc" id="L30">    ) {</span>
+<span class="fc" id="L31">        this.ruleIds = ruleIds;</span>
+<span class="fc" id="L32">        this.opcodes = opcodes;</span>
+<span class="fc" id="L33">        this.longArg0 = longArg0;</span>
+<span class="fc" id="L34">        this.longArg1 = longArg1;</span>
+<span class="fc" id="L35">        this.action = action;</span>
+<span class="fc" id="L36">        this.reasonCodes = reasonCodes;</span>
+<span class="fc" id="L37">        this.exactMcc = exactMcc;</span>
+<span class="fc" id="L38">    }</span>
+
+    MccDecision evaluate(MccEvaluationContext ctx) {
+<span class="fc" id="L41">        int[] localOps = opcodes;</span>
+<span class="fc bfc" id="L42" title="All 2 branches covered.">        for (int i = 0; i &lt; localOps.length; i++) {</span>
+<span class="fc bfc" id="L43" title="All 2 branches covered.">            if (!matches(i, localOps[i], ctx)) {</span>
+<span class="fc" id="L44">                continue;</span>
+            }
+<span class="fc" id="L46">            ctx.matchedRuleId(ruleIds[i]);</span>
+<span class="fc" id="L47">            ctx.matchedReasonCode(reasonCodes[i]);</span>
+<span class="fc" id="L48">            return toDecision(action[i]);</span>
+        }
+<span class="fc" id="L50">        return MccDecision.CONTINUE;</span>
+    }
+
+    private boolean matches(int index, int opcode, MccEvaluationContext ctx) {
+<span class="fc bfc" id="L54" title="All 4 branches covered.">        return switch (opcode) {</span>
+<span class="pc bpc" id="L55" title="1 of 2 branches missed.">            case MccConstants.RULE_EXACT_MCC -&gt; ctx.mcc() == exactMcc[index];</span>
+<span class="pc bpc" id="L56" title="1 of 2 branches missed.">            case MccConstants.RULE_MCC_GROUP -&gt; (ctx.groupMask() &amp; longArg0[index]) != 0L;</span>
+            case MccConstants.RULE_GROUP_AMOUNT_LIMIT -&gt;
+<span class="pc bpc" id="L58" title="2 of 4 branches missed.">                    (ctx.groupMask() &amp; longArg0[index]) != 0L &amp;&amp; ctx.amountMinor() &gt; longArg1[index];</span>
+<span class="fc" id="L59">            default -&gt; false;</span>
+        };
+    }
+
+    private MccDecision toDecision(int ruleAction) {
+<span class="pc bpc" id="L64" title="1 of 4 branches missed.">        return switch (ruleAction) {</span>
+<span class="fc" id="L65">            case MccConstants.ACTION_ALLOW -&gt; MccDecision.ALLOW;</span>
+<span class="fc" id="L66">            case MccConstants.ACTION_DECLINE -&gt; MccDecision.DECLINE;</span>
+<span class="fc" id="L67">            case MccConstants.ACTION_STEP_UP -&gt; MccDecision.STEP_UP;</span>
+<span class="nc" id="L68">            default -&gt; MccDecision.CONTINUE;</span>
+        };
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.14.202510111229</span></div></body></html>

@@ -1,0 +1,623 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>ChipDataParser.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">iso8583-processor</a> &gt; <a href="index.source.html" class="el_package">com.logicpoint.iso8583.emv</a> &gt; <span class="el_source">ChipDataParser.java</span></div><h1>ChipDataParser.java</h1><pre class="source lang-java linenums">package com.logicpoint.iso8583.emv;
+
+
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+import org.springframework.stereotype.Component;
+
+import java.util.*;
+import java.util.regex.Pattern;
+
+import com.logicpoint.iso8583.validation.TransactionType;
+
+/**
+ * Parser for EMV chip data (DE55) in ISO 8583 messages.
+ * Supports parsing TLV (Tag-Length-Value) format for different payment schemes.
+ * 
+ * Author: @logic point systems
+ * Date: 2025-07-11
+ * Version: 1.0.0
+ * Description: This class is used to parse the EMV chip data.
+ * 
+ */
+@Component
+<span class="fc" id="L24">public class ChipDataParser {</span>
+    
+<span class="fc" id="L26">    private static final Logger logger = LoggerFactory.getLogger(ChipDataParser.class);</span>
+    
+    // Common EMV tags
+    public static final String TAG_9F02 = &quot;9F02&quot;; // Amount, Authorized (Numeric)
+    public static final String TAG_9F03 = &quot;9F03&quot;; // Amount, Other (Numeric)
+    public static final String TAG_9F1A = &quot;9F1A&quot;; // Terminal Country Code
+    public static final String TAG_5F2A = &quot;5F2A&quot;; // Transaction Currency Code
+    public static final String TAG_82 = &quot;82&quot;;     // Application Interchange Profile
+    public static final String TAG_9F36 = &quot;9F36&quot;; // Application Transaction Counter
+    public static final String TAG_9F37 = &quot;9F37&quot;; // Unpredictable Number
+    public static final String TAG_9F10 = &quot;9F10&quot;; // Issuer Application Data
+    public static final String TAG_9F26 = &quot;9F26&quot;; // Application Cryptogram
+    public static final String TAG_9F27 = &quot;9F27&quot;; // Cryptogram Information Data
+    public static final String TAG_9F33 = &quot;9F33&quot;; // Terminal Capabilities
+    public static final String TAG_9F34 = &quot;9F34&quot;; // Cardholder Verification Method Results
+    public static final String TAG_9F35 = &quot;9F35&quot;; // Terminal Type
+    public static final String TAG_9F1E = &quot;9F1E&quot;; // Interface Device Serial Number
+    public static final String TAG_84 = &quot;84&quot;;     // Dedicated File Name
+    public static final String TAG_9F09 = &quot;9F09&quot;; // Application Version Number
+    public static final String TAG_9F08 = &quot;9F08&quot;; // Application Version Number
+    public static final String TAG_9F15 = &quot;9F15&quot;; // Merchant Category Code
+    public static final String TAG_9F16 = &quot;9F16&quot;; // Merchant Identifier
+    public static final String TAG_9F4C = &quot;9F4C&quot;; // ICC Dynamic Number
+    public static final String TAG_9F4D = &quot;9F4D&quot;; // Log Entry
+    public static final String TAG_9F4E = &quot;9F4E&quot;; // Merchant Name and Location
+    public static final String TAG_9F21 = &quot;9F21&quot;; // Transaction Time
+    public static final String TAG_9F20 = &quot;9F20&quot;; // Transaction Date
+    public static final String TAG_9F41 = &quot;9F41&quot;; // Transaction Sequence Counter
+    public static final String TAG_9F42 = &quot;9F42&quot;; // Application Identifier (Terminal)
+    public static final String TAG_9F44 = &quot;9F44&quot;; // Application Identifier (ICC)
+    public static final String TAG_9F46 = &quot;9F46&quot;; // ICC Public Key Certificate
+    public static final String TAG_9F47 = &quot;9F47&quot;; // ICC Public Key Exponent
+    public static final String TAG_9F48 = &quot;9F48&quot;; // ICC Public Key Remainder
+    public static final String TAG_9F49 = &quot;9F49&quot;; // Dynamic Data Authentication Data Object List
+    public static final String TAG_9F4A = &quot;9F4A&quot;; // Static Data Authentication Tag List
+    public static final String TAG_9F4B = &quot;9F4B&quot;; // Signed Dynamic Application Data
+    public static final String TAG_9F4F = &quot;9F4F&quot;; // Log Format
+    public static final String TAG_9F50 = &quot;9F50&quot;; // ICC Public Key Certificate
+    public static final String TAG_9F51 = &quot;9F51&quot;; // ICC Public Key Exponent
+    public static final String TAG_9F52 = &quot;9F52&quot;; // ICC Public Key Remainder
+    public static final String TAG_9F53 = &quot;9F53&quot;; // ICC Dynamic Number
+    public static final String TAG_9F54 = &quot;9F54&quot;; // Cumulative Total Transaction Amount
+    public static final String TAG_9F55 = &quot;9F55&quot;; // Cumulative Total Transaction Amount Upper Limit
+    public static final String TAG_9F56 = &quot;9F56&quot;; // Issuer Counter
+    public static final String TAG_9F57 = &quot;9F57&quot;; // Issuer Action Code - Default
+    public static final String TAG_9F58 = &quot;9F58&quot;; // Issuer Action Code - Denial
+    public static final String TAG_9F59 = &quot;9F59&quot;; // Issuer Action Code - Online
+    public static final String TAG_9F5A = &quot;9F5A&quot;; // Application Primary Account Number
+    public static final String TAG_9F5B = &quot;9F5B&quot;; // Track 2 Equivalent Data
+    public static final String TAG_9F5C = &quot;9F5C&quot;; // ICC Dynamic Number
+    public static final String TAG_9F5D = &quot;9F5D&quot;; // ICC Dynamic Number
+    public static final String TAG_9F5E = &quot;9F5E&quot;; // ICC Dynamic Number
+    public static final String TAG_9F5F = &quot;9F5F&quot;; // ICC Dynamic Number
+    public static final String TAG_9F60 = &quot;9F60&quot;; // ICC Dynamic Number
+    public static final String TAG_9F61 = &quot;9F61&quot;; // ICC Dynamic Number
+    public static final String TAG_9F62 = &quot;9F62&quot;; // ICC Dynamic Number
+    public static final String TAG_9F63 = &quot;9F63&quot;; // ICC Dynamic Number
+    public static final String TAG_9F64 = &quot;9F64&quot;; // ICC Dynamic Number
+    public static final String TAG_9F65 = &quot;9F65&quot;; // ICC Dynamic Number
+    public static final String TAG_9F66 = &quot;9F66&quot;; // ICC Dynamic Number
+    public static final String TAG_9F67 = &quot;9F67&quot;; // ICC Dynamic Number
+    public static final String TAG_9F68 = &quot;9F68&quot;; // ICC Dynamic Number
+    public static final String TAG_9F69 = &quot;9F69&quot;; // ICC Dynamic Number
+    public static final String TAG_9F6A = &quot;9F6A&quot;; // ICC Dynamic Number
+    public static final String TAG_9F6B = &quot;9F6B&quot;; // ICC Dynamic Number
+    public static final String TAG_9F6C = &quot;9F6C&quot;; // ICC Dynamic Number
+    public static final String TAG_9F6D = &quot;9F6D&quot;; // ICC Dynamic Number
+    public static final String TAG_9F6E = &quot;9F6E&quot;; // ICC Dynamic Number
+    public static final String TAG_9F6F = &quot;9F6F&quot;; // ICC Dynamic Number
+    public static final String TAG_9F70 = &quot;9F70&quot;; // ICC Dynamic Number
+    public static final String TAG_9F71 = &quot;9F71&quot;; // ICC Dynamic Number
+    public static final String TAG_9F72 = &quot;9F72&quot;; // ICC Dynamic Number
+    public static final String TAG_9F73 = &quot;9F73&quot;; // ICC Dynamic Number
+    public static final String TAG_9F74 = &quot;9F74&quot;; // ICC Dynamic Number
+    public static final String TAG_9F75 = &quot;9F75&quot;; // ICC Dynamic Number
+    public static final String TAG_9F76 = &quot;9F76&quot;; // ICC Dynamic Number
+    public static final String TAG_9F77 = &quot;9F77&quot;; // ICC Dynamic Number
+    public static final String TAG_9F78 = &quot;9F78&quot;; // ICC Dynamic Number
+    public static final String TAG_9F79 = &quot;9F79&quot;; // ICC Dynamic Number
+    public static final String TAG_9F7A = &quot;9F7A&quot;; // ICC Dynamic Number
+    public static final String TAG_9F7B = &quot;9F7B&quot;; // ICC Dynamic Number
+    public static final String TAG_9F7C = &quot;9F7C&quot;; // ICC Dynamic Number
+    public static final String TAG_9F7D = &quot;9F7D&quot;; // ICC Dynamic Number
+    public static final String TAG_9F7E = &quot;9F7E&quot;; // ICC Dynamic Number
+    public static final String TAG_9F7F = &quot;9F7F&quot;; // ICC Dynamic Number
+    public static final String TAG_9F80 = &quot;9F80&quot;; // ICC Dynamic Number
+    public static final String TAG_9F81 = &quot;9F81&quot;; // ICC Dynamic Number
+    public static final String TAG_9F82 = &quot;9F82&quot;; // ICC Dynamic Number
+    public static final String TAG_9F83 = &quot;9F83&quot;; // ICC Dynamic Number
+    public static final String TAG_9F84 = &quot;9F84&quot;; // ICC Dynamic Number
+    public static final String TAG_9F85 = &quot;9F85&quot;; // ICC Dynamic Number
+    public static final String TAG_9F86 = &quot;9F86&quot;; // ICC Dynamic Number
+    public static final String TAG_9F87 = &quot;9F87&quot;; // ICC Dynamic Number
+    public static final String TAG_9F88 = &quot;9F88&quot;; // ICC Dynamic Number
+    public static final String TAG_9F89 = &quot;9F89&quot;; // ICC Dynamic Number
+    public static final String TAG_9F8A = &quot;9F8A&quot;; // ICC Dynamic Number
+    public static final String TAG_9F8B = &quot;9F8B&quot;; // ICC Dynamic Number
+    public static final String TAG_9F8C = &quot;9F8C&quot;; // ICC Dynamic Number
+    public static final String TAG_9F8D = &quot;9F8D&quot;; // ICC Dynamic Number
+    public static final String TAG_9F8E = &quot;9F8E&quot;; // ICC Dynamic Number
+    public static final String TAG_9F8F = &quot;9F8F&quot;; // ICC Dynamic Number
+    public static final String TAG_9F90 = &quot;9F90&quot;; // ICC Dynamic Number
+    public static final String TAG_9F91 = &quot;9F91&quot;; // ICC Dynamic Number
+    public static final String TAG_9F92 = &quot;9F92&quot;; // ICC Dynamic Number
+    public static final String TAG_9F93 = &quot;9F93&quot;; // ICC Dynamic Number
+    public static final String TAG_9F94 = &quot;9F94&quot;; // ICC Dynamic Number
+    public static final String TAG_9F95 = &quot;9F95&quot;; // ICC Dynamic Number
+    public static final String TAG_9F96 = &quot;9F96&quot;; // ICC Dynamic Number
+    public static final String TAG_9F97 = &quot;9F97&quot;; // ICC Dynamic Number
+    public static final String TAG_9F98 = &quot;9F98&quot;; // ICC Dynamic Number
+    public static final String TAG_9F99 = &quot;9F99&quot;; // ICC Dynamic Number
+    public static final String TAG_9F9A = &quot;9F9A&quot;; // ICC Dynamic Number
+    public static final String TAG_9F9B = &quot;9F9B&quot;; // ICC Dynamic Number
+    public static final String TAG_9F9C = &quot;9F9C&quot;; // ICC Dynamic Number
+    public static final String TAG_9F9D = &quot;9F9D&quot;; // ICC Dynamic Number
+    public static final String TAG_9F9E = &quot;9F9E&quot;; // ICC Dynamic Number
+    public static final String TAG_9F9F = &quot;9F9F&quot;; // ICC Dynamic Number
+    public static final String TAG_9FA0 = &quot;9FA0&quot;; // ICC Dynamic Number
+    public static final String TAG_9FA1 = &quot;9FA1&quot;; // ICC Dynamic Number
+    public static final String TAG_9FA2 = &quot;9FA2&quot;; // ICC Dynamic Number
+    public static final String TAG_9FA3 = &quot;9FA3&quot;; // ICC Dynamic Number
+    public static final String TAG_9FA4 = &quot;9FA4&quot;; // ICC Dynamic Number
+    public static final String TAG_9FA5 = &quot;9FA5&quot;; // ICC Dynamic Number
+    public static final String TAG_9FA6 = &quot;9FA6&quot;; // ICC Dynamic Number
+    public static final String TAG_9FA7 = &quot;9FA7&quot;; // ICC Dynamic Number
+    public static final String TAG_9FA8 = &quot;9FA8&quot;; // ICC Dynamic Number
+    public static final String TAG_9FA9 = &quot;9FA9&quot;; // ICC Dynamic Number
+    public static final String TAG_9FAA = &quot;9FAA&quot;; // ICC Dynamic Number
+    public static final String TAG_9FAB = &quot;9FAB&quot;; // ICC Dynamic Number
+    public static final String TAG_9FAC = &quot;9FAC&quot;; // ICC Dynamic Number
+    public static final String TAG_9FAD = &quot;9FAD&quot;; // ICC Dynamic Number
+    public static final String TAG_9FAE = &quot;9FAE&quot;; // ICC Dynamic Number
+    public static final String TAG_9FAF = &quot;9FAF&quot;; // ICC Dynamic Number
+    public static final String TAG_9FB0 = &quot;9FB0&quot;; // ICC Dynamic Number
+    public static final String TAG_9FB1 = &quot;9FB1&quot;; // ICC Dynamic Number
+    public static final String TAG_9FB2 = &quot;9FB2&quot;; // ICC Dynamic Number
+    public static final String TAG_9FB3 = &quot;9FB3&quot;; // ICC Dynamic Number
+    public static final String TAG_9FB4 = &quot;9FB4&quot;; // ICC Dynamic Number
+    public static final String TAG_9FB5 = &quot;9FB5&quot;; // ICC Dynamic Number
+    public static final String TAG_9FB6 = &quot;9FB6&quot;; // ICC Dynamic Number
+    public static final String TAG_9FB7 = &quot;9FB7&quot;; // ICC Dynamic Number
+    public static final String TAG_9FB8 = &quot;9FB8&quot;; // ICC Dynamic Number
+    public static final String TAG_9FB9 = &quot;9FB9&quot;; // ICC Dynamic Number
+    public static final String TAG_9FBA = &quot;9FBA&quot;; // ICC Dynamic Number
+    public static final String TAG_9FBB = &quot;9FBB&quot;; // ICC Dynamic Number
+    public static final String TAG_9FBC = &quot;9FBC&quot;; // ICC Dynamic Number
+    public static final String TAG_9FBD = &quot;9FBD&quot;; // ICC Dynamic Number
+    public static final String TAG_9FBE = &quot;9FBE&quot;; // ICC Dynamic Number
+    public static final String TAG_9FBF = &quot;9FBF&quot;; // ICC Dynamic Number
+    public static final String TAG_9FC0 = &quot;9FC0&quot;; // ICC Dynamic Number
+    public static final String TAG_9FC1 = &quot;9FC1&quot;; // ICC Dynamic Number
+    public static final String TAG_9FC2 = &quot;9FC2&quot;; // ICC Dynamic Number
+    public static final String TAG_9FC3 = &quot;9FC3&quot;; // ICC Dynamic Number
+    public static final String TAG_9FC4 = &quot;9FC4&quot;; // ICC Dynamic Number
+    public static final String TAG_9FC5 = &quot;9FC5&quot;; // ICC Dynamic Number
+    public static final String TAG_9FC6 = &quot;9FC6&quot;; // ICC Dynamic Number
+    public static final String TAG_9FC7 = &quot;9FC7&quot;; // ICC Dynamic Number
+    public static final String TAG_9FC8 = &quot;9FC8&quot;; // ICC Dynamic Number
+    public static final String TAG_9FC9 = &quot;9FC9&quot;; // ICC Dynamic Number
+    public static final String TAG_9FCA = &quot;9FCA&quot;; // ICC Dynamic Number
+    public static final String TAG_9FCB = &quot;9FCB&quot;; // ICC Dynamic Number
+    public static final String TAG_9FCC = &quot;9FCC&quot;; // ICC Dynamic Number
+    public static final String TAG_9FCD = &quot;9FCD&quot;; // ICC Dynamic Number
+    public static final String TAG_9FCE = &quot;9FCE&quot;; // ICC Dynamic Number
+    public static final String TAG_9FCF = &quot;9FCF&quot;; // ICC Dynamic Number
+    public static final String TAG_9FD0 = &quot;9FD0&quot;; // ICC Dynamic Number
+    public static final String TAG_9FD1 = &quot;9FD1&quot;; // ICC Dynamic Number
+    public static final String TAG_9FD2 = &quot;9FD2&quot;; // ICC Dynamic Number
+    public static final String TAG_9FD3 = &quot;9FD3&quot;; // ICC Dynamic Number
+    public static final String TAG_9FD4 = &quot;9FD4&quot;; // ICC Dynamic Number
+    public static final String TAG_9FD5 = &quot;9FD5&quot;; // ICC Dynamic Number
+    public static final String TAG_9FD6 = &quot;9FD6&quot;; // ICC Dynamic Number
+    public static final String TAG_9FD7 = &quot;9FD7&quot;; // ICC Dynamic Number
+    public static final String TAG_9FD8 = &quot;9FD8&quot;; // ICC Dynamic Number
+    public static final String TAG_9FD9 = &quot;9FD9&quot;; // ICC Dynamic Number
+    public static final String TAG_9FDA = &quot;9FDA&quot;; // ICC Dynamic Number
+    public static final String TAG_9FDB = &quot;9FDB&quot;; // ICC Dynamic Number
+    public static final String TAG_9FDC = &quot;9FDC&quot;; // ICC Dynamic Number
+    public static final String TAG_9FDD = &quot;9FDD&quot;; // ICC Dynamic Number
+    public static final String TAG_9FDE = &quot;9FDE&quot;; // ICC Dynamic Number
+    public static final String TAG_9FDF = &quot;9FDF&quot;; // ICC Dynamic Number
+    public static final String TAG_9FE0 = &quot;9FE0&quot;; // ICC Dynamic Number
+    public static final String TAG_9FE1 = &quot;9FE1&quot;; // ICC Dynamic Number
+    public static final String TAG_9FE2 = &quot;9FE2&quot;; // ICC Dynamic Number
+    public static final String TAG_9FE3 = &quot;9FE3&quot;; // ICC Dynamic Number
+    public static final String TAG_9FE4 = &quot;9FE4&quot;; // ICC Dynamic Number
+    public static final String TAG_9FE5 = &quot;9FE5&quot;; // ICC Dynamic Number
+    public static final String TAG_9FE6 = &quot;9FE6&quot;; // ICC Dynamic Number
+    public static final String TAG_9FE7 = &quot;9FE7&quot;; // ICC Dynamic Number
+    public static final String TAG_9FE8 = &quot;9FE8&quot;; // ICC Dynamic Number
+    public static final String TAG_9FE9 = &quot;9FE9&quot;; // ICC Dynamic Number
+    public static final String TAG_9FEA = &quot;9FEA&quot;; // ICC Dynamic Number
+    public static final String TAG_9FEB = &quot;9FEB&quot;; // ICC Dynamic Number
+    public static final String TAG_9FEC = &quot;9FEC&quot;; // ICC Dynamic Number
+    public static final String TAG_9FED = &quot;9FED&quot;; // ICC Dynamic Number
+    public static final String TAG_9FEE = &quot;9FEE&quot;; // ICC Dynamic Number
+    public static final String TAG_9FEF = &quot;9FEF&quot;; // ICC Dynamic Number
+    public static final String TAG_9FF0 = &quot;9FF0&quot;; // ICC Dynamic Number
+    public static final String TAG_9FF1 = &quot;9FF1&quot;; // ICC Dynamic Number
+    public static final String TAG_9FF2 = &quot;9FF2&quot;; // ICC Dynamic Number
+    public static final String TAG_9FF3 = &quot;9FF3&quot;; // ICC Dynamic Number
+    public static final String TAG_9FF4 = &quot;9FF4&quot;; // ICC Dynamic Number
+    public static final String TAG_9FF5 = &quot;9FF5&quot;; // ICC Dynamic Number
+    public static final String TAG_9FF6 = &quot;9FF6&quot;; // ICC Dynamic Number
+    public static final String TAG_9FF7 = &quot;9FF7&quot;; // ICC Dynamic Number
+    public static final String TAG_9FF8 = &quot;9FF8&quot;; // ICC Dynamic Number
+    public static final String TAG_9FF9 = &quot;9FF9&quot;; // ICC Dynamic Number
+    public static final String TAG_9FFA = &quot;9FFA&quot;; // ICC Dynamic Number
+    public static final String TAG_9FFB = &quot;9FFB&quot;; // ICC Dynamic Number
+    public static final String TAG_9FFC = &quot;9FFC&quot;; // ICC Dynamic Number
+    public static final String TAG_9FFD = &quot;9FFD&quot;; // ICC Dynamic Number
+    public static final String TAG_9FFE = &quot;9FFE&quot;; // ICC Dynamic Number
+    public static final String TAG_9FFF = &quot;9FFF&quot;; // ICC Dynamic Number
+
+    // Pattern for hex string validation
+<span class="fc" id="L241">    private static final Pattern HEX_PATTERN = Pattern.compile(&quot;^[0-9A-Fa-f]+$&quot;);</span>
+
+    /**
+     * Parses EMV chip data from DE55 field.
+     * 
+     * @param emvData The EMV data string (hex format)
+     * @return ChipData object containing parsed EMV tags
+     */
+    public ChipData parseChipData(String emvData) {
+<span class="fc bfc" id="L250" title="All 4 branches covered.">        if (emvData == null || emvData.trim().isEmpty()) {</span>
+<span class="fc" id="L251">            logger.warn(&quot;EMV data is null or empty&quot;);</span>
+<span class="fc" id="L252">            return new ChipData();</span>
+        }
+
+<span class="fc" id="L255">        logger.debug(&quot;Parsing EMV data: {}&quot;, emvData);</span>
+        
+        try {
+<span class="fc" id="L258">            Map&lt;String, String&gt; tags = parseTLV(emvData);</span>
+<span class="fc" id="L259">            return new ChipData(tags);</span>
+<span class="nc" id="L260">        } catch (Exception e) {</span>
+<span class="nc" id="L261">            logger.error(&quot;Error parsing EMV data: {}&quot;, emvData, e);</span>
+<span class="nc" id="L262">            return new ChipData();</span>
+        }
+    }
+
+    /**
+     * Parses TLV (Tag-Length-Value) format from hex string.
+     * 
+     * @param hexData The hex string containing TLV data
+     * @return Map of tag to value
+     */
+    private Map&lt;String, String&gt; parseTLV(String hexData) {
+<span class="fc" id="L273">        Map&lt;String, String&gt; tags = new HashMap&lt;&gt;();</span>
+        
+<span class="fc bfc" id="L275" title="All 2 branches covered.">        if (!isValidHex(hexData)) {</span>
+<span class="fc" id="L276">            logger.error(&quot;Invalid hex data: {}&quot;, hexData);</span>
+<span class="fc" id="L277">            return tags;</span>
+        }
+
+<span class="fc" id="L280">        int offset = 0;</span>
+<span class="fc bfc" id="L281" title="All 2 branches covered.">        while (offset &lt; hexData.length()) {</span>
+            try {
+                // Parse tag
+<span class="fc" id="L284">                String tag = parseTag(hexData, offset);</span>
+<span class="pc bpc" id="L285" title="1 of 2 branches missed.">                if (tag == null) break;</span>
+                
+<span class="fc" id="L287">                offset += tag.length();</span>
+                
+                // Parse length
+<span class="fc" id="L290">                int length = parseLength(hexData, offset);</span>
+<span class="fc" id="L291">                offset += 2; // Length is 1 byte</span>
+                
+                // Parse value
+<span class="fc bfc" id="L294" title="All 2 branches covered.">                if (offset + length * 2 &lt;= hexData.length()) {</span>
+<span class="fc" id="L295">                    String value = hexData.substring(offset, offset + length * 2);</span>
+<span class="fc" id="L296">                    tags.put(tag, value);</span>
+<span class="fc" id="L297">                    offset += length * 2;</span>
+<span class="fc" id="L298">                } else {</span>
+<span class="fc" id="L299">                    logger.warn(&quot;Incomplete TLV data at offset {}&quot;, offset);</span>
+<span class="fc" id="L300">                    break;</span>
+                }
+<span class="fc" id="L302">            } catch (Exception e) {</span>
+<span class="fc" id="L303">                logger.error(&quot;Error parsing TLV at offset {}: {}&quot;, offset, e.getMessage());</span>
+<span class="fc" id="L304">                break;</span>
+<span class="fc" id="L305">            }</span>
+        }
+
+<span class="fc" id="L308">        return tags;</span>
+    }
+
+    /**
+     * Parses tag from hex string.
+     */
+    private String parseTag(String hexData, int offset) {
+<span class="pc bpc" id="L315" title="1 of 2 branches missed.">        if (offset &gt;= hexData.length()) return null;</span>
+        
+        // Handle 1-byte tags
+<span class="pc bpc" id="L318" title="1 of 2 branches missed.">        if (offset + 2 &lt;= hexData.length()) {</span>
+<span class="fc" id="L319">            String tag = hexData.substring(offset, offset + 2);</span>
+            
+            // Handle 2-byte tags (first byte has bit 5 set)
+<span class="fc bfc" id="L322" title="All 2 branches covered.">            if (isTwoByteTag(tag)) {</span>
+<span class="fc bfc" id="L323" title="All 2 branches covered.">                if (offset + 4 &lt;= hexData.length()) {</span>
+<span class="fc" id="L324">                    return hexData.substring(offset, offset + 4);</span>
+                }
+            }
+            
+<span class="fc" id="L328">            return tag;</span>
+        }
+        
+<span class="nc" id="L331">        return null;</span>
+    }
+
+    /**
+     * Checks if tag is a 2-byte tag.
+     */
+    private boolean isTwoByteTag(String tag) {
+<span class="pc bpc" id="L338" title="1 of 2 branches missed.">        if (tag.length() != 2) return false;</span>
+        
+        try {
+<span class="fc" id="L341">            int tagValue = Integer.parseInt(tag, 16);</span>
+<span class="fc bfc" id="L342" title="All 2 branches covered.">            return (tagValue &amp; 0x1F) == 0x1F; // Bit 5 is set</span>
+<span class="nc" id="L343">        } catch (NumberFormatException e) {</span>
+<span class="nc" id="L344">            return false;</span>
+        }
+    }
+
+    /**
+     * Parses length from hex string.
+     */
+    private int parseLength(String hexData, int offset) {
+<span class="fc bfc" id="L352" title="All 2 branches covered.">        if (offset + 2 &gt; hexData.length()) {</span>
+<span class="fc" id="L353">            throw new IllegalArgumentException(&quot;Insufficient data for length field&quot;);</span>
+        }
+        
+<span class="fc" id="L356">        String lengthHex = hexData.substring(offset, offset + 2);</span>
+<span class="fc" id="L357">        return Integer.parseInt(lengthHex, 16);</span>
+    }
+
+    /**
+     * Validates if string is valid hex.
+     */
+    private boolean isValidHex(String hex) {
+<span class="pc bpc" id="L364" title="1 of 4 branches missed.">        return hex != null &amp;&amp; HEX_PATTERN.matcher(hex).matches();</span>
+    }
+
+    /**
+     * Gets specific tag value from chip data.
+     */
+    public String getTagValue(ChipData chipData, String tag) {
+<span class="fc" id="L371">        return chipData.getTagValue(tag);</span>
+    }
+
+    /**
+     * Checks if specific tag exists in chip data.
+     */
+    public boolean hasTag(ChipData chipData, String tag) {
+<span class="fc" id="L378">        return chipData.hasTag(tag);</span>
+    }
+
+    /**
+     * Gets all tags from chip data.
+     */
+    public Set&lt;String&gt; getAllTags(ChipData chipData) {
+<span class="fc" id="L385">        return chipData.getAllTags();</span>
+    }
+
+    /**
+     * Converts hex string to readable format.
+     */
+    public String hexToReadable(String hex) {
+<span class="pc bpc" id="L392" title="1 of 4 branches missed.">        if (hex == null || hex.isEmpty()) return &quot;&quot;;</span>
+        
+<span class="fc" id="L394">        StringBuilder result = new StringBuilder();</span>
+<span class="fc bfc" id="L395" title="All 2 branches covered.">        for (int i = 0; i &lt; hex.length(); i += 2) {</span>
+<span class="pc bpc" id="L396" title="1 of 2 branches missed.">            if (i + 1 &lt; hex.length()) {</span>
+<span class="fc" id="L397">                String hexPair = hex.substring(i, i + 2);</span>
+                try {
+<span class="fc" id="L399">                    int decimal = Integer.parseInt(hexPair, 16);</span>
+<span class="pc bpc" id="L400" title="1 of 4 branches missed.">                    if (decimal &gt;= 32 &amp;&amp; decimal &lt;= 126) { // Printable ASCII</span>
+<span class="fc" id="L401">                        result.append((char) decimal);</span>
+                    } else {
+<span class="fc" id="L403">                        result.append(&quot;.&quot;);</span>
+                    }
+<span class="fc" id="L405">                } catch (NumberFormatException e) {</span>
+<span class="fc" id="L406">                    result.append(&quot;.&quot;);</span>
+<span class="fc" id="L407">                }</span>
+            }
+        }
+<span class="fc" id="L410">        return result.toString();</span>
+    }
+
+    /**
+     * Validates chip data integrity.
+     */
+    public boolean validateChipData(ChipData chipData) {
+<span class="fc bfc" id="L417" title="All 4 branches covered.">        if (chipData == null || chipData.isEmpty()) {</span>
+<span class="fc" id="L418">            return false;</span>
+        }
+
+        // Check for required tags based on transaction type
+<span class="fc" id="L422">        boolean hasApplicationCryptogram = chipData.hasTag(TAG_9F26);</span>
+<span class="fc" id="L423">        boolean hasCryptogramInfo = chipData.hasTag(TAG_9F27);</span>
+<span class="fc" id="L424">        boolean hasATC = chipData.hasTag(TAG_9F36);</span>
+<span class="fc" id="L425">        boolean hasUnpredictableNumber = chipData.hasTag(TAG_9F37);</span>
+
+<span class="pc bpc" id="L427" title="3 of 8 branches missed.">        return hasApplicationCryptogram &amp;&amp; hasCryptogramInfo &amp;&amp; hasATC &amp;&amp; hasUnpredictableNumber;</span>
+    }
+    
+
+    /**
+     * Packs a map of tag-value pairs into a TLV (Tag-Length-Value) formatted string.
+     * Each tag and value is encoded as: [TAG][LENGTH][VALUE]
+     * - TAG: variable length (usually 2-4 hex chars)
+     * - LENGTH: 2 bytes (hex) representing the length of VALUE in bytes
+     * - VALUE: hex string
+     *
+     * Example: tag &quot;9F02&quot; with value &quot;000000010000&quot; (6 bytes) becomes &quot;9F0206000000010000&quot;
+     *
+     * @param tagValueMap Map of tag to value (hex string)
+     * @return TLV formatted string
+     */
+    public String packTlv(Map&lt;String, String&gt; tagValueMap) {
+<span class="fc bfc" id="L444" title="All 4 branches covered.">        if (tagValueMap == null || tagValueMap.isEmpty()) {</span>
+<span class="fc" id="L445">            return &quot;&quot;;</span>
+        }
+<span class="fc" id="L447">        StringBuilder tlvBuilder = new StringBuilder();</span>
+<span class="fc bfc" id="L448" title="All 2 branches covered.">        for (Map.Entry&lt;String, String&gt; entry : tagValueMap.entrySet()) {</span>
+<span class="fc" id="L449">            String tag = entry.getKey();</span>
+<span class="fc bfc" id="L450" title="All 2 branches covered.">            String value = entry.getValue() != null ? entry.getValue() : &quot;&quot;;</span>
+<span class="fc" id="L451">            int valueLength = value.length() / 2; // Each 2 hex chars = 1 byte</span>
+
+            // Tag: as is (variable length)
+<span class="fc" id="L454">            tlvBuilder.append(tag);</span>
+
+            // Length: 2 bytes (4 hex chars), left padded with zeros if needed
+<span class="fc" id="L457">            String lengthHex = String.format(&quot;%02X&quot;, valueLength);</span>
+<span class="fc" id="L458">            tlvBuilder.append(lengthHex);</span>
+
+            // Value: as is
+<span class="fc" id="L461">            tlvBuilder.append(value);</span>
+<span class="fc" id="L462">        }</span>
+<span class="fc" id="L463">        return tlvBuilder.toString();</span>
+    }
+    /*
+     * Check the mandatory tags for the chip data
+     */
+    public boolean checkMandatoryTags(ChipData chipData,String scheme ,boolean isContactless,TransactionType transactionType) {
+<span class="fc bfc" id="L469" title="All 2 branches covered.">        if(isContactless){</span>
+<span class="pc bpc" id="L470" title="18 of 38 branches missed.">            return chipData.hasTag(&quot;9F02&quot;) &amp;&amp; chipData.hasTag(&quot;9F03&quot;) &amp;&amp; chipData.hasTag(&quot;9F36&quot;) &amp;&amp; chipData.hasTag(&quot;9F06&quot;)&amp;&amp; chipData.hasTag(&quot;82&quot;) &amp;&amp; chipData.hasTag(&quot;9F27&quot;) &amp;&amp; chipData.hasTag(&quot;9F34&quot;) &amp;&amp; chipData.hasTag(&quot;84&quot;) &amp;&amp; chipData.hasTag(&quot;9F1E&quot;) &amp;&amp; chipData.hasTag(&quot;9F10&quot;) &amp;&amp; chipData.hasTag(&quot;9F33&quot;) &amp;&amp; chipData.hasTag(&quot;9F1A&quot;) &amp;&amp; chipData.hasTag(&quot;9F35&quot;) &amp;&amp; chipData.hasTag(&quot;9F37&quot;) &amp;&amp; chipData.hasTag(&quot;95&quot;) &amp;&amp; chipData.hasTag(&quot;5F2A&quot;) &amp;&amp; chipData.hasTag(&quot;9A&quot;) &amp;&amp; chipData.hasTag(&quot;9C&quot;) &amp;&amp; chipData.hasTag(&quot;9F26&quot;);</span>
+        }else{
+<span class="pc bpc" id="L472" title="18 of 38 branches missed.">            if(chipData.hasTag(&quot;9F02&quot;) &amp;&amp; chipData.hasTag(&quot;9F03&quot;) &amp;&amp; chipData.hasTag(&quot;9F36&quot;) &amp;&amp; chipData.hasTag(&quot;9F06&quot;)&amp;&amp; chipData.hasTag(&quot;82&quot;) &amp;&amp; chipData.hasTag(&quot;9F27&quot;) &amp;&amp; chipData.hasTag(&quot;9F34&quot;) &amp;&amp; chipData.hasTag(&quot;84&quot;) &amp;&amp; chipData.hasTag(&quot;9F1E&quot;) &amp;&amp; chipData.hasTag(&quot;9F10&quot;) &amp;&amp; chipData.hasTag(&quot;9F33&quot;) &amp;&amp; chipData.hasTag(&quot;9F1A&quot;) &amp;&amp; chipData.hasTag(&quot;9F35&quot;) &amp;&amp; chipData.hasTag(&quot;9F37&quot;) &amp;&amp; chipData.hasTag(&quot;95&quot;) &amp;&amp; chipData.hasTag(&quot;5F2A&quot;) &amp;&amp; chipData.hasTag(&quot;9A&quot;) &amp;&amp; chipData.hasTag(&quot;9C&quot;) &amp;&amp; chipData.hasTag(&quot;9F26&quot;)){</span>
+<span class="fc" id="L473">                String tag9f02 = chipData.getTagValue(&quot;9F02&quot;);</span>
+<span class="fc" id="L474">                String tag9f03 = chipData.getTagValue(&quot;9F03&quot;);</span>
+<span class="pc bpc" id="L475" title="1 of 4 branches missed.">                if(!tag9f02.matches(&quot;^[0-9]+$&quot;) || !tag9f03.matches(&quot;^[0-9]+$&quot;)){</span>
+<span class="fc" id="L476">                    logger.error(&quot;Amount, Txn Amount(9f02) And Other Amount(9f03) are not Valid &quot;);</span>
+<span class="fc" id="L477">                    return false;</span>
+                }
+<span class="pc bpc" id="L479" title="6 of 16 branches missed.">                if(tag9f02.equals(&quot;000000000000&quot;) &amp;&amp; !(transactionType == TransactionType.SERVICE_CREATION || transactionType == TransactionType.SERVICE_CREATION_CONTACTLESS || transactionType == TransactionType.ML_BALANCEUPDATE || transactionType == TransactionType.BALANCE_ENQUIRY || transactionType == TransactionType.BALANCE_ENQUIRY_CL || transactionType == TransactionType.PIN_CHANGE || transactionType == TransactionType.MINI_STATEMENT)){</span>
+<span class="fc" id="L480">                    logger.error(&quot;Amount, Txn Amount(9f02)  is Invalid &quot;);</span>
+<span class="fc" id="L481">                    return false;</span>
+<span class="pc bpc" id="L482" title="6 of 16 branches missed.">                }else if(tag9f02.equals(tag9f03)&amp;&amp; !(transactionType == TransactionType.SERVICE_CREATION || transactionType == TransactionType.SERVICE_CREATION_CONTACTLESS || transactionType == TransactionType.ML_BALANCEUPDATE || transactionType == TransactionType.BALANCE_ENQUIRY || transactionType == TransactionType.BALANCE_ENQUIRY_CL || transactionType == TransactionType.PIN_CHANGE || transactionType == TransactionType.MINI_STATEMENT)){</span>
+<span class="fc" id="L483">                    logger.error(&quot;Amount, Txn Amount(9f02) And Other Amount(9f03) shouldn't be  equal&quot;);</span>
+<span class="fc" id="L484">                    return false;</span>
+                }else {
+<span class="fc" id="L486">                    return true;</span>
+                }
+
+            }else{
+<span class="fc" id="L490">                logger.error(&quot;Mandatory tags are not present&quot;);</span>
+<span class="fc" id="L491">                return false;</span>
+            }
+            
+        }
+    }
+
+    /**
+     * Extracts and parses Cardholder Verification Method Results from chip data
+     * 
+     * @param chipData The chip data containing CVM information
+     * @return CardholderVerificationMethodResults object or null if not found
+     */
+    public CardholderVerificationMethodResults extractCvmResults(ChipData chipData) {
+<span class="fc bfc" id="L504" title="All 4 branches covered.">        if (chipData == null || chipData.isEmpty()) {</span>
+<span class="fc" id="L505">            logger.warn(&quot;Chip data is null or empty, cannot extract CVM results&quot;);</span>
+<span class="fc" id="L506">            return null;</span>
+        }
+        
+<span class="fc" id="L509">        String cvmHex = chipData.getTagValue(TAG_9F34);</span>
+<span class="pc bpc" id="L510" title="2 of 4 branches missed.">        if (cvmHex == null || cvmHex.isEmpty()) {</span>
+<span class="nc" id="L511">            logger.debug(&quot;CVM Results (9F34) not found in chip data&quot;);</span>
+<span class="nc" id="L512">            return null;</span>
+        }
+        
+        try {
+<span class="fc" id="L516">            return new CardholderVerificationMethodResults(cvmHex);</span>
+<span class="fc" id="L517">        } catch (IllegalArgumentException e) {</span>
+<span class="fc" id="L518">            logger.error(&quot;Invalid CVM Results format in tag 9F34: {}&quot;, cvmHex, e);</span>
+<span class="fc" id="L519">            return null;</span>
+        }
+    }
+    
+    /**
+     * Validates CVM Results from chip data
+     * 
+     * @param chipData The chip data containing CVM information
+     * @return true if CVM Results are valid and suitable for transaction processing
+     */
+    public boolean validateCvmResults(ChipData chipData) {
+<span class="fc" id="L530">        CardholderVerificationMethodResults cvmResults = extractCvmResults(chipData);</span>
+<span class="pc bpc" id="L531" title="1 of 2 branches missed.">        if (cvmResults == null) {</span>
+<span class="nc" id="L532">            return false;</span>
+        }
+        
+<span class="fc" id="L535">        return cvmResults.isValidForTransaction();</span>
+    }
+    
+    /**
+     * Gets CVM information as a formatted string for logging/debugging
+     * 
+     * @param chipData The chip data containing CVM information
+     * @return Formatted CVM information string
+     */
+    public String getCvmInfo(ChipData chipData) {
+<span class="fc" id="L545">        CardholderVerificationMethodResults cvmResults = extractCvmResults(chipData);</span>
+<span class="fc bfc" id="L546" title="All 2 branches covered.">        if (cvmResults == null) {</span>
+<span class="fc" id="L547">            return &quot;No CVM Results available&quot;;</span>
+        }
+        
+<span class="fc" id="L550">        return String.format(&quot;CVM Code: %s (%s), Condition Code: %s (%s), Result: %s (%s), Valid: %s&quot;,</span>
+<span class="fc" id="L551">                           cvmResults.getCvmCode(),</span>
+<span class="fc" id="L552">                           cvmResults.getCvmCodeDescription(),</span>
+<span class="fc" id="L553">                           cvmResults.getConditionCode(),</span>
+<span class="fc" id="L554">                           cvmResults.getConditionCodeDescription(),</span>
+<span class="fc" id="L555">                           cvmResults.getCvmResults(),</span>
+<span class="fc" id="L556">                           cvmResults.getCvmResultsDescription(),</span>
+<span class="fc" id="L557">                           cvmResults.isValidForTransaction());</span>
+    }
+    
+    /**
+     * Checks if specific CVM type was performed based on chip data
+     * 
+     * @param chipData The chip data containing CVM information
+     * @param cvmType The type of CVM to check for
+     * @return true if the specified CVM type was performed successfully
+     */
+    public boolean isCvmTypePerformed(ChipData chipData, String cvmType) {
+<span class="fc" id="L568">        CardholderVerificationMethodResults cvmResults = extractCvmResults(chipData);</span>
+<span class="pc bpc" id="L569" title="1 of 2 branches missed.">        if (cvmResults == null) {</span>
+<span class="nc" id="L570">            return false;</span>
+        }
+        
+<span class="fc bfc" id="L573" title="All 6 branches covered.">        return switch (cvmType.toUpperCase()) {</span>
+<span class="pc bpc" id="L574" title="2 of 4 branches missed.">            case &quot;PIN&quot; -&gt; cvmResults.isPinVerificationPerformed() &amp;&amp; cvmResults.isCvmSuccessful();</span>
+<span class="pc bpc" id="L575" title="2 of 4 branches missed.">            case &quot;SIGNATURE&quot; -&gt; cvmResults.isSignatureVerificationPerformed() &amp;&amp; cvmResults.isCvmSuccessful();</span>
+<span class="pc bpc" id="L576" title="2 of 4 branches missed.">            case &quot;BIOMETRIC&quot; -&gt; cvmResults.isBiometricVerificationPerformed() &amp;&amp; cvmResults.isCvmSuccessful();</span>
+<span class="pc bpc" id="L577" title="2 of 4 branches missed.">            case &quot;NO_CVM&quot; -&gt; cvmResults.isNoCvmRequired() &amp;&amp; cvmResults.isCvmSuccessful();</span>
+<span class="pc bpc" id="L578" title="2 of 4 branches missed.">            case &quot;CONTACTLESS_NO_CVM&quot; -&gt; cvmResults.isContactlessNoCvm() &amp;&amp; cvmResults.isCvmSuccessful();</span>
+            default -&gt; {
+<span class="fc" id="L580">                logger.warn(&quot;Unknown CVM type: {}&quot;, cvmType);</span>
+<span class="fc" id="L581">                yield false;</span>
+            }
+        };
+    }
+    
+    /**
+     * Checks if offline PIN verification was performed
+     * 
+     * @param chipData The chip data containing CVM information
+     * @return true if offline PIN verification was performed successfully
+     */
+    public boolean isOfflinePinPerformed(ChipData chipData) {
+<span class="fc" id="L593">        CardholderVerificationMethodResults cvmResults = extractCvmResults(chipData);</span>
+<span class="pc bpc" id="L594" title="2 of 6 branches missed.">        return cvmResults != null &amp;&amp; cvmResults.isOfflinePinVerificationPerformed() &amp;&amp; cvmResults.isCvmSuccessful();</span>
+    }
+    
+    /**
+     * Checks if online PIN verification was performed
+     * 
+     * @param chipData The chip data containing CVM information
+     * @return true if online PIN verification was performed successfully
+     */
+    public boolean isOnlinePinPerformed(ChipData chipData) {
+<span class="fc" id="L604">        CardholderVerificationMethodResults cvmResults = extractCvmResults(chipData);</span>
+<span class="pc bpc" id="L605" title="2 of 6 branches missed.">        return cvmResults != null &amp;&amp; cvmResults.isOnlinePinVerificationPerformed() &amp;&amp; cvmResults.isCvmSuccessful();</span>
+    }
+    
+    /**
+     * Checks if this is a contactless transaction based on CVM data
+     * 
+     * @param chipData The chip data containing CVM information
+     * @return true if this appears to be a contactless transaction
+     */
+    public boolean isContactlessTransaction(ChipData chipData) {
+<span class="fc" id="L615">        CardholderVerificationMethodResults cvmResults = extractCvmResults(chipData);</span>
+<span class="pc bpc" id="L616" title="1 of 4 branches missed.">        return cvmResults != null &amp;&amp; cvmResults.isContactlessNoCvm();</span>
+    }
+
+    /*
+     * Check the optional tags for the chip data
+     */
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.14.202510111229</span></div></body></html>

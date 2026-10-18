@@ -1,0 +1,306 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>ValidationResult.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">iso8583-processor</a> &gt; <a href="index.source.html" class="el_package">com.logicpoint.iso8583.validation</a> &gt; <span class="el_source">ValidationResult.java</span></div><h1>ValidationResult.java</h1><pre class="source lang-java linenums">package com.logicpoint.iso8583.validation;
+
+import java.util.List;
+import java.util.ArrayList;
+import java.util.Collections;
+import java.util.Map;
+import java.util.HashMap;
+
+public class ValidationResult {
+    private final List&lt;String&gt; errors;
+    private final List&lt;String&gt; warnings;
+    private final boolean isValid;
+    private  String responseCode;
+    private final String responseMessage;
+    private final Map&lt;String, Object&gt; updatedDataElements;
+
+<span class="fc" id="L17">    public ValidationResult(List&lt;String&gt; errors, List&lt;String&gt; warnings) {</span>
+<span class="fc" id="L18">        this.errors = new ArrayList&lt;&gt;(errors);</span>
+<span class="fc" id="L19">        this.warnings = new ArrayList&lt;&gt;(warnings);</span>
+<span class="fc" id="L20">        this.isValid = errors.isEmpty();</span>
+<span class="fc" id="L21">        this.responseCode = determineResponseCode(errors);</span>
+<span class="fc" id="L22">        this.responseMessage = determineResponseMessage(errors);</span>
+<span class="fc" id="L23">        this.updatedDataElements = new HashMap&lt;&gt;();</span>
+<span class="fc" id="L24">    }</span>
+    
+<span class="fc" id="L26">    public ValidationResult(List&lt;String&gt; errors, List&lt;String&gt; warnings, Map&lt;String, Object&gt; updatedDataElements) {</span>
+<span class="fc" id="L27">        this.errors = new ArrayList&lt;&gt;(errors);</span>
+<span class="fc" id="L28">        this.warnings = new ArrayList&lt;&gt;(warnings);</span>
+<span class="fc" id="L29">        this.isValid = errors.isEmpty();</span>
+<span class="fc" id="L30">        this.responseCode = determineResponseCode(errors);</span>
+<span class="fc" id="L31">        this.responseMessage = determineResponseMessage(errors);</span>
+<span class="fc" id="L32">        this.updatedDataElements = new HashMap&lt;&gt;(updatedDataElements);</span>
+<span class="fc" id="L33">    }</span>
+
+    public List&lt;String&gt; getErrors() { 
+<span class="fc" id="L36">        return Collections.unmodifiableList(errors); </span>
+    }
+    
+    public List&lt;String&gt; getWarnings() { 
+<span class="fc" id="L40">        return Collections.unmodifiableList(warnings); </span>
+    }
+    
+    public boolean isValid() { 
+<span class="fc" id="L44">        return isValid; </span>
+    }
+    
+    public String getResponseCode() { 
+<span class="fc" id="L48">        return responseCode; </span>
+    }
+    
+    public void setResponseCode(String responseCode) {
+<span class="nc" id="L52">        this.responseCode = responseCode;</span>
+<span class="nc" id="L53">    }</span>
+    
+    public String getResponseMessage() { 
+<span class="nc" id="L56">        return responseMessage; </span>
+    }
+    
+    /**
+     * Gets the updated data elements map.
+     */
+    public Map&lt;String, Object&gt; getUpdatedDataElements() {
+<span class="fc" id="L63">        return Collections.unmodifiableMap(updatedDataElements);</span>
+    }
+    
+    /**
+     * Gets a specific updated data element by key.
+     */
+    public Object getUpdatedDataElement(String key) {
+<span class="fc" id="L70">        return updatedDataElements.get(key);</span>
+    }
+    
+    /**
+     * Checks if there are any updated data elements.
+     */
+    public boolean hasUpdatedDataElements() {
+<span class="fc bfc" id="L77" title="All 2 branches covered.">        return !updatedDataElements.isEmpty();</span>
+    }
+
+    private String determineResponseCode(List&lt;String&gt; errors) {
+<span class="fc bfc" id="L81" title="All 2 branches covered.">        if (errors.isEmpty()) return &quot;00&quot;; // Approval</span>
+        
+<span class="fc bfc" id="L83" title="All 2 branches covered.">        for (String error : errors) {</span>
+<span class="fc bfc" id="L84" title="All 2 branches covered.">            if (error.contains(&quot;EXPIRED_CARD&quot;)) return &quot;54&quot;;</span>
+<span class="fc bfc" id="L85" title="All 2 branches covered.">            if (error.contains(&quot;INVALID_CARD&quot;)) return &quot;14&quot;;</span>
+<span class="fc bfc" id="L86" title="All 2 branches covered.">            if (error.contains(&quot;BLOCKED_BIN&quot;)) return &quot;05&quot;;</span>
+<span class="fc bfc" id="L87" title="All 2 branches covered.">            if (error.contains(&quot;AMOUNT_LIMIT&quot;)) return &quot;61&quot;;</span>
+<span class="fc bfc" id="L88" title="All 2 branches covered.">            if (error.contains(&quot;VELOCITY_LIMIT&quot;)) return &quot;65&quot;;</span>
+<span class="fc bfc" id="L89" title="All 2 branches covered.">            if (error.contains(&quot;INVALID_SERVICE_CODE&quot;)) return &quot;14&quot;;</span>
+<span class="fc bfc" id="L90" title="All 2 branches covered.">            if (error.contains(&quot;MISSING_EXPIRY_DATE&quot;)) return &quot;30&quot;;</span>
+<span class="fc bfc" id="L91" title="All 2 branches covered.">            if (error.contains(&quot;INVALID_TRANSACTION_TYPE&quot;)) return &quot;12&quot;;</span>
+<span class="pc bpc" id="L92" title="1 of 2 branches missed.">            if (error.contains(&quot;DUPLICATE_TRANSACTION&quot;)) return &quot;94&quot;;</span>
+<span class="pc bpc" id="L93" title="1 of 2 branches missed.">            if (error.contains(&quot;MANDATORY_TAG_MISSING&quot;)) return &quot;30&quot;;</span>
+<span class="fc" id="L94">        }</span>
+<span class="fc" id="L95">        return &quot;96&quot;; // System malfunction</span>
+    }
+
+    private String determineResponseMessage(List&lt;String&gt; errors) {
+<span class="fc bfc" id="L99" title="All 2 branches covered.">        if (errors.isEmpty()) return &quot;APPROVED&quot;;</span>
+<span class="fc" id="L100">        return String.join(&quot;; &quot;, errors);</span>
+    }
+
+    /**
+     * Creates a new Builder instance.
+     */
+    public static Builder builder() {
+<span class="fc" id="L107">        return new Builder();</span>
+    }
+
+    /**
+     * Builder class for ValidationResult.
+     */
+<span class="fc" id="L113">    public static class Builder {</span>
+<span class="fc" id="L114">        private final List&lt;String&gt; errors = new ArrayList&lt;&gt;();</span>
+<span class="fc" id="L115">        private final List&lt;String&gt; warnings = new ArrayList&lt;&gt;();</span>
+<span class="fc" id="L116">        private final Map&lt;String, Object&gt; updatedDataElements = new HashMap&lt;&gt;();</span>
+
+        /**
+         * Adds a single error to the validation result.
+         */
+        public Builder addError(String error) {
+<span class="pc bpc" id="L122" title="2 of 4 branches missed.">            if (error != null &amp;&amp; !error.trim().isEmpty()) {</span>
+<span class="fc" id="L123">                errors.add(error.trim());</span>
+            }
+<span class="fc" id="L125">            return this;</span>
+        }
+
+        /**
+         * Adds multiple errors to the validation result.
+         */
+        public Builder addErrors(List&lt;String&gt; errors) {
+<span class="pc bpc" id="L132" title="1 of 2 branches missed.">            if (errors != null) {</span>
+<span class="fc bfc" id="L133" title="All 2 branches covered.">                for (String error : errors) {</span>
+<span class="fc" id="L134">                    addError(error);</span>
+<span class="fc" id="L135">                }</span>
+            }
+<span class="fc" id="L137">            return this;</span>
+        }
+
+        /**
+         * Adds a single warning to the validation result.
+         */
+        public Builder addWarning(String warning) {
+<span class="pc bpc" id="L144" title="2 of 4 branches missed.">            if (warning != null &amp;&amp; !warning.trim().isEmpty()) {</span>
+<span class="fc" id="L145">                warnings.add(warning.trim());</span>
+            }
+<span class="fc" id="L147">            return this;</span>
+        }
+
+        /**
+         * Adds multiple warnings to the validation result.
+         */
+        public Builder addWarnings(List&lt;String&gt; warnings) {
+<span class="pc bpc" id="L154" title="1 of 2 branches missed.">            if (warnings != null) {</span>
+<span class="fc bfc" id="L155" title="All 2 branches covered.">                for (String warning : warnings) {</span>
+<span class="fc" id="L156">                    addWarning(warning);</span>
+<span class="fc" id="L157">                }</span>
+            }
+<span class="fc" id="L159">            return this;</span>
+        }
+
+        /**
+         * Adds errors from another ValidationResult.
+         */
+        public Builder addErrors(ValidationResult other) {
+<span class="nc bnc" id="L166" title="All 2 branches missed.">            if (other != null) {</span>
+<span class="nc" id="L167">                addErrors(other.getErrors());</span>
+            }
+<span class="nc" id="L169">            return this;</span>
+        }
+
+        /**
+         * Adds warnings from another ValidationResult.
+         */
+        public Builder addWarnings(ValidationResult other) {
+<span class="nc bnc" id="L176" title="All 2 branches missed.">            if (other != null) {</span>
+<span class="nc" id="L177">                addWarnings(other.getWarnings());</span>
+            }
+<span class="nc" id="L179">            return this;</span>
+        }
+
+        /**
+         * Adds both errors and warnings from another ValidationResult.
+         */
+        public Builder addValidationResult(ValidationResult other) {
+<span class="nc bnc" id="L186" title="All 2 branches missed.">            if (other != null) {</span>
+<span class="nc" id="L187">                addErrors(other.getErrors());</span>
+<span class="nc" id="L188">                addWarnings(other.getWarnings());</span>
+            }
+<span class="nc" id="L190">            return this;</span>
+        }
+
+        /**
+         * Adds an updated data element.
+         */
+        public Builder addUpdatedDataElement(String key, Object value) {
+<span class="pc bpc" id="L197" title="2 of 4 branches missed.">            if (key != null &amp;&amp; value != null) {</span>
+<span class="fc" id="L198">                updatedDataElements.put(key, value);</span>
+            }
+<span class="fc" id="L200">            return this;</span>
+        }
+        
+        /**
+         * Adds multiple updated data elements.
+         */
+        public Builder addUpdatedDataElements(Map&lt;String, Object&gt; dataElements) {
+<span class="nc bnc" id="L207" title="All 2 branches missed.">            if (dataElements != null) {</span>
+<span class="nc" id="L208">                updatedDataElements.putAll(dataElements);</span>
+            }
+<span class="nc" id="L210">            return this;</span>
+        }
+        
+        /**
+         * Clears all errors and warnings.
+         */
+        public Builder clear() {
+<span class="nc" id="L217">            errors.clear();</span>
+<span class="nc" id="L218">            warnings.clear();</span>
+<span class="nc" id="L219">            updatedDataElements.clear();</span>
+<span class="nc" id="L220">            return this;</span>
+        }
+
+        /**
+         * Clears only errors.
+         */
+        public Builder clearErrors() {
+<span class="nc" id="L227">            errors.clear();</span>
+<span class="nc" id="L228">            return this;</span>
+        }
+
+        /**
+         * Clears only warnings.
+         */
+        public Builder clearWarnings() {
+<span class="nc" id="L235">            warnings.clear();</span>
+<span class="nc" id="L236">            return this;</span>
+        }
+
+        /**
+         * Sets a custom response code for the validation result.
+         */
+        public Builder setResponseCode(String responseCode) {
+            // This will be handled in the build method
+<span class="nc" id="L244">            return this;</span>
+        }
+
+        /**
+         * Builds and returns the ValidationResult.
+         */
+        public ValidationResult build() {
+<span class="fc" id="L251">            ValidationResult result = new ValidationResult(errors, warnings, updatedDataElements);</span>
+<span class="fc" id="L252">            return result;</span>
+        }
+
+        /**
+         * Builds a ValidationResult with a specific response code.
+         */
+        public ValidationResult buildWithResponseCode(String responseCode) {
+<span class="nc" id="L259">            ValidationResult result = build();</span>
+            // Note: This would require modifying the ValidationResult constructor
+            // to accept a custom response code. For now, we'll use the default logic.
+<span class="nc" id="L262">            return result;</span>
+        }
+
+        /**
+         * Checks if the current builder has any errors.
+         */
+        public boolean hasErrors() {
+<span class="nc bnc" id="L269" title="All 2 branches missed.">            return !errors.isEmpty();</span>
+        }
+
+        /**
+         * Checks if the current builder has any warnings.
+         */
+        public boolean hasWarnings() {
+<span class="nc bnc" id="L276" title="All 2 branches missed.">            return !warnings.isEmpty();</span>
+        }
+
+        /**
+         * Gets the current error count.
+         */
+        public int getErrorCount() {
+<span class="nc" id="L283">            return errors.size();</span>
+        }
+
+        /**
+         * Gets the current warning count.
+         */
+        public int getWarningCount() {
+<span class="nc" id="L290">            return warnings.size();</span>
+        }
+    }
+
+    @Override
+    public String toString() {
+<span class="nc" id="L296">        return &quot;ValidationResult{&quot; +</span>
+                &quot;isValid=&quot; + isValid +
+<span class="nc" id="L298">                &quot;, errorCount=&quot; + errors.size() +</span>
+<span class="nc" id="L299">                &quot;, warningCount=&quot; + warnings.size() +</span>
+                &quot;, responseCode='&quot; + responseCode + '\'' +
+                &quot;, responseMessage='&quot; + responseMessage + '\'' +
+                &quot;, updatedDataElements=&quot; + updatedDataElements +
+                '}';
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.14.202510111229</span></div></body></html>

@@ -1,0 +1,80 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>CmsCardController.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">iso8583-processor</a> &gt; <a href="index.source.html" class="el_package">com.logicpoint.iso8583.cmsintegration</a> &gt; <span class="el_source">CmsCardController.java</span></div><h1>CmsCardController.java</h1><pre class="source lang-java linenums">package com.logicpoint.iso8583.cmsintegration;
+
+import tools.jackson.databind.json.JsonMapper;
+
+import static com.logicpoint.iso8583.cmsintegration.CmsContracts.*;
+import tools.jackson.databind.*;
+import jakarta.validation.Validator;
+import io.swagger.v3.oas.annotations.Operation;
+import io.swagger.v3.oas.annotations.responses.ApiResponse;
+import io.swagger.v3.oas.annotations.responses.ApiResponses;
+import io.swagger.v3.oas.annotations.security.SecurityRequirement;
+import io.swagger.v3.oas.annotations.tags.Tag;
+import org.springframework.web.bind.annotation.*;
+import java.util.UUID;
+
+@RestController
+@RequestMapping(&quot;/internal/v1/institutions/{institutionId}&quot;)
+@Tag(name = &quot;CMS card authorization integration&quot;, description = &quot;Authenticated CMS lifecycle and authorization-profile synchronization&quot;)
+@SecurityRequirement(name = &quot;cmsServiceBearer&quot;)
+public class CmsCardController {
+    private final CmsCardIntegrationService service;
+    private final JsonMapper json;
+    private final Validator validator;
+<span class="fc" id="L24">    public CmsCardController(CmsCardIntegrationService service,JsonMapper json,Validator validator) {</span>
+<span class="fc" id="L25">        this.service=service; this.json=json.rebuild().enable(DeserializationFeature.FAIL_ON_UNKNOWN_PROPERTIES).build(); this.validator=validator;</span>
+<span class="fc" id="L26">    }</span>
+    @PutMapping(&quot;/cards/{cardId}/registration&quot;)
+    @Operation(summary = &quot;Register a CMS card&quot;, description = &quot;Creates the Switch card_data identity and its initial PENDING authorization profile from recipient-encrypted card material.&quot;)
+    @ApiResponses({@ApiResponse(responseCode = &quot;200&quot;, description = &quot;Registration receipt&quot;),
+            @ApiResponse(responseCode = &quot;400&quot;, description = &quot;Invalid profile, envelope, mapping, or idempotency key&quot;),
+            @ApiResponse(responseCode = &quot;409&quot;, description = &quot;Command or identity conflict&quot;)})
+    public JsonNode register(@PathVariable UUID institutionId,@PathVariable UUID cardId,
+            @RequestHeader(&quot;Idempotency-Key&quot;) UUID key,@RequestBody JsonNode body) {
+<span class="fc" id="L34">        Registration request=parse(body,Registration.class); match(key,request.commandId());</span>
+<span class="fc" id="L35">        return service.register(institutionId,cardId,request);</span>
+    }
+    @PutMapping(&quot;/cards/{cardId}/authorization-profile&quot;)
+    @Operation(summary = &quot;Update card authorization profile&quot;, description = &quot;Atomically applies the complete status, representation, geography, channel and limit profile.&quot;)
+    @ApiResponses({@ApiResponse(responseCode = &quot;200&quot;, description = &quot;Update receipt&quot;),
+            @ApiResponse(responseCode = &quot;400&quot;, description = &quot;Invalid profile or lifecycle transition&quot;),
+            @ApiResponse(responseCode = &quot;409&quot;, description = &quot;Stale revision or command conflict&quot;)})
+    public JsonNode update(@PathVariable UUID institutionId,@PathVariable UUID cardId,
+            @RequestHeader(&quot;Idempotency-Key&quot;) UUID key,@RequestBody JsonNode body) {
+<span class="fc" id="L44">        Update request=parse(body,Update.class); match(key,request.commandId());</span>
+<span class="fc" id="L45">        return service.update(institutionId,cardId,request);</span>
+    }
+    @PostMapping(&quot;/card-cutovers&quot;)
+    @Operation(summary = &quot;Cut over a replacement&quot;, description = &quot;Atomically retires the predecessor and applies the successor profile.&quot;)
+    @ApiResponses({@ApiResponse(responseCode = &quot;200&quot;, description = &quot;Cutover receipt&quot;),
+            @ApiResponse(responseCode = &quot;400&quot;, description = &quot;Invalid cutover&quot;),
+            @ApiResponse(responseCode = &quot;409&quot;, description = &quot;Revision, family, account or predecessor conflict&quot;)})
+    public JsonNode cutover(@PathVariable UUID institutionId,@RequestHeader(&quot;Idempotency-Key&quot;) UUID key,
+            @RequestBody JsonNode body) {
+<span class="fc" id="L54">        Cutover request=parse(body,Cutover.class); match(key,request.commandId());</span>
+<span class="fc" id="L55">        return service.cutover(institutionId,request);</span>
+    }
+    @GetMapping(&quot;/cards/{cardId}/authorization-profile&quot;)
+    @Operation(summary = &quot;Read the applied authorization profile&quot;)
+    @ApiResponses({@ApiResponse(responseCode = &quot;200&quot;, description = &quot;Current profile&quot;),
+            @ApiResponse(responseCode = &quot;404&quot;, description = &quot;Card is not registered&quot;)})
+    public JsonNode get(@PathVariable UUID institutionId,@PathVariable UUID cardId) {
+<span class="fc" id="L62">        return service.get(institutionId,cardId);</span>
+    }
+    @GetMapping(&quot;/card-commands/{commandId}&quot;)
+    @Operation(summary = &quot;Read a command receipt&quot;, description = &quot;Used by CMS to reconcile a timeout or retry without repeating a lifecycle effect.&quot;)
+    @ApiResponses({@ApiResponse(responseCode = &quot;200&quot;, description = &quot;Stored receipt&quot;),
+            @ApiResponse(responseCode = &quot;404&quot;, description = &quot;Command is not known&quot;)})
+    public JsonNode command(@PathVariable UUID institutionId,@PathVariable UUID commandId) {
+<span class="fc" id="L69">        return service.command(institutionId,commandId);</span>
+    }
+    private &lt;T&gt; T parse(JsonNode body,Class&lt;T&gt; type) {
+        try {
+<span class="fc" id="L73">            T result=json.treeToValue(body,type);</span>
+<span class="pc bpc" id="L74" title="1 of 4 branches missed.">            if(result==null || !validator.validate(result).isEmpty()) throw new IllegalArgumentException();</span>
+<span class="fc" id="L75">            return result;</span>
+<span class="fc" id="L76">        } catch(Exception e) { throw CmsIntegrationException.bad(&quot;Invalid request fields&quot;); }</span>
+    }
+<span class="fc bfc" id="L78" title="All 2 branches covered.">    private void match(UUID header,UUID command) { if(!header.equals(command)) throw CmsIntegrationException.bad(&quot;Idempotency-Key must equal commandId&quot;); }</span>
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.14.202510111229</span></div></body></html>

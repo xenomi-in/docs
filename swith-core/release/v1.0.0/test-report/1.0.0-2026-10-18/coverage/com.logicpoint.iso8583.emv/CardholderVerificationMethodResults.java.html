@@ -1,0 +1,420 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>CardholderVerificationMethodResults.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">iso8583-processor</a> &gt; <a href="index.source.html" class="el_package">com.logicpoint.iso8583.emv</a> &gt; <span class="el_source">CardholderVerificationMethodResults.java</span></div><h1>CardholderVerificationMethodResults.java</h1><pre class="source lang-java linenums">package com.logicpoint.iso8583.emv;
+
+import com.logicpoint.iso8583.util.ISOUtil;
+
+import java.io.PrintStream;
+import java.util.Objects;
+
+/**
+ * Cardholder Verification Method Results (CVM) parser.
+ * Parses the 9F34 tag which contains information about the CVM performed during the transaction.
+ * 
+ * The CVM Results field is 3 bytes long and contains:
+ * - Byte 1: CVM Code (low 6 bits indicate the CVM performed)
+ * - Byte 2: Condition Code
+ * - Byte 3: CVM Result
+ * 
+ * Based on EMV Book 3, Section A1.4.2
+ * 
+ * @author Logic Point Systems
+ * @version 1.0.0
+ */
+public final class CardholderVerificationMethodResults {
+
+    
+    private final byte[] cvmResults;
+    
+    // CVM Code constants (Byte 1)
+    public static final int CVM_CODE_FAILED = 0x00;
+    public static final int CVM_CODE_PLAINTEXT_PIN_VERIFICATION_PERFORMED = 0x01;
+    public static final int CVM_CODE_ENCRYPTED_PIN_VERIFICATION_PERFORMED = 0x02;
+    public static final int CVM_CODE_PLAINTEXT_PIN_VERIFICATION_PERFORMED_ICC = 0x03;
+    public static final int CVM_CODE_ENCRYPTED_PIN_VERIFICATION_PERFORMED_ICC = 0x04;
+    public static final int CVM_CODE_SIGNATURE_VERIFICATION_PERFORMED = 0x05;
+    public static final int CVM_CODE_NO_CVM_REQUIRED = 0x06;
+    public static final int CVM_CODE_FAILED_CVM_REQUIRED = 0x07;
+    public static final int CVM_CODE_SIGNATURE_VERIFICATION_PERFORMED_PAPER = 0x08;
+    public static final int CVM_CODE_NO_CVM_REQUIRED_CONTACTLESS = 0x09;
+    public static final int CVM_CODE_BIOMETRIC_VERIFICATION_PERFORMED = 0x0A;
+    public static final int CVM_CODE_BIOMETRIC_AND_PIN_VERIFICATION_PERFORMED = 0x0B;
+    public static final int CVM_CODE_BIOMETRIC_AND_SIGNATURE_VERIFICATION_PERFORMED = 0x0C;
+    public static final int CVM_CODE_OTHER_CVM_PERFORMED = 0x1E;
+    public static final int CVM_CODE_NO_CVM_PERFORMED = 0x1F;
+
+    
+    
+    // CVM Results constants (Byte 3)
+    public static final int CVM_RESULT_UNKNOWN = 0x00;
+    public static final int CVM_RESULT_FAILED = 0x01;
+    public static final int CVM_RESULT_SUCCESSFUL = 0x02;
+    public static final int CVM_RESULT_NOT_PERFORMED = 0x03;
+    public static final int CVM_RESULT_NOT_SUPPORTED = 0x04;
+    public static final int CVM_RESULT_NOT_APPLICABLE = 0x05;
+
+<span class="fc" id="L54">    public CardholderVerificationMethodResults(byte[] cvmResults) {</span>
+<span class="fc" id="L55">        Objects.requireNonNull(cvmResults);</span>
+<span class="fc bfc" id="L56" title="All 2 branches covered.">        if (cvmResults.length != 3) {</span>
+<span class="fc" id="L57">            throw new IllegalArgumentException(&quot;CVM Results length must be 3 bytes, got: &quot; + cvmResults.length);</span>
+        }
+<span class="fc" id="L59">        this.cvmResults = cvmResults.clone();</span>
+<span class="fc" id="L60">    }</span>
+
+    public CardholderVerificationMethodResults(String hexCVM) {
+<span class="fc" id="L63">        this(ISOUtil.hex2byte(hexCVM));</span>
+<span class="fc" id="L64">    }</span>
+
+    /**
+     * Gets the CVM Code (Byte 1)
+     * @return CVM Code as integer
+     */
+    public int getCvmCode() {
+<span class="fc" id="L71">        return cvmResults[0] &amp; 0x3F;</span>
+    }
+
+    /**
+     * Gets the Condition Code (Byte 2)
+     * @return Condition Code as integer
+     */
+    public int getConditionCode() {
+<span class="fc" id="L79">        return cvmResults[1] &amp; 0xFF;</span>
+    }
+
+    /**
+     * Gets the CVM Results (Byte 3)
+     * @return CVM Results as integer
+     */
+    public int getCvmResults() {
+<span class="fc" id="L87">        return cvmResults[2] &amp; 0xFF;</span>
+    }
+
+    /**
+     * Legacy accessor retained for compatibility.
+     * 9F34 byte 2 is the condition code, not a reserved byte.
+     *
+     * @return Condition Code as integer
+     */
+    @Deprecated
+    public int getReserved() {
+<span class="fc" id="L98">        return getConditionCode();</span>
+    }
+
+    /**
+     * Checks if CVM was successful
+     * @return true if CVM was successful
+     */
+    public boolean isCvmSuccessful() {
+<span class="fc bfc" id="L106" title="All 2 branches covered.">        return getCvmResults() == CVM_RESULT_SUCCESSFUL;</span>
+    }
+
+    /**
+     * Checks if CVM failed
+     * @return true if CVM failed
+     */
+    public boolean isCvmFailed() {
+<span class="fc bfc" id="L114" title="All 2 branches covered.">        return getCvmResults() == CVM_RESULT_FAILED;</span>
+    }
+
+    /**
+     * Checks if CVM was not performed
+     * @return true if CVM was not performed
+     */
+    public boolean isCvmNotPerformed() {
+<span class="fc bfc" id="L122" title="All 2 branches covered.">        return getCvmResults() == CVM_RESULT_NOT_PERFORMED;</span>
+    }
+
+    /**
+     * Checks if CVM is not supported
+     * @return true if CVM is not supported
+     */
+    public boolean isCvmNotSupported() {
+<span class="fc bfc" id="L130" title="All 2 branches covered.">        return getCvmResults() == CVM_RESULT_NOT_SUPPORTED;</span>
+    }
+
+    /**
+     * Checks if CVM is not applicable
+     * @return true if CVM is not applicable
+     */
+    public boolean isCvmNotApplicable() {
+<span class="fc bfc" id="L138" title="All 2 branches covered.">        return getCvmResults() == CVM_RESULT_NOT_APPLICABLE;</span>
+    }
+
+    /**
+     * Checks if the terminal reported an unknown CVM result.
+     * Some terminals send 00 for online PIN flows, so callers may choose to
+     * treat this as non-fatal in that specific scenario.
+     *
+     * @return true if the CVM result is unknown
+     */
+    public boolean isCvmResultUnknown() {
+<span class="fc bfc" id="L149" title="All 2 branches covered.">        return getCvmResults() == CVM_RESULT_UNKNOWN;</span>
+    }
+
+    /**
+     * Checks if PIN verification was performed
+     * @return true if PIN verification was performed
+     */
+    public boolean isPinVerificationPerformed() {
+<span class="fc" id="L157">        int code = getCvmCode();</span>
+<span class="pc bpc" id="L158" title="2 of 10 branches missed.">        return code == CVM_CODE_PLAINTEXT_PIN_VERIFICATION_PERFORMED ||</span>
+               code == CVM_CODE_ENCRYPTED_PIN_VERIFICATION_PERFORMED ||
+               code == CVM_CODE_PLAINTEXT_PIN_VERIFICATION_PERFORMED_ICC ||
+               code == CVM_CODE_ENCRYPTED_PIN_VERIFICATION_PERFORMED_ICC ||
+               code == CVM_CODE_BIOMETRIC_AND_PIN_VERIFICATION_PERFORMED;
+    }
+
+    /**
+     * Checks if signature verification was performed
+     * @return true if signature verification was performed
+     */
+    public boolean isSignatureVerificationPerformed() {
+<span class="fc" id="L170">        int code = getCvmCode();</span>
+<span class="fc bfc" id="L171" title="All 6 branches covered.">        return code == CVM_CODE_SIGNATURE_VERIFICATION_PERFORMED ||</span>
+               code == CVM_CODE_SIGNATURE_VERIFICATION_PERFORMED_PAPER ||
+               code == CVM_CODE_BIOMETRIC_AND_SIGNATURE_VERIFICATION_PERFORMED;
+    }
+
+    /**
+     * Checks if biometric verification was performed
+     * @return true if biometric verification was performed
+     */
+    public boolean isBiometricVerificationPerformed() {
+<span class="fc" id="L181">        int code = getCvmCode();</span>
+<span class="fc bfc" id="L182" title="All 6 branches covered.">        return code == CVM_CODE_BIOMETRIC_VERIFICATION_PERFORMED ||</span>
+               code == CVM_CODE_BIOMETRIC_AND_PIN_VERIFICATION_PERFORMED ||
+               code == CVM_CODE_BIOMETRIC_AND_SIGNATURE_VERIFICATION_PERFORMED;
+    }
+
+    /**
+     * Checks if no CVM was required
+     * @return true if no CVM was required
+     */
+    public boolean isNoCvmRequired() {
+<span class="fc" id="L192">        int code = getCvmCode();</span>
+<span class="fc bfc" id="L193" title="All 4 branches covered.">        return code == CVM_CODE_NO_CVM_REQUIRED ||</span>
+               code == CVM_CODE_NO_CVM_REQUIRED_CONTACTLESS;
+    }
+
+    /**
+     * Checks if this is a contactless transaction with no CVM
+     * @return true if contactless transaction with no CVM
+     */
+    public boolean isContactlessNoCvm() {
+<span class="fc bfc" id="L202" title="All 2 branches covered.">        return getCvmCode() == CVM_CODE_NO_CVM_REQUIRED_CONTACTLESS;</span>
+    }
+
+    /**
+     * Checks if the terminal reported that no CVM was performed.
+     *
+     * @return true if no CVM was performed
+     */
+    public boolean isNoCvmPerformed() {
+<span class="fc bfc" id="L211" title="All 2 branches covered.">        return getCvmCode() == CVM_CODE_NO_CVM_PERFORMED;</span>
+    }
+
+    /**
+     * Checks if CVM failed but was required
+     * @return true if CVM failed but was required
+     */
+    public boolean isCvmFailedButRequired() {
+<span class="fc bfc" id="L219" title="All 2 branches covered.">        return getCvmCode() == CVM_CODE_FAILED_CVM_REQUIRED;</span>
+    }
+
+    /**
+     * Checks if offline PIN verification was performed
+     * @return true if offline PIN verification was performed
+     */
+    public boolean isOfflinePinVerificationPerformed() {
+<span class="fc" id="L227">        int code = getCvmCode();</span>
+<span class="fc bfc" id="L228" title="All 4 branches covered.">        return code == CVM_CODE_PLAINTEXT_PIN_VERIFICATION_PERFORMED_ICC ||</span>
+               code == CVM_CODE_ENCRYPTED_PIN_VERIFICATION_PERFORMED_ICC;
+    }
+
+    /**
+     * Checks if online PIN verification was performed
+     * @return true if online PIN verification was performed
+     */
+    public boolean isOnlinePinVerificationPerformed() {
+<span class="fc" id="L237">        int code = getCvmCode();</span>
+<span class="fc bfc" id="L238" title="All 4 branches covered.">        return code == CVM_CODE_PLAINTEXT_PIN_VERIFICATION_PERFORMED ||</span>
+               code == CVM_CODE_ENCRYPTED_PIN_VERIFICATION_PERFORMED;
+    }
+
+    /**
+     * Gets a human-readable description of the CVM Code
+     * @return Description of the CVM Code
+     */
+    public String getCvmCodeDescription() {
+<span class="pc bpc" id="L247" title="5 of 16 branches missed.">        return switch (getCvmCode()) {</span>
+<span class="fc" id="L248">            case CVM_CODE_FAILED -&gt; &quot;CVM Failed&quot;;</span>
+<span class="fc" id="L249">            case CVM_CODE_PLAINTEXT_PIN_VERIFICATION_PERFORMED -&gt; &quot;Plaintext PIN Verification Performed&quot;;</span>
+<span class="fc" id="L250">            case CVM_CODE_ENCRYPTED_PIN_VERIFICATION_PERFORMED -&gt; &quot;Enciphered PIN verified online&quot;;</span>
+<span class="fc" id="L251">            case CVM_CODE_PLAINTEXT_PIN_VERIFICATION_PERFORMED_ICC -&gt; &quot;Plaintext PIN Verification Performed (ICC)&quot;;</span>
+<span class="fc" id="L252">            case CVM_CODE_ENCRYPTED_PIN_VERIFICATION_PERFORMED_ICC -&gt; &quot;Enciphered PIN verification performed by ICC&quot;;</span>
+<span class="fc" id="L253">            case CVM_CODE_SIGNATURE_VERIFICATION_PERFORMED -&gt; &quot;Signature Verification Performed&quot;;</span>
+<span class="fc" id="L254">            case CVM_CODE_NO_CVM_REQUIRED -&gt; &quot;No CVM Required&quot;;</span>
+<span class="fc" id="L255">            case CVM_CODE_FAILED_CVM_REQUIRED -&gt; &quot;Failed - CVM Required&quot;;</span>
+<span class="nc" id="L256">            case CVM_CODE_SIGNATURE_VERIFICATION_PERFORMED_PAPER -&gt; &quot;Signature Verification Performed (Paper)&quot;;</span>
+<span class="fc" id="L257">            case CVM_CODE_NO_CVM_REQUIRED_CONTACTLESS -&gt; &quot;No CVM Required (Contactless)&quot;;</span>
+<span class="fc" id="L258">            case CVM_CODE_BIOMETRIC_VERIFICATION_PERFORMED -&gt; &quot;Biometric Verification Performed&quot;;</span>
+<span class="nc" id="L259">            case CVM_CODE_BIOMETRIC_AND_PIN_VERIFICATION_PERFORMED -&gt; &quot;Biometric and PIN Verification Performed&quot;;</span>
+<span class="nc" id="L260">            case CVM_CODE_BIOMETRIC_AND_SIGNATURE_VERIFICATION_PERFORMED -&gt; &quot;Biometric and Signature Verification Performed&quot;;</span>
+<span class="nc" id="L261">            case CVM_CODE_OTHER_CVM_PERFORMED -&gt; &quot;Other CVM Performed&quot;;</span>
+<span class="fc" id="L262">            case CVM_CODE_NO_CVM_PERFORMED -&gt; &quot;No CVM Performed&quot;;</span>
+<span class="nc" id="L263">            default -&gt; &quot;Unknown CVM Code: &quot; + getCvmCode();</span>
+        };
+    }
+
+    /**
+     * Gets a human-readable description of the CVM Results
+     * @return Description of the CVM Results
+     */
+    public String getCvmResultsDescription() {
+<span class="pc bpc" id="L272" title="1 of 7 branches missed.">        return switch (getCvmResults()) {</span>
+<span class="fc" id="L273">            case CVM_RESULT_UNKNOWN -&gt; &quot;Unknown&quot;;</span>
+<span class="fc" id="L274">            case CVM_RESULT_FAILED -&gt; &quot;Failed&quot;;</span>
+<span class="fc" id="L275">            case CVM_RESULT_SUCCESSFUL -&gt; &quot;Successful&quot;;</span>
+<span class="fc" id="L276">            case CVM_RESULT_NOT_PERFORMED -&gt; &quot;Not Performed&quot;;</span>
+<span class="fc" id="L277">            case CVM_RESULT_NOT_SUPPORTED -&gt; &quot;Not Supported&quot;;</span>
+<span class="fc" id="L278">            case CVM_RESULT_NOT_APPLICABLE -&gt; &quot;Not Applicable&quot;;</span>
+<span class="nc" id="L279">            default -&gt; &quot;Unknown CVM Result: &quot; + getCvmResults();</span>
+        };
+    }
+
+    /**
+     * Gets a human-readable description of the condition code (Byte 2).
+     *
+     * @return Condition Code description
+     */
+    public String getConditionCodeDescription() {
+<span class="pc bpc" id="L289" title="9 of 11 branches missed.">        return switch (getConditionCode()) {</span>
+<span class="fc" id="L290">            case 0x00 -&gt; &quot;Always&quot;;</span>
+<span class="nc" id="L291">            case 0x01 -&gt; &quot;If unattended cash&quot;;</span>
+<span class="nc" id="L292">            case 0x02 -&gt; &quot;If not unattended cash and not manual cash and not purchase with cashback&quot;;</span>
+<span class="fc" id="L293">            case 0x03 -&gt; &quot;If terminal supports the CVM&quot;;</span>
+<span class="nc" id="L294">            case 0x04 -&gt; &quot;If manual cash&quot;;</span>
+<span class="nc" id="L295">            case 0x05 -&gt; &quot;If purchase with cashback&quot;;</span>
+<span class="nc" id="L296">            case 0x06 -&gt; &quot;If transaction is in the application currency and is under X value&quot;;</span>
+<span class="nc" id="L297">            case 0x07 -&gt; &quot;If transaction is in the application currency and is over X value&quot;;</span>
+<span class="nc" id="L298">            case 0x08 -&gt; &quot;If transaction is in the application currency and is under Y value&quot;;</span>
+<span class="nc" id="L299">            case 0x09 -&gt; &quot;If transaction is in the application currency and is over Y value&quot;;</span>
+<span class="nc" id="L300">            default -&gt; &quot;Condition Code: &quot; + String.format(&quot;%02X&quot;, getConditionCode());</span>
+        };
+    }
+
+    /**
+     * Validates the CVM Results based on business rules
+     * @return true if CVM is valid for transaction processing
+     */
+    public boolean isValidForTransaction() {
+        // If CVM failed but was required, transaction should be declined
+<span class="fc bfc" id="L310" title="All 2 branches covered.">        if (isCvmFailedButRequired()) {</span>
+<span class="fc" id="L311">            return false;</span>
+        }
+        
+        // If CVM was performed and failed, transaction should be declined
+<span class="fc bfc" id="L315" title="All 2 branches covered.">        if (isCvmFailed()) {</span>
+<span class="fc" id="L316">            return false;</span>
+        }
+
+        // Many terminals send 00 for online PIN flows while PIN is verified
+        // separately by the issuer/HSM. Do not fail those transactions here.
+<span class="fc bfc" id="L321" title="All 4 branches covered.">        if (isOnlinePinVerificationPerformed() &amp;&amp; isCvmResultUnknown()) {</span>
+<span class="fc" id="L322">            return true;</span>
+        }
+
+        // Offline PIN is verified by the ICC/terminal and is represented in
+        // 9F34/TVR. The issuer must not re-verify it using DE52.
+<span class="pc bpc" id="L327" title="1 of 4 branches missed.">        if (isOfflinePinVerificationPerformed() &amp;&amp; isCvmSuccessful()) {</span>
+<span class="fc" id="L328">            return true;</span>
+        }
+
+        // RuPay contactless certification may send 9F34=1F0300
+        // (No CVM Performed / terminal supports CVM / Unknown result).
+        // Treat it as eligible no-CVM data; the contactless amount limit is
+        // enforced later by CvmValidationService.
+<span class="pc bpc" id="L335" title="3 of 6 branches missed.">        if (isNoCvmPerformed() &amp;&amp; (isCvmResultUnknown() || isCvmNotPerformed())) {</span>
+<span class="fc" id="L336">            return true;</span>
+        }
+        
+        // If CVM is successful or not required, transaction can proceed
+<span class="pc bpc" id="L340" title="1 of 6 branches missed.">        return isCvmSuccessful() || isNoCvmRequired() || isCvmNotApplicable();</span>
+    }
+
+    /**
+     * Gets the raw CVM Results as byte array
+     * @return CVM Results as byte array
+     */
+    public byte[] getRawCvmResults() {
+<span class="fc" id="L348">        return cvmResults.clone();</span>
+    }
+
+    /**
+     * Gets the CVM Results as hex string
+     * @return CVM Results as hex string
+     */
+    public String getHexCvmResults() {
+<span class="fc" id="L356">        return ISOUtil.hexString(cvmResults);</span>
+    }
+
+    /**
+     * Dumps CVM Results information to a PrintStream
+     * @param p PrintStream to dump to
+     * @param indent Indentation string
+     */
+    public void dump(PrintStream p, String indent) {
+<span class="nc" id="L365">        String inner = indent + &quot;  &quot;;</span>
+<span class="nc" id="L366">        p.printf(&quot;%s&lt;cardholder-verification-method-results value='%s'&gt;%n&quot;, indent, getHexCvmResults());</span>
+<span class="nc" id="L367">        p.printf(&quot;%sByte 1 (CVM Code): %s (%s)%n&quot;, inner, </span>
+<span class="nc" id="L368">                String.format(&quot;%02X&quot;, getCvmCode()), getCvmCodeDescription());</span>
+<span class="nc" id="L369">        p.printf(&quot;%sByte 2 (Condition Code): %s (%s)%n&quot;, inner,</span>
+<span class="nc" id="L370">                String.format(&quot;%02X&quot;, getConditionCode()), getConditionCodeDescription());</span>
+<span class="nc" id="L371">        p.printf(&quot;%sByte 3 (CVM Result): %s (%s)%n&quot;, inner,</span>
+<span class="nc" id="L372">                String.format(&quot;%02X&quot;, getCvmResults()), getCvmResultsDescription());</span>
+<span class="nc" id="L373">        p.printf(&quot;%sValid for Transaction: %s%n&quot;, inner, isValidForTransaction());</span>
+<span class="nc" id="L374">        p.printf(&quot;%s&lt;/cardholder-verification-method-results&gt;%n&quot;, indent);</span>
+<span class="nc" id="L375">    }</span>
+
+    @Override
+    public String toString() {
+<span class="fc" id="L379">        return String.format(&quot;CVMResults[Code=%s, Result=%s, Valid=%s]&quot;, </span>
+<span class="fc" id="L380">                getCvmCodeDescription(), getCvmResultsDescription(), isValidForTransaction());</span>
+    }
+
+    @Override
+    public boolean equals(Object obj) {
+<span class="pc bpc" id="L385" title="1 of 2 branches missed.">        if (this == obj) return true;</span>
+<span class="pc bpc" id="L386" title="2 of 4 branches missed.">        if (obj == null || getClass() != obj.getClass()) return false;</span>
+<span class="fc" id="L387">        CardholderVerificationMethodResults that = (CardholderVerificationMethodResults) obj;</span>
+<span class="fc" id="L388">        return java.util.Arrays.equals(cvmResults, that.cvmResults);</span>
+    }
+
+    @Override
+    public int hashCode() {
+<span class="fc" id="L393">        return java.util.Arrays.hashCode(cvmResults);</span>
+    }
+
+    /**
+     * Main method for testing CVM parsing
+     */
+    public static void main(String[] args) {
+        // Test with different CVM scenarios
+<span class="nc" id="L401">        testCvmParsing(&quot;000000&quot;, &quot;No CVM Required - Successful&quot;);</span>
+<span class="nc" id="L402">        testCvmParsing(&quot;010200&quot;, &quot;Plaintext PIN - Successful&quot;);</span>
+<span class="nc" id="L403">        testCvmParsing(&quot;050100&quot;, &quot;Signature - Failed&quot;);</span>
+<span class="nc" id="L404">        testCvmParsing(&quot;090000&quot;, &quot;Contactless No CVM&quot;);</span>
+<span class="nc" id="L405">        testCvmParsing(&quot;070100&quot;, &quot;Failed CVM Required&quot;);</span>
+<span class="nc" id="L406">        testCvmParsing(&quot;420300&quot;, &quot;Enciphered PIN verified online&quot;);</span>
+<span class="nc" id="L407">        testCvmParsing(&quot;1F0300&quot;, &quot;Enciphered PIN verified online&quot;);</span>
+<span class="nc" id="L408">    }</span>
+
+    private static void testCvmParsing(String hexCvm, String description) {
+<span class="nc" id="L411">        System.out.println(&quot;\n=== &quot; + description + &quot; ===&quot;);</span>
+        try {
+<span class="nc" id="L413">            CardholderVerificationMethodResults cvm = new CardholderVerificationMethodResults(hexCvm);</span>
+<span class="nc" id="L414">            cvm.dump(System.out, &quot;&quot;);</span>
+<span class="nc" id="L415">        } catch (Exception e) {</span>
+<span class="nc" id="L416">            System.err.println(&quot;Error parsing CVM: &quot; + e.getMessage());</span>
+<span class="nc" id="L417">        }</span>
+<span class="nc" id="L418">    }</span>
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.14.202510111229</span></div></body></html>

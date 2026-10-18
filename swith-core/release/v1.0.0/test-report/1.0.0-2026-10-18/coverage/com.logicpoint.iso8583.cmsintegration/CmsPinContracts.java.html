@@ -1,0 +1,64 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>CmsPinContracts.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">iso8583-processor</a> &gt; <a href="index.source.html" class="el_package">com.logicpoint.iso8583.cmsintegration</a> &gt; <span class="el_source">CmsPinContracts.java</span></div><h1>CmsPinContracts.java</h1><pre class="source lang-java linenums">package com.logicpoint.iso8583.cmsintegration;
+
+import io.swagger.v3.oas.annotations.media.Schema;
+import jakarta.validation.Valid;
+import jakarta.validation.constraints.*;
+import java.time.Instant;
+import java.util.UUID;
+
+/** CMS-to-Switch PIN contract. Clear PINs and verification values are never returned. */
+public final class CmsPinContracts {
+    private CmsPinContracts() {}
+<span class="fc" id="L12">    public enum Operation { CONFIGURE_PIN_PROFILE, INITIALIZE_SELECTED_PIN, GENERATE_INITIAL_PIN, CHANGE_PIN, RESET_PIN }</span>
+<span class="fc" id="L13">    public enum Status { PENDING, COMPLETED, FAILED }</span>
+<span class="fc" id="L14">    public enum Establishment { CUSTOMER_SELECTED, HSM_GENERATED }</span>
+<span class="fc" id="L15">    public enum Delivery { NONE, PIN_MAILER }</span>
+<span class="fc" id="L16">    public enum VerificationMethod { VISA_PVV, IBM_3624_OFFSET }</span>
+
+    @Schema(description=&quot;Configuration only. CUSTOMER_SELECTED requires NONE delivery; HSM_GENERATED requires PIN_MAILER. The runtime currently supports VISA_PVV; configured profiles also drive transaction verification.&quot;)
+<span class="fc" id="L19">    public record PinProfile(@NotNull Establishment establishment, @NotNull Delivery delivery,</span>
+            @NotNull VerificationMethod verificationMethod,
+            @Schema(description=&quot;Institution-scoped cms_pin_key_binding alias pinning an exact key_management row; resolved at execution&quot;, example=&quot;issuer10.visa.pvk.v1&quot;)
+            @NotBlank @Pattern(regexp=&quot;[A-Za-z0-9_.:-]{1,100}&quot;) String keyBindingReference,
+            @Schema(description=&quot;Explicit Visa PIN verification key index shared by establishment and verification&quot;, example=&quot;0&quot;)
+            @NotNull @Min(0) @Max(6) Integer pvki) {
+        public PinProfile(Establishment establishment, Delivery delivery, VerificationMethod method, String reference) {
+<span class="fc" id="L26">            this(establishment,delivery,method,reference,0);</span>
+<span class="fc" id="L27">        }</span>
+    }
+
+<span class="fc" id="L30">    public record PinCommand(</span>
+            @Schema(description=&quot;Unique command ID; must equal Idempotency-Key&quot;) @NotNull UUID operationId,
+            @Schema(description=&quot;Must equal path institutionId&quot;) @NotNull UUID institutionId,
+            @Schema(description=&quot;Must equal path family and registration panFamilyId&quot;) @NotNull UUID panFamilyReference,
+            @Schema(description=&quot;Must increase for configuration; must match stored profile for execution&quot;, example=&quot;1&quot;) @Positive long policyProfileVersion,
+            @Schema(description=&quot;Must match active PIN version; initially 0&quot;, example=&quot;0&quot;) @PositiveOrZero long expectedPinVersion,
+            @NotNull Operation operation,
+            @Schema(description=&quot;Required for CONFIGURE_PIN_PROFILE; omit for all other operations&quot;) @Valid PinProfile profile,
+            @Schema(description=&quot;Compact RSA-OAEP-256/A256GCM JWE. Required for initialization, change and reset; omit for configuration and generation.&quot;)
+            @Size(max=16384) String protectedPinMaterial) {
+<span class="fc" id="L40">        @Override public String toString() { return &quot;PinCommand[operationId=&quot; + operationId + &quot;]&quot;; }</span>
+    }
+
+<span class="fc" id="L43">    public enum PinBlockFormat { ISO_0, ISO_4 }</span>
+<span class="fc" id="L44">    public record EncryptedPin(@NotBlank String encryptedPinBlock, @NotNull PinBlockFormat format,</span>
+            @NotBlank @Pattern(regexp=&quot;[A-Za-z0-9_.:-]{1,100}&quot;) String keyBindingReference) {
+<span class="fc" id="L46">        @Override public String toString() { return &quot;EncryptedPin[REDACTED]&quot;; }</span>
+    }
+<span class="fc" id="L48">    public record PinMaterial(@NotNull UUID operationId, @NotNull UUID institutionId,</span>
+            @NotNull UUID panFamilyReference, @Positive long policyProfileVersion,
+            @PositiveOrZero long expectedPinVersion, @NotNull Operation operation,
+            @NotNull Instant expiresAt,
+            @NotBlank @Pattern(regexp=&quot;[A-Za-z0-9_.:-]{1,200}&quot;) String authorizationReference,
+            @Valid EncryptedPin currentPin, @NotNull @Valid EncryptedPin newPin) {
+<span class="fc" id="L54">        @Override public String toString() { return &quot;PinMaterial[REDACTED]&quot;; }</span>
+    }
+
+<span class="fc" id="L57">    public record PinOperationReceipt(UUID operationId, UUID institutionId, UUID panFamilyReference,</span>
+            Operation operation, Status status, long policyProfileVersion,
+            @Schema(description=&quot;Active PIN version; configuration and pending/failed execution leave it unchanged&quot;) long pinVersion,
+            @Schema(description=&quot;Required on completed initial generation; identifies a mailer, not delivery confirmation&quot;, nullable=true, example=&quot;MAILER-20260923-000001&quot;) String mailerReference,
+            @Schema(description=&quot;Executor-defined failure code; no standardized catalogue yet&quot;, nullable=true) String failureCode,
+            @Schema(description=&quot;Receipt creation instant; ISO-8601 or Unix seconds according to Jackson configuration&quot;) Instant updatedAt) {}
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.14.202510111229</span></div></body></html>

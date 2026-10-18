@@ -1,0 +1,97 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>PosDataAuthorizationValidationService.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">iso8583-processor</a> &gt; <a href="index.source.html" class="el_package">com.logicpoint.iso8583.service</a> &gt; <span class="el_source">PosDataAuthorizationValidationService.java</span></div><h1>PosDataAuthorizationValidationService.java</h1><pre class="source lang-java linenums">package com.logicpoint.iso8583.service;
+
+import com.logicpoint.iso8583.config.PosDataAuthorizationProperties;
+import com.logicpoint.iso8583.context.RequestContext;
+import com.logicpoint.iso8583.util.Scheme;
+import com.logicpoint.iso8583.validation.TransactionType;
+import java.util.ArrayList;
+import java.util.List;
+import java.util.Map;
+import java.util.stream.Collectors;
+import org.springframework.stereotype.Service;
+
+/**
+ * Validates fixed-position POS data fields using scheme-configured authorization rules.
+ */
+@Service
+public class PosDataAuthorizationValidationService {
+
+    private final PosDataAuthorizationProperties properties;
+
+<span class="fc" id="L21">    public PosDataAuthorizationValidationService(PosDataAuthorizationProperties properties) {</span>
+<span class="fc" id="L22">        this.properties = properties;</span>
+<span class="fc" id="L23">    }</span>
+
+    public List&lt;String&gt; validate(RequestContext requestContext, Scheme scheme, TransactionType transactionType) {
+<span class="fc" id="L26">        List&lt;String&gt; errors = new ArrayList&lt;&gt;();</span>
+<span class="pc bpc" id="L27" title="4 of 8 branches missed.">        if (!properties.isEnabled() || requestContext == null || scheme == null || transactionType == null) {</span>
+<span class="nc" id="L28">            return errors;</span>
+        }
+
+<span class="fc" id="L31">        PosDataAuthorizationProperties.SchemeRule schemeRule = properties.getRule(scheme.name());</span>
+<span class="pc bpc" id="L32" title="1 of 4 branches missed.">        if (schemeRule == null || !schemeRule.isEnabled()) {</span>
+<span class="fc" id="L33">            return errors;</span>
+        }
+
+<span class="fc" id="L36">        PosDataAuthorizationProperties.TransactionRule transactionRule =</span>
+<span class="fc" id="L37">                schemeRule.getTransactionRules().get(transactionType);</span>
+<span class="fc bfc" id="L38" title="All 2 branches covered.">        if (transactionRule == null) {</span>
+<span class="fc" id="L39">            return errors;</span>
+        }
+
+<span class="fc" id="L42">        String posData = requestContext.getFields().get(schemeRule.getFieldNumber());</span>
+<span class="fc bfc" id="L43" title="All 2 branches covered.">        if (isBlank(posData)) {</span>
+<span class="pc bpc" id="L44" title="1 of 2 branches missed.">            if (transactionRule.isRequired()) {</span>
+<span class="fc" id="L45">                errors.add(&quot;MISSING_DE&quot; + schemeRule.getFieldNumber() + &quot;: POS data is required for &quot;</span>
+                        + scheme + &quot; &quot; + transactionType);
+            }
+<span class="fc" id="L48">            return errors;</span>
+        }
+
+<span class="fc bfc" id="L51" title="All 2 branches covered.">        if (posData.length() &lt; schemeRule.getMinLength()) {</span>
+<span class="fc" id="L52">            errors.add(&quot;INVALID_DE&quot; + schemeRule.getFieldNumber() + &quot;: POS data too short; expected at least &quot;</span>
+<span class="fc" id="L53">                    + schemeRule.getMinLength() + &quot; characters, got &quot; + posData.length());</span>
+<span class="fc" id="L54">            return errors;</span>
+        }
+
+        for (Map.Entry&lt;String, PosDataAuthorizationProperties.SubfieldRule&gt; entry
+<span class="fc bfc" id="L58" title="All 2 branches covered.">                : transactionRule.getSubfields().entrySet()) {</span>
+<span class="fc" id="L59">            validateSubfield(schemeRule.getFieldNumber(), posData, entry.getKey(), entry.getValue(), scheme,</span>
+                    transactionType, errors);
+<span class="fc" id="L61">        }</span>
+
+<span class="fc" id="L63">        return errors;</span>
+    }
+
+    private void validateSubfield(int fieldNumber,
+                                  String posData,
+                                  String subfieldName,
+                                  PosDataAuthorizationProperties.SubfieldRule rule,
+                                  Scheme scheme,
+                                  TransactionType transactionType,
+                                  List&lt;String&gt; errors) {
+<span class="fc" id="L73">        int position = rule.getPosition();</span>
+<span class="pc bpc" id="L74" title="1 of 4 branches missed.">        if (position &lt; 0 || position &gt;= posData.length()) {</span>
+<span class="fc" id="L75">            errors.add(&quot;INVALID_DE&quot; + fieldNumber + &quot;: &quot; + displayName(subfieldName, rule)</span>
+                    + &quot; is not present at configured position &quot; + position);
+<span class="fc" id="L77">            return;</span>
+        }
+
+<span class="fc" id="L80">        String value = String.valueOf(posData.charAt(position)).toUpperCase();</span>
+<span class="pc bpc" id="L81" title="1 of 4 branches missed.">        if (!rule.getAllowedValues().isEmpty() &amp;&amp; !rule.getAllowedValues().contains(value)) {</span>
+<span class="fc" id="L82">            String allowed = rule.getAllowedValues().stream().sorted().collect(Collectors.joining(&quot;,&quot;));</span>
+<span class="fc" id="L83">            errors.add(&quot;INVALID_DE&quot; + fieldNumber + &quot;: &quot; + displayName(subfieldName, rule)</span>
+                    + &quot; expected one of [&quot; + allowed + &quot;] for &quot; + scheme + &quot; &quot; + transactionType
+                    + &quot;, got &quot; + value);
+        }
+<span class="fc" id="L87">    }</span>
+
+    private String displayName(String subfieldName, PosDataAuthorizationProperties.SubfieldRule rule) {
+<span class="fc bfc" id="L90" title="All 2 branches covered.">        return isBlank(rule.getDescription()) ? subfieldName : rule.getDescription();</span>
+    }
+
+    private boolean isBlank(String value) {
+<span class="fc bfc" id="L94" title="All 4 branches covered.">        return value == null || value.trim().isEmpty();</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.14.202510111229</span></div></body></html>

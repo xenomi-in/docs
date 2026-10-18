@@ -1,0 +1,522 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>Iso8583ProcessorService.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">iso8583-processor</a> &gt; <a href="index.source.html" class="el_package">com.logicpoint.iso8583.service</a> &gt; <span class="el_source">Iso8583ProcessorService.java</span></div><h1>Iso8583ProcessorService.java</h1><pre class="source lang-java linenums">package com.logicpoint.iso8583.service;
+
+import com.logicpoint.iso8583.context.RequestContext;
+import com.logicpoint.iso8583.model.Iso8583Message;
+import com.logicpoint.iso8583.entity.TransactionResponse;
+import com.logicpoint.iso8583.repository.TransactionResponseRepository;
+import com.logicpoint.iso8583.notification.service.NotificationService;
+import com.logicpoint.iso8583.util.Scheme;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.scheduling.annotation.Async;
+import org.springframework.stereotype.Service;
+import org.slf4j.MDC;
+import java.util.concurrent.CompletableFuture;
+import java.util.Map;
+import java.util.Set;
+import com.logicpoint.iso8583.responsecode.InternalResCode;
+import com.logicpoint.iso8583.service.CacheInitializationService;
+import com.logicpoint.iso8583.validation.TlvUtils;
+import com.logicpoint.iso8583.emv.ChipData;
+import com.logicpoint.iso8583.emv.ChipDataParser;
+
+import com.logicpoint.iso8583.service.KeyManagementService;
+import com.logicpoint.iso8583.service.ResponseCodeCacheService;
+@Service
+public class Iso8583ProcessorService {
+
+<span class="fc" id="L29">    private static final Logger log = LoggerFactory.getLogger(Iso8583ProcessorService.class);</span>
+<span class="fc" id="L30">    private static final Set&lt;String&gt; RESPONSE_DE48_OMIT_TAGS = Set.of(&quot;052&quot;, &quot;056&quot;, &quot;061&quot;, &quot;071&quot;, &quot;078&quot;, &quot;084&quot;);</span>
+    private final MessageProcessorService messageProcessor;
+    private final TransactionResponseRepository transactionResponseRepository;
+    private final NettyHsmService nettyHsmService;
+    private final KeyManagementService keyManagementService;
+    private final AutomaticReversalService automaticReversalService;
+    private final ResponseCodeCacheService responseCodeCacheService;
+    private final CardDataEncryptionService cardDataEncryptionService;
+    private final CacheInitializationService cacheInitializationService;
+    private final NotificationService notificationService;
+    private final TransactionOutcomeMetrics transactionOutcomeMetrics;
+    @Autowired
+<span class="fc" id="L42">    public Iso8583ProcessorService(MessageProcessorService messageProcessor, TransactionResponseRepository transactionResponseRepository, NettyHsmService nettyHsmService, KeyManagementService keyManagementService, AutomaticReversalService automaticReversalService, ResponseCodeCacheService responseCodeCacheService, CardDataEncryptionService cardDataEncryptionService, CacheInitializationService cacheInitializationService, NotificationService notificationService, TransactionOutcomeMetrics transactionOutcomeMetrics) {</span>
+<span class="fc" id="L43">        this.messageProcessor = messageProcessor;</span>
+<span class="fc" id="L44">        this.transactionResponseRepository = transactionResponseRepository;</span>
+<span class="fc" id="L45">        this.nettyHsmService = nettyHsmService;</span>
+<span class="fc" id="L46">        this.keyManagementService = keyManagementService;</span>
+<span class="fc" id="L47">        this.automaticReversalService = automaticReversalService;</span>
+<span class="fc" id="L48">        this.responseCodeCacheService = responseCodeCacheService;</span>
+<span class="fc" id="L49">        this.cardDataEncryptionService = cardDataEncryptionService;</span>
+<span class="fc" id="L50">        this.cacheInitializationService = cacheInitializationService;</span>
+<span class="fc" id="L51">        this.notificationService = notificationService;</span>
+<span class="fc" id="L52">        this.transactionOutcomeMetrics = transactionOutcomeMetrics;</span>
+<span class="fc" id="L53">    }</span>
+
+    // Update Iso8583ProcessorService.java
+
+@Async(&quot;iso8583TxnExecutor&quot;)
+public CompletableFuture&lt;Iso8583Message&gt; processMessage(Iso8583Message request) {
+<span class="nc" id="L59">    String uniqueTransactionId = request.getUniqueTransactionId();</span>
+<span class="nc" id="L60">    RequestContext requestContext = buildRequestContext(request, uniqueTransactionId);</span>
+<span class="nc" id="L61">    MDC.put(&quot;txnId&quot;, uniqueTransactionId);</span>
+<span class="nc" id="L62">    applyNetworkSessionContext(request);</span>
+<span class="nc" id="L63">    transactionOutcomeMetrics.started();</span>
+
+    try {
+        // Register transaction for reversal tracking
+<span class="nc" id="L67">        automaticReversalService.registerTransaction(requestContext);</span>
+
+        // Process the message
+<span class="nc" id="L70">        Map&lt;Integer, String&gt; processedFields = messageProcessor.processMessage(requestContext);</span>
+        
+        // Check if accounting was approved (stored in context)
+<span class="nc" id="L73">        String responseCode = processedFields.get(39);</span>
+<span class="nc" id="L74">        boolean accountingApproved = &quot;00&quot;.equals(responseCode);</span>
+<span class="nc" id="L75">        notificationService.publishDeclinedAuthorization(requestContext, new java.util.HashMap&lt;&gt;(processedFields));</span>
+        
+<span class="nc bnc" id="L77" title="All 2 branches missed.">        if (accountingApproved) {</span>
+            // Extract accounting transaction ID from processed fields
+<span class="nc" id="L79">            String accountingTxnId = processedFields.get(901);</span>
+<span class="nc bnc" id="L80" title="All 2 branches missed.">            if (accountingTxnId != null) {</span>
+<span class="nc" id="L81">                automaticReversalService.markAccountingApproved(uniqueTransactionId, accountingTxnId);</span>
+            }
+        }
+        
+        // Create response - WRAP IN TRY-CATCH
+        Iso8583Message response;
+        try {
+<span class="nc" id="L88">            response = buildResponse(processedFields, requestContext);</span>
+<span class="nc" id="L89">        } catch (Exception e) {</span>
+<span class="nc" id="L90">            log.error(&quot;Failed to build response&quot;, e);</span>
+<span class="nc bnc" id="L91" title="All 2 branches missed.">            if (accountingApproved) {</span>
+<span class="nc" id="L92">                automaticReversalService.handlePostApprovalFailure(</span>
+                    uniqueTransactionId, &quot;RESPONSE_BUILD&quot;, 
+<span class="nc" id="L94">                    &quot;Failed to build response: &quot; + e.getMessage(), e);</span>
+            }
+<span class="nc" id="L96">            throw e;</span>
+<span class="nc" id="L97">        }</span>
+        
+        // Save transaction response - WRAP IN TRY-CATCH
+        try {
+<span class="nc" id="L101">            saveTransactionResponse(response, requestContext);</span>
+<span class="nc" id="L102">        } catch (Exception e) {</span>
+<span class="nc" id="L103">            log.error(&quot;Failed to save transaction response&quot;, e);</span>
+<span class="nc bnc" id="L104" title="All 2 branches missed.">            if (accountingApproved) {</span>
+<span class="nc" id="L105">                automaticReversalService.handlePostApprovalFailure(</span>
+                    uniqueTransactionId, &quot;RESPONSE_PERSIST&quot;, 
+<span class="nc" id="L107">                    &quot;Failed to persist response: &quot; + e.getMessage(), e);</span>
+            }
+<span class="nc" id="L109">            throw e;</span>
+<span class="nc" id="L110">        }</span>
+        
+        // Mark response as sent (this clears reversal requirement)
+<span class="nc" id="L113">        automaticReversalService.markResponseSent(uniqueTransactionId);</span>
+
+<span class="nc" id="L115">        transactionOutcomeMetrics.completed(</span>
+                requestContext,
+<span class="nc bnc" id="L117" title="All 2 branches missed.">                &quot;00&quot;.equals(response.getField(39)) ? &quot;success&quot; : &quot;declined&quot;,</span>
+<span class="nc" id="L118">                response.getField(39));</span>
+        
+<span class="nc" id="L120">        return CompletableFuture.completedFuture(response);</span>
+        
+<span class="nc" id="L122">    } catch (Exception e) {</span>
+<span class="nc" id="L123">        log.error(&quot;Error processing ISO8583 message&quot;, e);</span>
+        
+        // Generic failure handler - will check if reversal needed
+<span class="nc" id="L126">        automaticReversalService.handlePostApprovalFailure(</span>
+            uniqueTransactionId, &quot;PROCESSING&quot;, 
+<span class="nc" id="L128">            &quot;Processing failed: &quot; + e.getMessage(), e);</span>
+
+<span class="nc" id="L130">        transactionOutcomeMetrics.completed(</span>
+                requestContext,
+<span class="nc bnc" id="L132" title="All 2 branches missed.">                isTimeout(e) ? &quot;timeout&quot; : &quot;error&quot;,</span>
+                &quot;none&quot;);
+        
+<span class="nc" id="L135">        throw new RuntimeException(&quot;Failed to process ISO8583 message&quot;, e);</span>
+    } finally {
+<span class="nc" id="L137">        transactionOutcomeMetrics.finished();</span>
+<span class="nc" id="L138">        NetworkSessionContextHolder.clear();</span>
+<span class="nc" id="L139">        MDC.remove(&quot;txnId&quot;);</span>
+    }
+		}
+
+private boolean isTimeout(Throwable throwable) {
+<span class="nc" id="L144">    Throwable current = throwable;</span>
+<span class="nc bnc" id="L145" title="All 2 branches missed.">    while (current != null) {</span>
+<span class="nc bnc" id="L146" title="All 6 branches missed.">        if (current instanceof java.util.concurrent.TimeoutException</span>
+                || current instanceof java.net.SocketTimeoutException
+                || current instanceof java.net.http.HttpTimeoutException) {
+<span class="nc" id="L149">            return true;</span>
+        }
+<span class="nc" id="L151">        current = current.getCause();</span>
+    }
+<span class="nc" id="L153">    return false;</span>
+}
+
+private RequestContext buildRequestContext(Iso8583Message request, String uniqueTransactionId) {
+<span class="nc" id="L157">    String institutionId = resolveInstitutionId(request);</span>
+<span class="nc" id="L158">    RequestContext requestContext = new RequestContext(</span>
+        uniqueTransactionId,
+        uniqueTransactionId,
+        institutionId,
+<span class="nc" id="L162">        request.getMti(),</span>
+<span class="nc" id="L163">        request.getScheme(),</span>
+<span class="nc" id="L164">        request.getFields()</span>
+    );
+<span class="nc" id="L166">    String panHash = cardDataEncryptionService.computePanLookupHmac(requestContext.getCardNumber(), parseInstitutionId(institutionId));</span>
+<span class="nc" id="L167">    requestContext.setPanHash(panHash);</span>
+<span class="nc" id="L168">    return requestContext;</span>
+}
+
+private String resolveInstitutionId(Iso8583Message request) {
+<span class="nc" id="L172">    String pan = request.getField(2);</span>
+<span class="nc bnc" id="L173" title="All 4 branches missed.">    if (pan != null &amp;&amp; pan.length() &gt;= 6) {</span>
+<span class="nc" id="L174">        CacheInitializationService.BinInstitutionData binData = cacheInitializationService</span>
+<span class="nc" id="L175">                .loadBinInstitutionCache()</span>
+<span class="nc" id="L176">                .get(pan.substring(0, 6));</span>
+<span class="nc bnc" id="L177" title="All 6 branches missed.">        if (binData != null &amp;&amp; binData.getBinDetails() != null &amp;&amp; binData.getBinDetails().getInstitution_id() != null) {</span>
+<span class="nc" id="L178">            return String.valueOf(binData.getBinDetails().getInstitution_id());</span>
+        }
+    }
+<span class="nc" id="L181">    return request.getField(32);</span>
+}
+
+private Integer parseInstitutionId(String institutionId) {
+<span class="nc bnc" id="L185" title="All 4 branches missed.">    if (institutionId == null || institutionId.isBlank()) {</span>
+<span class="nc" id="L186">        return null;</span>
+    }
+    try {
+<span class="nc" id="L189">        return Integer.valueOf(institutionId);</span>
+<span class="nc" id="L190">    } catch (NumberFormatException ex) {</span>
+<span class="nc" id="L191">        return null;</span>
+    }
+}
+
+private Iso8583Message buildResponse(Map&lt;Integer, String&gt; processedFields, RequestContext requestContext) {
+<span class="fc" id="L196">    Iso8583Message response = new Iso8583Message();</span>
+<span class="fc" id="L197">    response.setScheme(requestContext.getScheme());</span>
+<span class="fc" id="L198">    response.setMti(processedFields.get(0));</span>
+<span class="fc" id="L199">    response.setUniqueTransactionId(requestContext.getUniqueTransactionId());</span>
+    
+<span class="fc" id="L201">    processedFields.remove(0);</span>
+<span class="fc" id="L202">    processedFields.remove(14);</span>
+<span class="fc" id="L203">    processedFields.remove(18);</span>
+<span class="fc" id="L204">    processedFields.remove(22);</span>
+<span class="fc" id="L205">    processedFields.remove(25);</span>
+<span class="fc" id="L206">    processedFields.remove(33);</span>
+<span class="fc" id="L207">    processedFields.remove(35);</span>
+<span class="fc" id="L208">    processedFields.remove(40);</span>
+<span class="fc" id="L209">    processedFields.remove(42);</span>
+<span class="fc" id="L210">    processedFields.remove(43);</span>
+<span class="fc" id="L211">    processedFields.remove(52);</span>
+<span class="fc" id="L212">    processedFields.remove(61);</span>
+<span class="fc" id="L213">    processedFields.remove(901);</span>
+<span class="fc" id="L214">    sanitizeResponseDe48(processedFields);</span>
+<span class="fc" id="L215">    sanitizeFailedResponseFields(processedFields);</span>
+<span class="fc" id="L216">    sanitizeResponseDe55(processedFields, requestContext);</span>
+    
+<span class="fc" id="L218">    response.setFields(processedFields);</span>
+<span class="fc" id="L219">    return response;</span>
+}
+
+private void sanitizeFailedResponseFields(Map&lt;Integer, String&gt; fields) {
+<span class="fc bfc" id="L223" title="All 2 branches covered.">    if (&quot;00&quot;.equals(fields.get(39))) {</span>
+<span class="fc" id="L224">        return;</span>
+    }
+
+<span class="fc" id="L227">    fields.remove(55);</span>
+<span class="fc" id="L228">    removeTlvTag(fields, 120, &quot;004&quot;);</span>
+<span class="fc" id="L229">}</span>
+
+private void removeTlvTag(Map&lt;Integer, String&gt; fields, int fieldNumber, String tag) {
+<span class="fc" id="L232">    String tlv = fields.get(fieldNumber);</span>
+<span class="pc bpc" id="L233" title="1 of 4 branches missed.">    if (tlv == null || tlv.isBlank()) {</span>
+<span class="fc" id="L234">        return;</span>
+    }
+
+    try {
+<span class="fc" id="L238">        Map&lt;String, String&gt; tlvMap = TlvUtils.parseTlv(tlv);</span>
+<span class="pc bpc" id="L239" title="1 of 2 branches missed.">        if (tlvMap.remove(tag) == null) {</span>
+<span class="nc" id="L240">            return;</span>
+        }
+
+<span class="fc bfc" id="L243" title="All 2 branches covered.">        if (tlvMap.isEmpty()) {</span>
+<span class="fc" id="L244">            fields.remove(fieldNumber);</span>
+        } else {
+<span class="fc" id="L246">            fields.put(fieldNumber, packTlv(tlvMap));</span>
+        }
+<span class="nc" id="L248">    } catch (Exception ex) {</span>
+<span class="nc" id="L249">        log.warn(&quot;Unable to sanitize response DE{} tag {}; removing field: {}&quot;,</span>
+<span class="nc" id="L250">                fieldNumber, tag, ex.getMessage());</span>
+<span class="nc" id="L251">        fields.remove(fieldNumber);</span>
+<span class="fc" id="L252">    }</span>
+<span class="fc" id="L253">}</span>
+
+private void sanitizeResponseDe48(Map&lt;Integer, String&gt; fields) {
+<span class="fc" id="L256">    String de48 = fields.get(48);</span>
+<span class="pc bpc" id="L257" title="1 of 4 branches missed.">    if (de48 == null || de48.isBlank()) {</span>
+<span class="fc" id="L258">        return;</span>
+    }
+
+    try {
+<span class="fc" id="L262">        Map&lt;String, String&gt; tlvMap = TlvUtils.parseTlv(de48);</span>
+<span class="pc bpc" id="L263" title="1 of 2 branches missed.">        if (!tlvMap.keySet().removeAll(RESPONSE_DE48_OMIT_TAGS)) {</span>
+<span class="nc" id="L264">            return;</span>
+        }
+
+<span class="fc" id="L267">        fields.put(48, packTlv(tlvMap));</span>
+<span class="nc" id="L268">    } catch (Exception ex) {</span>
+<span class="nc" id="L269">        log.warn(&quot;Unable to sanitize response DE48 tags: {}&quot;, ex.getMessage());</span>
+<span class="fc" id="L270">    }</span>
+<span class="fc" id="L271">}</span>
+
+private void sanitizeResponseDe55(Map&lt;Integer, String&gt; fields, RequestContext requestContext) {
+<span class="pc bpc" id="L274" title="1 of 4 branches missed.">    if (!Scheme.RUPAY.equals(requestContext.getScheme()) || !fields.containsKey(55)) {</span>
+<span class="fc" id="L275">        return;</span>
+    }
+
+    try {
+<span class="fc" id="L279">        ChipData chipData = new ChipDataParser().parseChipData(fields.get(55));</span>
+<span class="fc" id="L280">        String tag91 = chipData.getTagValue(&quot;91&quot;);</span>
+<span class="pc bpc" id="L281" title="2 of 4 branches missed.">        if (tag91 == null || tag91.isBlank()) {</span>
+<span class="nc" id="L282">            fields.remove(55);</span>
+<span class="nc" id="L283">            return;</span>
+        }
+
+<span class="fc" id="L286">        ChipData responseChipData = new ChipData();</span>
+<span class="fc" id="L287">        responseChipData.setTagValue(&quot;91&quot;, tag91.trim());</span>
+<span class="fc" id="L288">        fields.put(55, responseChipData.buildIccData());</span>
+<span class="nc" id="L289">    } catch (Exception ex) {</span>
+<span class="nc" id="L290">        log.warn(&quot;Unable to sanitize response DE55; removing field 55: {}&quot;, ex.getMessage());</span>
+<span class="nc" id="L291">        fields.remove(55);</span>
+<span class="fc" id="L292">    }</span>
+<span class="fc" id="L293">}</span>
+
+private String packTlv(Map&lt;String, String&gt; tlvMap) {
+<span class="fc" id="L296">    StringBuilder packed = new StringBuilder();</span>
+<span class="fc bfc" id="L297" title="All 2 branches covered.">    for (Map.Entry&lt;String, String&gt; entry : tlvMap.entrySet()) {</span>
+<span class="fc" id="L298">        packed.append(entry.getKey())</span>
+<span class="fc" id="L299">                .append(String.format(&quot;%03d&quot;, entry.getValue().length()))</span>
+<span class="fc" id="L300">                .append(entry.getValue());</span>
+<span class="fc" id="L301">    }</span>
+<span class="fc" id="L302">    return packed.toString();</span>
+}
+
+private void saveTransactionResponse(Iso8583Message response, RequestContext requestContext) {
+<span class="nc" id="L306">    TransactionResponse transactionResponse = new TransactionResponse();</span>
+<span class="nc" id="L307">    transactionResponse.setTransactionId(requestContext.getUniqueTransactionId());</span>
+<span class="nc" id="L308">    transactionResponse.setResponseCode(response.getField(39));</span>
+<span class="nc" id="L309">    transactionResponse.setResponseMessage(&quot;&quot;);</span>
+<span class="nc" id="L310">    transactionResponse.setAuthCode(response.getField(38));</span>
+<span class="nc" id="L311">    transactionResponse.setChipData(response.getField(55));</span>
+<span class="nc" id="L312">    transactionResponse.setMti(response.getMti());</span>
+<span class="nc" id="L313">    transactionResponse.setOriginalData(requestContext.getFields().get(90));</span>
+<span class="nc" id="L314">    transactionResponseRepository.save(transactionResponse);</span>
+<span class="nc" id="L315">    log.info(&quot;Transaction response saved with ID: {}&quot;, requestContext.getUniqueTransactionId());</span>
+<span class="nc" id="L316">}</span>
+   /*  @Async(&quot;iso8583TxnExecutor&quot;)
+    public CompletableFuture&lt;Iso8583Message&gt; processMessage(Iso8583Message request) {
+        try {
+            // Convert request to ISO8583 format
+            //String isoMessage = Iso8583MessageHandler.formatIso8583Message(request.getFields());
+            //log.debug(&quot;Formatted ISO8583 message: {}&quot;, isoMessage);
+            String uniqueTransactionId = request.getUniqueTransactionId();
+            MDC.put(&quot;txnId&quot;, uniqueTransactionId);
+            // Process the message
+            Map&lt;Integer, String&gt; processedFields = messageProcessor.processMessage(request.getFields(), request.getScheme(), request.getMti(), uniqueTransactionId);
+
+            // Create response
+            Iso8583Message response = new Iso8583Message();
+            response.setScheme(request.getScheme());
+            //processedFields.put(900, uniqueTransactionId);
+
+            response.setMti(processedFields.get(0));
+            response.setUniqueTransactionId(uniqueTransactionId);
+            processedFields.remove(0);
+
+            //omit DE in response 
+            processedFields.remove(18);
+            processedFields.remove(22);
+            processedFields.remove(25);
+            processedFields.remove(35);
+            processedFields.remove(40);
+            processedFields.remove(42);
+            processedFields.remove(43);
+            processedFields.remove(52);
+            processedFields.remove(61);
+            processedFields.remove(999); // removing scheme from the fields
+
+            response.setFields(processedFields);
+
+            // save the transaction response in the database
+            TransactionResponse transactionResponse = new TransactionResponse();
+            transactionResponse.setTransactionId(uniqueTransactionId);
+            transactionResponse.setResponseCode(response.getField(39));
+            transactionResponse.setResponseMessage(&quot;&quot;);
+            transactionResponse.setAuthCode(response.getField(38));
+            transactionResponse.setChipData(response.getField(55));
+            transactionResponse.setMti(response.getMti());
+            transactionResponse.setOriginalData(request.getFields().get(90));
+            TransactionResponse savedTransactionResponse = transactionResponseRepository.save(transactionResponse);
+            log.info(&quot;Transaction response saved with ID: {}&quot;, savedTransactionResponse.getTransactionId().toString());
+
+            return CompletableFuture.completedFuture(response);
+        } catch (Exception e) {
+            log.error(&quot;Error processing ISO8583 message&quot;, e);
+            throw new RuntimeException(&quot;Failed to process ISO8583 message&quot;, e);
+        } finally {
+            MDC.remove(&quot;txnId&quot;);
+        }
+    }*/
+
+    /**
+     * Processes a Dynamic Key Exchange (DKE) ISO8583 message. This method
+     * handles logic specific to DKE messages, such as key parsing, validation,
+     * updating security modules, and assembling DKE-compliant response fields.
+     *
+     * @param request The incoming ISO8583 message representing a DKE request
+     * @return The processed ISO8583 response message for the DKE operation
+     */
+    public Iso8583Message processNetworkKeyExchange(Iso8583Message request, String scheme) {
+<span class="nc" id="L381">        String uniqueTransactionId = java.util.UUID.randomUUID().toString();</span>
+        try {
+<span class="nc" id="L383">            applyNetworkSessionContext(request);</span>
+<span class="nc" id="L384">            log.info(&quot;Processing Dynamic Key Exchange message: txnId={}&quot;, uniqueTransactionId);</span>
+<span class="nc" id="L385">            String responseCode = &quot;00&quot;;</span>
+<span class="nc" id="L386">            InternalResCode reesCode = InternalResCode.APPROVED;</span>
+            // Example: Retrieve the encrypted key and related DEs (customize DEs as per your spec)
+<span class="nc" id="L388">            String reqEncryptedKeyTR31 = request.getField(48); // // Rupay De 48 (not in tlv format)</span>
+<span class="nc" id="L389">            String reqKcv = reqEncryptedKeyTR31.substring(reqEncryptedKeyTR31.length() - 6); // // last 6 characters of the encrypted key</span>
+<span class="nc" id="L390">            reqEncryptedKeyTR31 = reqEncryptedKeyTR31.substring(0, reqEncryptedKeyTR31.length() - 6); // // last 6 characters of the encrypted key</span>
+<span class="nc" id="L391">            String reqHeader = reqEncryptedKeyTR31.substring(0, 16); // 16 bytes of the encrypted key</span>
+<span class="nc" id="L392">            String keyType = request.getField(70); // Key Type or usage info (70) </span>
+<span class="nc bnc" id="L393" title="All 4 branches missed.">            if (scheme.equals(&quot;RUPAY&quot;) &amp;&amp; keyType.equals(&quot;184&quot;)) {</span>
+<span class="nc" id="L394">                keyType = &quot;ZPK&quot;;</span>
+<span class="nc bnc" id="L395" title="All 2 branches missed.">                if (reqHeader.equals(&quot;B0080P0TB00S0000&quot;)) {</span>
+<span class="nc" id="L396">                    responseCode = &quot;00&quot;;</span>
+<span class="nc" id="L397">                    reesCode = InternalResCode.APPROVED;</span>
+                } else {
+<span class="nc" id="L399">                    log.error(&quot;Invalid header for &quot; + keyType);</span>
+<span class="nc" id="L400">                    responseCode = &quot;81&quot;;</span>
+<span class="nc" id="L401">                    reesCode = InternalResCode.CRYPTOGRAPHIC_ERROR;</span>
+                }
+<span class="nc bnc" id="L403" title="All 4 branches missed.">            } else if (scheme.equals(&quot;RUPAY&quot;) &amp;&amp; keyType.equals(&quot;185&quot;)) {</span>
+<span class="nc" id="L404">                keyType = &quot;ZAK&quot;;</span>
+<span class="nc bnc" id="L405" title="All 2 branches missed.">                if (reqHeader.equals(&quot;B0080M3TC00S0000&quot;)) {</span>
+<span class="nc" id="L406">                    responseCode = &quot;00&quot;;</span>
+<span class="nc" id="L407">                    reesCode = InternalResCode.APPROVED;</span>
+                } else {
+<span class="nc" id="L409">                    log.error(&quot;Invalid header for &quot; + keyType);</span>
+<span class="nc" id="L410">                    responseCode = &quot;81&quot;;</span>
+<span class="nc" id="L411">                    reesCode = InternalResCode.CRYPTOGRAPHIC_ERROR;</span>
+                }
+            }
+            // Update all existing keys of this type and scheme to &quot;old&quot; in the DB
+<span class="nc bnc" id="L415" title="All 2 branches missed.">            if (reesCode.equals(InternalResCode.APPROVED)) {</span>
+<span class="nc" id="L416">                String hmsResponse = nettyHsmService.TranslateWorkingKey(reqEncryptedKeyTR31, keyType, true, scheme);</span>
+<span class="nc" id="L417">                String[] workingKeyParts = hmsResponse.split(&quot;;&quot;);</span>
+<span class="nc bnc" id="L418" title="All 2 branches missed.">                if (workingKeyParts.length != 3) {</span>
+<span class="nc" id="L419">                    log.error(&quot;Invalid working key response format&quot;);</span>
+<span class="nc" id="L420">                    responseCode = &quot;81&quot;;</span>
+<span class="nc" id="L421">                    reesCode = InternalResCode.CRYPTOGRAPHIC_ERROR;</span>
+                } else {
+<span class="nc" id="L423">                    String encryptedKeyTR31 = workingKeyParts[1];</span>
+<span class="nc" id="L424">                    String kcv = workingKeyParts[2];</span>
+<span class="nc" id="L425">                    responseCode = &quot;00&quot;;</span>
+<span class="nc bnc" id="L426" title="All 2 branches missed.">                    if (!reqKcv.startsWith(kcv)) {</span>
+<span class="nc" id="L427">                        log.error(&quot;KCV mismatch for &quot; + keyType);</span>
+<span class="nc" id="L428">                        responseCode = &quot;81&quot;;</span>
+<span class="nc" id="L429">                        reesCode = InternalResCode.CRYPTOGRAPHIC_ERROR;</span>
+                    } else {
+                        // Update all existing keys of this type and scheme to 'old'
+<span class="nc" id="L432">                        boolean success = rotateKeyForRequestContext(request, keyType, scheme, encryptedKeyTR31, kcv);</span>
+<span class="nc bnc" id="L433" title="All 2 branches missed.">                        if (!success) {</span>
+<span class="nc" id="L434">                            log.error(&quot;Failed to rotate key for &quot; + keyType + &quot; and scheme &quot; + scheme);</span>
+<span class="nc" id="L435">                            responseCode = &quot;81&quot;;</span>
+<span class="nc" id="L436">                            reesCode = InternalResCode.CRYPTOGRAPHIC_ERROR;</span>
+                        } else {
+<span class="nc" id="L438">                            responseCode = &quot;00&quot;;</span>
+<span class="nc" id="L439">                            reesCode = InternalResCode.APPROVED;</span>
+                        }
+                    }
+
+                }
+<span class="nc" id="L444">            } else {</span>
+<span class="nc" id="L445">                log.error(&quot;Response code is not 00 for &quot; + keyType + &quot; and scheme &quot; + scheme);</span>
+            }
+            // Assemble a positive response
+<span class="nc" id="L448">            Iso8583Message response = new Iso8583Message();</span>
+<span class="nc" id="L449">            response.setScheme(request.getScheme());</span>
+<span class="nc" id="L450">            response.setMti(&quot;0810&quot;); // Example: Advice response for network management</span>
+<span class="nc" id="L451">            response.setUniqueTransactionId(uniqueTransactionId);</span>
+
+<span class="nc" id="L453">            java.util.Map&lt;Integer, String&gt; responseFields = new java.util.HashMap&lt;&gt;();</span>
+<span class="nc" id="L454">            responseFields.put(7, request.getField(7)); // Transmission date/time</span>
+<span class="nc" id="L455">            responseFields.put(11, request.getField(11)); // Stan number</span>
+<span class="nc" id="L456">            responseFields.put(39, responseCodeCacheService.resolve(reesCode, request.getScheme()).getResponseCode()); // Response code: success</span>
+<span class="nc" id="L457">            responseFields.put(70, request.getField(70)); // Echoing or updating key per spec</span>
+            //responseFields.put(48, encryptedKeyTR31); // Echoing or updating key per spec
+
+            // Add any DKE-specific response fields as required
+<span class="nc" id="L461">            response.setFields(responseFields);</span>
+
+<span class="nc" id="L463">            log.info(&quot;DKE response assembled for txnId={}&quot;, uniqueTransactionId);</span>
+<span class="nc" id="L464">            return response;</span>
+<span class="nc" id="L465">        } catch (IllegalArgumentException ex) {</span>
+<span class="nc" id="L466">            log.error(&quot;DKE error: {}&quot;, ex.getMessage());</span>
+<span class="nc" id="L467">            throw ex;</span>
+<span class="nc" id="L468">        } catch (Exception ex) {</span>
+<span class="nc" id="L469">            log.error(&quot;Unhandled exception during DKE processing&quot;, ex);</span>
+<span class="nc" id="L470">            throw new RuntimeException(&quot;DKE message processing failed&quot;, ex);</span>
+        } finally {
+<span class="nc" id="L472">            NetworkSessionContextHolder.clear();</span>
+        }
+    }
+
+    private boolean rotateKeyForRequestContext(Iso8583Message request,
+                                               String keyType,
+                                               String scheme,
+                                               String encryptedKeyTR31,
+                                               String kcv) {
+<span class="nc" id="L481">        String siteId = request.getMetadataValue(&quot;site_id&quot;);</span>
+<span class="nc" id="L482">        String listenerId = request.getMetadataValue(&quot;listener_id&quot;);</span>
+<span class="nc" id="L483">        String connectionId = request.getMetadataValue(&quot;connection_id&quot;);</span>
+
+<span class="nc bnc" id="L485" title="All 6 branches missed.">        if (hasText(siteId) &amp;&amp; hasText(listenerId) &amp;&amp; hasText(connectionId)) {</span>
+<span class="nc" id="L486">            log.info(&quot;Rotating DKE key into network_session_keys for site={}, listener={}, connection={}, scheme={}, keyType={}&quot;,</span>
+                    siteId, listenerId, connectionId, scheme, keyType);
+<span class="nc" id="L488">            return keyManagementService.rotateSessionNetworkKey(</span>
+                    keyType,
+                    scheme,
+                    siteId,
+                    listenerId,
+                    connectionId,
+                    encryptedKeyTR31,
+                    kcv
+            );
+        }
+
+<span class="nc" id="L499">        log.warn(&quot;Missing site/listener/connection metadata for DKE key rotation. Falling back to legacy key_management path for scheme={}, keyType={}&quot;,</span>
+                scheme, keyType);
+<span class="nc" id="L501">        return keyManagementService.rotateKey(keyType, scheme, &quot;INACTIVE&quot;, encryptedKeyTR31, kcv);</span>
+    }
+
+    private void applyNetworkSessionContext(Iso8583Message request) {
+<span class="nc bnc" id="L505" title="All 2 branches missed.">        if (request == null) {</span>
+<span class="nc" id="L506">            NetworkSessionContextHolder.clear();</span>
+<span class="nc" id="L507">            return;</span>
+        }
+
+<span class="nc" id="L510">        NetworkSessionContextHolder.set(</span>
+<span class="nc" id="L511">                request.getMetadataValue(&quot;site_id&quot;),</span>
+<span class="nc" id="L512">                request.getMetadataValue(&quot;listener_id&quot;),</span>
+<span class="nc" id="L513">                request.getMetadataValue(&quot;connection_id&quot;),</span>
+<span class="nc bnc" id="L514" title="All 2 branches missed.">                request.getScheme() != null ? request.getScheme().name() : null</span>
+        );
+<span class="nc" id="L516">    }</span>
+
+    private boolean hasText(String value) {
+<span class="nc bnc" id="L519" title="All 4 branches missed.">        return value != null &amp;&amp; !value.isBlank();</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.14.202510111229</span></div></body></html>

@@ -1,0 +1,103 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>TransactionValidatorFactory.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">iso8583-processor</a> &gt; <a href="index.source.html" class="el_package">com.logicpoint.iso8583.validation.factory</a> &gt; <span class="el_source">TransactionValidatorFactory.java</span></div><h1>TransactionValidatorFactory.java</h1><pre class="source lang-java linenums">package com.logicpoint.iso8583.validation.factory;
+
+import com.logicpoint.iso8583.validation.transaction.TransactionTypeValidator;
+import com.logicpoint.iso8583.validation.transaction.impl.NcmcTxnValidation;
+import com.logicpoint.iso8583.validation.transaction.impl.PurchaseTransactionValidator;
+import com.logicpoint.iso8583.validation.transaction.impl.EcommerceTransactionValidator;
+import com.logicpoint.iso8583.validation.transaction.impl.AtmFinancialTransactionValidator;
+import com.logicpoint.iso8583.validation.transaction.impl.AtmServiceTransactionValidator;
+import com.logicpoint.iso8583.validation.TransactionType;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.stereotype.Component;
+
+import java.util.Map;
+import java.util.HashMap;
+
+/**
+ * Factory class for creating appropriate transaction validators based on transaction type.
+ * Follows the Factory pattern to encapsulate validator creation logic.
+ */
+@Component
+public class TransactionValidatorFactory {
+    
+    private final Map&lt;TransactionType, TransactionTypeValidator&gt; validators;
+    
+    @Autowired
+    public TransactionValidatorFactory(
+            PurchaseTransactionValidator purchaseValidator,
+            EcommerceTransactionValidator ecommerceValidator,
+            AtmFinancialTransactionValidator atmFinancialValidator,
+            NcmcTxnValidation ncmcValidator,
+<span class="fc" id="L31">            AtmServiceTransactionValidator atmServiceTransactionValidator) {</span>
+
+<span class="fc" id="L33">        this.validators = new HashMap&lt;&gt;();</span>
+<span class="fc" id="L34">        this.validators.put(TransactionType.PURCHASE, purchaseValidator);</span>
+<span class="fc" id="L35">        this.validators.put(TransactionType.PURCHASE_CONTACTLESS, purchaseValidator);</span>
+<span class="fc" id="L36">        this.validators.put(TransactionType.PURCHASE_WITHCASHBACK, purchaseValidator);</span>
+<span class="fc" id="L37">        this.validators.put(TransactionType.PURCHASE_TRANSIT, purchaseValidator);</span>
+<span class="fc" id="L38">        this.validators.put(TransactionType.PURCHASE_FALLBACK, purchaseValidator);</span>
+<span class="fc" id="L39">        this.validators.put(TransactionType.ECOMMERCE, ecommerceValidator);</span>
+<span class="fc" id="L40">        this.validators.put(TransactionType.MOTO, ecommerceValidator);</span>
+<span class="fc" id="L41">        this.validators.put(TransactionType.IVR_PURCHASE, ecommerceValidator);</span>
+<span class="fc" id="L42">        this.validators.put(TransactionType.CASH_WITHDRAWAL, atmFinancialValidator);</span>
+<span class="fc" id="L43">        this.validators.put(TransactionType.CASH_WITHDRAWAL_FALLBACK, atmFinancialValidator);</span>
+
+<span class="fc" id="L45">        this.validators.put(TransactionType.CASH_AT_POS, atmFinancialValidator);</span>
+<span class="fc" id="L46">        this.validators.put(TransactionType.PREAUTH, purchaseValidator);</span>
+<span class="fc" id="L47">        this.validators.put(TransactionType.SI_REGISTRATION, ecommerceValidator);</span>
+<span class="fc" id="L48">        this.validators.put(TransactionType.SI_TRANSACTION, ecommerceValidator);</span>
+<span class="fc" id="L49">        this.validators.put(TransactionType.SI_DEREGISTRATION, ecommerceValidator);</span>
+<span class="fc" id="L50">        this.validators.put(TransactionType.SI_EDIT, ecommerceValidator);</span>
+<span class="fc" id="L51">        this.validators.put(TransactionType.SI_REVOKEALL, ecommerceValidator);</span>
+<span class="fc" id="L52">        this.validators.put(TransactionType.SI_PAUSE, ecommerceValidator);</span>
+<span class="fc" id="L53">        this.validators.put(TransactionType.SI_START, ecommerceValidator);</span>
+<span class="fc" id="L54">        this.validators.put(TransactionType.SI_PDN, ecommerceValidator);</span>
+
+<span class="fc" id="L56">        this.validators.put(TransactionType.EMI_PURCHASE, ecommerceValidator);</span>
+<span class="fc" id="L57">        this.validators.put(TransactionType.CARD_EMI_PURCHASE, ecommerceValidator);</span>
+<span class="fc" id="L58">        this.validators.put(TransactionType.SERVICE_CREATION, ncmcValidator);</span>
+<span class="fc" id="L59">        this.validators.put(TransactionType.SERVICE_CREATION_CONTACTLESS, ncmcValidator);</span>
+<span class="fc" id="L60">        this.validators.put(TransactionType.MONEY_LOAD, ncmcValidator);</span>
+<span class="fc" id="L61">        this.validators.put(TransactionType.ML_BALANCEUPDATE, ncmcValidator);</span>
+<span class="fc" id="L62">        this.validators.put(TransactionType.BALANCE_ENQUIRY, atmServiceTransactionValidator);</span>
+<span class="fc" id="L63">        this.validators.put(TransactionType.BALANCE_ENQUIRY_CL, atmServiceTransactionValidator);</span>
+<span class="fc" id="L64">        this.validators.put(TransactionType.PIN_CHANGE, atmServiceTransactionValidator);</span>
+<span class="fc" id="L65">        this.validators.put(TransactionType.MINI_STATEMENT, atmServiceTransactionValidator);</span>
+        
+
+        
+        // Add more validators as needed
+        // this.validators.put(TransactionType.REFUND, refundValidator);
+        // this.validators.put(TransactionType.BALANCE_INQUIRY, balanceInquiryValidator);
+<span class="fc" id="L72">    }</span>
+    
+    /**
+     * Gets the appropriate validator for the given transaction type.
+     * 
+     * @param transactionType The transaction type
+     * @return The appropriate validator, or null if not found
+     */
+    public TransactionTypeValidator getValidator(TransactionType transactionType) {
+<span class="fc" id="L81">        return validators.get(transactionType);</span>
+    }
+    
+    /**
+     * Checks if a validator exists for the given transaction type.
+     * 
+     * @param transactionType The transaction type
+     * @return true if a validator exists, false otherwise
+     */
+    public boolean hasValidator(TransactionType transactionType) {
+<span class="fc" id="L91">        return validators.containsKey(transactionType);</span>
+    }
+    
+    /**
+     * Gets all available transaction types that have validators.
+     * 
+     * @return Set of transaction types with validators
+     */
+    public java.util.Set&lt;TransactionType&gt; getSupportedTransactionTypes() {
+<span class="fc" id="L100">        return validators.keySet();</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.14.202510111229</span></div></body></html>

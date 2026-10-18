@@ -1,0 +1,231 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>CacheInitializationService.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">iso8583-processor</a> &gt; <a href="index.source.html" class="el_package">com.logicpoint.iso8583.service</a> &gt; <span class="el_source">CacheInitializationService.java</span></div><h1>CacheInitializationService.java</h1><pre class="source lang-java linenums">package com.logicpoint.iso8583.service;
+
+import com.logicpoint.iso8583.entity.BinDetails;
+import com.logicpoint.iso8583.entity.Institutions;
+import com.logicpoint.iso8583.entity.CardData;
+import com.logicpoint.iso8583.repository.BinDetailsRepository;
+import com.logicpoint.iso8583.repository.InstitutionsRepository;
+import com.logicpoint.iso8583.repository.CardDataRepository;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.boot.context.event.ApplicationReadyEvent;
+import org.springframework.cache.Cache;
+import org.springframework.cache.CacheManager;
+import org.springframework.cache.annotation.CacheEvict;
+import org.springframework.context.event.EventListener;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+import org.springframework.scheduling.annotation.Scheduled;
+import org.springframework.stereotype.Service;
+
+import java.util.List;
+import java.util.Map;
+import java.util.HashMap;
+import org.springframework.cache.interceptor.SimpleKey;
+
+/**
+ * Service for initializing and managing cache data for validation entities.
+ * Loads data on application startup and provides scheduled cache updates.
+ */
+@Service
+<span class="fc" id="L30">public class CacheInitializationService {</span>
+
+<span class="fc" id="L32">    Logger log = LoggerFactory.getLogger(CacheInitializationService.class);</span>
+    @Autowired
+    private BinDetailsRepository binDetailsRepository;
+
+    @Autowired
+    private InstitutionsRepository institutionsRepository;
+
+    @Autowired
+    private CardDataRepository cardDataRepository;
+
+    @Autowired
+    private CacheManager cacheManager;
+
+<span class="fc" id="L45">    private static final SimpleKey NO_ARG_CACHE_KEY = SimpleKey.EMPTY;</span>
+
+    /**
+     * Initialize all caches after the application is fully ready so the first
+     * live request doesn't pay the cache warm-up cost.
+     */
+    @EventListener(ApplicationReadyEvent.class)
+    public void initializeCaches() {
+<span class="fc" id="L53">        warmBinInstitutionCache();</span>
+        // warmCardDataCache();
+<span class="fc" id="L55">    }</span>
+
+    /**
+     * Load BIN and Institution data into cache
+     */
+    public Map&lt;String, BinInstitutionData&gt; loadBinInstitutionCache() {
+<span class="fc" id="L61">        Cache cache = getRequiredCache(&quot;binInstitutionCache&quot;);</span>
+<span class="fc" id="L62">        Map&lt;String, BinInstitutionData&gt; cached = cache.get(NO_ARG_CACHE_KEY, Map.class);</span>
+<span class="fc bfc" id="L63" title="All 2 branches covered.">        if (cached != null) {</span>
+<span class="fc" id="L64">            return cached;</span>
+        }
+<span class="fc" id="L66">        return warmBinInstitutionCache();</span>
+    }
+
+    private Map&lt;String, BinInstitutionData&gt; warmBinInstitutionCache() {
+<span class="fc" id="L70">        log.info(&quot;Warming BIN and Institution cache on startup/refresh&quot;);</span>
+<span class="fc" id="L71">        Map&lt;String, BinInstitutionData&gt; loaded = buildBinInstitutionCache();</span>
+<span class="fc" id="L72">        getRequiredCache(&quot;binInstitutionCache&quot;).put(NO_ARG_CACHE_KEY, loaded);</span>
+<span class="fc" id="L73">        log.info(&quot;BIN and Institution cache warmed with {} BIN entries&quot;, loaded.size());</span>
+<span class="fc" id="L74">        return loaded;</span>
+    }
+
+    private Map&lt;String, BinInstitutionData&gt; buildBinInstitutionCache() {
+<span class="fc" id="L78">        Map&lt;String, BinInstitutionData&gt; cache = new HashMap&lt;&gt;();</span>
+
+<span class="fc" id="L80">        List&lt;BinDetails&gt; binDetails = binDetailsRepository.findAll();</span>
+<span class="fc" id="L81">        List&lt;Institutions&gt; institutions = institutionsRepository.findAll();</span>
+
+<span class="fc" id="L83">        Map&lt;Long, Institutions&gt; institutionMap = new HashMap&lt;&gt;();</span>
+<span class="fc bfc" id="L84" title="All 2 branches covered.">        for (Institutions inst : institutions) {</span>
+            try {
+<span class="fc" id="L86">                Long id = (Long) inst.getClass().getMethod(&quot;getInstitutionId&quot;).invoke(inst);</span>
+<span class="fc" id="L87">                institutionMap.put(id, inst);</span>
+<span class="fc" id="L88">            } catch (Exception e) {</span>
+<span class="fc" id="L89">                log.warn(&quot;Skipping institution cache entry due to reflection error: {}&quot;, e.getMessage());</span>
+<span class="fc" id="L90">            }</span>
+<span class="fc" id="L91">        }</span>
+
+<span class="fc bfc" id="L93" title="All 2 branches covered.">        for (BinDetails bin : binDetails) {</span>
+            try {
+<span class="fc" id="L95">                Integer institutionId = (Integer) bin.getClass().getMethod(&quot;getInstitution_id&quot;).invoke(bin);</span>
+<span class="fc" id="L96">                String binNumber = (String) bin.getClass().getMethod(&quot;getBinNumber&quot;).invoke(bin);</span>
+<span class="fc" id="L97">                Institutions institution = institutionMap.get(institutionId.longValue());</span>
+<span class="pc bpc" id="L98" title="1 of 2 branches missed.">                if (institution != null) {</span>
+<span class="fc" id="L99">                    cache.put(binNumber, new BinInstitutionData(bin, institution));</span>
+                }
+<span class="fc" id="L101">            } catch (Exception e) {</span>
+<span class="fc" id="L102">                log.warn(&quot;Skipping BIN cache entry due to reflection error: {}&quot;, e.getMessage());</span>
+<span class="fc" id="L103">            }</span>
+<span class="fc" id="L104">        }</span>
+
+<span class="fc" id="L106">        return cache;</span>
+    }
+
+    /**
+     * Load Card data into cache
+     */
+    public Map&lt;String, CardData&gt; loadCardDataCache() {
+<span class="fc" id="L113">        Cache cache = getRequiredCache(&quot;cardDataCache&quot;);</span>
+<span class="fc" id="L114">        Map&lt;String, CardData&gt; cached = cache.get(NO_ARG_CACHE_KEY, Map.class);</span>
+<span class="fc bfc" id="L115" title="All 2 branches covered.">        if (cached != null) {</span>
+<span class="fc" id="L116">            return cached;</span>
+        }
+<span class="fc" id="L118">        return warmCardDataCache();</span>
+    }
+
+    private Map&lt;String, CardData&gt; warmCardDataCache() {
+<span class="fc" id="L122">        List&lt;CardData&gt; cardDataList = cardDataRepository.findAll();</span>
+<span class="fc" id="L123">        Map&lt;String, CardData&gt; cache = new HashMap&lt;&gt;();</span>
+
+<span class="fc bfc" id="L125" title="All 2 branches covered.">        for (CardData card : cardDataList) {</span>
+            try {
+<span class="fc" id="L127">                String pan = (String) card.getClass().getMethod(&quot;getPan&quot;).invoke(card);</span>
+<span class="fc" id="L128">                cache.put(pan, card);</span>
+<span class="fc" id="L129">            } catch (Exception e) {</span>
+<span class="fc" id="L130">                log.warn(&quot;Skipping card cache entry due to reflection error: {}&quot;, e.getMessage());</span>
+<span class="fc" id="L131">            }</span>
+<span class="fc" id="L132">        }</span>
+
+<span class="fc" id="L134">        getRequiredCache(&quot;cardDataCache&quot;).put(NO_ARG_CACHE_KEY, cache);</span>
+<span class="fc" id="L135">        return cache;</span>
+    }
+    
+    /**
+     * Scheduled cache refresh every 5 minutes
+     */
+    @Scheduled(fixedRate = 300000) // 5 minutes
+    @CacheEvict(value = {&quot;binInstitutionCache&quot;, &quot;cardDataCache&quot;}, allEntries = true)
+    public void refreshAllCaches() {
+<span class="fc" id="L144">        warmBinInstitutionCache();</span>
+<span class="fc" id="L145">        warmCardDataCache();</span>
+<span class="fc" id="L146">    }</span>
+
+    /**
+     * Manual cache refresh method
+     */
+    public void refreshCache(String cacheName) {
+<span class="fc" id="L152">        getRequiredCache(cacheName).clear();</span>
+<span class="fc bfc" id="L153" title="All 3 branches covered.">        switch (cacheName) {</span>
+            case &quot;binInstitutionCache&quot;:
+<span class="fc" id="L155">                warmBinInstitutionCache();</span>
+<span class="fc" id="L156">                break;</span>
+            case &quot;cardDataCache&quot;:
+<span class="fc" id="L158">                warmCardDataCache();</span>
+<span class="fc" id="L159">                break;</span>
+            default:
+<span class="fc" id="L161">                log.warn(&quot;Unsupported cache refresh requested for cache: {}&quot;, cacheName);</span>
+        }
+<span class="fc" id="L163">    }</span>
+
+    private Cache getRequiredCache(String cacheName) {
+<span class="fc" id="L166">        Cache cache = cacheManager.getCache(cacheName);</span>
+<span class="fc bfc" id="L167" title="All 2 branches covered.">        if (cache == null) {</span>
+<span class="fc" id="L168">            throw new IllegalStateException(&quot;Cache not configured: &quot; + cacheName);</span>
+        }
+<span class="fc" id="L170">        return cache;</span>
+    }
+
+    /**
+     * Data class to hold BIN and Institution data together
+     */
+    public static class BinInstitutionData {
+        private final BinDetails binDetails;
+        private final Institutions institution;
+
+<span class="fc" id="L180">        public BinInstitutionData(BinDetails binDetails, Institutions institution) {</span>
+<span class="fc" id="L181">            this.binDetails = binDetails;</span>
+<span class="fc" id="L182">            this.institution = institution;</span>
+<span class="fc" id="L183">        }</span>
+
+<span class="fc" id="L185">        public BinDetails getBinDetails() { return binDetails; }</span>
+<span class="fc" id="L186">        public Institutions getInstitution() { return institution; }</span>
+        
+        public boolean isBinActive() {
+            try {
+<span class="fc" id="L190">                String status = (String) binDetails.getClass().getMethod(&quot;getStatus&quot;).invoke(binDetails);</span>
+<span class="fc" id="L191">                return &quot;ACTIVE&quot;.equalsIgnoreCase(status);</span>
+<span class="fc" id="L192">            } catch (Exception e) {</span>
+<span class="fc" id="L193">                return false;</span>
+            }
+        }
+        
+        public boolean isInstitutionActive() {
+            try {
+<span class="fc" id="L199">                String status = (String) institution.getClass().getMethod(&quot;getStatus&quot;).invoke(institution);</span>
+<span class="fc" id="L200">                return &quot;ACTIVE&quot;.equalsIgnoreCase(status);</span>
+<span class="fc" id="L201">            } catch (Exception e) {</span>
+<span class="fc" id="L202">                return false;</span>
+            }
+        }
+        
+        public String getBinNumber() { 
+            try {
+<span class="nc" id="L208">                return (String) binDetails.getClass().getMethod(&quot;getBin_number&quot;).invoke(binDetails);</span>
+<span class="fc" id="L209">            } catch (Exception e) {</span>
+<span class="fc" id="L210">                return null;</span>
+            }
+        }
+        
+        public String getCardScheme() { 
+            try {
+<span class="fc" id="L216">                return (String) binDetails.getClass().getMethod(&quot;getCard_scheme&quot;).invoke(binDetails);</span>
+<span class="fc" id="L217">            } catch (Exception e) {</span>
+<span class="fc" id="L218">                return null;</span>
+            }
+        }
+        
+        public String getInstitutionCode() { 
+            try {
+<span class="fc" id="L224">                return (String) institution.getClass().getMethod(&quot;getInstitutionCode&quot;).invoke(institution);</span>
+<span class="fc" id="L225">            } catch (Exception e) {</span>
+<span class="fc" id="L226">                return null;</span>
+            }
+        }
+    }
+} 
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.14.202510111229</span></div></body></html>

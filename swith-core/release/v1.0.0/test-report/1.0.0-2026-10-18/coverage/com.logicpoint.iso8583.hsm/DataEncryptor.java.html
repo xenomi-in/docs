@@ -1,0 +1,57 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>DataEncryptor.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">iso8583-processor</a> &gt; <a href="index.source.html" class="el_package">com.logicpoint.iso8583.hsm</a> &gt; <span class="el_source">DataEncryptor.java</span></div><h1>DataEncryptor.java</h1><pre class="source lang-java linenums">package com.logicpoint.iso8583.hsm;
+
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.stereotype.Component;
+import javax.crypto.Cipher;
+import javax.crypto.SecretKey;
+import java.util.Base64;
+
+/**
+ * Utility for encrypting and decrypting sensitive data.
+ * Author: @logicpoint  
+ * Date: 2025-07-13
+ * Version: 1.0.0
+ * Description: This class is used to encrypt and decrypt sensitive data.
+ * 
+ * 
+ * 
+ * 
+ * 
+ */
+@Component
+<span class="fc" id="L22">public class DataEncryptor {</span>
+
+  
+
+    /**
+     * Encrypts the given plaintext.
+     *
+     * @param plaintext Data to encrypt.
+     * @return Base64-encoded ciphertext.
+     * @throws Exception If encryption fails.
+     */
+    public String encrypt(String plaintext) throws Exception {
+<span class="fc" id="L34">        SecretKey key = null;//keyManager.getEncryptionKey();</span>
+<span class="fc" id="L35">        Cipher cipher = Cipher.getInstance(&quot;AES/ECB/PKCS5Padding&quot;); // Or GCM for better security</span>
+<span class="nc" id="L36">        cipher.init(Cipher.ENCRYPT_MODE, key);</span>
+<span class="nc" id="L37">        byte[] encrypted = cipher.doFinal(plaintext.getBytes(&quot;UTF-8&quot;));</span>
+<span class="nc" id="L38">        return Base64.getEncoder().encodeToString(encrypted);</span>
+    }
+
+    /**
+     * Decrypts the given ciphertext.
+     *
+     * @param ciphertext Base64-encoded encrypted data.
+     * @return Decrypted plaintext.
+     * @throws Exception If decryption fails.
+     */
+    public String decrypt(String ciphertext) throws Exception {
+<span class="fc" id="L49">        SecretKey key = null; //keyManager.getEncryptionKey();</span>
+<span class="fc" id="L50">        Cipher cipher = Cipher.getInstance(&quot;AES/ECB/PKCS5Padding&quot;);</span>
+<span class="nc" id="L51">        cipher.init(Cipher.DECRYPT_MODE, key);</span>
+<span class="nc" id="L52">        byte[] decoded = Base64.getDecoder().decode(ciphertext);</span>
+<span class="nc" id="L53">        byte[] decrypted = cipher.doFinal(decoded);</span>
+<span class="nc" id="L54">        return new String(decrypted, &quot;UTF-8&quot;);</span>
+    }
+} 
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.14.202510111229</span></div></body></html>

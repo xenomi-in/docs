@@ -1,0 +1,177 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>DeclinedTransactionNotificationMapper.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">iso8583-processor</a> &gt; <a href="index.source.html" class="el_package">com.logicpoint.iso8583.notification.mapper</a> &gt; <span class="el_source">DeclinedTransactionNotificationMapper.java</span></div><h1>DeclinedTransactionNotificationMapper.java</h1><pre class="source lang-java linenums">package com.logicpoint.iso8583.notification.mapper;
+
+import com.logicpoint.iso8583.context.RequestContext;
+import com.logicpoint.iso8583.context.TransactionChannel;
+import com.logicpoint.iso8583.notification.dto.DeclinedTransactionPayload;
+import com.logicpoint.iso8583.notification.dto.NotificationChannel;
+import com.logicpoint.iso8583.notification.dto.NotificationPriority;
+import com.logicpoint.iso8583.notification.dto.NotificationRequest;
+import com.logicpoint.iso8583.validation.TransactionType;
+import java.time.Clock;
+import java.time.OffsetDateTime;
+import java.util.List;
+import java.util.Map;
+import java.util.Set;
+import org.springframework.stereotype.Component;
+
+@Component
+public class DeclinedTransactionNotificationMapper {
+
+<span class="fc" id="L20">    private static final List&lt;NotificationChannel&gt; DEFAULT_CHANNELS = List.of(</span>
+            NotificationChannel.EMAIL,
+            NotificationChannel.SMS
+    );
+    private static final String CHANNEL_ATM = &quot;ATM&quot;;
+    private static final String CHANNEL_POS = &quot;POS&quot;;
+    private static final String CHANNEL_ECOMMERCE = &quot;E-comm&quot;;
+<span class="fc" id="L27">    private static final Set&lt;TransactionType&gt; ATM_TRANSACTION_TYPES = Set.of(</span>
+            TransactionType.CASH_WITHDRAWAL,
+            TransactionType.CASH_WITHDRAWAL_CONTACTLESS,
+            TransactionType.BALANCE_ENQUIRY,
+            TransactionType.BALANCE_ENQUIRY_CL,
+            TransactionType.MINI_STATEMENT,
+            TransactionType.PIN_CHANGE,
+            TransactionType.STATEMENT_REQUEST,
+            TransactionType.CASH_DEPOSIT,
+            TransactionType.SERVICE_CREATION,
+            TransactionType.SERVICE_CREATION_CONTACTLESS,
+            TransactionType.MOBILE_NUMBER_UPDATE,
+            TransactionType.CHEQUEBOOK_REQUEST,
+            TransactionType.AADHAR_INQUIRY,
+            TransactionType.BIOMETIC_VERIFICATION
+    );
+<span class="fc" id="L43">    private static final Set&lt;TransactionType&gt; ECOMMERCE_TRANSACTION_TYPES = Set.of(</span>
+            TransactionType.ECOMMERCE,
+            TransactionType.MOTO,
+            TransactionType.IVR_PURCHASE,
+            TransactionType.EMI_PURCHASE,
+            TransactionType.SI_REGISTRATION,
+            TransactionType.SI_EDIT,
+            TransactionType.SI_TRANSACTION,
+            TransactionType.SI_DEREGISTRATION,
+            TransactionType.SI_REVOKEALL,
+            TransactionType.SI_PAUSE,
+            TransactionType.SI_START,
+            TransactionType.SI_PDN
+    );
+    private final Clock clock;
+
+    public DeclinedTransactionNotificationMapper() {
+<span class="fc" id="L60">        this(Clock.systemUTC());</span>
+<span class="fc" id="L61">    }</span>
+
+<span class="fc" id="L63">    DeclinedTransactionNotificationMapper(Clock clock) {</span>
+<span class="fc" id="L64">        this.clock = clock;</span>
+<span class="fc" id="L65">    }</span>
+
+    public NotificationRequest toNotificationRequest(RequestContext requestContext, Map&lt;Integer, String&gt; responseFields, String traceId) {
+<span class="fc" id="L68">        DeclinedTransactionPayload payload = new DeclinedTransactionPayload(</span>
+<span class="fc" id="L69">                requestContext.getUniqueTransactionId(),</span>
+<span class="fc" id="L70">                field(requestContext, responseFields, 11),</span>
+<span class="fc" id="L71">                field(requestContext, responseFields, 37),</span>
+<span class="fc" id="L72">                field(requestContext, responseFields, 2),</span>
+<span class="fc" id="L73">                requestContext.getPanHash(),</span>
+<span class="fc" id="L74">                field(requestContext, responseFields, 3),</span>
+<span class="fc" id="L75">                field(requestContext, responseFields, 4),</span>
+<span class="fc" id="L76">                field(requestContext, responseFields, 49),</span>
+<span class="fc" id="L77">                field(requestContext, responseFields, 42),</span>
+<span class="fc" id="L78">                field(requestContext, responseFields, 41),</span>
+<span class="fc" id="L79">                resolveChannel(requestContext, responseFields),</span>
+<span class="fc" id="L80">                responseFields.get(39),</span>
+<span class="fc" id="L81">                resolveDeclineReason(requestContext),</span>
+<span class="fc" id="L82">                OffsetDateTime.now(clock),</span>
+<span class="fc" id="L83">                requestContext.getRequestId(),</span>
+<span class="fc" id="L84">                requestContext.getInstitutionId(),</span>
+<span class="fc" id="L85">                field(requestContext, responseFields, 32)</span>
+        );
+
+<span class="fc" id="L88">        return new NotificationRequest(</span>
+                NotificationRequest.TRANSACTION_DECLINED,
+                payload,
+                null,
+<span class="fc" id="L92">                requestContext.getInstitutionId(),</span>
+<span class="fc" id="L93">                requestContext.getPanHash(),</span>
+                &quot;TRANSACTION&quot;,
+<span class="fc" id="L95">                requestContext.getUniqueTransactionId(),</span>
+                NotificationRequest.SWITCH_EVENT_SOURCE,
+<span class="fc" id="L97">                firstNonBlank(field(requestContext, responseFields, 37), traceId),</span>
+                DEFAULT_CHANNELS,
+                NotificationPriority.MEDIUM
+        );
+    }
+
+    private String resolveDeclineReason(RequestContext requestContext) {
+<span class="fc bfc" id="L104" title="All 2 branches covered.">        return requestContext.getInternalResponseCode() == null</span>
+<span class="fc" id="L105">                ? &quot;ISSUER_DECLINED&quot;</span>
+<span class="fc" id="L106">                : requestContext.getInternalResponseCode().name();</span>
+    }
+
+    private String resolveChannel(RequestContext requestContext, Map&lt;Integer, String&gt; responseFields) {
+<span class="fc" id="L110">        TransactionChannel resolvedChannel = requestContext.getChannel();</span>
+<span class="pc bpc" id="L111" title="2 of 4 branches missed.">        if (resolvedChannel != null &amp;&amp; resolvedChannel != TransactionChannel.UNKNOWN) {</span>
+<span class="nc bnc" id="L112" title="All 4 branches missed.">            return switch (resolvedChannel) {</span>
+<span class="nc" id="L113">                case ATM -&gt; CHANNEL_ATM;</span>
+<span class="nc" id="L114">                case ECOMMERCE -&gt; CHANNEL_ECOMMERCE;</span>
+<span class="nc" id="L115">                case POS -&gt; CHANNEL_POS;</span>
+<span class="nc" id="L116">                case UNKNOWN -&gt; CHANNEL_POS;</span>
+            };
+        }
+
+        // Compatibility fallback for contexts created outside the main processing pipeline.
+<span class="fc" id="L121">        TransactionType transactionType = requestContext.getTransactionType();</span>
+<span class="fc bfc" id="L122" title="All 2 branches covered.">        if (ATM_TRANSACTION_TYPES.contains(transactionType)) {</span>
+<span class="fc" id="L123">            return CHANNEL_ATM;</span>
+        }
+<span class="fc bfc" id="L125" title="All 2 branches covered.">        if (ECOMMERCE_TRANSACTION_TYPES.contains(transactionType)) {</span>
+<span class="fc" id="L126">            return CHANNEL_ECOMMERCE;</span>
+        }
+
+<span class="fc" id="L129">        String posEntryMode = field(requestContext, responseFields, 22);</span>
+<span class="fc" id="L130">        String posConditionCode = field(requestContext, responseFields, 25);</span>
+<span class="fc" id="L131">        String processingCode = field(requestContext, responseFields, 3);</span>
+<span class="fc bfc" id="L132" title="All 2 branches covered.">        if (isEcommerce(posEntryMode, posConditionCode)) {</span>
+<span class="fc" id="L133">            return CHANNEL_ECOMMERCE;</span>
+        }
+<span class="pc bpc" id="L135" title="1 of 2 branches missed.">        if (isAtm(processingCode, posEntryMode, posConditionCode)) {</span>
+<span class="nc" id="L136">            return CHANNEL_ATM;</span>
+        }
+<span class="fc" id="L138">        return CHANNEL_POS;</span>
+    }
+
+    private boolean isEcommerce(String posEntryMode, String posConditionCode) {
+<span class="fc bfc" id="L142" title="All 2 branches covered.">        return startsWithAny(posEntryMode, &quot;001&quot;, &quot;011&quot;, &quot;061&quot;, &quot;810&quot;, &quot;811&quot;)</span>
+<span class="pc bpc" id="L143" title="1 of 2 branches missed.">                || &quot;59&quot;.equals(posConditionCode)</span>
+<span class="pc bpc" id="L144" title="1 of 2 branches missed.">                || &quot;08&quot;.equals(posConditionCode)</span>
+<span class="pc bpc" id="L145" title="1 of 2 branches missed.">                || &quot;06&quot;.equals(posConditionCode)</span>
+<span class="pc bpc" id="L146" title="1 of 2 branches missed.">                || &quot;07&quot;.equals(posConditionCode);</span>
+    }
+
+    private boolean isAtm(String processingCode, String posEntryMode, String posConditionCode) {
+<span class="pc bpc" id="L150" title="1 of 2 branches missed.">        return startsWithAny(processingCode, &quot;01&quot;, &quot;30&quot;, &quot;31&quot;, &quot;38&quot;, &quot;40&quot;, &quot;91&quot;)</span>
+<span class="pc bpc" id="L151" title="1 of 2 branches missed.">                || startsWithAny(posEntryMode, &quot;010&quot;, &quot;020&quot;)</span>
+<span class="pc bpc" id="L152" title="1 of 2 branches missed.">                || &quot;51&quot;.equals(posConditionCode)</span>
+<span class="pc bpc" id="L153" title="1 of 2 branches missed.">                || &quot;52&quot;.equals(posConditionCode);</span>
+    }
+
+    private boolean startsWithAny(String value, String... prefixes) {
+<span class="pc bpc" id="L157" title="1 of 4 branches missed.">        if (value == null || value.isBlank()) {</span>
+<span class="fc" id="L158">            return false;</span>
+        }
+<span class="fc bfc" id="L160" title="All 2 branches covered.">        for (String prefix : prefixes) {</span>
+<span class="fc bfc" id="L161" title="All 2 branches covered.">            if (value.startsWith(prefix)) {</span>
+<span class="fc" id="L162">                return true;</span>
+            }
+        }
+<span class="fc" id="L165">        return false;</span>
+    }
+
+    private String field(RequestContext requestContext, Map&lt;Integer, String&gt; responseFields, int fieldNumber) {
+<span class="fc" id="L169">        String responseValue = responseFields.get(fieldNumber);</span>
+<span class="fc bfc" id="L170" title="All 2 branches covered.">        return responseValue != null ? responseValue : requestContext.getFields().get(fieldNumber);</span>
+    }
+
+    private String firstNonBlank(String value, String fallback) {
+<span class="pc bpc" id="L174" title="2 of 4 branches missed.">        return value == null || value.isBlank() ? fallback : value;</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.14.202510111229</span></div></body></html>

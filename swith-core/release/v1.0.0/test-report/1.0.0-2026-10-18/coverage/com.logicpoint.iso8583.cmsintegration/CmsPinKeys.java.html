@@ -1,0 +1,32 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>CmsPinKeys.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">iso8583-processor</a> &gt; <a href="index.source.html" class="el_package">com.logicpoint.iso8583.cmsintegration</a> &gt; <span class="el_source">CmsPinKeys.java</span></div><h1>CmsPinKeys.java</h1><pre class="source lang-java linenums">package com.logicpoint.iso8583.cmsintegration;
+
+import java.util.*;
+import org.springframework.jdbc.core.JdbcTemplate;
+import org.springframework.stereotype.Component;
+
+@Component
+public class CmsPinKeys {
+    private final JdbcTemplate db;
+<span class="fc" id="L10">    public CmsPinKeys(JdbcTemplate db) { this.db=db; }</span>
+    public String resolve(UUID institution,String reference,String purpose) {
+<span class="fc" id="L12">        var rows=db.queryForList(&quot;&quot;&quot;</span>
+            select k.key_value,k.is_tr31 from cms_pin_key_binding b
+            join cms_institution_mapping m on m.cms_institution_id=b.cms_institution_id
+            join key_management k on k.key_id=b.key_id
+            where b.cms_institution_id=? and b.reference=? and b.purpose=?
+              and k.institution_id=m.switch_institution_id
+              and k.key_status='A' and k.valid_from&lt;=now() and k.valid_to&gt;=now()
+              and ((b.purpose='PVK' and k.key_type='PVK')
+                or (b.purpose='INPUT' and k.key_type in ('ZPK','PEK')))
+            &quot;&quot;&quot;,institution,reference,purpose);
+<span class="fc bfc" id="L22" title="All 2 branches covered.">        if(rows.size()!=1) throw CmsIntegrationException.unavailable(&quot;Approved PIN key binding is unavailable&quot;);</span>
+<span class="fc" id="L23">        var row=rows.getFirst();</span>
+<span class="fc" id="L24">        byte[] bytes=(byte[])row.get(&quot;key_value&quot;);</span>
+<span class="pc bpc" id="L25" title="1 of 4 branches missed.">        if(bytes==null || bytes.length==0) throw CmsIntegrationException.unavailable(&quot;PIN key is unavailable&quot;);</span>
+        // Initial adapter supports the repository's existing cryptogram command format.
+<span class="fc bfc" id="L27" title="All 2 branches covered.">        if(Boolean.TRUE.equals(row.get(&quot;is_tr31&quot;)))</span>
+<span class="fc" id="L28">            throw CmsIntegrationException.unavailable(&quot;TR-31 PIN keys require a certified command adapter&quot;);</span>
+<span class="fc" id="L29">        return HexFormat.of().withUpperCase().formatHex(bytes);</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.14.202510111229</span></div></body></html>

@@ -1,0 +1,122 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>CardOnboardingController.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">iso8583-processor</a> &gt; <a href="index.source.html" class="el_package">com.logicpoint.iso8583.controller</a> &gt; <span class="el_source">CardOnboardingController.java</span></div><h1>CardOnboardingController.java</h1><pre class="source lang-java linenums">package com.logicpoint.iso8583.controller;
+
+import com.logicpoint.iso8583.entity.CardData;
+import com.logicpoint.iso8583.model.CardOnboardingRequest;
+import com.logicpoint.iso8583.model.CardOnboardingResponse;
+import com.logicpoint.iso8583.repository.CardDataRepository;
+import com.logicpoint.iso8583.service.CacheInitializationService;
+import com.logicpoint.iso8583.service.CardDataEncryptionService;
+import jakarta.validation.Valid;
+import java.time.LocalDateTime;
+import org.springframework.http.HttpStatus;
+import org.springframework.http.ResponseEntity;
+import org.springframework.transaction.annotation.Transactional;
+import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.RequestBody;
+import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RestController;
+
+@RestController
+@RequestMapping(&quot;/api/v1/cards&quot;)
+public class CardOnboardingController {
+
+    private final CardDataRepository cardDataRepository;
+    private final CardDataEncryptionService cardDataEncryptionService;
+    private final CacheInitializationService cacheInitializationService;
+
+    public CardOnboardingController(CardDataRepository cardDataRepository,
+                                    CardDataEncryptionService cardDataEncryptionService,
+<span class="fc" id="L29">                                    CacheInitializationService cacheInitializationService) {</span>
+<span class="fc" id="L30">        this.cardDataRepository = cardDataRepository;</span>
+<span class="fc" id="L31">        this.cardDataEncryptionService = cardDataEncryptionService;</span>
+<span class="fc" id="L32">        this.cacheInitializationService = cacheInitializationService;</span>
+<span class="fc" id="L33">    }</span>
+
+    @PostMapping(&quot;/onboard&quot;)
+    @Transactional
+    public ResponseEntity&lt;CardOnboardingResponse&gt; onboardCard(@Valid @RequestBody CardOnboardingRequest request) {
+<span class="fc" id="L38">        String pan = request.getPan().trim();</span>
+<span class="fc bfc" id="L39" title="All 2 branches covered.">        Integer institutionId = request.getInstitutionId() != null</span>
+<span class="fc" id="L40">                ? request.getInstitutionId()</span>
+<span class="fc" id="L41">                : resolveInstitutionId(pan);</span>
+
+<span class="fc bfc" id="L43" title="All 2 branches covered.">        if (institutionId == null) {</span>
+<span class="fc" id="L44">            return ResponseEntity.badRequest()</span>
+<span class="fc" id="L45">                    .body(CardOnboardingResponse.failure(&quot;Institution could not be resolved from PAN BIN&quot;));</span>
+        }
+
+<span class="fc" id="L48">        String panLookupHmac = cardDataEncryptionService.computePanLookupHmac(pan, institutionId);</span>
+<span class="fc bfc" id="L49" title="All 2 branches covered.">        CardData existingCard = panLookupHmac == null</span>
+<span class="fc" id="L50">                ? cardDataRepository.findByPan(pan)</span>
+<span class="fc" id="L51">                : cardDataRepository.findByPanLookupHmac(panLookupHmac);</span>
+<span class="fc bfc" id="L52" title="All 2 branches covered.">        if (existingCard != null) {</span>
+<span class="fc" id="L53">            return ResponseEntity.status(HttpStatus.CONFLICT)</span>
+<span class="fc" id="L54">                    .body(CardOnboardingResponse.failure(&quot;Card already exists&quot;));</span>
+        }
+
+<span class="fc" id="L57">        CardData cardData = toCardData(request);</span>
+<span class="fc" id="L58">        cardDataEncryptionService.prepareForPersistence(cardData, institutionId);</span>
+<span class="fc" id="L59">        CardData saved = cardDataRepository.save(cardData);</span>
+<span class="fc" id="L60">        cacheInitializationService.refreshCache(&quot;cardDataCache&quot;);</span>
+
+<span class="fc" id="L62">        return ResponseEntity.status(HttpStatus.CREATED).body(CardOnboardingResponse.success(</span>
+<span class="fc" id="L63">                saved.getAuth_id(),</span>
+<span class="fc" id="L64">                saved.getCard_id(),</span>
+                institutionId,
+<span class="fc" id="L66">                saved.getMasked_pan(),</span>
+<span class="fc" id="L67">                saved.getPan_lookup_hmac(),</span>
+<span class="fc" id="L68">                saved.getPan_key_version(),</span>
+<span class="fc" id="L69">                saved.getExpiry_key_version(),</span>
+<span class="fc" id="L70">                saved.getPvv_key_version()));</span>
+    }
+
+    private CardData toCardData(CardOnboardingRequest request) {
+<span class="fc" id="L74">        LocalDateTime now = LocalDateTime.now();</span>
+<span class="fc" id="L75">        CardData cardData = new CardData();</span>
+<span class="fc" id="L76">        cardData.setCard_id(request.getCardId());</span>
+<span class="fc" id="L77">        cardData.setPan(request.getPan().trim());</span>
+<span class="fc" id="L78">        cardData.setAccount_id(request.getAccountId());</span>
+<span class="fc" id="L79">        cardData.setCard_proxy_number(request.getCardProxyNumber());</span>
+<span class="fc" id="L80">        cardData.setCard_type(normalizeChar(request.getCardType()));</span>
+<span class="fc" id="L81">        cardData.setCard_scheme(normalizeChar(request.getCardScheme()));</span>
+<span class="fc" id="L82">        cardData.setIsDualInterface(normalizeChar(request.getDualInterface()));</span>
+<span class="fc" id="L83">        cardData.setExpiryDate(request.getExpiryDate());</span>
+<span class="fc" id="L84">        cardData.setPvv_offest(request.getPvvOffset());</span>
+<span class="fc" id="L85">        cardData.setKey_ref(request.getKeyRef());</span>
+<span class="fc" id="L86">        cardData.setCvv(request.getCvv());</span>
+<span class="fc" id="L87">        cardData.setCvv_key_ref(request.getCvvKeyRef());</span>
+<span class="fc" id="L88">        cardData.setEmv_aip(request.getEmvAip());</span>
+<span class="fc" id="L89">        cardData.setEmv_capk_id(request.getEmvCapkId());</span>
+<span class="fc" id="L90">        cardData.setArqc_validation_required(Boolean.TRUE.equals(request.getArqcValidationRequired()));</span>
+<span class="fc bfc" id="L91" title="All 2 branches covered.">        cardData.setAtc(request.getAtc() == null ? 0 : request.getAtc());</span>
+<span class="fc bfc" id="L92" title="All 2 branches covered.">        cardData.setPin_retry_count(request.getPinRetryCount() == null ? 0 : request.getPinRetryCount());</span>
+<span class="fc bfc" id="L93" title="All 2 branches covered.">        cardData.setMax_pin_retry(request.getMaxPinRetry() == null ? 3 : request.getMaxPinRetry());</span>
+<span class="fc" id="L94">        cardData.setPin_blocked(Boolean.TRUE.equals(request.getPinBlocked()));</span>
+<span class="fc" id="L95">        cardData.setLast_auth_status(null);</span>
+<span class="fc" id="L96">        cardData.setLast_auth_timestamp(null);</span>
+<span class="fc" id="L97">        cardData.setCreated_at(now);</span>
+<span class="fc" id="L98">        cardData.setUpdated_at(now);</span>
+<span class="pc bpc" id="L99" title="1 of 4 branches missed.">        cardData.setStatus(request.getStatus() == null || request.getStatus().isBlank()</span>
+<span class="fc" id="L100">                ? &quot;ACTIVE&quot;</span>
+<span class="fc" id="L101">                : request.getStatus().trim().toUpperCase());</span>
+<span class="fc" id="L102">        return cardData;</span>
+    }
+
+    private Character normalizeChar(Character value) {
+<span class="fc bfc" id="L106" title="All 2 branches covered.">        return value == null ? null : Character.toUpperCase(value);</span>
+    }
+
+    private Integer resolveInstitutionId(String pan) {
+<span class="pc bpc" id="L110" title="1 of 4 branches missed.">        if (pan == null || pan.length() &lt; 6) {</span>
+<span class="fc" id="L111">            return null;</span>
+        }
+<span class="fc" id="L113">        CacheInitializationService.BinInstitutionData binData = cacheInitializationService</span>
+<span class="fc" id="L114">                .loadBinInstitutionCache()</span>
+<span class="fc" id="L115">                .get(pan.substring(0, 6));</span>
+<span class="pc bpc" id="L116" title="1 of 4 branches missed.">        if (binData == null || binData.getBinDetails() == null) {</span>
+<span class="fc" id="L117">            return null;</span>
+        }
+<span class="fc" id="L119">        return binData.getBinDetails().getInstitution_id();</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.14.202510111229</span></div></body></html>

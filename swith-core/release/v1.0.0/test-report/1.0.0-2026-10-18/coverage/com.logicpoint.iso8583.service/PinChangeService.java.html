@@ -1,0 +1,239 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>PinChangeService.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">iso8583-processor</a> &gt; <a href="index.source.html" class="el_package">com.logicpoint.iso8583.service</a> &gt; <span class="el_source">PinChangeService.java</span></div><h1>PinChangeService.java</h1><pre class="source lang-java linenums">package com.logicpoint.iso8583.service;
+
+import com.logicpoint.iso8583.entity.CardData;
+import com.logicpoint.iso8583.validation.orchestrator.CardDataContext;
+import com.logicpoint.iso8583.validation.ValidationResult;
+
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
+import java.time.LocalDateTime;
+import java.util.Map;
+
+import com.logicpoint.iso8583.validation.TlvUtils;
+
+/**
+ * Service for handling PIN change operations using NettyHsmService.PinChangeandVerify()
+ * Updates database with new PVV offset after successful PIN change
+ * 
+ * @author LogicPoint Systems
+ * @version 1.0
+ * @since 2025-01-27
+ */
+@Service
+<span class="fc" id="L27">public class PinChangeService {</span>
+    
+<span class="fc" id="L29">    private static final Logger logger = LoggerFactory.getLogger(PinChangeService.class);</span>
+    
+    @Autowired
+    private NettyHsmService nettyHsmService;
+    
+    @Autowired
+    private CardDataService cardDataService;
+    @Autowired
+    private com.logicpoint.iso8583.cmsintegration.CmsAuthorizationLookup cmsLookup;
+    
+    /**
+     * Process PIN change using NettyHsmService.PinChangeandVerify()
+     * 
+     * @param pan Primary Account Number
+     * @param currentPinBlock Current encrypted PIN block
+     * @param newPinBlock New encrypted PIN block
+     * @param pinMethod PIN method (VISA, IBM3624, ISO9564)
+     * @param transactionId Transaction ID for logging
+     * @return PinChangeResult with success status and new offset
+     */
+    @Transactional
+    public ValidationResult processPinChange(Map&lt;Integer, String&gt; transactionData, CardDataContext cardContext) {
+<span class="fc" id="L51">        logger.info(&quot;Processing PIN change for card&quot;);</span>
+        
+        try {
+<span class="pc bpc" id="L54" title="1 of 4 branches missed.">            if(cmsLookup!=null &amp;&amp; cmsLookup.isManaged(cardContext.getCardData().getAuth_id()))</span>
+<span class="fc" id="L55">                return new ValidationResult.Builder().addError(&quot;CMS PIN change requires the family transaction service&quot;).build();</span>
+<span class="fc" id="L56">            String pan = transactionData.get(2);</span>
+<span class="fc" id="L57">            String currentPinBlock = transactionData.get(52);</span>
+<span class="fc" id="L58">            Map&lt;String, String&gt; de120Data = TlvUtils.parseTlv(transactionData.get(120));</span>
+<span class="fc" id="L59">           String newPinBlock = de120Data.get(&quot;004&quot;); // New PIN Block</span>
+<span class="fc" id="L60">            String pinMethod = &quot;VISA&quot;;</span>
+            
+<span class="fc" id="L62">            CardData cardData = cardContext.getCardData();</span>
+<span class="fc" id="L63">            String currentOffset = cardData.getPvv_offest();</span>
+            
+<span class="fc bfc" id="L65" title="All 2 branches covered.">            if (currentOffset == null) {</span>
+<span class="fc" id="L66">                logger.error(&quot;No PVV offset found for card: {}&quot;, maskPan(pan));</span>
+                
+<span class="fc" id="L68">            ValidationResult.Builder resultBuilder = new ValidationResult.Builder();</span>
+<span class="fc" id="L69">            resultBuilder.addError(&quot;Missing PVV offset&quot;);</span>
+<span class="fc" id="L70">            return resultBuilder.build();</span>
+            }
+            // Step 2: Store original offset for rollback
+<span class="fc" id="L73">            String originalOffset = currentOffset;</span>
+            
+            // Step 3: Call HSM PIN change
+<span class="fc" id="L76">            logger.debug(&quot;Calling HSM PIN change for card: {}&quot;, maskPan(pan));</span>
+<span class="fc" id="L77">            String hsmResult = nettyHsmService.pinChangeAndVerify(</span>
+                currentPinBlock,  // Current PIN block
+                pan,             // PAN
+                newPinBlock,     // New PIN block
+                pinMethod,       // PIN method
+                currentOffset,   // Current offset
+                false            // false = PIN change, true = verification
+            );
+            
+<span class="fc" id="L86">            logger.debug(&quot;HSM PIN change result: {}&quot;, hsmResult);</span>
+            
+            // Step 4: Parse HSM response
+<span class="fc bfc" id="L89" title="All 4 branches covered.">            if (hsmResult == null || hsmResult.startsWith(&quot;F&quot;)) {</span>
+<span class="fc" id="L90">                logger.warn(&quot;HSM PIN change failed for card: {}. Result: {}&quot;, maskPan(pan), hsmResult);</span>
+<span class="fc" id="L91">                return handleHsmFailure(hsmResult);</span>
+            }
+            
+            // Step 5: Extract result and new offset
+<span class="fc" id="L95">            String[] resultParts = hsmResult.split(&quot;;&quot;);</span>
+<span class="fc bfc" id="L96" title="All 2 branches covered.">            if (resultParts.length &lt; 2) {</span>
+<span class="fc" id="L97">                logger.error(&quot;Invalid HSM response format: {}&quot;, hsmResult);</span>
+               // return new PinChangeResult(false, &quot;96&quot;, &quot;Invalid HSM response&quot;, null);
+<span class="fc" id="L99">                ValidationResult.Builder resultBuilder = new ValidationResult.Builder();</span>
+<span class="fc" id="L100">                resultBuilder.addError(&quot;Invalid HSM response&quot;);</span>
+<span class="fc" id="L101">                return resultBuilder.build();</span>
+            }
+            
+<span class="fc" id="L104">            String pinChangeResult = resultParts[0];</span>
+<span class="fc" id="L105">            String newOffset = resultParts[1];</span>
+            
+            // Step 6: Check if PIN change was successful
+<span class="fc bfc" id="L108" title="All 2 branches covered.">            if (!&quot;Y&quot;.equals(pinChangeResult)) {</span>
+<span class="fc" id="L109">                logger.warn(&quot;PIN change failed for card: {}. HSM result: {}&quot;, maskPan(pan), pinChangeResult);</span>
+<span class="fc" id="L110">                ValidationResult.Builder resultBuilder = new ValidationResult.Builder();</span>
+<span class="fc" id="L111">                resultBuilder.addError(&quot;PIN change failed&quot;);</span>
+<span class="fc" id="L112">                return resultBuilder.build();</span>
+
+            }
+            
+            // Step 7: Update database with new PVV offset
+            try {
+<span class="fc" id="L118">                updateCardDataWithNewOffset(cardData, newOffset, originalOffset);</span>
+<span class="fc" id="L119">                logger.info(&quot;Successfully updated PVV offset for card: {}&quot;, maskPan(pan));</span>
+                
+<span class="fc" id="L121">                ValidationResult.Builder resultBuilder = new ValidationResult.Builder();</span>
+<span class="fc" id="L122">                resultBuilder.addWarning(&quot;PIN change successful&quot;);</span>
+<span class="fc" id="L123">                return resultBuilder.build();</span>
+                
+<span class="fc" id="L125">            } catch (Exception dbException) {</span>
+<span class="fc" id="L126">                logger.error(&quot;Failed to update database for card: {}&quot;, maskPan(pan), dbException);</span>
+<span class="fc" id="L127">                ValidationResult.Builder resultBuilder = new ValidationResult.Builder();</span>
+<span class="fc" id="L128">                resultBuilder.addError(&quot;Database update failed&quot;);</span>
+<span class="fc" id="L129">                return resultBuilder.build();</span>
+            }
+            
+<span class="fc" id="L132">        } catch (Exception e) {</span>
+<span class="fc" id="L133">            logger.error(&quot;Error during PIN change process &quot; , e);</span>
+<span class="fc" id="L134">            ValidationResult.Builder resultBuilder = new ValidationResult.Builder();</span>
+<span class="fc" id="L135">            resultBuilder.addError(&quot;System malfunction&quot;);</span>
+<span class="fc" id="L136">            return resultBuilder.build();</span>
+        }
+    }
+    
+    /**
+     * Update card data with new PVV offset
+     */
+    private void updateCardDataWithNewOffset(CardData cardData, String newOffset, String originalOffset) {
+        try {
+            // Store old offset for audit trail
+<span class="fc" id="L146">            cardData.setOld_pvv_offest(originalOffset);</span>
+            
+            // Update with new offset
+<span class="fc" id="L149">            cardData.setPvv_offest(newOffset);</span>
+<span class="fc" id="L150">            cardData.setUpdated_at(LocalDateTime.now());</span>
+            
+            // Reset PIN retry count on successful PIN change
+<span class="fc" id="L153">            cardData.setPin_retry_count(0);</span>
+<span class="fc" id="L154">            cardData.setPin_blocked(false);</span>
+            
+            // Save to database
+<span class="fc bfc" id="L157" title="All 2 branches covered.">            if (!cardDataService.updateCardData(cardData)) {</span>
+<span class="fc" id="L158">                throw new RuntimeException(&quot;Failed to persist encrypted card data&quot;);</span>
+            }
+            
+<span class="fc" id="L161">            logger.debug(&quot;Updated card data after PIN change for card: {}&quot;, maskPan(cardData.getPan()));</span>
+            
+<span class="fc" id="L163">        } catch (Exception e) {</span>
+<span class="fc" id="L164">            logger.error(&quot;Error updating card data: {}&quot;, e.getMessage());</span>
+<span class="fc" id="L165">            throw new RuntimeException(&quot;Failed to update card data&quot;, e);</span>
+<span class="fc" id="L166">        }</span>
+<span class="fc" id="L167">    }</span>
+    
+    /**
+     * Handle HSM failure scenarios
+     */
+    private ValidationResult handleHsmFailure(String hsmResult) {
+        String responseCode;
+        String message;
+        
+<span class="fc bfc" id="L176" title="All 2 branches covered.">        if (hsmResult == null) {</span>
+<span class="fc" id="L177">            responseCode = &quot;96&quot;;</span>
+<span class="fc" id="L178">            message = &quot;HSM communication error&quot;;</span>
+<span class="fc bfc" id="L179" title="All 2 branches covered.">        } else if (hsmResult.contains(&quot;Invalid PIN&quot;)) {</span>
+<span class="fc" id="L180">            responseCode = &quot;55&quot;;</span>
+<span class="fc" id="L181">            message = &quot;Invalid PIN&quot;;</span>
+<span class="fc bfc" id="L182" title="All 2 branches covered.">        } else if (hsmResult.contains(&quot;PIN blocked&quot;)) {</span>
+<span class="fc" id="L183">            responseCode = &quot;55&quot;;</span>
+<span class="fc" id="L184">            message = &quot;PIN blocked&quot;;</span>
+<span class="fc bfc" id="L185" title="All 2 branches covered.">        } else if (hsmResult.contains(&quot;Invalid pin method&quot;)) {</span>
+<span class="fc" id="L186">            responseCode = &quot;30&quot;;</span>
+<span class="fc" id="L187">            message = &quot;Invalid PIN method&quot;;</span>
+        } else {
+<span class="fc" id="L189">            responseCode = &quot;96&quot;;</span>
+<span class="fc" id="L190">            message = &quot;HSM error: &quot; + hsmResult;</span>
+        }
+        
+<span class="fc" id="L193">        ValidationResult.Builder resultBuilder = new ValidationResult.Builder();</span>
+<span class="fc" id="L194">        resultBuilder.addError( message);</span>
+<span class="fc" id="L195">        return resultBuilder.build();</span>
+    }
+    
+   
+    
+    /**
+     * Mask PAN for logging
+     */
+    private String maskPan(String pan) {
+<span class="pc bpc" id="L204" title="2 of 4 branches missed.">        if (pan == null || pan.length() &lt; 8) {</span>
+<span class="nc" id="L205">            return &quot;****&quot;;</span>
+        }
+<span class="fc" id="L207">        return pan.substring(0, 4) + &quot;****&quot; + pan.substring(pan.length() - 4);</span>
+    }
+    
+    /**
+     * PIN Change Result DTO
+     */
+    public static class PinChangeResult {
+        private boolean success;
+        private String responseCode;
+        private String message;
+        private String newOffset;
+        
+<span class="fc" id="L219">        public PinChangeResult(boolean success, String responseCode, String message, String newOffset) {</span>
+<span class="fc" id="L220">            this.success = success;</span>
+<span class="fc" id="L221">            this.responseCode = responseCode;</span>
+<span class="fc" id="L222">            this.message = message;</span>
+<span class="fc" id="L223">            this.newOffset = newOffset;</span>
+<span class="fc" id="L224">        }</span>
+        
+        // Getters
+<span class="fc" id="L227">        public boolean isSuccess() { return success; }</span>
+<span class="fc" id="L228">        public String getResponseCode() { return responseCode; }</span>
+<span class="fc" id="L229">        public String getMessage() { return message; }</span>
+<span class="fc" id="L230">        public String getNewOffset() { return newOffset; }</span>
+        
+        @Override
+        public String toString() {
+<span class="fc" id="L234">            return String.format(&quot;PinChangeResult{success=%s, responseCode='%s', message='%s', newOffset='%s'}&quot;, </span>
+<span class="fc" id="L235">                success, responseCode, message, newOffset);</span>
+        }
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.14.202510111229</span></div></body></html>

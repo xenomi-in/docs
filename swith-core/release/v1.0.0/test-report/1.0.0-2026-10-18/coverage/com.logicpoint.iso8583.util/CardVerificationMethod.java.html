@@ -1,0 +1,99 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>CardVerificationMethod.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">iso8583-processor</a> &gt; <a href="index.source.html" class="el_package">com.logicpoint.iso8583.util</a> &gt; <span class="el_source">CardVerificationMethod.java</span></div><h1>CardVerificationMethod.java</h1><pre class="source lang-java linenums">package com.logicpoint.iso8583.util;
+
+import io.swagger.v3.oas.annotations.media.Schema;
+
+<span class="fc" id="L5">@Schema(description = &quot;ISO 8583 Card Verification Methods&quot;)</span>
+public enum CardVerificationMethod {
+<span class="fc" id="L7">    @Schema(description = &quot;No CVM Required&quot;)</span>
+    NO_CVM(&quot;0&quot;, &quot;No CVM Required&quot;),
+    
+<span class="fc" id="L10">    @Schema(description = &quot;Signature&quot;)</span>
+    SIGNATURE(&quot;1&quot;, &quot;Signature&quot;),
+    
+<span class="fc" id="L13">    @Schema(description = &quot;Online PIN&quot;)</span>
+    ONLINE_PIN(&quot;2&quot;, &quot;Online PIN&quot;),
+    
+<span class="fc" id="L16">    @Schema(description = &quot;Offline PIN&quot;)</span>
+    OFFLINE_PIN(&quot;3&quot;, &quot;Offline PIN&quot;),
+    
+<span class="fc" id="L19">    @Schema(description = &quot;Online PIN and Signature&quot;)</span>
+    ONLINE_PIN_SIGNATURE(&quot;4&quot;, &quot;Online PIN and Signature&quot;),
+    
+<span class="fc" id="L22">    @Schema(description = &quot;Offline PIN and Signature&quot;)</span>
+    OFFLINE_PIN_SIGNATURE(&quot;5&quot;, &quot;Offline PIN and Signature&quot;),
+    
+<span class="fc" id="L25">    @Schema(description = &quot;Biometric&quot;)</span>
+    BIOMETRIC(&quot;6&quot;, &quot;Biometric&quot;),
+    
+<span class="fc" id="L28">    @Schema(description = &quot;Biometric and PIN&quot;)</span>
+    BIOMETRIC_PIN(&quot;7&quot;, &quot;Biometric and PIN&quot;),
+    
+<span class="fc" id="L31">    @Schema(description = &quot;Biometric and Signature&quot;)</span>
+    BIOMETRIC_SIGNATURE(&quot;8&quot;, &quot;Biometric and Signature&quot;),
+    
+<span class="fc" id="L34">    @Schema(description = &quot;No CVM Required (Contactless)&quot;)</span>
+    NO_CVM_CONTACTLESS(&quot;9&quot;, &quot;No CVM Required (Contactless)&quot;),
+    
+<span class="fc" id="L37">    @Schema(description = &quot;Unknown CVM&quot;)</span>
+    UNKNOWN(&quot;99&quot;, &quot;Unknown CVM&quot;);
+
+    private final String code;
+    private final String description;
+
+<span class="fc" id="L43">    CardVerificationMethod(String code, String description) {</span>
+<span class="fc" id="L44">        this.code = code;</span>
+<span class="fc" id="L45">        this.description = description;</span>
+<span class="fc" id="L46">    }</span>
+
+    @Schema(description = &quot;CVM Code&quot;)
+    public String getCode() {
+<span class="fc" id="L50">        return code;</span>
+    }
+
+    @Schema(description = &quot;CVM Description&quot;)
+    public String getDescription() {
+<span class="fc" id="L55">        return description;</span>
+    }
+
+    public static CardVerificationMethod fromCode(String code) {
+<span class="fc bfc" id="L59" title="All 2 branches covered.">        if (code == null) {</span>
+<span class="fc" id="L60">            return UNKNOWN;</span>
+        }
+        
+<span class="fc bfc" id="L63" title="All 2 branches covered.">        for (CardVerificationMethod cvm : values()) {</span>
+<span class="fc bfc" id="L64" title="All 2 branches covered.">            if (cvm.getCode().equals(code)) {</span>
+<span class="fc" id="L65">                return cvm;</span>
+            }
+        }
+<span class="fc" id="L68">        return UNKNOWN;</span>
+    }
+
+    public boolean requiresPin() {
+<span class="fc bfc" id="L72" title="All 10 branches covered.">        return this == ONLINE_PIN || this == OFFLINE_PIN || </span>
+               this == ONLINE_PIN_SIGNATURE || this == OFFLINE_PIN_SIGNATURE ||
+               this == BIOMETRIC_PIN;
+    }
+
+    public boolean requiresSignature() {
+<span class="fc bfc" id="L78" title="All 8 branches covered.">        return this == SIGNATURE || this == ONLINE_PIN_SIGNATURE || </span>
+               this == OFFLINE_PIN_SIGNATURE || this == BIOMETRIC_SIGNATURE;
+    }
+
+    public boolean requiresBiometric() {
+<span class="fc bfc" id="L83" title="All 6 branches covered.">        return this == BIOMETRIC || this == BIOMETRIC_PIN || </span>
+               this == BIOMETRIC_SIGNATURE;
+    }
+
+    public boolean isOnline() {
+<span class="fc bfc" id="L88" title="All 4 branches covered.">        return this == ONLINE_PIN || this == ONLINE_PIN_SIGNATURE;</span>
+    }
+
+    public boolean isOffline() {
+<span class="fc bfc" id="L92" title="All 4 branches covered.">        return this == OFFLINE_PIN || this == OFFLINE_PIN_SIGNATURE;</span>
+    }
+
+    public boolean isNoCVM() {
+<span class="fc bfc" id="L96" title="All 4 branches covered.">        return this == NO_CVM || this == NO_CVM_CONTACTLESS;</span>
+    }
+} 
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.14.202510111229</span></div></body></html>

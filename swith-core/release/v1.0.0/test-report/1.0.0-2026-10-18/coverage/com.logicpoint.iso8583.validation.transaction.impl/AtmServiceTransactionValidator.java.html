@@ -1,0 +1,100 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>AtmServiceTransactionValidator.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">iso8583-processor</a> &gt; <a href="index.source.html" class="el_package">com.logicpoint.iso8583.validation.transaction.impl</a> &gt; <span class="el_source">AtmServiceTransactionValidator.java</span></div><h1>AtmServiceTransactionValidator.java</h1><pre class="source lang-java linenums">package com.logicpoint.iso8583.validation.transaction.impl;
+
+import io.swagger.v3.oas.annotations.servers.Server;
+
+import org.springframework.beans.factory.annotation.Value;
+import org.springframework.stereotype.Service;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
+import com.logicpoint.iso8583.validation.ValidationResult;
+import com.logicpoint.iso8583.validation.TransactionType;
+
+import java.math.BigDecimal;
+import java.util.Random;
+import java.util.Map;
+import java.util.List;
+import java.util.ArrayList;
+import java.util.Set;
+import java.util.EnumSet;
+
+import com.logicpoint.iso8583.util.rupay.De54data;
+
+/* @author LogicPoint Systems
+ * @version 1.0
+ * @date 18-10-2025
+ * @description Generic validator for ATM service transactions including BALANCE_INQUIRY, MINI_STATEMENT, PIN_CHANGE, STATEMENT_REQUEST etc...
+ * This validator handles scheme-specific validation rules for different payment networks.
+ *
+ * Supported transaction types: - BALANCE_INQUIRY: Balance inquiry transactions
+ * - MINI_STATEMENT: Mini statement transactions
+ * - PIN_CHANGE: PIN change transactions
+ * - STATEMENT_REQUEST: Statement request transaction
+ * 
+ *
+ * Scheme identification: Field 999 contains the scheme name
+ */
+@Service
+<span class="fc" id="L38">public class AtmServiceTransactionValidator extends AbstractTransactionTypeValidator {</span>
+<span class="fc" id="L39">    private static final Logger log = LoggerFactory.getLogger(AtmServiceTransactionValidator.class);</span>
+
+    @Value(&quot;${accounting.api.enabled:false}&quot;)
+    boolean accountingApiEnabled;
+<span class="fc" id="L43">    private static final Set&lt;TransactionType&gt; SUPPORTED_TYPES = EnumSet.of(</span>
+        TransactionType.BALANCE_ENQUIRY,
+        TransactionType.MINI_STATEMENT,
+        TransactionType.PIN_CHANGE,
+        TransactionType.STATEMENT_REQUEST,
+        TransactionType.BALANCE_ENQUIRY_CL
+    );
+
+    @Override
+    public ValidationResult validateTransactionType(TransactionType transactionType, Map&lt;Integer, String&gt; transactionData) {
+<span class="fc" id="L53">        List&lt;String&gt; errors = new ArrayList&lt;&gt;();</span>
+<span class="fc bfc" id="L54" title="All 2 branches covered.">        if(!SUPPORTED_TYPES.contains(transactionType)) {</span>
+<span class="fc" id="L55">            errors.add(&quot;INVALID_TRANSACTION_TYPE: Expected one of &quot; + SUPPORTED_TYPES + &quot;, got &quot; + transactionType);</span>
+<span class="fc" id="L56">            return new ValidationResult(errors, new ArrayList&lt;&gt;());</span>
+        }
+<span class="fc" id="L58">        String txnAmount = transactionData.get(4);</span>
+<span class="fc bfc" id="L59" title="All 2 branches covered.">        if(!txnAmount.equals(&quot;000000000000&quot;)) {</span>
+<span class="fc" id="L60">            errors.add(&quot;INVALID_TRANSACTION_AMOUNT: Transaction amount must be greater than zero&quot;);</span>
+<span class="fc" id="L61">            return new ValidationResult(errors, new ArrayList&lt;&gt;());</span>
+        }
+
+        // adding De54 for balance enquiry this should be removied after accounting integration
+<span class="pc bpc" id="L65" title="1 of 6 branches missed.">        if(!accountingApiEnabled &amp;&amp; (transactionType == TransactionType.BALANCE_ENQUIRY || transactionType == TransactionType.BALANCE_ENQUIRY_CL)){</span>
+<span class="fc" id="L66">            Random random = new Random();</span>
+<span class="fc" id="L67">            BigDecimal availableBalance = BigDecimal.valueOf(random.nextInt(10000));</span>
+<span class="fc" id="L68">            BigDecimal ledgerBalance = availableBalance.add(BigDecimal.ONE);</span>
+<span class="fc" id="L69">            String de54 = De54data.packBalanceEnquiryDe54(ledgerBalance, availableBalance);</span>
+<span class="fc" id="L70">            transactionData.put(54, de54);</span>
+        }
+<span class="fc" id="L72">        return new ValidationResult(errors, new ArrayList&lt;&gt;());</span>
+    }
+
+    @Override
+    public ValidationResult validateAmountLimits(TransactionType transactionType, Double amount) {
+<span class="fc" id="L77">        return null;</span>
+    }
+
+    @Override
+    public ValidationResult validateVelocityLimits(TransactionType transactionType, String cardNumber) {
+<span class="fc" id="L82">        return null;</span>
+    }
+
+    @Override
+    public double getMaxAmountForTransactionType(TransactionType transactionType) {
+<span class="fc" id="L87">        return 0;</span>
+    }
+
+    @Override
+    public boolean isVelocityLimitExceeded(TransactionType transactionType, String cardNumber) {
+<span class="fc" id="L92">        return false;</span>
+    }
+
+    @Override
+    public String getValidatorType() {
+<span class="fc" id="L97">        return &quot;ATM_SERVICE&quot;;</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.14.202510111229</span></div></body></html>

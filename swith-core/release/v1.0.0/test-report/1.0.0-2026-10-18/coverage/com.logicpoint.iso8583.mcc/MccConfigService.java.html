@@ -1,0 +1,218 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>MccConfigService.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">iso8583-processor</a> &gt; <a href="index.source.html" class="el_package">com.logicpoint.iso8583.mcc</a> &gt; <span class="el_source">MccConfigService.java</span></div><h1>MccConfigService.java</h1><pre class="source lang-java linenums">package com.logicpoint.iso8583.mcc;
+
+import com.logicpoint.iso8583.responsecode.InternalResCode;
+import jakarta.annotation.PostConstruct;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+import org.springframework.scheduling.annotation.Scheduled;
+import org.springframework.stereotype.Service;
+
+import java.util.ArrayList;
+import java.util.Comparator;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
+
+@Service
+class MccConfigService {
+<span class="fc" id="L18">    private static final Logger log = LoggerFactory.getLogger(MccConfigService.class);</span>
+    private static final int ADD_GROUP = 1;
+    private static final int REMOVE_GROUP = 2;
+
+    private final MccConfigRepository repository;
+<span class="fc" id="L23">    private volatile MccRuntimeConfig current = MccRuntimeConfig.EMPTY;</span>
+
+<span class="fc" id="L25">    MccConfigService(MccConfigRepository repository) {</span>
+<span class="fc" id="L26">        this.repository = repository;</span>
+<span class="fc" id="L27">    }</span>
+
+    @PostConstruct
+    public void loadAtStartup() {
+<span class="fc" id="L31">        refresh();</span>
+<span class="fc" id="L32">    }</span>
+
+    @Scheduled(fixedDelayString = &quot;${mcc.cache.refresh.ms:300000}&quot;)
+    public void refresh() {
+<span class="fc" id="L36">        long startNanos = System.nanoTime();</span>
+<span class="fc" id="L37">        MccRuntimeConfig next = buildConfig();</span>
+<span class="fc" id="L38">        current = next;</span>
+<span class="fc" id="L39">        log.info(&quot;Loaded MCC runtime config in {} ms&quot;, (System.nanoTime() - startNanos) / 1_000_000L);</span>
+<span class="fc" id="L40">    }</span>
+
+    MccRuntimeConfig current() {
+<span class="fc" id="L43">        return current;</span>
+    }
+
+    private MccRuntimeConfig buildConfig() {
+<span class="fc" id="L47">        List&lt;MccConfigRepository.MccRow&gt; mccRows = repository.loadMccRows();</span>
+<span class="fc bfc" id="L48" title="All 2 branches covered.">        if (mccRows.isEmpty()) {</span>
+<span class="fc" id="L49">            log.warn(&quot;No MCC master data loaded; MCC validation will return SYSTEM_ERROR&quot;);</span>
+<span class="fc" id="L50">            return MccRuntimeConfig.EMPTY;</span>
+        }
+<span class="fc" id="L52">        MccTable table = buildMccTable(mccRows);</span>
+<span class="fc" id="L53">        Map&lt;Long, MccCompiledRules&gt; rules = buildRules(table);</span>
+<span class="fc" id="L54">        return new MccRuntimeConfig(table, Map.copyOf(rules), true);</span>
+    }
+
+    private MccTable buildMccTable(List&lt;MccConfigRepository.MccRow&gt; mccRows) {
+<span class="fc" id="L58">        long[] canonicalValidBits = new long[(MccConstants.MCC_LIMIT + 63) &gt;&gt;&gt; 6];</span>
+<span class="fc" id="L59">        long[][] schemeValidBits = new long[MccConstants.SCHEME_SLOT_COUNT][(MccConstants.MCC_LIMIT + 63) &gt;&gt;&gt; 6];</span>
+<span class="fc" id="L60">        long[][] schemeInvalidBits = new long[MccConstants.SCHEME_SLOT_COUNT][(MccConstants.MCC_LIMIT + 63) &gt;&gt;&gt; 6];</span>
+<span class="fc" id="L61">        long[] canonicalGroupMaskByMcc = new long[MccConstants.MCC_LIMIT];</span>
+<span class="fc" id="L62">        long[][] schemeGroupMaskByMcc = new long[MccConstants.SCHEME_SLOT_COUNT][MccConstants.MCC_LIMIT];</span>
+
+<span class="fc bfc" id="L64" title="All 2 branches covered.">        for (MccConfigRepository.MccRow row : mccRows) {</span>
+<span class="fc bfc" id="L65" title="All 2 branches covered.">            if (validMcc(row.mccCode())) {</span>
+<span class="fc" id="L66">                MccTable.setBit(canonicalValidBits, row.mccCode());</span>
+            }
+<span class="fc" id="L68">        }</span>
+
+<span class="fc bfc" id="L70" title="All 2 branches covered.">        for (MccConfigRepository.MccGroupMapRow row : repository.loadMccGroupRows()) {</span>
+<span class="pc bpc" id="L71" title="1 of 6 branches missed.">            if (validMcc(row.mccCode()) &amp;&amp; row.bitIndex() &gt;= 0 &amp;&amp; row.bitIndex() &lt; MccConstants.GROUP_LIMIT) {</span>
+<span class="fc" id="L72">                canonicalGroupMaskByMcc[row.mccCode()] |= 1L &lt;&lt; row.bitIndex();</span>
+            }
+<span class="fc" id="L74">        }</span>
+
+<span class="fc bfc" id="L76" title="All 2 branches covered.">        for (MccConfigRepository.SchemeMccValidityRow row : repository.loadSchemeValidityRows()) {</span>
+<span class="fc" id="L77">            int schemeSlot = MccSchemeSlots.slot(row.scheme());</span>
+<span class="fc bfc" id="L78" title="All 4 branches covered.">            if (schemeSlot &gt; 0 &amp;&amp; validMcc(row.mccCode())) {</span>
+<span class="fc bfc" id="L79" title="All 2 branches covered.">                if (row.valid()) {</span>
+<span class="fc" id="L80">                    MccTable.setBit(schemeValidBits[schemeSlot], row.mccCode());</span>
+                } else {
+<span class="fc" id="L82">                    MccTable.setBit(schemeInvalidBits[schemeSlot], row.mccCode());</span>
+                }
+            }
+<span class="fc" id="L85">        }</span>
+
+<span class="fc bfc" id="L87" title="All 2 branches covered.">        for (MccConfigRepository.SchemeGroupOverrideRow row : repository.loadSchemeGroupOverrides()) {</span>
+<span class="fc" id="L88">            int schemeSlot = MccSchemeSlots.slot(row.scheme());</span>
+<span class="pc bpc" id="L89" title="2 of 8 branches missed.">            if (schemeSlot &lt;= 0 || !validMcc(row.mccCode()) || row.bitIndex() &lt; 0 || row.bitIndex() &gt;= MccConstants.GROUP_LIMIT) {</span>
+<span class="fc" id="L90">                continue;</span>
+            }
+<span class="fc" id="L92">            long existing = schemeGroupMaskByMcc[schemeSlot][row.mccCode()];</span>
+<span class="fc bfc" id="L93" title="All 2 branches covered.">            if (existing == 0L) {</span>
+<span class="fc" id="L94">                existing = canonicalGroupMaskByMcc[row.mccCode()];</span>
+            }
+<span class="fc" id="L96">            long bit = 1L &lt;&lt; row.bitIndex();</span>
+<span class="fc bfc" id="L97" title="All 2 branches covered.">            if (row.overrideAction() == ADD_GROUP) {</span>
+<span class="fc" id="L98">                schemeGroupMaskByMcc[schemeSlot][row.mccCode()] = existing | bit;</span>
+<span class="fc bfc" id="L99" title="All 2 branches covered.">            } else if (row.overrideAction() == REMOVE_GROUP) {</span>
+<span class="fc" id="L100">                schemeGroupMaskByMcc[schemeSlot][row.mccCode()] = existing &amp; ~bit;</span>
+            }
+<span class="fc" id="L102">        }</span>
+
+<span class="fc" id="L104">        return new MccTable(canonicalValidBits, schemeValidBits, schemeInvalidBits, canonicalGroupMaskByMcc, schemeGroupMaskByMcc);</span>
+    }
+
+    private Map&lt;Long, MccCompiledRules&gt; buildRules(MccTable table) {
+<span class="fc" id="L108">        List&lt;MccConfigRepository.MccRuleRow&gt; rows = new ArrayList&lt;&gt;(repository.loadRuleRows());</span>
+<span class="fc" id="L109">        rows.sort(Comparator</span>
+<span class="fc" id="L110">                .comparingInt(MccConfigRepository.MccRuleRow::institutionId)</span>
+<span class="fc" id="L111">                .thenComparingInt(row -&gt; MccSchemeSlots.slot(row.scheme()))</span>
+<span class="fc" id="L112">                .thenComparingInt(MccConfigRepository.MccRuleRow::priority)</span>
+<span class="fc" id="L113">                .thenComparingInt(MccConfigRepository.MccRuleRow::ruleId));</span>
+
+<span class="fc" id="L115">        Map&lt;Long, List&lt;MccConfigRepository.MccRuleRow&gt;&gt; grouped = new HashMap&lt;&gt;();</span>
+<span class="fc bfc" id="L116" title="All 2 branches covered.">        for (MccConfigRepository.MccRuleRow row : rows) {</span>
+<span class="fc" id="L117">            int schemeSlot = MccSchemeSlots.slot(row.scheme());</span>
+<span class="fc bfc" id="L118" title="All 6 branches covered.">            if (row.institutionId() &lt;= 0 || schemeSlot &lt;= 0 || !validAction(row.action())) {</span>
+<span class="fc" id="L119">                continue;</span>
+            }
+<span class="fc" id="L121">            grouped.computeIfAbsent(MccRuntimeConfig.ruleKey(row.institutionId(), schemeSlot), ignored -&gt; new ArrayList&lt;&gt;()).add(row);</span>
+<span class="fc" id="L122">        }</span>
+
+<span class="fc" id="L124">        Map&lt;Long, MccCompiledRules&gt; compiled = new HashMap&lt;&gt;(grouped.size());</span>
+<span class="fc bfc" id="L125" title="All 2 branches covered.">        for (Map.Entry&lt;Long, List&lt;MccConfigRepository.MccRuleRow&gt;&gt; entry : grouped.entrySet()) {</span>
+<span class="fc" id="L126">            compiled.put(entry.getKey(), compileRules(entry.getValue(), table));</span>
+<span class="fc" id="L127">        }</span>
+<span class="fc" id="L128">        return compiled;</span>
+    }
+
+    private MccCompiledRules compileRules(List&lt;MccConfigRepository.MccRuleRow&gt; rows, MccTable table) {
+<span class="fc" id="L132">        int size = rows.size();</span>
+<span class="fc" id="L133">        int[] ruleIds = new int[size];</span>
+<span class="fc" id="L134">        int[] opcodes = new int[size];</span>
+<span class="fc" id="L135">        long[] longArg0 = new long[size];</span>
+<span class="fc" id="L136">        long[] longArg1 = new long[size];</span>
+<span class="fc" id="L137">        int[] actions = new int[size];</span>
+<span class="fc" id="L138">        int[] reasonCodes = new int[size];</span>
+<span class="fc" id="L139">        int[] exactMcc = new int[size];</span>
+
+<span class="fc" id="L141">        int count = 0;</span>
+<span class="fc bfc" id="L142" title="All 2 branches covered.">        for (MccConfigRepository.MccRuleRow row : rows) {</span>
+<span class="fc" id="L143">            int opcode = row.ruleType();</span>
+<span class="fc bfc" id="L144" title="All 2 branches covered.">            if (opcode == MccConstants.RULE_EXACT_MCC) {</span>
+<span class="pc bpc" id="L145" title="1 of 4 branches missed.">                if (row.mccCode() == null || !validMcc(row.mccCode())) {</span>
+<span class="nc" id="L146">                    continue;</span>
+                }
+<span class="fc" id="L148">                exactMcc[count] = row.mccCode();</span>
+<span class="fc bfc" id="L149" title="All 4 branches covered.">            } else if (opcode == MccConstants.RULE_MCC_GROUP || opcode == MccConstants.RULE_GROUP_AMOUNT_LIMIT) {</span>
+<span class="pc bpc" id="L150" title="2 of 6 branches missed.">                if (row.groupBitIndex() == null || row.groupBitIndex() &lt; 0 || row.groupBitIndex() &gt;= MccConstants.GROUP_LIMIT) {</span>
+<span class="fc" id="L151">                    continue;</span>
+                }
+<span class="fc" id="L153">                longArg0[count] = 1L &lt;&lt; row.groupBitIndex();</span>
+<span class="fc bfc" id="L154" title="All 2 branches covered.">                if (opcode == MccConstants.RULE_GROUP_AMOUNT_LIMIT) {</span>
+<span class="pc bpc" id="L155" title="1 of 2 branches missed.">                    longArg1[count] = row.maxAmountMinor() == null ? Long.MAX_VALUE : row.maxAmountMinor();</span>
+                }
+            } else {
+                continue;
+            }
+
+<span class="fc" id="L161">            ruleIds[count] = row.ruleId();</span>
+<span class="fc" id="L162">            opcodes[count] = opcode;</span>
+<span class="fc" id="L163">            actions[count] = row.action();</span>
+<span class="fc" id="L164">            reasonCodes[count] = responseOrdinal(row.responseCode(), row.action());</span>
+<span class="fc" id="L165">            count++;</span>
+<span class="fc" id="L166">        }</span>
+
+<span class="pc bpc" id="L168" title="1 of 2 branches missed.">        if (count == size) {</span>
+<span class="nc" id="L169">            return new MccCompiledRules(ruleIds, opcodes, longArg0, longArg1, actions, reasonCodes, exactMcc);</span>
+        }
+<span class="fc" id="L171">        return new MccCompiledRules(</span>
+<span class="fc" id="L172">                copy(ruleIds, count),</span>
+<span class="fc" id="L173">                copy(opcodes, count),</span>
+<span class="fc" id="L174">                copy(longArg0, count),</span>
+<span class="fc" id="L175">                copy(longArg1, count),</span>
+<span class="fc" id="L176">                copy(actions, count),</span>
+<span class="fc" id="L177">                copy(reasonCodes, count),</span>
+<span class="fc" id="L178">                copy(exactMcc, count)</span>
+        );
+    }
+
+    private int responseOrdinal(String configuredCode, int action) {
+<span class="pc bpc" id="L183" title="1 of 4 branches missed.">        if (configuredCode != null &amp;&amp; !configuredCode.isBlank()) {</span>
+            try {
+<span class="fc" id="L185">                return InternalResCode.valueOf(configuredCode.trim().toUpperCase()).ordinal();</span>
+<span class="fc" id="L186">            } catch (IllegalArgumentException ignored) {</span>
+<span class="fc" id="L187">                log.warn(&quot;Ignoring unknown MCC response_code {}&quot;, configuredCode);</span>
+            }
+        }
+<span class="fc bfc" id="L190" title="All 2 branches covered.">        InternalResCode fallback = action == MccConstants.ACTION_STEP_UP</span>
+<span class="fc" id="L191">                ? InternalResCode.MCC_STEP_UP_REQUIRED</span>
+<span class="fc" id="L192">                : InternalResCode.MCC_NOT_ALLOWED;</span>
+<span class="fc" id="L193">        return fallback.ordinal();</span>
+    }
+
+    private boolean validAction(int action) {
+<span class="fc bfc" id="L197" title="All 6 branches covered.">        return action == MccConstants.ACTION_ALLOW</span>
+                || action == MccConstants.ACTION_DECLINE
+                || action == MccConstants.ACTION_STEP_UP;
+    }
+
+    private boolean validMcc(int mcc) {
+<span class="fc bfc" id="L203" title="All 4 branches covered.">        return mcc &gt;= 0 &amp;&amp; mcc &lt; MccConstants.MCC_LIMIT;</span>
+    }
+
+    private int[] copy(int[] source, int count) {
+<span class="fc" id="L207">        int[] target = new int[count];</span>
+<span class="fc" id="L208">        System.arraycopy(source, 0, target, 0, count);</span>
+<span class="fc" id="L209">        return target;</span>
+    }
+
+    private long[] copy(long[] source, int count) {
+<span class="fc" id="L213">        long[] target = new long[count];</span>
+<span class="fc" id="L214">        System.arraycopy(source, 0, target, 0, count);</span>
+<span class="fc" id="L215">        return target;</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.14.202510111229</span></div></body></html>

@@ -1,0 +1,119 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>CanonicalResponseCodeSeedService.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">iso8583-processor</a> &gt; <a href="index.source.html" class="el_package">com.logicpoint.iso8583.service</a> &gt; <span class="el_source">CanonicalResponseCodeSeedService.java</span></div><h1>CanonicalResponseCodeSeedService.java</h1><pre class="source lang-java linenums">package com.logicpoint.iso8583.service;
+
+import com.logicpoint.iso8583.entity.CanonicalResponseCode;
+import com.logicpoint.iso8583.repository.CanonicalResponseCodeRepository;
+import jakarta.annotation.PostConstruct;
+import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
+import org.springframework.stereotype.Service;
+
+import java.time.LocalDateTime;
+import java.util.List;
+
+<span class="fc" id="L13">@Slf4j</span>
+@Service
+@RequiredArgsConstructor
+public class CanonicalResponseCodeSeedService {
+
+    private final CanonicalResponseCodeRepository repository;
+    private final ResponseCodeCacheService responseCodeCacheService;
+
+    @PostConstruct
+    public void seedIfRequired() {
+<span class="fc" id="L23">        List&lt;CanonicalResponseCode&gt; seeds = buildSeeds();</span>
+<span class="fc" id="L24">        int inserted = 0;</span>
+<span class="fc" id="L25">        int skipped = 0;</span>
+
+<span class="fc bfc" id="L27" title="All 2 branches covered.">        for (CanonicalResponseCode seed : seeds) {</span>
+<span class="fc" id="L28">            CanonicalResponseCode existing = repository.findById(seed.getInternalCode()).orElse(null);</span>
+<span class="pc bpc" id="L29" title="1 of 2 branches missed.">            if (existing == null) {</span>
+<span class="nc" id="L30">                repository.save(seed);</span>
+<span class="nc" id="L31">                inserted++;</span>
+            } else {
+<span class="fc" id="L33">                skipped++;</span>
+            }
+<span class="fc" id="L35">        }</span>
+
+<span class="fc" id="L37">        log.info(&quot;Canonical response code seed complete. inserted={}, skippedExisting={}&quot;, inserted, skipped);</span>
+<span class="fc" id="L38">        responseCodeCacheService.refreshCache();</span>
+<span class="fc" id="L39">    }</span>
+
+    private List&lt;CanonicalResponseCode&gt; buildSeeds() {
+<span class="fc" id="L42">        return List.of(</span>
+<span class="fc" id="L43">                seed(&quot;APPROVED&quot;, &quot;Approved&quot;, &quot;00&quot;, &quot;00&quot;, &quot;Approved&quot;, &quot;00&quot;, &quot;Approved&quot;, &quot;00&quot;, &quot;Approved&quot;, &quot;APPROVAL&quot;, null, false, false, &quot;NONE&quot;),</span>
+<span class="fc" id="L44">                seed(&quot;PARTIAL_APPROVAL&quot;, &quot;Partial approval&quot;, &quot;10&quot;, &quot;10&quot;, &quot;Partial approval&quot;, &quot;10&quot;, &quot;Partial approval&quot;, &quot;10&quot;, &quot;Partial approval&quot;, &quot;APPROVAL&quot;, null, false, false, &quot;NONE&quot;),</span>
+<span class="fc" id="L45">                seed(&quot;DO_NOT_HONOR&quot;, &quot;Generic decline&quot;, &quot;05&quot;, &quot;05&quot;, &quot;Do not honor&quot;, &quot;05&quot;, &quot;Do not honor&quot;, &quot;05&quot;, &quot;Do not honor&quot;, &quot;DECLINE&quot;, &quot;BUSINESS&quot;, false, false, &quot;NONE&quot;),</span>
+<span class="fc" id="L46">                seed(&quot;INVALID_TRANSACTION&quot;, &quot;Invalid transaction&quot;, &quot;12&quot;, &quot;12&quot;, &quot;Invalid transaction&quot;, &quot;12&quot;, &quot;Invalid transaction&quot;, &quot;12&quot;, &quot;Invalid transaction&quot;, &quot;DECLINE&quot;, &quot;BUSINESS&quot;, false, false, &quot;NONE&quot;),</span>
+<span class="fc" id="L47">                seed(&quot;INVALID_AMOUNT&quot;, &quot;Invalid amount&quot;, &quot;13&quot;, &quot;13&quot;, &quot;Invalid amount&quot;, &quot;13&quot;, &quot;Invalid amount&quot;, &quot;13&quot;, &quot;Invalid amount&quot;, &quot;DECLINE&quot;, &quot;BUSINESS&quot;, false, false, &quot;NONE&quot;),</span>
+<span class="fc" id="L48">                seed(&quot;INVALID_CARD_NUMBER&quot;, &quot;Invalid card number&quot;, &quot;14&quot;, &quot;14&quot;, &quot;Invalid card number&quot;, &quot;14&quot;, &quot;Invalid card number&quot;, &quot;14&quot;, &quot;Invalid card number&quot;, &quot;DECLINE&quot;, &quot;BUSINESS&quot;, false, false, &quot;NONE&quot;),</span>
+<span class="fc" id="L49">                seed(&quot;NO_SUCH_ISSUER&quot;, &quot;No such issuer&quot;, &quot;15&quot;, &quot;15&quot;, &quot;No such issuer&quot;, &quot;15&quot;, &quot;No such issuer&quot;, &quot;15&quot;, &quot;No such issuer&quot;, &quot;DECLINE&quot;, &quot;BUSINESS&quot;, false, false, &quot;NONE&quot;),</span>
+<span class="fc" id="L50">                seed(&quot;REENTER_TRANSACTION&quot;, &quot;Re-enter transaction&quot;, &quot;19&quot;, &quot;19&quot;, &quot;Re-enter transaction&quot;, &quot;19&quot;, &quot;Re-enter transaction&quot;, &quot;19&quot;, &quot;Re-enter transaction&quot;, &quot;DECLINE&quot;, &quot;SOFT&quot;, true, false, &quot;RETRY&quot;),</span>
+<span class="fc" id="L51">                seed(&quot;FORMAT_ERROR&quot;, &quot;Message format error&quot;, &quot;30&quot;, &quot;30&quot;, &quot;Format error&quot;, &quot;30&quot;, &quot;Format error&quot;, &quot;30&quot;, &quot;Format error&quot;, &quot;ERROR&quot;, &quot;TECHNICAL&quot;, false, false, &quot;NONE&quot;),</span>
+<span class="fc" id="L52">                seed(&quot;ISSUER_INOPERATIVE&quot;, &quot;Issuer unavailable&quot;, &quot;91&quot;, &quot;91&quot;, &quot;Issuer unavailable&quot;, &quot;91&quot;, &quot;Issuer unavailable&quot;, &quot;91&quot;, &quot;Issuer unavailable&quot;, &quot;ERROR&quot;, &quot;TECHNICAL&quot;, true, false, &quot;RETRY&quot;),</span>
+<span class="fc" id="L53">                seed(&quot;SYSTEM_ERROR&quot;, &quot;System malfunction&quot;, &quot;96&quot;, &quot;96&quot;, &quot;System malfunction&quot;, &quot;96&quot;, &quot;System malfunction&quot;, &quot;96&quot;, &quot;System malfunction&quot;, &quot;ERROR&quot;, &quot;TECHNICAL&quot;, true, true, &quot;SEND_REVERSAL&quot;),</span>
+<span class="fc" id="L54">                seed(&quot;EXPIRED_CARD&quot;, &quot;Expired card&quot;, &quot;54&quot;, &quot;54&quot;, &quot;Expired card&quot;, &quot;54&quot;, &quot;Expired card&quot;, &quot;54&quot;, &quot;Expired card&quot;, &quot;DECLINE&quot;, &quot;BUSINESS&quot;, false, false, &quot;NONE&quot;),</span>
+<span class="fc" id="L55">                seed(&quot;EXPIRED_CARD_CAPTURE&quot;, &quot;Expired card capture&quot;, &quot;33&quot;, &quot;33&quot;, &quot;Expired card capture&quot;, &quot;33&quot;, &quot;Expired card capture&quot;, &quot;33&quot;, &quot;Expired card capture&quot;, &quot;DECLINE&quot;, &quot;BUSINESS&quot;, false, false, &quot;CAPTURE_CARD&quot;),</span>
+<span class="fc" id="L56">                seed(&quot;INVALID_PIN&quot;, &quot;Incorrect PIN&quot;, &quot;55&quot;, &quot;55&quot;, &quot;Invalid PIN&quot;, &quot;55&quot;, &quot;Invalid PIN&quot;, &quot;55&quot;, &quot;Invalid PIN&quot;, &quot;DECLINE&quot;, &quot;SECURITY&quot;, false, false, &quot;NONE&quot;),</span>
+<span class="fc" id="L57">                seed(&quot;PIN_TRY_EXCEEDED&quot;, &quot;PIN tries exceeded&quot;, &quot;75&quot;, &quot;75&quot;, &quot;PIN tries exceeded&quot;, &quot;75&quot;, &quot;PIN tries exceeded&quot;, &quot;75&quot;, &quot;PIN tries exceeded&quot;, &quot;DECLINE&quot;, &quot;SECURITY&quot;, false, false, &quot;CAPTURE_CARD&quot;),</span>
+<span class="fc" id="L58">                seed(&quot;INSUFFICIENT_FUNDS&quot;, &quot;Insufficient funds&quot;, &quot;51&quot;, &quot;51&quot;, &quot;Insufficient funds&quot;, &quot;51&quot;, &quot;Insufficient funds&quot;, &quot;51&quot;, &quot;Insufficient funds&quot;, &quot;DECLINE&quot;, &quot;BUSINESS&quot;, false, false, &quot;NONE&quot;),</span>
+<span class="fc" id="L59">                seed(&quot;EXCEEDS_LIMIT&quot;, &quot;Exceeds withdrawal or transaction limit&quot;, &quot;61&quot;, &quot;61&quot;, &quot;Exceeds limit&quot;, &quot;61&quot;, &quot;Exceeds limit&quot;, &quot;61&quot;, &quot;Exceeds limit&quot;, &quot;DECLINE&quot;, &quot;BUSINESS&quot;, false, false, &quot;NONE&quot;),</span>
+<span class="fc" id="L60">                seed(&quot;RESTRICTED_CARD&quot;, &quot;Restricted card&quot;, &quot;62&quot;, &quot;62&quot;, &quot;Restricted card&quot;, &quot;62&quot;, &quot;Restricted card&quot;, &quot;62&quot;, &quot;Restricted card&quot;, &quot;DECLINE&quot;, &quot;BUSINESS&quot;, false, false, &quot;NONE&quot;),</span>
+<span class="fc" id="L61">                seed(&quot;SECURITY_VIOLATION&quot;, &quot;Security violation&quot;, &quot;63&quot;, &quot;63&quot;, &quot;Security violation&quot;, &quot;63&quot;, &quot;Security violation&quot;, &quot;63&quot;, &quot;Security violation&quot;, &quot;DECLINE&quot;, &quot;SECURITY&quot;, false, false, &quot;HOTLIST&quot;),</span>
+<span class="fc" id="L62">                seed(&quot;LOST_CARD&quot;, &quot;Lost card&quot;, &quot;41&quot;, &quot;41&quot;, &quot;Lost card&quot;, &quot;41&quot;, &quot;Lost card&quot;, &quot;41&quot;, &quot;Lost card&quot;, &quot;DECLINE&quot;, &quot;SECURITY&quot;, false, false, &quot;CAPTURE_CARD&quot;),</span>
+<span class="fc" id="L63">                seed(&quot;STOLEN_CARD&quot;, &quot;Stolen card&quot;, &quot;43&quot;, &quot;43&quot;, &quot;Stolen card&quot;, &quot;43&quot;, &quot;Stolen card&quot;, &quot;43&quot;, &quot;Stolen card&quot;, &quot;DECLINE&quot;, &quot;SECURITY&quot;, false, false, &quot;CAPTURE_CARD&quot;),</span>
+<span class="fc" id="L64">                seed(&quot;SUSPECTED_FRAUD&quot;, &quot;Suspected fraud&quot;, &quot;59&quot;, &quot;59&quot;, &quot;Suspected fraud&quot;, &quot;59&quot;, &quot;Suspected fraud&quot;, &quot;59&quot;, &quot;Suspected fraud&quot;, &quot;DECLINE&quot;, &quot;SECURITY&quot;, false, false, &quot;HOTLIST&quot;),</span>
+<span class="fc" id="L65">                seed(&quot;NO_SUCH_ACCOUNT&quot;, &quot;No such account&quot;, &quot;42&quot;, &quot;42&quot;, &quot;No such account&quot;, &quot;42&quot;, &quot;No such account&quot;, &quot;42&quot;, &quot;No such account&quot;, &quot;DECLINE&quot;, &quot;BUSINESS&quot;, false, false, &quot;NONE&quot;),</span>
+<span class="fc" id="L66">                seed(&quot;DUPLICATE_TRANSACTION&quot;, &quot;Duplicate transaction&quot;, &quot;94&quot;, &quot;94&quot;, &quot;Duplicate transaction&quot;, &quot;94&quot;, &quot;Duplicate transaction&quot;, &quot;94&quot;, &quot;Duplicate transaction&quot;, &quot;DECLINE&quot;, &quot;BUSINESS&quot;, false, false, &quot;NONE&quot;),</span>
+<span class="fc" id="L67">                seed(&quot;REVERSAL_NOT_PERMITTED&quot;, &quot;Reversal not permitted&quot;, &quot;57&quot;, &quot;57&quot;, &quot;Transaction not permitted&quot;, &quot;57&quot;, &quot;Transaction not permitted&quot;, &quot;57&quot;, &quot;Transaction not permitted&quot;, &quot;DECLINE&quot;, &quot;BUSINESS&quot;, false, false, &quot;NONE&quot;),</span>
+<span class="fc" id="L68">                seed(&quot;CVV_FAILURE&quot;, &quot;CVV/CVC failure&quot;, &quot;05&quot;, &quot;05&quot;, &quot;CVV failure&quot;, &quot;N7&quot;, &quot;CVV2 failure&quot;, &quot;63&quot;, &quot;Security violation or CVC2 failure&quot;, &quot;DECLINE&quot;, &quot;SECURITY&quot;, false, false, &quot;NONE&quot;),</span>
+<span class="fc" id="L69">                seed(&quot;MAC_FAIL&quot;, &quot;MAC validation failure&quot;, &quot;96&quot;, &quot;89&quot;, &quot;MAC validation failure&quot;, &quot;96&quot;, &quot;MAC validation failure&quot;, &quot;96&quot;, &quot;MAC validation failure&quot;, &quot;ERROR&quot;, &quot;SECURITY&quot;, false, false, &quot;NONE&quot;),</span>
+<span class="fc" id="L70">                seed(&quot;ARQC_FAIL&quot;, &quot;EMV cryptogram validation failed&quot;, &quot;96&quot;, &quot;88&quot;, &quot;Cryptographic failure&quot;, &quot;96&quot;, &quot;EMV cryptogram validation failed&quot;, &quot;96&quot;, &quot;EMV cryptogram validation failed&quot;, &quot;ERROR&quot;, &quot;SECURITY&quot;, false, false, &quot;NONE&quot;),</span>
+<span class="fc" id="L71">                seed(&quot;CVM_FAILED&quot;, &quot;Cardholder verification method validation failed&quot;, &quot;05&quot;, &quot;05&quot;, &quot;CVM validation failed&quot;, &quot;05&quot;, &quot;CVM validation failed&quot;, &quot;05&quot;, &quot;CVM validation failed&quot;, &quot;DECLINE&quot;, &quot;SECURITY&quot;, false, false, &quot;NONE&quot;),</span>
+<span class="fc" id="L72">                seed(&quot;TVR_FAILED&quot;, &quot;Terminal verification results validation failed&quot;, &quot;05&quot;, &quot;05&quot;, &quot;TVR validation failed&quot;, &quot;05&quot;, &quot;TVR validation failed&quot;, &quot;05&quot;, &quot;TVR validation failed&quot;, &quot;DECLINE&quot;, &quot;SECURITY&quot;, false, false, &quot;NONE&quot;),</span>
+<span class="fc" id="L73">                seed(&quot;CVR_FAILED&quot;, &quot;Card verification result validation failed&quot;, &quot;05&quot;, &quot;05&quot;, &quot;CVR validation failed&quot;, &quot;05&quot;, &quot;CVR validation failed&quot;, &quot;05&quot;, &quot;CVR validation failed&quot;, &quot;DECLINE&quot;, &quot;SECURITY&quot;, false, false, &quot;NONE&quot;),</span>
+<span class="fc" id="L74">                seed(&quot;MISSING_MCC&quot;, &quot;Missing merchant category code&quot;, &quot;30&quot;, &quot;30&quot;, &quot;Missing merchant category code&quot;, &quot;30&quot;, &quot;Missing merchant category code&quot;, &quot;30&quot;, &quot;Missing merchant category code&quot;, &quot;DECLINE&quot;, &quot;BUSINESS&quot;, false, false, &quot;NONE&quot;),</span>
+<span class="fc" id="L75">                seed(&quot;INVALID_MCC&quot;, &quot;Invalid merchant category code&quot;, &quot;12&quot;, &quot;12&quot;, &quot;Invalid merchant category code&quot;, &quot;12&quot;, &quot;Invalid merchant category code&quot;, &quot;12&quot;, &quot;Invalid merchant category code&quot;, &quot;DECLINE&quot;, &quot;BUSINESS&quot;, false, false, &quot;NONE&quot;),</span>
+<span class="fc" id="L76">                seed(&quot;MCC_NOT_ALLOWED&quot;, &quot;Merchant category not permitted&quot;, &quot;57&quot;, &quot;57&quot;, &quot;Transaction not permitted for merchant category&quot;, &quot;57&quot;, &quot;Transaction not permitted for merchant category&quot;, &quot;57&quot;, &quot;Transaction not permitted for merchant category&quot;, &quot;DECLINE&quot;, &quot;BUSINESS&quot;, false, false, &quot;NONE&quot;),</span>
+<span class="fc" id="L77">                seed(&quot;MCC_STEP_UP_REQUIRED&quot;, &quot;Merchant category requires additional authentication&quot;, &quot;65&quot;, &quot;65&quot;, &quot;Authentication required for merchant category&quot;, &quot;65&quot;, &quot;Authentication required for merchant category&quot;, &quot;65&quot;, &quot;Authentication required for merchant category&quot;, &quot;DECLINE&quot;, &quot;SECURITY&quot;, false, false, &quot;NONE&quot;)</span>
+        );
+    }
+
+    private CanonicalResponseCode seed(
+            String internalCode,
+            String canonicalDescription,
+            String isoDefaultResponseCode,
+            String rupayResponseCode,
+            String rupayDescription,
+            String visaResponseCode,
+            String visaDescription,
+            String mastercardResponseCode,
+            String mastercardDescription,
+            String category,
+            String declineType,
+            boolean retryable,
+            boolean reversalRequired,
+            String adviceAction) {
+<span class="fc" id="L96">        CanonicalResponseCode row = new CanonicalResponseCode();</span>
+<span class="fc" id="L97">        LocalDateTime now = LocalDateTime.now();</span>
+<span class="fc" id="L98">        row.setInternalCode(internalCode);</span>
+<span class="fc" id="L99">        row.setCanonicalDescription(canonicalDescription);</span>
+<span class="fc" id="L100">        row.setIsoDefaultResponseCode(isoDefaultResponseCode);</span>
+<span class="fc" id="L101">        row.setRupayResponseCode(rupayResponseCode);</span>
+<span class="fc" id="L102">        row.setRupayDescription(rupayDescription);</span>
+<span class="fc" id="L103">        row.setVisaResponseCode(visaResponseCode);</span>
+<span class="fc" id="L104">        row.setVisaDescription(visaDescription);</span>
+<span class="fc" id="L105">        row.setMastercardResponseCode(mastercardResponseCode);</span>
+<span class="fc" id="L106">        row.setMastercardDescription(mastercardDescription);</span>
+<span class="fc" id="L107">        row.setCategory(category);</span>
+<span class="fc" id="L108">        row.setDeclineType(declineType);</span>
+<span class="fc" id="L109">        row.setRetryable(retryable);</span>
+<span class="fc" id="L110">        row.setReversalRequired(reversalRequired);</span>
+<span class="fc" id="L111">        row.setAdviceAction(adviceAction);</span>
+<span class="fc" id="L112">        row.setActive(true);</span>
+<span class="fc" id="L113">        row.setVersion(1);</span>
+<span class="fc" id="L114">        row.setCreatedAt(now);</span>
+<span class="fc" id="L115">        row.setUpdatedAt(now);</span>
+<span class="fc" id="L116">        return row;</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.14.202510111229</span></div></body></html>

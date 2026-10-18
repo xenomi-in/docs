@@ -1,0 +1,35 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>MccSchemeSlots.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">iso8583-processor</a> &gt; <a href="index.source.html" class="el_package">com.logicpoint.iso8583.mcc</a> &gt; <span class="el_source">MccSchemeSlots.java</span></div><h1>MccSchemeSlots.java</h1><pre class="source lang-java linenums">package com.logicpoint.iso8583.mcc;
+
+import com.logicpoint.iso8583.util.Scheme;
+
+final class MccSchemeSlots {
+    private MccSchemeSlots() {
+    }
+
+    static int slot(Scheme scheme) {
+<span class="fc bfc" id="L10" title="All 2 branches covered.">        if (scheme == null) {</span>
+<span class="fc" id="L11">            return 0;</span>
+        }
+<span class="fc bfc" id="L13" title="All 7 branches covered.">        return switch (scheme) {</span>
+<span class="fc" id="L14">            case VISA -&gt; 1;</span>
+<span class="fc" id="L15">            case MASTERCARD -&gt; 2;</span>
+<span class="fc" id="L16">            case RUPAY -&gt; 3;</span>
+<span class="fc" id="L17">            case AMEX -&gt; 4;</span>
+<span class="fc" id="L18">            case DISCOVER -&gt; 5;</span>
+<span class="fc" id="L19">            case UNIONPAY -&gt; 6;</span>
+<span class="fc" id="L20">            case DINERS -&gt; 7;</span>
+        };
+    }
+
+    static int slot(String scheme) {
+<span class="fc bfc" id="L25" title="All 4 branches covered.">        if (scheme == null || scheme.isBlank()) {</span>
+<span class="fc" id="L26">            return 0;</span>
+        }
+        try {
+<span class="fc" id="L29">            return slot(Scheme.valueOf(scheme.trim().toUpperCase()));</span>
+<span class="fc" id="L30">        } catch (IllegalArgumentException ex) {</span>
+<span class="fc" id="L31">            return 0;</span>
+        }
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.14.202510111229</span></div></body></html>

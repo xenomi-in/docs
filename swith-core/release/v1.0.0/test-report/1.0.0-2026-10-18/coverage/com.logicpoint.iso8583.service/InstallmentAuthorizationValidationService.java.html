@@ -1,0 +1,112 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>InstallmentAuthorizationValidationService.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">iso8583-processor</a> &gt; <a href="index.source.html" class="el_package">com.logicpoint.iso8583.service</a> &gt; <span class="el_source">InstallmentAuthorizationValidationService.java</span></div><h1>InstallmentAuthorizationValidationService.java</h1><pre class="source lang-java linenums">package com.logicpoint.iso8583.service;
+
+import com.logicpoint.iso8583.config.InstallmentAuthorizationProperties;
+import com.logicpoint.iso8583.context.RequestContext;
+import com.logicpoint.iso8583.util.Scheme;
+import com.logicpoint.iso8583.validation.TransactionType;
+import java.math.BigDecimal;
+import java.util.ArrayList;
+import java.util.List;
+import java.util.Map;
+import org.springframework.stereotype.Service;
+
+/**
+ * Validates installment/EMI data carried in ISO8583 authorization TLV fields.
+ */
+@Service
+public class InstallmentAuthorizationValidationService {
+
+    public static final String ATTR_EMI_TOTAL_AMOUNT = &quot;emi_total_amount&quot;;
+    public static final String ATTR_EMI_AMOUNT = &quot;emi_amount&quot;;
+    public static final String ATTR_EMI_INSTALLMENTS = &quot;emi_installments&quot;;
+    public static final String ATTR_EMI_INTEREST_RATE = &quot;emi_interest_rate&quot;;
+
+    private final InstallmentAuthorizationProperties properties;
+
+<span class="fc" id="L26">    public InstallmentAuthorizationValidationService(InstallmentAuthorizationProperties properties) {</span>
+<span class="fc" id="L27">        this.properties = properties;</span>
+<span class="fc" id="L28">    }</span>
+
+    public List&lt;String&gt; validate(RequestContext requestContext, Scheme scheme, TransactionType transactionType) {
+<span class="fc" id="L31">        List&lt;String&gt; errors = new ArrayList&lt;&gt;();</span>
+<span class="pc bpc" id="L32" title="2 of 8 branches missed.">        if (!properties.isEnabled() || requestContext == null || scheme == null || transactionType == null) {</span>
+<span class="fc" id="L33">            return errors;</span>
+        }
+
+<span class="fc" id="L36">        InstallmentAuthorizationProperties.SchemeRule rule = properties.getRule(scheme.name());</span>
+<span class="pc bpc" id="L37" title="1 of 6 branches missed.">        if (rule == null || !rule.isEnabled() || !rule.getTransactionTypes().contains(transactionType)) {</span>
+<span class="fc" id="L38">            return errors;</span>
+        }
+
+        Map&lt;String, String&gt; tags;
+        try {
+<span class="fc" id="L43">            tags = requestContext.getParsedTlv(rule.getDataField());</span>
+<span class="fc" id="L44">        } catch (Exception ex) {</span>
+<span class="fc" id="L45">            errors.add(&quot;INVALID_EMI_DATA_FORMAT: Unable to parse DE&quot; + rule.getDataField()</span>
+                    + &quot; for installment data&quot;);
+<span class="fc" id="L47">            return errors;</span>
+<span class="fc" id="L48">        }</span>
+
+<span class="fc" id="L50">        String emiData = tags.get(rule.getEmiDataTag());</span>
+<span class="fc bfc" id="L51" title="All 2 branches covered.">        if (isBlank(emiData)) {</span>
+<span class="pc bpc" id="L52" title="1 of 2 branches missed.">            if (rule.isRequired()) {</span>
+<span class="fc" id="L53">                errors.add(&quot;MISSING_EMI_DATA: DE&quot; + rule.getDataField() + &quot; tag &quot;</span>
+<span class="fc" id="L54">                        + rule.getEmiDataTag() + &quot; is required for &quot; + scheme + &quot; &quot; + transactionType);</span>
+            }
+<span class="fc" id="L56">            return errors;</span>
+        }
+
+<span class="fc bfc" id="L59" title="All 2 branches covered.">        if (emiData.length() &lt; rule.getMinLength()) {</span>
+<span class="fc" id="L60">            errors.add(&quot;INVALID_EMI_DATA: DE&quot; + rule.getDataField() + &quot; tag &quot; + rule.getEmiDataTag()</span>
+<span class="fc" id="L61">                    + &quot; is too short; expected at least &quot; + rule.getMinLength() + &quot; characters&quot;);</span>
+<span class="fc" id="L62">            return errors;</span>
+        }
+
+<span class="fc" id="L65">        String totalAmount = emiData.substring(0, 12);</span>
+<span class="fc" id="L66">        String emiAmount = emiData.substring(12, 24);</span>
+<span class="fc" id="L67">        String installments = emiData.substring(24, 26);</span>
+<span class="fc" id="L68">        String interestRate = emiData.substring(26, 31);</span>
+
+<span class="fc" id="L70">        validateAmount(&quot;INVALID_EMI_TOTAL_AMOUNT&quot;, &quot;Total amount&quot;, totalAmount, errors);</span>
+<span class="fc" id="L71">        validateAmount(&quot;INVALID_EMI_AMOUNT&quot;, &quot;EMI amount&quot;, emiAmount, errors);</span>
+<span class="fc" id="L72">        validateInstallments(installments, errors);</span>
+<span class="fc" id="L73">        validateInterestRate(interestRate, errors);</span>
+
+<span class="fc" id="L75">        requestContext.setAttribute(ATTR_EMI_TOTAL_AMOUNT, totalAmount);</span>
+<span class="fc" id="L76">        requestContext.setAttribute(ATTR_EMI_AMOUNT, emiAmount);</span>
+<span class="fc" id="L77">        requestContext.setAttribute(ATTR_EMI_INSTALLMENTS, installments);</span>
+<span class="fc" id="L78">        requestContext.setAttribute(ATTR_EMI_INTEREST_RATE, interestRate);</span>
+<span class="fc" id="L79">        return errors;</span>
+    }
+
+    private void validateAmount(String code, String label, String value, List&lt;String&gt; errors) {
+<span class="fc bfc" id="L83" title="All 2 branches covered.">        if (!value.matches(&quot;\\d{12}&quot;)) {</span>
+<span class="fc" id="L84">            errors.add(code + &quot;: &quot; + label + &quot; must be 12 digits&quot;);</span>
+<span class="fc" id="L85">            return;</span>
+        }
+<span class="fc bfc" id="L87" title="All 2 branches covered.">        if (new BigDecimal(value).compareTo(BigDecimal.ZERO) &lt;= 0) {</span>
+<span class="fc" id="L88">            errors.add(code + &quot;: &quot; + label + &quot; must be greater than zero&quot;);</span>
+        }
+<span class="fc" id="L90">    }</span>
+
+    private void validateInstallments(String value, List&lt;String&gt; errors) {
+<span class="pc bpc" id="L93" title="1 of 2 branches missed.">        if (!value.matches(&quot;\\d{2}&quot;)) {</span>
+<span class="nc" id="L94">            errors.add(&quot;INVALID_EMI_INSTALLMENTS: Number of installments must be 2 digits&quot;);</span>
+<span class="nc" id="L95">            return;</span>
+        }
+<span class="fc bfc" id="L97" title="All 2 branches covered.">        if (Integer.parseInt(value) &lt;= 0) {</span>
+<span class="fc" id="L98">            errors.add(&quot;INVALID_EMI_INSTALLMENTS: Number of installments must be greater than zero&quot;);</span>
+        }
+<span class="fc" id="L100">    }</span>
+
+    private void validateInterestRate(String value, List&lt;String&gt; errors) {
+<span class="fc bfc" id="L103" title="All 2 branches covered.">        if (!value.matches(&quot;\\d{5}&quot;)) {</span>
+<span class="fc" id="L104">            errors.add(&quot;INVALID_EMI_INTEREST_RATE: Interest rate must be 5 digits&quot;);</span>
+        }
+<span class="fc" id="L106">    }</span>
+
+    private boolean isBlank(String value) {
+<span class="pc bpc" id="L109" title="1 of 4 branches missed.">        return value == null || value.trim().isEmpty();</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.14.202510111229</span></div></body></html>

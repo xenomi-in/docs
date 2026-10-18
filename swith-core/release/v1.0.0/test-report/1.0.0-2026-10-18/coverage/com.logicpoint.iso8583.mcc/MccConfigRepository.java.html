@@ -1,0 +1,130 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>MccConfigRepository.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">iso8583-processor</a> &gt; <a href="index.source.html" class="el_package">com.logicpoint.iso8583.mcc</a> &gt; <span class="el_source">MccConfigRepository.java</span></div><h1>MccConfigRepository.java</h1><pre class="source lang-java linenums">package com.logicpoint.iso8583.mcc;
+
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+import org.springframework.dao.DataAccessException;
+import org.springframework.jdbc.core.JdbcTemplate;
+import org.springframework.stereotype.Repository;
+
+import java.util.List;
+
+@Repository
+class MccConfigRepository {
+<span class="fc" id="L13">    private static final Logger log = LoggerFactory.getLogger(MccConfigRepository.class);</span>
+
+    private final JdbcTemplate jdbcTemplate;
+
+<span class="fc" id="L17">    MccConfigRepository(JdbcTemplate jdbcTemplate) {</span>
+<span class="fc" id="L18">        this.jdbcTemplate = jdbcTemplate;</span>
+<span class="fc" id="L19">    }</span>
+
+    List&lt;MccRow&gt; loadMccRows() {
+<span class="fc" id="L22">        return queryList(&quot;&quot;&quot;</span>
+                SELECT mcc_code
+                FROM mcc
+                WHERE is_valid = TRUE
+<span class="fc" id="L26">                &quot;&quot;&quot;, (rs, rowNum) -&gt; new MccRow(rs.getInt(&quot;mcc_code&quot;)), &quot;mcc&quot;);</span>
+    }
+
+    List&lt;MccGroupMapRow&gt; loadMccGroupRows() {
+<span class="fc" id="L30">        return queryList(&quot;&quot;&quot;</span>
+                SELECT mgm.mcc_code, mg.bit_index
+                FROM mcc_group_map mgm
+                JOIN mcc_group mg ON mg.group_id = mgm.group_id
+                WHERE mg.bit_index BETWEEN 0 AND 62
+<span class="fc" id="L35">                &quot;&quot;&quot;, (rs, rowNum) -&gt; new MccGroupMapRow(</span>
+<span class="fc" id="L36">                rs.getInt(&quot;mcc_code&quot;),</span>
+<span class="fc" id="L37">                rs.getInt(&quot;bit_index&quot;)</span>
+        ), &quot;mcc_group_map&quot;);
+    }
+
+    List&lt;SchemeMccValidityRow&gt; loadSchemeValidityRows() {
+<span class="fc" id="L42">        return queryList(&quot;&quot;&quot;</span>
+                SELECT scheme, mcc_code, is_valid
+                FROM scheme_mcc
+                WHERE effective_from &lt;= CURRENT_DATE
+                  AND (effective_to IS NULL OR effective_to &gt;= CURRENT_DATE)
+<span class="fc" id="L47">                &quot;&quot;&quot;, (rs, rowNum) -&gt; new SchemeMccValidityRow(</span>
+<span class="fc" id="L48">                rs.getString(&quot;scheme&quot;),</span>
+<span class="fc" id="L49">                rs.getInt(&quot;mcc_code&quot;),</span>
+<span class="fc" id="L50">                rs.getBoolean(&quot;is_valid&quot;)</span>
+        ), &quot;scheme_mcc&quot;);
+    }
+
+    List&lt;SchemeGroupOverrideRow&gt; loadSchemeGroupOverrides() {
+<span class="fc" id="L55">        return queryList(&quot;&quot;&quot;</span>
+                SELECT ovr.scheme, ovr.mcc_code, grp.bit_index, ovr.override_action
+                FROM scheme_mcc_group_override ovr
+                JOIN mcc_group grp ON grp.group_id = ovr.group_id
+                WHERE ovr.effective_from &lt;= CURRENT_DATE
+                  AND (ovr.effective_to IS NULL OR ovr.effective_to &gt;= CURRENT_DATE)
+                  AND grp.bit_index BETWEEN 0 AND 62
+<span class="fc" id="L62">                &quot;&quot;&quot;, (rs, rowNum) -&gt; new SchemeGroupOverrideRow(</span>
+<span class="fc" id="L63">                rs.getString(&quot;scheme&quot;),</span>
+<span class="fc" id="L64">                rs.getInt(&quot;mcc_code&quot;),</span>
+<span class="fc" id="L65">                rs.getInt(&quot;bit_index&quot;),</span>
+<span class="fc" id="L66">                rs.getInt(&quot;override_action&quot;)</span>
+        ), &quot;scheme_mcc_group_override&quot;);
+    }
+
+    List&lt;MccRuleRow&gt; loadRuleRows() {
+<span class="fc" id="L71">        return queryList(&quot;&quot;&quot;</span>
+                SELECT r.rule_id, r.institution_id, r.scheme, r.priority, r.rule_type,
+                       r.mcc_code, grp.bit_index AS group_bit_index,
+                       action, max_amount_minor, response_code
+                FROM institution_mcc_rule r
+                LEFT JOIN mcc_group grp ON grp.group_id = r.group_id
+                WHERE r.active = TRUE
+                  AND r.effective_from &lt;= CURRENT_DATE
+                  AND (r.effective_to IS NULL OR r.effective_to &gt;= CURRENT_DATE)
+                ORDER BY r.institution_id, r.scheme, r.priority, r.rule_id
+<span class="fc" id="L81">                &quot;&quot;&quot;, (rs, rowNum) -&gt; new MccRuleRow(</span>
+<span class="fc" id="L82">                rs.getInt(&quot;rule_id&quot;),</span>
+<span class="fc" id="L83">                rs.getInt(&quot;institution_id&quot;),</span>
+<span class="fc" id="L84">                rs.getString(&quot;scheme&quot;),</span>
+<span class="fc" id="L85">                rs.getInt(&quot;priority&quot;),</span>
+<span class="fc" id="L86">                rs.getInt(&quot;rule_type&quot;),</span>
+<span class="fc" id="L87">                rs.getObject(&quot;mcc_code&quot;, Integer.class),</span>
+<span class="fc" id="L88">                rs.getObject(&quot;group_bit_index&quot;, Integer.class),</span>
+<span class="fc" id="L89">                rs.getInt(&quot;action&quot;),</span>
+<span class="fc" id="L90">                rs.getObject(&quot;max_amount_minor&quot;, Long.class),</span>
+<span class="fc" id="L91">                rs.getString(&quot;response_code&quot;)</span>
+        ), &quot;institution_mcc_rule&quot;);
+    }
+
+    private &lt;T&gt; List&lt;T&gt; queryList(String sql, org.springframework.jdbc.core.RowMapper&lt;T&gt; mapper, String source) {
+        try {
+<span class="fc" id="L97">            return jdbcTemplate.query(sql, mapper);</span>
+<span class="fc" id="L98">        } catch (DataAccessException ex) {</span>
+<span class="fc" id="L99">            log.warn(&quot;MCC config table/query unavailable: {}&quot;, source);</span>
+<span class="fc" id="L100">            return List.of();</span>
+        }
+    }
+
+<span class="fc" id="L104">    record MccRow(int mccCode) {</span>
+    }
+
+<span class="fc" id="L107">    record MccGroupMapRow(int mccCode, int bitIndex) {</span>
+    }
+
+<span class="fc" id="L110">    record SchemeMccValidityRow(String scheme, int mccCode, boolean valid) {</span>
+    }
+
+<span class="fc" id="L113">    record SchemeGroupOverrideRow(String scheme, int mccCode, int bitIndex, int overrideAction) {</span>
+    }
+
+<span class="fc" id="L116">    record MccRuleRow(</span>
+            int ruleId,
+            int institutionId,
+            String scheme,
+            int priority,
+            int ruleType,
+            Integer mccCode,
+            Integer groupBitIndex,
+            int action,
+            Long maxAmountMinor,
+            String responseCode
+    ) {
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.14.202510111229</span></div></body></html>

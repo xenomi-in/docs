@@ -1,0 +1,212 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>RequestContext.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">iso8583-processor</a> &gt; <a href="index.source.html" class="el_package">com.logicpoint.iso8583.context</a> &gt; <span class="el_source">RequestContext.java</span></div><h1>RequestContext.java</h1><pre class="source lang-java linenums">package com.logicpoint.iso8583.context;
+
+import com.logicpoint.iso8583.emv.ChipData;
+import com.logicpoint.iso8583.emv.ChipDataParser;
+import com.logicpoint.iso8583.responsecode.InternalResCode;
+import com.logicpoint.iso8583.util.Scheme;
+import com.logicpoint.iso8583.util.rupay.RuPayDe61Parser;
+import com.logicpoint.iso8583.validation.TransactionType;
+import com.logicpoint.iso8583.validation.TlvUtils;
+
+import java.util.Collections;
+import java.util.HashMap;
+import java.util.Map;
+
+public class RequestContext {
+    private final String requestId;
+    private final String uniqueTransactionId;
+    private final String institutionId;
+    private final String mti;
+    private final Scheme scheme;
+    private final Map&lt;Integer, String&gt; fields;
+    private final Map&lt;String, Object&gt; attributes;
+    private final String cardNumber;
+    private final String bin;
+    private final Double amount;
+    private final String merchantId;
+    private String panHash;
+    private TransactionType transactionType;
+    private TransactionChannel channel;
+    private InternalResCode internalResponseCode;
+
+    public RequestContext(
+            String requestId,
+            String uniqueTransactionId,
+            String institutionId,
+            String mti,
+            Scheme scheme,
+            Map&lt;Integer, String&gt; fields
+<span class="fc" id="L39">    ) {</span>
+<span class="fc" id="L40">        this.requestId = requestId;</span>
+<span class="fc" id="L41">        this.uniqueTransactionId = uniqueTransactionId;</span>
+<span class="fc" id="L42">        this.institutionId = institutionId;</span>
+<span class="fc" id="L43">        this.mti = mti;</span>
+<span class="fc" id="L44">        this.scheme = scheme;</span>
+<span class="fc" id="L45">        this.fields = fields;</span>
+<span class="fc" id="L46">        this.attributes = new HashMap&lt;&gt;();</span>
+<span class="fc" id="L47">        this.cardNumber = fields.get(2);</span>
+<span class="fc bfc" id="L48" title="All 4 branches covered.">        this.bin = cardNumber != null &amp;&amp; cardNumber.length() &gt;= 6 ? cardNumber.substring(0, 6) : null;</span>
+<span class="fc" id="L49">        this.amount = parseAmount(fields.get(4));</span>
+<span class="fc" id="L50">        this.merchantId = fields.get(42);</span>
+<span class="fc" id="L51">        this.transactionType = TransactionType.UNKNOWN;</span>
+<span class="fc" id="L52">        this.channel = TransactionChannel.UNKNOWN;</span>
+<span class="fc" id="L53">        this.internalResponseCode = null;</span>
+<span class="fc" id="L54">    }</span>
+
+    private Double parseAmount(String amountField) {
+<span class="fc bfc" id="L57" title="All 4 branches covered.">        if (amountField == null || amountField.isBlank()) {</span>
+<span class="fc" id="L58">            return null;</span>
+        }
+        try {
+<span class="fc" id="L61">            return Double.parseDouble(amountField) / 100.0;</span>
+<span class="fc" id="L62">        } catch (NumberFormatException ex) {</span>
+<span class="fc" id="L63">            return null;</span>
+        }
+    }
+
+    public String getRequestId() {
+<span class="fc" id="L68">        return requestId;</span>
+    }
+
+    public String getUniqueTransactionId() {
+<span class="fc" id="L72">        return uniqueTransactionId;</span>
+    }
+
+    public String getInstitutionId() {
+<span class="fc" id="L76">        return institutionId;</span>
+    }
+
+    public String getMti() {
+<span class="fc" id="L80">        return mti;</span>
+    }
+
+    public Scheme getScheme() {
+<span class="fc" id="L84">        return scheme;</span>
+    }
+
+    public Map&lt;Integer, String&gt; getFields() {
+<span class="fc" id="L88">        return fields;</span>
+    }
+
+    public Map&lt;String, Object&gt; getAttributes() {
+<span class="nc" id="L92">        return attributes;</span>
+    }
+
+    public String getCardNumber() {
+<span class="fc" id="L96">        return cardNumber;</span>
+    }
+
+    public String getBin() {
+<span class="fc" id="L100">        return bin;</span>
+    }
+
+    public Double getAmount() {
+<span class="fc" id="L104">        return amount;</span>
+    }
+
+    public String getMerchantId() {
+<span class="nc" id="L108">        return merchantId;</span>
+    }
+
+    public String getPanHash() {
+<span class="fc" id="L112">        return panHash;</span>
+    }
+
+    public void setPanHash(String panHash) {
+<span class="fc" id="L116">        this.panHash = panHash;</span>
+<span class="fc" id="L117">    }</span>
+
+    public Object getAttribute(String key) {
+<span class="fc" id="L120">        return attributes.get(key);</span>
+    }
+
+    public void setAttribute(String key, Object value) {
+<span class="fc" id="L124">        attributes.put(key, value);</span>
+<span class="fc" id="L125">    }</span>
+
+    public TransactionType getTransactionType() {
+<span class="fc" id="L128">        return transactionType;</span>
+    }
+
+    public void setTransactionType(TransactionType transactionType) {
+<span class="pc bpc" id="L132" title="1 of 2 branches missed.">        this.transactionType = transactionType == null ? TransactionType.UNKNOWN : transactionType;</span>
+<span class="fc" id="L133">    }</span>
+
+    public TransactionChannel getChannel() {
+<span class="fc" id="L136">        return channel;</span>
+    }
+
+    public void setChannel(TransactionChannel channel) {
+<span class="pc bpc" id="L140" title="1 of 2 branches missed.">        this.channel = channel == null ? TransactionChannel.UNKNOWN : channel;</span>
+<span class="fc" id="L141">    }</span>
+
+    public InternalResCode getInternalResponseCode() {
+<span class="fc" id="L144">        return internalResponseCode;</span>
+    }
+
+    public void setInternalResponseCode(InternalResCode internalResponseCode) {
+<span class="fc" id="L148">        this.internalResponseCode = internalResponseCode;</span>
+<span class="fc" id="L149">    }</span>
+
+    @SuppressWarnings(&quot;unchecked&quot;)
+    public Map&lt;String, String&gt; getParsedTlv(int fieldNumber) {
+<span class="fc" id="L153">        String rawValue = fields.get(fieldNumber);</span>
+<span class="pc bpc" id="L154" title="1 of 4 branches missed.">        if (rawValue == null || rawValue.isBlank()) {</span>
+<span class="fc" id="L155">            return Collections.emptyMap();</span>
+        }
+
+<span class="fc" id="L158">        String rawKey = &quot;parsed_tlv_raw_&quot; + fieldNumber;</span>
+<span class="fc" id="L159">        String cacheKey = &quot;parsed_tlv_&quot; + fieldNumber;</span>
+<span class="fc" id="L160">        Object cachedRaw = attributes.get(rawKey);</span>
+<span class="fc" id="L161">        Object cachedValue = attributes.get(cacheKey);</span>
+<span class="pc bpc" id="L162" title="1 of 4 branches missed.">        if (rawValue.equals(cachedRaw) &amp;&amp; cachedValue instanceof Map&lt;?, ?&gt;) {</span>
+<span class="fc" id="L163">            return (Map&lt;String, String&gt;) cachedValue;</span>
+        }
+
+<span class="fc" id="L166">        Map&lt;String, String&gt; parsed = TlvUtils.parseTlv(rawValue);</span>
+<span class="fc" id="L167">        attributes.put(rawKey, rawValue);</span>
+<span class="fc" id="L168">        attributes.put(cacheKey, parsed);</span>
+<span class="fc" id="L169">        return parsed;</span>
+    }
+
+    public ChipData getParsedChipData(int fieldNumber) {
+<span class="fc" id="L173">        String rawValue = fields.get(fieldNumber);</span>
+<span class="pc bpc" id="L174" title="1 of 4 branches missed.">        if (rawValue == null || rawValue.isBlank()) {</span>
+<span class="fc" id="L175">            return null;</span>
+        }
+
+<span class="fc" id="L178">        String rawKey = &quot;parsed_chip_raw_&quot; + fieldNumber;</span>
+<span class="fc" id="L179">        String cacheKey = &quot;parsed_chip_&quot; + fieldNumber;</span>
+<span class="fc" id="L180">        Object cachedRaw = attributes.get(rawKey);</span>
+<span class="fc" id="L181">        Object cachedValue = attributes.get(cacheKey);</span>
+<span class="pc bpc" id="L182" title="1 of 4 branches missed.">        if (rawValue.equals(cachedRaw) &amp;&amp; cachedValue instanceof ChipData chipData) {</span>
+<span class="fc" id="L183">            return chipData;</span>
+        }
+
+<span class="fc" id="L186">        ChipData chipData = new ChipDataParser().parseChipData(rawValue);</span>
+<span class="fc" id="L187">        attributes.put(rawKey, rawValue);</span>
+<span class="fc" id="L188">        attributes.put(cacheKey, chipData);</span>
+<span class="fc" id="L189">        return chipData;</span>
+    }
+
+    public RuPayDe61Parser.RuPayDE61Data getParsedDe61(int fieldNumber) {
+<span class="fc" id="L193">        String rawValue = fields.get(fieldNumber);</span>
+<span class="pc bpc" id="L194" title="2 of 4 branches missed.">        if (rawValue == null || rawValue.isBlank()) {</span>
+<span class="nc" id="L195">            return null;</span>
+        }
+
+<span class="fc" id="L198">        String rawKey = &quot;parsed_de61_raw_&quot; + fieldNumber;</span>
+<span class="fc" id="L199">        String cacheKey = &quot;parsed_de61_&quot; + fieldNumber;</span>
+<span class="fc" id="L200">        Object cachedRaw = attributes.get(rawKey);</span>
+<span class="fc" id="L201">        Object cachedValue = attributes.get(cacheKey);</span>
+<span class="pc bpc" id="L202" title="3 of 4 branches missed.">        if (rawValue.equals(cachedRaw) &amp;&amp; cachedValue instanceof RuPayDe61Parser.RuPayDE61Data de61Data) {</span>
+<span class="nc" id="L203">            return de61Data;</span>
+        }
+
+<span class="fc" id="L206">        RuPayDe61Parser.RuPayDE61Data de61Data = RuPayDe61Parser.parseDE61(rawValue);</span>
+<span class="fc" id="L207">        attributes.put(rawKey, rawValue);</span>
+<span class="fc" id="L208">        attributes.put(cacheKey, de61Data);</span>
+<span class="fc" id="L209">        return de61Data;</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.14.202510111229</span></div></body></html>

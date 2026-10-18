@@ -1,0 +1,111 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>FuturexHsmCmd.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">iso8583-processor</a> &gt; <a href="index.source.html" class="el_package">com.logicpoint.iso8583.hsm</a> &gt; <span class="el_source">FuturexHsmCmd.java</span></div><h1>FuturexHsmCmd.java</h1><pre class="source lang-java linenums">package com.logicpoint.iso8583.hsm;
+
+import java.util.LinkedHashMap;
+import java.util.Map;
+import java.util.StringJoiner;
+
+import io.netty.handler.codec.mqtt.MqttMessageBuilders;
+/*
+ * This class is used to build and parse Futurex HSM commands.
+ * @author: LogicPoint systems  
+ * @version: 1.0
+ * @since: 2025-08-06
+ 
+ */
+
+public class FuturexHsmCmd {
+    private static final char START = '[';
+    private static final char END = ']';
+    private static final char SEPARATOR = ';';
+
+    private String commandId;
+<span class="fc" id="L22">    private final Map&lt;String, String&gt; fields = new LinkedHashMap&lt;&gt;();</span>
+
+<span class="fc" id="L24">    public FuturexHsmCmd(String commandId) {</span>
+<span class="fc" id="L25">        this.commandId = commandId;</span>
+<span class="fc" id="L26">    }</span>
+
+    public void addField(String token, String value) {
+<span class="fc bfc" id="L29" title="All 2 branches covered.">        if (token.length() != 2) {</span>
+<span class="fc" id="L30">            throw new IllegalArgumentException(&quot;Token must be exactly 2 characters&quot;);</span>
+        }
+<span class="fc" id="L32">        fields.put(token, value);</span>
+<span class="fc" id="L33">    }</span>
+
+    public String build() {
+<span class="fc" id="L36">        StringJoiner joiner = new StringJoiner(String.valueOf(SEPARATOR));</span>
+<span class="fc" id="L37">        joiner.add(&quot;AO&quot;+commandId);</span>
+<span class="fc bfc" id="L38" title="All 2 branches covered.">        for (Map.Entry&lt;String, String&gt; entry : fields.entrySet()) {</span>
+<span class="fc" id="L39">            joiner.add(entry.getKey() + entry.getValue());</span>
+<span class="fc" id="L40">        }</span>
+<span class="fc" id="L41">        return START + joiner.toString() + SEPARATOR + END;</span>
+    }
+
+    public static FuturexHsmCmd parse(String commandStr) {
+<span class="fc bfc" id="L45" title="All 4 branches covered.">        if (commandStr == null || commandStr.isEmpty()) {</span>
+<span class="fc" id="L46">            throw new IllegalArgumentException(&quot;Command string cannot be null or empty&quot;);</span>
+<span class="pc bpc" id="L47" title="1 of 4 branches missed.">        }else if (commandStr.charAt(0) != START || commandStr.charAt(commandStr.length() - 1) != END) {</span>
+<span class="fc" id="L48">            throw new IllegalArgumentException(&quot;Invalid format: must start with '[' and end with ']'&quot;);</span>
+        }
+
+<span class="fc" id="L51">        String content = commandStr.substring(1, commandStr.length() - 1);</span>
+<span class="fc" id="L52">        String[] parts = content.split(String.valueOf(SEPARATOR));</span>
+
+<span class="fc bfc" id="L54" title="All 2 branches covered.">        if (parts.length &lt; 1) {</span>
+<span class="fc" id="L55">            throw new IllegalArgumentException(&quot;Empty command&quot;);</span>
+        }
+
+<span class="fc" id="L58">        FuturexHsmCmd cmd = new FuturexHsmCmd(parts[0]);</span>
+
+<span class="fc bfc" id="L60" title="All 2 branches covered.">        for (int i = 0; i &lt; parts.length; i++) {</span>
+<span class="pc bpc" id="L61" title="1 of 2 branches missed.">            if (parts[i].isEmpty()) continue;</span>
+<span class="fc bfc" id="L62" title="All 2 branches covered.">            if (parts[i].length() &lt; 2) {</span>
+<span class="fc" id="L63">                throw new IllegalArgumentException(&quot;Invalid field, too short: &quot; + parts[i]);</span>
+            }
+<span class="fc" id="L65">            String token = parts[i].substring(0, 2);</span>
+<span class="fc" id="L66">            String value = parts[i].substring(2);</span>
+<span class="fc" id="L67">            cmd.addField(token, value);</span>
+        }
+
+<span class="fc" id="L70">        return cmd;</span>
+    }
+
+    public String getCommandId() {
+<span class="fc" id="L74">        return commandId;</span>
+    }
+
+    public Map&lt;String, String&gt; getFields() {
+<span class="fc" id="L78">        return fields;</span>
+    }
+
+    public String getField(String token) {
+<span class="fc" id="L82">        return fields.get(token);</span>
+    }
+
+    @Override
+    public String toString() {
+<span class="fc" id="L87">        return &quot;CommandID: &quot; + commandId + &quot;, Fields: &quot; + fields;</span>
+    }
+
+    public boolean isSuccess() {
+<span class="fc bfc" id="L91" title="All 2 branches covered.">        return !fields.get(&quot;AO&quot;).equals(&quot;ERRO&quot;);</span>
+    }
+
+    public String getErroMsg() {
+<span class="fc" id="L95">        String errorMsg = &quot;token :&quot; + fields.get(&quot;AN&quot;) + &quot; error message :&quot; + fields.get(&quot;BS&quot;);</span>
+<span class="fc" id="L96">        return errorMsg;</span>
+    }
+
+    public static void main(String[] args) {
+<span class="nc" id="L100">        FuturexHsmCmd cmd = new FuturexHsmCmd(&quot;AOGWKS&quot;);//&quot;[AOGWKS;BGA0088P0TE00E00003952751F1CD785C4930B2F9081BAFDD21FE504F5405CE96744CED32C092C5565F538069C;BHA0088P0TE00E0000A2130D0C75C27615DFE97B509C227F46706BE8DAF63C7B5878D89A1D8D32363F01107511;AE4CCA;]&quot;);</span>
+        //cmd.addField(&quot;BJ0&quot;, &quot;AGEcho Msg sent from APP service class&quot;);
+       // System.out.println(cmd.build());    
+
+<span class="nc" id="L104">        FuturexHsmCmd parsedCmd = FuturexHsmCmd.parse(&quot;[AOGWKS;BGA0088P0TE00E00003952751F1CD785C4930B2F9081BAFDD21FE504F5405CE96744CED32C092C5565F538069C;BHA0088P0TE00E0000A2130D0C75C27615DFE97B509C227F46706BE8DAF63C7B5878D89A1D8D32363F01107511;AE4CCA;]&quot;);</span>
+<span class="nc" id="L105">        System.out.println(parsedCmd.toString());</span>
+<span class="nc" id="L106">        parsedCmd.addField(&quot;AB&quot;, &quot;DEFG&quot;);</span>
+<span class="nc" id="L107">        System.out.println(parsedCmd.build());</span>
+<span class="nc" id="L108">    }   </span>
+
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.14.202510111229</span></div></body></html>

@@ -1,0 +1,305 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>StandingInstructionMandateService.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">iso8583-processor</a> &gt; <a href="index.source.html" class="el_package">com.logicpoint.iso8583.service</a> &gt; <span class="el_source">StandingInstructionMandateService.java</span></div><h1>StandingInstructionMandateService.java</h1><pre class="source lang-java linenums">package com.logicpoint.iso8583.service;
+
+import com.logicpoint.iso8583.context.RequestContext;
+import com.logicpoint.iso8583.entity.StandingInstructionMandate;
+import com.logicpoint.iso8583.entity.StandingInstructionMandate.MandateStatus;
+import com.logicpoint.iso8583.repository.StandingInstructionMandateRepository;
+import com.logicpoint.iso8583.responsecode.InternalResCode;
+import com.logicpoint.iso8583.util.Scheme;
+import com.logicpoint.iso8583.validation.TransactionType;
+import java.math.BigDecimal;
+import java.time.LocalDate;
+import java.time.LocalDateTime;
+import java.util.ArrayList;
+import java.util.List;
+import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
+
+/**
+ * Applies persisted standing-instruction mandate state transitions and follow-through checks.
+ */
+@Service
+public class StandingInstructionMandateService {
+
+    public static final String ATTR_SI_MANDATE_STATUS = &quot;si_mandate_status&quot;;
+
+    private final StandingInstructionMandateRepository mandateRepository;
+    private final StandingInstructionHubClient hubClient;
+
+    public StandingInstructionMandateService(StandingInstructionMandateRepository mandateRepository,
+<span class="fc" id="L30">                                             StandingInstructionHubClient hubClient) {</span>
+<span class="fc" id="L31">        this.mandateRepository = mandateRepository;</span>
+<span class="fc" id="L32">        this.hubClient = hubClient;</span>
+<span class="fc" id="L33">    }</span>
+
+    @Transactional
+    public List&lt;String&gt; apply(RequestContext requestContext,
+                              Scheme scheme,
+                              TransactionType transactionType,
+                              StandingInstructionAuthorizationValidationService.ParsedSiData siData) {
+<span class="fc" id="L40">        List&lt;String&gt; errors = new ArrayList&lt;&gt;();</span>
+<span class="fc" id="L41">        String schemeName = scheme.name();</span>
+<span class="fc" id="L42">        String mandateId = normalize(siData.mandateId());</span>
+
+<span class="fc bfc" id="L44" title="All 9 branches covered.">        switch (transactionType) {</span>
+<span class="fc" id="L45">            case SI_REGISTRATION -&gt; createMandate(requestContext, schemeName, mandateId, siData, errors);</span>
+<span class="fc" id="L46">            case SI_EDIT -&gt; updateMandate(requestContext, schemeName, mandateId, siData, errors);</span>
+<span class="fc" id="L47">            case SI_TRANSACTION -&gt; validateMandateUse(requestContext, schemeName, mandateId, true, errors);</span>
+            case SI_DEREGISTRATION -&gt;
+<span class="fc" id="L49">                    transitionMandate(requestContext, schemeName, mandateId, MandateStatus.REVOKED, errors);</span>
+<span class="fc" id="L50">            case SI_REVOKEALL -&gt; revokeAll(requestContext, schemeName, errors);</span>
+<span class="fc" id="L51">            case SI_PAUSE -&gt; transitionMandate(requestContext, schemeName, mandateId, MandateStatus.PAUSED, errors);</span>
+<span class="fc" id="L52">            case SI_START -&gt; transitionMandate(requestContext, schemeName, mandateId, MandateStatus.ACTIVE, errors);</span>
+<span class="fc" id="L53">            case SI_PDN -&gt; validateMandateUse(requestContext, schemeName, mandateId, false, errors);</span>
+<span class="fc" id="L54">            default -&gt; errors.add(&quot;UNSUPPORTED_SI_TRANSACTION_TYPE: &quot; + transactionType);</span>
+        }
+
+<span class="fc" id="L57">        return errors;</span>
+    }
+
+    private void createMandate(RequestContext requestContext,
+                               String scheme,
+                               String mandateId,
+                               StandingInstructionAuthorizationValidationService.ParsedSiData siData,
+                               List&lt;String&gt; errors) {
+<span class="fc bfc" id="L65" title="All 2 branches covered.">        if (isBlank(mandateId)) {</span>
+<span class="fc" id="L66">            addDecline(requestContext, InternalResCode.INVALID_TRANSACTION,</span>
+                    &quot;MISSING_SI_MANDATE_ID: DE48 tag 086 is required to create SI mandate&quot;, errors);
+<span class="fc" id="L68">            return;</span>
+        }
+
+<span class="fc" id="L71">        StandingInstructionMandate mandate = mandateRepository.lockBySchemeAndMandateId(scheme, mandateId)</span>
+<span class="fc" id="L72">                .orElseGet(StandingInstructionMandate::new);</span>
+<span class="pc bpc" id="L73" title="1 of 4 branches missed.">        if (mandate.getId() != null &amp;&amp; mandate.getStatus() == MandateStatus.ACTIVE) {</span>
+<span class="fc" id="L74">            addDecline(requestContext, InternalResCode.INVALID_TRANSACTION,</span>
+                    &quot;DUPLICATE_SI_MANDATE: Active mandate already exists for ID &quot; + mandateId, errors);
+<span class="fc" id="L76">            return;</span>
+        }
+
+<span class="fc" id="L79">        mandate.setScheme(scheme);</span>
+<span class="fc" id="L80">        mandate.setMandateId(mandateId);</span>
+<span class="fc" id="L81">        mandate.setStatus(MandateStatus.ACTIVE);</span>
+<span class="fc" id="L82">        mandate.setRevokedAt(null);</span>
+<span class="fc" id="L83">        mandate.setPausedAt(null);</span>
+<span class="fc" id="L84">        copyMandateData(mandate, requestContext, siData);</span>
+<span class="fc" id="L85">        StandingInstructionMandate saved = mandateRepository.save(mandate);</span>
+<span class="fc" id="L86">        hubClient.mandateCreated(saved);</span>
+<span class="fc" id="L87">        requestContext.setAttribute(ATTR_SI_MANDATE_STATUS, mandate.getStatus().name());</span>
+<span class="fc" id="L88">    }</span>
+
+    private void updateMandate(RequestContext requestContext,
+                               String scheme,
+                               String mandateId,
+                               StandingInstructionAuthorizationValidationService.ParsedSiData siData,
+                               List&lt;String&gt; errors) {
+<span class="fc" id="L95">        StandingInstructionMandate mandate = lockMandate(requestContext, scheme, mandateId, errors);</span>
+<span class="pc bpc" id="L96" title="1 of 4 branches missed.">        if (mandate == null || !ensureActive(requestContext, mandate, errors)) {</span>
+<span class="fc" id="L97">            return;</span>
+        }
+
+<span class="fc" id="L100">        copyMandateData(mandate, requestContext, siData);</span>
+<span class="fc" id="L101">        StandingInstructionMandate saved = mandateRepository.save(mandate);</span>
+<span class="fc" id="L102">        hubClient.mandateUpdated(saved);</span>
+<span class="fc" id="L103">        requestContext.setAttribute(ATTR_SI_MANDATE_STATUS, mandate.getStatus().name());</span>
+<span class="fc" id="L104">    }</span>
+
+    private void validateMandateUse(RequestContext requestContext,
+                                    String scheme,
+                                    String mandateId,
+                                    boolean recordDebit,
+                                    List&lt;String&gt; errors) {
+<span class="fc" id="L111">        StandingInstructionMandate mandate = lockMandate(requestContext, scheme, mandateId, errors);</span>
+<span class="pc bpc" id="L112" title="1 of 4 branches missed.">        if (mandate == null || !ensureActive(requestContext, mandate, errors)) {</span>
+<span class="fc" id="L113">            return;</span>
+        }
+
+<span class="fc" id="L116">        BigDecimal txnAmount = resolveTransactionAmount(requestContext);</span>
+<span class="fc bfc" id="L117" title="All 2 branches covered.">        if (txnAmount != null) {</span>
+<span class="pc bpc" id="L118" title="1 of 4 branches missed.">            if (mandate.getMinAmount() != null &amp;&amp; txnAmount.compareTo(mandate.getMinAmount()) &lt; 0) {</span>
+<span class="fc" id="L119">                addDecline(requestContext, InternalResCode.INVALID_AMOUNT,</span>
+                        &quot;SI_AMOUNT_BELOW_MINIMUM: Debit amount is below mandate minimum&quot;, errors);
+<span class="fc" id="L121">                return;</span>
+            }
+<span class="pc bpc" id="L123" title="1 of 4 branches missed.">            if (mandate.getMaxAmount() != null &amp;&amp; txnAmount.compareTo(mandate.getMaxAmount()) &gt; 0) {</span>
+<span class="fc" id="L124">                addDecline(requestContext, InternalResCode.EXCEEDS_LIMIT,</span>
+                        &quot;SI_AMOUNT_ABOVE_MAXIMUM: Debit amount exceeds mandate maximum&quot;, errors);
+<span class="fc" id="L126">                return;</span>
+            }
+        }
+
+<span class="fc" id="L130">        LocalDate today = LocalDate.now();</span>
+<span class="pc bpc" id="L131" title="1 of 4 branches missed.">        if (mandate.getStartDate() != null &amp;&amp; today.isBefore(mandate.getStartDate())) {</span>
+<span class="fc" id="L132">            addDecline(requestContext, InternalResCode.INVALID_TRANSACTION,</span>
+                    &quot;SI_MANDATE_NOT_STARTED: Debit is before mandate start date&quot;, errors);
+<span class="fc" id="L134">            return;</span>
+        }
+<span class="pc bpc" id="L136" title="1 of 4 branches missed.">        if (mandate.getEndDate() != null &amp;&amp; today.isAfter(mandate.getEndDate())) {</span>
+<span class="fc" id="L137">            addDecline(requestContext, InternalResCode.EXPIRED_CARD,</span>
+                    &quot;SI_MANDATE_EXPIRED: Debit is after mandate end date&quot;, errors);
+<span class="fc" id="L139">            return;</span>
+        }
+
+<span class="fc bfc" id="L142" title="All 2 branches covered.">        if (recordDebit) {</span>
+<span class="fc" id="L143">            mandate.setLastDebitAt(LocalDateTime.now());</span>
+<span class="fc" id="L144">            mandate.setLastRrn(requestContext.getFields().get(37));</span>
+<span class="fc" id="L145">            mandate.setLastStan(requestContext.getFields().get(11));</span>
+<span class="fc" id="L146">            mandate.setLastTransactionId(requestContext.getUniqueTransactionId());</span>
+<span class="fc" id="L147">            mandateRepository.save(mandate);</span>
+        }
+<span class="fc" id="L149">        requestContext.setAttribute(ATTR_SI_MANDATE_STATUS, mandate.getStatus().name());</span>
+<span class="fc" id="L150">    }</span>
+
+    private void transitionMandate(RequestContext requestContext,
+                                   String scheme,
+                                   String mandateId,
+                                   MandateStatus targetStatus,
+                                   List&lt;String&gt; errors) {
+<span class="fc" id="L157">        StandingInstructionMandate mandate = lockMandate(requestContext, scheme, mandateId, errors);</span>
+<span class="pc bpc" id="L158" title="1 of 2 branches missed.">        if (mandate == null) {</span>
+<span class="nc" id="L159">            return;</span>
+        }
+
+<span class="fc bfc" id="L162" title="All 4 branches covered.">        if (targetStatus == MandateStatus.ACTIVE &amp;&amp; mandate.getStatus() != MandateStatus.PAUSED) {</span>
+<span class="fc" id="L163">            addDecline(requestContext, InternalResCode.INVALID_TRANSACTION,</span>
+                    &quot;SI_MANDATE_CANNOT_START: Only a paused mandate can be started&quot;, errors);
+<span class="fc" id="L165">            return;</span>
+        }
+<span class="pc bpc" id="L167" title="1 of 4 branches missed.">        if (targetStatus == MandateStatus.PAUSED &amp;&amp; !ensureActive(requestContext, mandate, errors)) {</span>
+<span class="nc" id="L168">            return;</span>
+        }
+
+<span class="fc" id="L171">        mandate.setStatus(targetStatus);</span>
+<span class="fc bfc" id="L172" title="All 2 branches covered.">        if (targetStatus == MandateStatus.REVOKED) {</span>
+<span class="fc" id="L173">            mandate.setRevokedAt(LocalDateTime.now());</span>
+<span class="fc bfc" id="L174" title="All 2 branches covered.">        } else if (targetStatus == MandateStatus.PAUSED) {</span>
+<span class="fc" id="L175">            mandate.setPausedAt(LocalDateTime.now());</span>
+<span class="pc bpc" id="L176" title="1 of 2 branches missed.">        } else if (targetStatus == MandateStatus.ACTIVE) {</span>
+<span class="fc" id="L177">            mandate.setPausedAt(null);</span>
+        }
+<span class="fc" id="L179">        mandate.setLastRrn(requestContext.getFields().get(37));</span>
+<span class="fc" id="L180">        mandate.setLastStan(requestContext.getFields().get(11));</span>
+<span class="fc" id="L181">        mandate.setLastTransactionId(requestContext.getUniqueTransactionId());</span>
+<span class="fc" id="L182">        StandingInstructionMandate saved = mandateRepository.save(mandate);</span>
+<span class="fc bfc" id="L183" title="All 2 branches covered.">        if (targetStatus == MandateStatus.REVOKED) {</span>
+<span class="fc" id="L184">            hubClient.mandateRevoked(saved);</span>
+<span class="fc bfc" id="L185" title="All 2 branches covered.">        } else if (targetStatus == MandateStatus.PAUSED) {</span>
+<span class="fc" id="L186">            hubClient.mandatePaused(saved);</span>
+<span class="pc bpc" id="L187" title="1 of 2 branches missed.">        } else if (targetStatus == MandateStatus.ACTIVE) {</span>
+<span class="fc" id="L188">            hubClient.mandateUpdated(saved);</span>
+        }
+<span class="fc" id="L190">        requestContext.setAttribute(ATTR_SI_MANDATE_STATUS, mandate.getStatus().name());</span>
+<span class="fc" id="L191">    }</span>
+
+    private void revokeAll(RequestContext requestContext, String scheme, List&lt;String&gt; errors) {
+<span class="fc" id="L194">        String panLookupHmac = requestContext.getPanHash();</span>
+<span class="fc bfc" id="L195" title="All 2 branches covered.">        if (isBlank(panLookupHmac)) {</span>
+<span class="fc" id="L196">            addDecline(requestContext, InternalResCode.SYSTEM_ERROR,</span>
+                    &quot;SI_CANCEL_ALL_UNAVAILABLE: PAN lookup hash is required for cancel-all&quot;, errors);
+<span class="fc" id="L198">            return;</span>
+        }
+
+<span class="fc" id="L201">        List&lt;StandingInstructionMandate&gt; mandates = mandateRepository.lockBySchemeAndPanLookupHmacAndStatusIn(</span>
+                scheme,
+                panLookupHmac,
+<span class="fc" id="L204">                List.of(MandateStatus.ACTIVE, MandateStatus.PAUSED));</span>
+<span class="fc bfc" id="L205" title="All 2 branches covered.">        if (mandates.isEmpty()) {</span>
+<span class="fc" id="L206">            addDecline(requestContext, InternalResCode.INVALID_TRANSACTION,</span>
+                    &quot;SI_CANCEL_ALL_NOT_FOUND: No active or paused mandates found for card&quot;, errors);
+<span class="fc" id="L208">            return;</span>
+        }
+
+<span class="fc" id="L211">        LocalDateTime now = LocalDateTime.now();</span>
+<span class="fc bfc" id="L212" title="All 2 branches covered.">        for (StandingInstructionMandate mandate : mandates) {</span>
+<span class="fc" id="L213">            mandate.setStatus(MandateStatus.REVOKED);</span>
+<span class="fc" id="L214">            mandate.setRevokedAt(now);</span>
+<span class="fc" id="L215">            mandate.setLastRrn(requestContext.getFields().get(37));</span>
+<span class="fc" id="L216">            mandate.setLastStan(requestContext.getFields().get(11));</span>
+<span class="fc" id="L217">            mandate.setLastTransactionId(requestContext.getUniqueTransactionId());</span>
+<span class="fc" id="L218">        }</span>
+<span class="fc" id="L219">        mandateRepository.saveAll(mandates);</span>
+<span class="fc bfc" id="L220" title="All 2 branches covered.">        for (StandingInstructionMandate mandate : mandates) {</span>
+<span class="fc" id="L221">            hubClient.mandateRevoked(mandate);</span>
+<span class="fc" id="L222">        }</span>
+<span class="fc" id="L223">    }</span>
+
+    private StandingInstructionMandate lockMandate(RequestContext requestContext,
+                                                   String scheme,
+                                                   String mandateId,
+                                                   List&lt;String&gt; errors) {
+<span class="pc bpc" id="L229" title="1 of 2 branches missed.">        if (isBlank(mandateId)) {</span>
+<span class="nc" id="L230">            addDecline(requestContext, InternalResCode.INVALID_TRANSACTION,</span>
+                    &quot;MISSING_SI_MANDATE_ID: DE48 tag 086 is required for SI mandate lookup&quot;, errors);
+<span class="nc" id="L232">            return null;</span>
+        }
+
+<span class="fc" id="L235">        StandingInstructionMandate mandate = mandateRepository.lockBySchemeAndMandateId(scheme, mandateId).orElse(null);</span>
+<span class="fc bfc" id="L236" title="All 2 branches covered.">        if (mandate == null) {</span>
+<span class="fc" id="L237">            addDecline(requestContext, InternalResCode.INVALID_TRANSACTION,</span>
+                    &quot;SI_MANDATE_NOT_FOUND: No mandate found for ID &quot; + mandateId, errors);
+<span class="fc" id="L239">            return null;</span>
+        }
+<span class="fc" id="L241">        requestContext.setAttribute(ATTR_SI_MANDATE_STATUS, mandate.getStatus().name());</span>
+<span class="fc" id="L242">        return mandate;</span>
+    }
+
+    private boolean ensureActive(RequestContext requestContext, StandingInstructionMandate mandate, List&lt;String&gt; errors) {
+<span class="fc bfc" id="L246" title="All 2 branches covered.">        if (mandate.getStatus() == MandateStatus.ACTIVE) {</span>
+<span class="fc" id="L247">            return true;</span>
+        }
+
+<span class="pc bpc" id="L250" title="1 of 2 branches missed.">        InternalResCode responseCode = mandate.getStatus() == MandateStatus.REVOKED</span>
+<span class="nc" id="L251">                ? InternalResCode.DO_NOT_HONOR</span>
+<span class="fc" id="L252">                : InternalResCode.RESTRICTED_CARD;</span>
+<span class="fc" id="L253">        addDecline(requestContext, responseCode,</span>
+<span class="fc" id="L254">                &quot;SI_MANDATE_NOT_ACTIVE: Mandate &quot; + mandate.getMandateId()</span>
+<span class="fc" id="L255">                        + &quot; is &quot; + mandate.getStatus(), errors);</span>
+<span class="fc" id="L256">        return false;</span>
+    }
+
+    private void copyMandateData(StandingInstructionMandate mandate,
+                                 RequestContext requestContext,
+                                 StandingInstructionAuthorizationValidationService.ParsedSiData siData) {
+<span class="fc" id="L262">        mandate.setPanLookupHmac(requestContext.getPanHash());</span>
+<span class="fc" id="L263">        mandate.setInstitutionId(requestContext.getInstitutionId());</span>
+<span class="fc" id="L264">        mandate.setCardAcceptorId(requestContext.getFields().get(42));</span>
+<span class="fc" id="L265">        mandate.setTerminalId(requestContext.getFields().get(41));</span>
+<span class="fc" id="L266">        mandate.setCurrencyCode(requestContext.getFields().get(49));</span>
+<span class="fc" id="L267">        mandate.setSiRequestType(siData.requestType());</span>
+<span class="fc" id="L268">        mandate.setNumberOfInstallments(siData.numberOfInstallments());</span>
+<span class="fc" id="L269">        mandate.setPreferredDay(siData.preferredDay());</span>
+<span class="fc" id="L270">        mandate.setMinAmount(siData.minAmount());</span>
+<span class="fc" id="L271">        mandate.setMaxAmount(siData.maxAmount());</span>
+<span class="fc" id="L272">        mandate.setStartDate(siData.startDate());</span>
+<span class="fc" id="L273">        mandate.setEndDate(siData.endDate());</span>
+<span class="fc" id="L274">        mandate.setNotificationMode(siData.notificationMode());</span>
+<span class="fc" id="L275">        mandate.setFrequencyIndicator(siData.frequencyIndicator());</span>
+<span class="fc" id="L276">        mandate.setLastRrn(requestContext.getFields().get(37));</span>
+<span class="fc" id="L277">        mandate.setLastStan(requestContext.getFields().get(11));</span>
+<span class="fc" id="L278">        mandate.setLastTransactionId(requestContext.getUniqueTransactionId());</span>
+<span class="fc" id="L279">    }</span>
+
+    private BigDecimal resolveTransactionAmount(RequestContext requestContext) {
+<span class="fc" id="L282">        String amount = requestContext.getFields().get(4);</span>
+<span class="pc bpc" id="L283" title="1 of 4 branches missed.">        if (isBlank(amount) || !amount.matches(&quot;\\d+&quot;)) {</span>
+<span class="fc" id="L284">            return null;</span>
+        }
+<span class="fc" id="L286">        return new BigDecimal(amount).movePointLeft(2);</span>
+    }
+
+    private void addDecline(RequestContext requestContext,
+                            InternalResCode responseCode,
+                            String error,
+                            List&lt;String&gt; errors) {
+<span class="fc" id="L293">        requestContext.setInternalResponseCode(responseCode);</span>
+<span class="fc" id="L294">        errors.add(error);</span>
+<span class="fc" id="L295">    }</span>
+
+    private String normalize(String value) {
+<span class="fc bfc" id="L298" title="All 2 branches covered.">        return isBlank(value) ? null : value.trim().toUpperCase();</span>
+    }
+
+    private boolean isBlank(String value) {
+<span class="fc bfc" id="L302" title="All 4 branches covered.">        return value == null || value.trim().isEmpty();</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.14.202510111229</span></div></body></html>

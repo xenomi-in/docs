@@ -1,0 +1,2094 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>TransactionValidationOrchestrator.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">iso8583-processor</a> &gt; <a href="index.source.html" class="el_package">com.logicpoint.iso8583.validation.orchestrator</a> &gt; <span class="el_source">TransactionValidationOrchestrator.java</span></div><h1>TransactionValidationOrchestrator.java</h1><pre class="source lang-java linenums">package com.logicpoint.iso8583.validation.orchestrator;
+
+import com.logicpoint.iso8583.context.RequestContext;
+import com.logicpoint.iso8583.responsecode.InternalResCode;
+import com.logicpoint.iso8583.validation.card.CardValidator;
+import com.logicpoint.iso8583.validation.bin.BinValidator;
+import com.logicpoint.iso8583.validation.transaction.TransactionTypeValidator;
+import com.logicpoint.iso8583.validation.business.BusinessRuleValidator;
+import com.logicpoint.iso8583.validation.factory.TransactionValidatorFactory;
+import com.logicpoint.iso8583.validation.ValidationResult;
+import com.logicpoint.iso8583.validation.TransactionType;
+import com.logicpoint.iso8583.service.*;
+import com.logicpoint.iso8583.entity.CardData;
+import com.logicpoint.iso8583.entity.BinDetails;
+import com.logicpoint.iso8583.entity.PrepaidCardBalanceSnapshot;
+import com.logicpoint.iso8583.util.Scheme;
+import com.logicpoint.iso8583.emv.ChipData;
+
+import java.util.List;
+import java.util.Base64;
+
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.stereotype.Service;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+import org.springframework.beans.factory.annotation.Value;
+import org.springframework.scheduling.annotation.Async;
+import java.util.concurrent.CompletableFuture;
+import java.util.Map;
+import java.util.Set;
+
+import com.logicpoint.iso8583.emv.ChipDataParser;
+import com.logicpoint.iso8583.emv.TerminalVerificationResults;
+import com.logicpoint.iso8583.model.accounting.AccountingAuthorizationResponse;
+
+import java.math.BigDecimal;
+import java.math.RoundingMode;
+
+import com.logicpoint.iso8583.util.rupay.De54data;
+import com.logicpoint.iso8583.util.rupay.CardAcceptorLocation;
+
+/**
+ * Main validation orchestrator that coordinates all validation services.
+ * Follows the Facade pattern to provide a simplified interface for transaction
+ * validation.
+ */
+@Service
+public class TransactionValidationOrchestrator {
+
+    private final CvmValidationService cvmValidationService;
+    private final CvrValidationService cvrValidationService;
+    private final TvrValidationService tvrValidationService;
+<span class="fc" id="L53">    private static final Logger logger = LoggerFactory.getLogger(TransactionValidationOrchestrator.class);</span>
+    private static final String ICVV_SERVICE_CODE = &quot;620; \\ it suppoesed to be 999 , but time being 620 given sisnce ICS from for track2 the data of magstipe given for iCVV we need to use 99 service to generate&quot;;
+    private static final String CVV2_SERVICE_CODE = &quot;000&quot;;
+<span class="fc" id="L56">    private static final Set&lt;String&gt; DIRECT_CVV2_TLV_TAGS = Set.of(&quot;052&quot;, &quot;105&quot;, &quot;CV2&quot;, &quot;CVV2&quot;);</span>
+    private static final String ORIGINAL_DE55_ATTRIBUTE = &quot;original_de55&quot;;
+    private static final String ORIGINAL_CHIP_DATA_ATTRIBUTE = &quot;original_chip_data&quot;;
+
+    private final CardValidator cardValidator;
+    private final BinValidator binValidator;
+    private final BusinessRuleValidator businessRuleValidator;
+    private final TransactionValidatorFactory transactionValidatorFactory;
+    private final ServiceCodeValidationService serviceCodeValidationService;
+    private final NettyHsmService nettyHsmService;
+    //private final CardAuthenticationService cardAuthenticationService;
+    private final CardDataService cardDataService;
+    private final CacheInitializationService cacheInitializationService;
+    private final AccountingApiService accountingApiService;
+    @Value(&quot;${accounting.api.enabled:false}&quot;)
+    boolean accountingApiEnabled;
+    private final PinChangeService pinChangeService;
+    @Autowired
+    private com.logicpoint.iso8583.cmsintegration.CmsPinTransactionService cmsPinTransactions;
+    private final PrepaidLimitValidationService prepaidLimitValidationService;
+    private final PrepaidCardBalanceSnapshotService prepaidCardBalanceSnapshotService;
+    @Value(&quot;${accounting.api.temp-gbs:no-update}&quot;)
+    String tempGbs;
+
+    /**
+     * Constructs the orchestrator with injected validators and services.
+     *
+     * @param cardValidator Card validator
+     * @param binValidator BIN validator
+     * @param businessRuleValidator Business rule validator
+     * @param transactionValidatorFactory Transaction validator factory
+     * @param serviceCodeValidationService Service code validation service
+     * @param nettyHsmService HSM service for cryptographic operations
+     * @param cardAuthenticationService Card authentication service
+     * @param cardDataService Card data service for centralized card data
+     * management
+     * @param accountingApiService Accounting API service for authorization
+     */
+    @Autowired
+    public TransactionValidationOrchestrator(
+            CardValidator cardValidator,
+            BinValidator binValidator,
+            BusinessRuleValidator businessRuleValidator,
+            TransactionValidatorFactory transactionValidatorFactory,
+            ServiceCodeValidationService serviceCodeValidationService,
+            NettyHsmService nettyHsmService,
+            //CardAuthenticationService cardAuthenticationService,
+            CardDataService cardDataService,
+            CacheInitializationService cacheInitializationService,
+            AccountingApiService accountingApiService,
+            PinChangeService pinChangeService,
+            PrepaidLimitValidationService prepaidLimitValidationService,
+            PrepaidCardBalanceSnapshotService prepaidCardBalanceSnapshotService,
+            CvmValidationService cvmValidationService,
+            CvrValidationService cvrValidationService,
+<span class="fc" id="L111">            TvrValidationService tvrValidationService) {</span>
+
+<span class="fc" id="L113">        this.cardValidator = cardValidator;</span>
+<span class="fc" id="L114">        this.binValidator = binValidator;</span>
+<span class="fc" id="L115">        this.businessRuleValidator = businessRuleValidator;</span>
+<span class="fc" id="L116">        this.transactionValidatorFactory = transactionValidatorFactory;</span>
+<span class="fc" id="L117">        this.serviceCodeValidationService = serviceCodeValidationService;</span>
+<span class="fc" id="L118">        this.nettyHsmService = nettyHsmService;</span>
+        //this.cardAuthenticationService = cardAuthenticationService;
+<span class="fc" id="L120">        this.cardDataService = cardDataService;</span>
+<span class="fc" id="L121">        this.cacheInitializationService = cacheInitializationService;</span>
+<span class="fc" id="L122">        this.accountingApiService = accountingApiService;</span>
+<span class="fc" id="L123">        this.pinChangeService = pinChangeService;</span>
+<span class="fc" id="L124">        this.prepaidLimitValidationService = prepaidLimitValidationService;</span>
+<span class="fc" id="L125">        this.prepaidCardBalanceSnapshotService = prepaidCardBalanceSnapshotService;</span>
+<span class="fc" id="L126">        this.cvmValidationService = cvmValidationService;</span>
+<span class="fc" id="L127">        this.cvrValidationService = cvrValidationService;</span>
+<span class="fc" id="L128">        this.tvrValidationService = tvrValidationService;</span>
+<span class="fc" id="L129">    }</span>
+
+<span class="fc" id="L131">    private enum CvvVerificationType {</span>
+<span class="fc" id="L132">        MAGSTRIPE,</span>
+<span class="fc" id="L133">        ICVV,</span>
+<span class="fc" id="L134">        CVV2</span>
+    }
+
+    private static final class TrackSecurityData {
+        private final String expiryDate;
+        private final String serviceCode;
+        private final String securityCode;
+
+<span class="fc" id="L142">        private TrackSecurityData(String expiryDate, String serviceCode, String securityCode) {</span>
+<span class="fc" id="L143">            this.expiryDate = expiryDate;</span>
+<span class="fc" id="L144">            this.serviceCode = serviceCode;</span>
+<span class="fc" id="L145">            this.securityCode = securityCode;</span>
+<span class="fc" id="L146">        }</span>
+    }
+
+    private static final class CvvVerificationRequest {
+        private final CvvVerificationType type;
+        private final String securityCode;
+        private final String serviceCode;
+        private final String expiryDate;
+
+<span class="fc" id="L155">        private CvvVerificationRequest(CvvVerificationType type, String securityCode, String serviceCode, String expiryDate) {</span>
+<span class="fc" id="L156">            this.type = type;</span>
+<span class="fc" id="L157">            this.securityCode = securityCode;</span>
+<span class="fc" id="L158">            this.serviceCode = serviceCode;</span>
+<span class="fc" id="L159">            this.expiryDate = expiryDate;</span>
+<span class="fc" id="L160">        }</span>
+
+        private boolean hasSecurityCode() {
+<span class="pc bpc" id="L163" title="1 of 4 branches missed.">            return securityCode != null &amp;&amp; !securityCode.trim().isEmpty();</span>
+        }
+    }
+
+    /**
+     * Performs comprehensive validation for a transaction with early
+     * termination on first failure.
+     *
+     * @param cardNumber The card number
+     * @param bin The BIN (first 6 digits of card)
+     * @param transactionType The transaction type
+     * @param amount The transaction amount
+     * @param merchantId The merchant ID
+     * @param transactionData Additional transaction data
+     * @param cvrValidationService CVR validation service
+     * @param tvrValidationService TVR validation service
+     * @return Comprehensive validation result
+     */
+    public ValidationResult validateTransaction(
+            RequestContext requestContext){
+	       // CvrValidationService cvrValidationService,
+        //TvrValidationService tvrValidationService) {
+<span class="fc" id="L185">        TransactionType transactionType = requestContext.getTransactionType();</span>
+<span class="fc" id="L186">        Map&lt;Integer, String&gt; transactionData = requestContext.getFields();</span>
+<span class="fc" id="L187">        String cardNumber = requestContext.getCardNumber();</span>
+<span class="fc" id="L188">        String bin = requestContext.getBin();</span>
+
+<span class="fc" id="L190">        logger.debug(&quot;Starting transaction validation for card: {}, BIN: {}, type: {}&quot;,</span>
+<span class="fc" id="L191">                maskCardNumber(cardNumber), bin, transactionType);</span>
+
+<span class="fc" id="L193">        ValidationResult.Builder resultBuilder = ValidationResult.builder();</span>
+
+        // Execute validations in optimized order with early termination
+<span class="fc" id="L196">        ValidationResult result = executeValidationsInOrder(requestContext, resultBuilder);</span>
+
+<span class="fc" id="L198">        logger.debug(&quot;Transaction validation completed. Valid: {}&quot;, result.isValid());</span>
+<span class="fc" id="L199">        return result;</span>
+    }
+
+    /**
+     * Executes validations in optimized order with early termination.
+     *
+     * @param cardNumber Card number
+     * @param bin BIN
+     * @param transactionType Transaction type
+     * @param amount Amount
+     * @param merchantId Merchant ID
+     * @param transactionData Transaction data
+     * @param resultBuilder Result builder
+     * @return Validation result
+     */
+    private ValidationResult executeValidationsInOrder(
+            RequestContext requestContext,
+            ValidationResult.Builder resultBuilder) {
+<span class="fc" id="L217">        TransactionType transactionType = requestContext.getTransactionType();</span>
+<span class="fc" id="L218">        Map&lt;Integer, String&gt; transactionData = requestContext.getFields();</span>
+<span class="fc" id="L219">        String cardNumber = requestContext.getCardNumber();</span>
+<span class="fc" id="L220">        String bin = requestContext.getBin();</span>
+
+        // logger.debug(&quot;Starting optimized validation flow for card: {}&quot;, maskCardNumber(cardNumber));
+        // 1. BIN validation (fastest, no DB calls if cached)
+<span class="fc" id="L224">        ValidationResult binResult = validateBin(bin);</span>
+<span class="fc bfc" id="L225" title="All 2 branches covered.">        if (!binResult.isValid()) {</span>
+<span class="fc" id="L226">            logger.error(&quot;BIN validation failed: {}&quot;, binResult.getErrors());</span>
+<span class="fc" id="L227">            return resultBuilder.addErrors(binResult.getErrors()).build();</span>
+        }
+<span class="fc" id="L229">        resultBuilder.addWarnings(binResult.getWarnings());</span>
+
+        // 2. Transaction type validation
+<span class="fc" id="L232">        ValidationResult transactionResult = validateTransactionType(requestContext);</span>
+<span class="fc bfc" id="L233" title="All 2 branches covered.">        if (!transactionResult.isValid()) {</span>
+<span class="fc" id="L234">            return resultBuilder.addErrors(transactionResult.getErrors()).build();</span>
+        }
+<span class="fc" id="L236">        resultBuilder.addWarnings(transactionResult.getWarnings());</span>
+
+<span class="fc" id="L238">        ValidationResult nepalBhutanCurrencyResult = validateNepalBhutanCurrency(requestContext);</span>
+<span class="pc bpc" id="L239" title="1 of 2 branches missed.">        if (!nepalBhutanCurrencyResult.isValid()) {</span>
+<span class="nc" id="L240">            return nepalBhutanCurrencyResult;</span>
+        }
+
+        // 3. Fetch card data ONCE for all subsequent validations
+<span class="fc" id="L244">        logger.debug(&quot;Fetching card data once for all validation levels&quot;);</span>
+<span class="fc" id="L245">        CardDataContext cardContext = cardDataService.fetchCardData(requestContext);</span>
+<span class="fc bfc" id="L246" title="All 2 branches covered.">        if (!cardContext.isValid()) {</span>
+<span class="fc" id="L247">            logger.error(&quot;Failed to fetch card data: {}&quot;, cardContext.getFetchError());</span>
+<span class="fc" id="L248">            return resultBuilder.addError(&quot;CARD_DATA_FETCH_FAILED: &quot; + cardContext.getFetchError()).build();</span>
+        }
+
+        // 4. Basic card validation (using fetched data)
+<span class="fc" id="L252">        ValidationResult cardResult = validateCardWithContext(cardNumber, cardContext);</span>
+<span class="fc bfc" id="L253" title="All 2 branches covered.">        if (!cardResult.isValid()) {</span>
+<span class="fc" id="L254">            return resultBuilder.addErrors(cardResult.getErrors()).build();</span>
+        }
+<span class="pc bpc" id="L256" title="1 of 4 branches missed.">        if (transactionType == TransactionType.PREAUTH &amp;&amp; cardContext.getCardData().getCard_type() == Character.valueOf('P')) {</span>
+<span class="fc" id="L257">            return resultBuilder.addError(&quot;INVALID_TRANSACTION_TYPE: Preauth is not supported for prepaid cards&quot;).build();</span>
+        }
+
+<span class="fc" id="L260">        ValidationResult cashAtPosCardTypeResult = validateCashAtPosCardType(</span>
+                requestContext, cardContext, transactionType);
+<span class="pc bpc" id="L262" title="1 of 2 branches missed.">        if (!cashAtPosCardTypeResult.isValid()) {</span>
+<span class="nc" id="L263">            return cashAtPosCardTypeResult;</span>
+        }
+
+<span class="fc" id="L266">        resultBuilder.addWarnings(cardResult.getWarnings());</span>
+<span class="fc" id="L267">         addRuPayCreditAccountId(requestContext, cardContext, transactionType, resultBuilder);</span>
+
+
+
+        // 5. Service code validation
+<span class="fc" id="L272">        ValidationResult serviceCodeResult = validateServiceCode(transactionData, transactionType);</span>
+<span class="fc bfc" id="L273" title="All 2 branches covered.">        if (!serviceCodeResult.isValid()) {</span>
+<span class="fc" id="L274">            return serviceCodeResult; // Early termination</span>
+        }
+<span class="fc" id="L276">        resultBuilder.addWarnings(serviceCodeResult.getWarnings());</span>
+
+        // 6. Card expiry validation (using fetched data)
+<span class="fc" id="L279">        ValidationResult expiryResult = validateCardExpiryWithContext(transactionData, cardContext);</span>
+<span class="fc bfc" id="L280" title="All 2 branches covered.">        if (!expiryResult.isValid()) {</span>
+<span class="fc bfc" id="L281" title="All 2 branches covered.">            if (expiryResult.getErrors().contains(&quot;EXPIRED_CARD: Card has expired&quot;)) {</span>
+<span class="fc" id="L282">                requestContext.setInternalResponseCode(InternalResCode.EXPIRED_CARD_CAPTURE);</span>
+            }
+<span class="fc" id="L284">            return resultBuilder.addErrors(expiryResult.getErrors()).build();</span>
+        }
+<span class="fc" id="L286">        resultBuilder.addWarnings(expiryResult.getWarnings());</span>
+
+        // 6. PIN Retry Count validation
+        // Check PIN try count against maximum allowed attempts
+<span class="fc" id="L290">        Integer pinTryCount = cardContext.getPinRetryCount();</span>
+<span class="fc" id="L291">        Integer maxPinTryCount = cardContext.getMaxPinRetry();</span>
+
+<span class="pc bpc" id="L293" title="1 of 4 branches missed.">        if (pinTryCount != null &amp;&amp; maxPinTryCount != null) {</span>
+<span class="fc bfc" id="L294" title="All 2 branches covered.">            if (pinTryCount &gt;= maxPinTryCount) {</span>
+<span class="fc" id="L295">                ValidationResult pinRetryResult = new ValidationResult(List.of(&quot;PIN_TRY_EXCEEDED: PIN try count has reached or exceeded maximum allowed&quot;), List.of(&quot;&quot;));</span>
+<span class="fc" id="L296">                logger.warn(&quot;PIN try count ({}) has reached or exceeded maximum allowed ({}) &quot;, pinTryCount, maxPinTryCount);</span>
+<span class="fc" id="L297">                requestContext.setInternalResponseCode(InternalResCode.PIN_TRY_EXCEEDED);</span>
+<span class="fc" id="L298">                return pinRetryResult;</span>
+            } else {
+<span class="fc" id="L300">                logger.debug(&quot;PIN try count is valid for card: {}&quot;, maskCardNumber(cardNumber));</span>
+            }
+        }
+
+        // 7. Card authentications (PIN, CVV, ARQC, ARPC) using fetched data
+<span class="fc" id="L305">        ValidationResult cardAuthenticationResult = validateCardAuthenticationWithContext(requestContext, cardContext, transactionType);</span>
+<span class="fc bfc" id="L306" title="All 2 branches covered.">        if (!cardAuthenticationResult.isValid()) {</span>
+<span class="pc bpc" id="L307" title="1 of 2 branches missed.">            if (requestContext.getInternalResponseCode() == null) {</span>
+<span class="nc" id="L308">                requestContext.setInternalResponseCode(InternalResCode.SYSTEM_ERROR);</span>
+            }
+<span class="fc" id="L310">            return cardAuthenticationResult;</span>
+        }
+<span class="fc" id="L312">        resultBuilder.addWarnings(cardAuthenticationResult.getWarnings());</span>
+
+        //omit DE in response 
+        // Collect all updated data elements from validation results
+<span class="pc bpc" id="L316" title="1 of 2 branches missed.">        if (cardAuthenticationResult.hasUpdatedDataElements()) {</span>
+<span class="nc" id="L317">            resultBuilder.addUpdatedDataElements(cardAuthenticationResult.getUpdatedDataElements());</span>
+        }
+
+<span class="fc bfc" id="L320" title="All 2 branches covered.">        if (transactionType == TransactionType.MINI_STATEMENT) {</span>
+            // Temporary fix: Mini Statement is not supported by Accounting API yet.
+            // Remove this local response generation once Accounting adds support.
+<span class="fc" id="L323">            logger.info(&quot;Bypassing Accounting API for Mini Statement temporary local response&quot;);</span>
+<span class="fc" id="L324">            transactionData.put(120, buildMiniStatementDe120(transactionData.get(120)));</span>
+<span class="pc bpc" id="L325" title="1 of 2 branches missed.">            if (isPrepaidAtmSource(requestContext, cardContext)) {</span>
+<span class="fc" id="L326">                transactionData.put(54, packPrepaidAtmBalanceDe54(</span>
+<span class="fc" id="L327">                        BigDecimal.valueOf(9476.51),</span>
+<span class="fc" id="L328">                        BigDecimal.valueOf(9475.51)));</span>
+            }
+<span class="fc" id="L330">            return resultBuilder.build();</span>
+        }
+
+        // Prepaid limit validation
+<span class="pc bpc" id="L334" title="1 of 4 branches missed.">        if (prepaidLimitValidationService != null &amp;&amp; cardContext.getCardData().getCard_type() == 'P') {</span>
+<span class="fc" id="L335">            logger.info(&quot;Calling Prepaid Limit validation &quot;);</span>
+<span class="fc" id="L336">            ValidationResult prepaidLimitResult = prepaidLimitValidationService.validate(</span>
+<span class="fc" id="L337">                    requestContext, cardContext.getCardData());</span>
+<span class="fc bfc" id="L338" title="All 2 branches covered.">            if (!prepaidLimitResult.isValid()) {</span>
+<span class="fc" id="L339">                return prepaidLimitResult;</span>
+            }
+        }
+
+        // 8. Call Accounting API for final authorization
+<span class="fc bfc" id="L344" title="All 2 branches covered.">        if (transactionType == TransactionType.PIN_CHANGE) { // PIN change is not a financial transaction, so we don't need to call the accounting API</span>
+<span class="fc" id="L345">            logger.debug(&quot;Accounting API is disabled for PIN change, skipping authorization service call&quot;);</span>
+            ValidationResult pinChangeResult;
+<span class="pc bpc" id="L347" title="1 of 4 branches missed.">            if(cmsPinTransactions!=null &amp;&amp; cmsPinTransactions.managed(cardContext.getCardData().getAuth_id())) {</span>
+                try {
+<span class="fc" id="L349">                    var receipt=cmsPinTransactions.change(cardContext.getCardData().getAuth_id(),</span>
+<span class="fc" id="L350">                            requestContext.getUniqueTransactionId(),transactionData.get(52),</span>
+<span class="fc" id="L351">                            com.logicpoint.iso8583.validation.TlvUtils.parseTlv(transactionData.get(120)).get(&quot;004&quot;));</span>
+<span class="fc" id="L352">                    var pinResult=new ValidationResult.Builder();</span>
+<span class="fc bfc" id="L353" title="All 2 branches covered.">                    if(!&quot;COMPLETED&quot;.equals(receipt.path(&quot;status&quot;).asText())) {</span>
+<span class="fc" id="L354">                        pinResult.addError(&quot;PIN change rejected&quot;);</span>
+<span class="fc" id="L355">                        requestContext.setInternalResponseCode(InternalResCode.INVALID_PIN);</span>
+                    }
+<span class="fc" id="L357">                    pinChangeResult=pinResult.build();</span>
+<span class="fc" id="L358">                } catch(Exception e) {</span>
+<span class="fc" id="L359">                    requestContext.setInternalResponseCode(InternalResCode.SYSTEM_ERROR);</span>
+<span class="fc" id="L360">                    return new ValidationResult.Builder().addError(&quot;PIN change unavailable&quot;).build();</span>
+<span class="fc" id="L361">                }</span>
+<span class="fc" id="L362">            } else pinChangeResult = pinChangeService.processPinChange(transactionData, cardContext);</span>
+<span class="fc bfc" id="L363" title="All 2 branches covered.">            if (!pinChangeResult.isValid()) {</span>
+<span class="fc" id="L364">                return pinChangeResult;</span>
+            }
+<span class="fc" id="L366">            resultBuilder.addWarnings(pinChangeResult.getWarnings());</span>
+<span class="fc" id="L367">            return resultBuilder.build();</span>
+<span class="fc bfc" id="L368" title="All 2 branches covered.">        } else if (accountingApiEnabled) {</span>
+<span class="fc" id="L369">            ValidationResult accountingResult = callAccountingApiForAuthorization(</span>
+                    requestContext, cardContext);
+<span class="fc bfc" id="L371" title="All 2 branches covered.">            if (!accountingResult.isValid()) {</span>
+<span class="fc" id="L372">                return accountingResult;</span>
+            }
+<span class="fc" id="L374">            resultBuilder.addWarnings(accountingResult.getWarnings());</span>
+<span class="fc" id="L375">        } else {</span>
+<span class="fc" id="L376">            logger.debug(&quot;Accounting API is disabled, skipping authorization service call&quot;);</span>
+        }
+
+        // Business rule validation (if needed)
+        // ValidationResult businessResult = validateBusinessRules(cardNumber, bin, transactionType, amount, merchantId);
+        // if (!businessResult.isValid()) {
+        //     return resultBuilder.addErrors(businessResult.getErrors()).build();
+        // }
+        // resultBuilder.addWarnings(businessResult.getWarnings());
+<span class="fc" id="L385">        logger.debug(&quot;All validation levels completed successfully for card: {}&quot;, maskCardNumber(cardNumber));</span>
+<span class="fc" id="L386">        return resultBuilder.build();</span>
+    }
+
+    ValidationResult validateNepalBhutanCurrency(RequestContext requestContext) {
+<span class="pc bpc" id="L390" title="1 of 4 branches missed.">        if (requestContext == null || isCreditTransaction(requestContext)) {</span>
+<span class="fc" id="L391">            return new ValidationResult(List.of(), List.of());</span>
+        }
+
+<span class="fc" id="L394">        Map&lt;Integer, String&gt; fields = requestContext.getFields();</span>
+<span class="fc" id="L395">        String acquirerCountry = normalize(fields.get(19));</span>
+<span class="fc" id="L396">        String merchantCountry = merchantCountry(fields.get(43));</span>
+<span class="fc bfc" id="L397" title="All 2 branches covered.">        boolean isNepalOrBhutan = &quot;524&quot;.equals(acquirerCountry)</span>
+<span class="pc bpc" id="L398" title="1 of 2 branches missed.">                || &quot;064&quot;.equals(acquirerCountry)</span>
+<span class="pc bpc" id="L399" title="1 of 2 branches missed.">                || &quot;NP&quot;.equals(merchantCountry)</span>
+<span class="fc bfc" id="L400" title="All 2 branches covered.">                || &quot;BT&quot;.equals(merchantCountry);</span>
+<span class="fc bfc" id="L401" title="All 2 branches covered.">        if (!isNepalOrBhutan) {</span>
+<span class="fc" id="L402">            return new ValidationResult(List.of(), List.of());</span>
+        }
+
+<span class="fc" id="L405">        String transactionCurrency = normalize(fields.get(49));</span>
+<span class="fc bfc" id="L406" title="All 4 branches covered.">        if (transactionCurrency == null || &quot;356&quot;.equals(transactionCurrency)) {</span>
+<span class="fc" id="L407">            return new ValidationResult(List.of(), List.of());</span>
+        }
+
+<span class="fc" id="L410">        requestContext.setAttribute(&quot;complianceRule&quot;, &quot;FEMA_NP_BT_FOREIGN_CURRENCY&quot;);</span>
+<span class="fc" id="L411">        requestContext.setInternalResponseCode(InternalResCode.INVALID_TRANSACTION);</span>
+<span class="fc" id="L412">        logger.warn(&quot;Declining transaction in Nepal or Bhutan with non-INR currency. &quot;</span>
+                        + &quot;transactionType={}, acquirerCountry={}, merchantCountry={}, currency={}&quot;,
+<span class="fc" id="L414">                requestContext.getTransactionType(), acquirerCountry, merchantCountry, transactionCurrency);</span>
+<span class="fc" id="L415">        return new ValidationResult(</span>
+<span class="fc" id="L416">                List.of(&quot;INVALID_TRANSACTION: Foreign-currency transactions are not permitted in Nepal or Bhutan&quot;),</span>
+<span class="fc" id="L417">                List.of());</span>
+    }
+
+    private boolean isCreditTransaction(RequestContext requestContext) {
+<span class="fc" id="L421">        TransactionType transactionType = requestContext.getTransactionType();</span>
+<span class="pc bpc" id="L422" title="5 of 12 branches missed.">        if (transactionType == TransactionType.REFUND</span>
+                || transactionType == TransactionType.REVERSAL
+                || transactionType == TransactionType.OCT
+                || transactionType == TransactionType.CASH_DEPOSIT
+                || transactionType == TransactionType.MONEY_LOAD
+                || transactionType == TransactionType.ML_BALANCEUPDATE) {
+<span class="fc" id="L428">            return true;</span>
+        }
+
+<span class="fc" id="L431">        String processingCode = normalize(requestContext.getFields().get(3));</span>
+<span class="pc bpc" id="L432" title="1 of 4 branches missed.">        return processingCode != null &amp;&amp; processingCode.startsWith(&quot;20&quot;);</span>
+    }
+
+    private String merchantCountry(String de43) {
+<span class="pc bpc" id="L436" title="1 of 4 branches missed.">        if (de43 == null || de43.length() != 40) {</span>
+<span class="fc" id="L437">            return null;</span>
+        }
+        try {
+<span class="fc" id="L440">            return normalize(CardAcceptorLocation.parse(de43).getTerminalCountryCode());</span>
+<span class="nc" id="L441">        } catch (IllegalArgumentException ex) {</span>
+<span class="nc" id="L442">            return null;</span>
+        }
+    }
+
+    private String normalize(String value) {
+<span class="pc bpc" id="L447" title="1 of 4 branches missed.">        if (value == null || value.isBlank()) {</span>
+<span class="fc" id="L448">            return null;</span>
+        }
+<span class="fc" id="L450">        return value.trim().toUpperCase();</span>
+    }
+
+    ValidationResult validateCashAtPosCardType(
+            RequestContext requestContext,
+            CardDataContext cardContext,
+            TransactionType transactionType) {
+<span class="fc bfc" id="L457" title="All 4 branches covered.">        if (transactionType != TransactionType.CASH_AT_POS</span>
+                &amp;&amp; transactionType != TransactionType.CASH_AT_POS_CL) {
+<span class="fc" id="L459">            return new ValidationResult(List.of(), List.of());</span>
+        }
+
+<span class="pc bpc" id="L462" title="2 of 4 branches missed.">        Character cardType = cardContext != null &amp;&amp; cardContext.isValid()</span>
+<span class="fc" id="L463">                ? cardContext.getCardData().getCard_type()</span>
+<span class="pc" id="L464">                : null;</span>
+<span class="fc bfc" id="L465" title="All 2 branches covered.">        if (!Character.valueOf('C').equals(cardType)) {</span>
+<span class="fc" id="L466">            return new ValidationResult(List.of(), List.of());</span>
+        }
+
+<span class="fc" id="L469">        requestContext.setInternalResponseCode(InternalResCode.INVALID_TRANSACTION);</span>
+<span class="fc" id="L470">        logger.warn(&quot;Declining {} because cash withdrawal at POS is not permitted for credit cards&quot;,</span>
+                transactionType);
+<span class="fc" id="L472">        return new ValidationResult(</span>
+<span class="fc" id="L473">                List.of(&quot;INVALID_TRANSACTION: Cash withdrawal at POS is not permitted for credit cards&quot;),</span>
+<span class="fc" id="L474">                List.of());</span>
+    }
+ void addRuPayCreditAccountId(
+            RequestContext requestContext,
+            CardDataContext cardContext,
+            TransactionType transactionType,
+            ValidationResult.Builder resultBuilder) {
+<span class="pc bpc" id="L481" title="2 of 6 branches missed.">        if (requestContext.getScheme() != Scheme.RUPAY || cardContext == null || !cardContext.isValid()) {</span>
+<span class="fc" id="L482">            return;</span>
+        }
+
+<span class="fc bfc" id="L485" title="All 8 branches covered.">        if (transactionType == TransactionType.MONEY_LOAD</span>
+                || transactionType == TransactionType.ML_BALANCEUPDATE
+                || transactionType == TransactionType.SERVICE_CREATION
+                || transactionType == TransactionType.SERVICE_CREATION_CONTACTLESS) {
+<span class="fc" id="L489">            return;</span>
+        }
+
+<span class="fc" id="L492">        CardData cardData = cardContext.getCardData();</span>
+<span class="fc bfc" id="L493" title="All 2 branches covered.">        if (!Character.valueOf('C').equals(cardData.getCard_type())) {</span>
+<span class="fc" id="L494">            return;</span>
+        }
+
+<span class="fc" id="L497">        Long accountId = cardData.getAccount_id();</span>
+<span class="pc bpc" id="L498" title="1 of 2 branches missed.">        if (accountId == null) {</span>
+<span class="nc" id="L499">            logger.warn(&quot;RuPay credit card has no mapped account_id in card_data&quot;);</span>
+<span class="nc" id="L500">            return;</span>
+        }
+
+<span class="fc" id="L503">        resultBuilder.addUpdatedDataElement(&quot;DE102&quot;, String.valueOf(accountId));</span>
+<span class="fc" id="L504">    }</span>
+
+    /**
+     * Validates BIN with early termination.
+     *
+     * @param bin BIN to validate
+     * @return Validation result
+     */
+    private ValidationResult validateBin(String bin) {
+<span class="fc" id="L513">        logger.debug(&quot;Validating BIN: {}&quot;, bin);</span>
+<span class="fc" id="L514">        return binValidator.validate(bin);</span>
+    }
+
+    /**
+     * Validates transaction type with early termination.
+     *
+     * @param transactionType Transaction type
+     * @param transactionData Transaction data
+     * @return Validation result
+     */
+    private ValidationResult validateTransactionType(RequestContext requestContext) {
+<span class="fc" id="L525">        TransactionType transactionType = requestContext.getTransactionType();</span>
+<span class="fc" id="L526">        logger.debug(&quot;Validating transaction type: {}&quot;, transactionType);</span>
+
+<span class="fc" id="L528">        TransactionTypeValidator validator = transactionValidatorFactory.getValidator(transactionType);</span>
+<span class="fc bfc" id="L529" title="All 2 branches covered.">        if (validator == null) {</span>
+<span class="fc" id="L530">            return ValidationResult.builder()</span>
+<span class="fc" id="L531">                    .addError(&quot;INVALID_TRANSACTION_TYPE: No validator found for transaction type &quot; + transactionType)</span>
+<span class="fc" id="L532">                    .build();</span>
+        }
+
+<span class="fc" id="L535">        return validator.validateTransactionType(transactionType, requestContext);</span>
+    }
+
+    /**
+     * Validates card with early termination.
+     *
+     * @param cardNumber Card number
+     * @return Validation result
+     */
+    private ValidationResult validateCard(String cardNumber) {
+<span class="fc" id="L545">        logger.debug(&quot;Validating card: {}&quot;, maskCardNumber(cardNumber));</span>
+<span class="fc" id="L546">        return cardValidator.validate(cardNumber);</span>
+    }
+
+    /**
+     * Validates card using pre-fetched card data context. This method avoids
+     * additional database calls.
+     *
+     * @param cardNumber Card number
+     * @param cardContext Pre-fetched card data context
+     * @return Validation result
+     */
+    private ValidationResult validateCardWithContext(String cardNumber, CardDataContext cardContext) {
+<span class="fc" id="L558">        logger.debug(&quot;Validating card with context: {}&quot;, maskCardNumber(cardNumber));</span>
+
+        // Basic card number format validation (no DB call)
+<span class="fc" id="L561">        ValidationResult formatResult = cardValidator.validateCardNumber(cardNumber);</span>
+<span class="fc bfc" id="L562" title="All 2 branches covered.">        if (!formatResult.isValid()) {</span>
+<span class="fc" id="L563">            return formatResult;</span>
+        }
+
+        // Use pre-fetched card data for status validation
+<span class="fc bfc" id="L567" title="All 2 branches covered.">        if (!cardDataService.isCardDataValidForTransaction(cardContext)) {</span>
+<span class="fc" id="L568">            return ValidationResult.builder()</span>
+<span class="fc" id="L569">                    .addError(&quot;INVALID_CARD: Card data validation failed&quot;)</span>
+<span class="fc" id="L570">                    .build();</span>
+        }
+
+<span class="fc" id="L573">        logger.debug(&quot;Card validation successful using pre-fetched data&quot;);</span>
+<span class="fc" id="L574">        return ValidationResult.builder().build();</span>
+    }
+
+    /**
+     * Validates service code with early termination.
+     *
+     * @param transactionData Transaction data
+     * @param transactionType Transaction type
+     * @return Validation result
+     */
+    private ValidationResult validateServiceCode(Map&lt;Integer, String&gt; transactionData, TransactionType transactionType) {
+<span class="fc" id="L585">        String serviceCode = extractServiceCode(transactionData);</span>
+<span class="fc bfc" id="L586" title="All 2 branches covered.">        if (serviceCode == null) {</span>
+<span class="fc" id="L587">            logger.debug(&quot;No service code found in transaction data&quot;);</span>
+<span class="fc" id="L588">            return ValidationResult.builder().build(); // Valid if no service code</span>
+        }
+
+<span class="fc" id="L591">        logger.debug(&quot;Validating service code: {}&quot;, serviceCode);</span>
+<span class="fc" id="L592">        return serviceCodeValidationService.validateServiceCode(</span>
+                serviceCode, Scheme.RUPAY, transactionType, transactionData);
+    }
+
+    /**
+     * Validates card expiry using pre-fetched card data context. This method
+     * avoids additional database calls.
+     *
+     * @param transactionData Transaction data
+     * @param cardContext Pre-fetched card data context
+     * @return Validation result
+     */
+    private ValidationResult validateCardExpiryWithContext(Map&lt;Integer, String&gt; transactionData, CardDataContext cardContext) {
+<span class="fc" id="L605">        String cardExp = transactionData.get(14); // DE14 for expiry date</span>
+<span class="fc bfc" id="L606" title="All 2 branches covered.">        if (cardExp == null) {</span>
+<span class="fc" id="L607">            String track2 = transactionData.get(35);</span>
+<span class="pc bpc" id="L608" title="3 of 4 branches missed.">            if (track2 != null &amp;&amp; track2.length() &gt;= 3) {</span>
+<span class="nc" id="L609">                String[] parts = track2.split(&quot;=&quot;);</span>
+<span class="nc bnc" id="L610" title="All 2 branches missed.">                if (parts.length &gt;= 2) {</span>
+<span class="nc" id="L611">                    cardExp = parts[1].substring(0, 4);</span>
+<span class="nc" id="L612">                    logger.debug(&quot;Card expiry date found in track2: {}&quot;, cardExp);</span>
+                }
+            }
+        }
+
+<span class="fc bfc" id="L617" title="All 2 branches covered.">        if (cardExp == null) {</span>
+<span class="fc" id="L618">            logger.warn(&quot;No expiry date found in transaction data&quot;);</span>
+<span class="fc" id="L619">            return ValidationResult.builder()</span>
+<span class="fc" id="L620">                    .addError(&quot;MISSING_EXPIRY_DATE: Card expiry date is required&quot;)</span>
+<span class="fc" id="L621">                    .build();</span>
+        }
+
+        // Validate expiry date format
+<span class="fc bfc" id="L625" title="All 2 branches covered.">        if (!cardExp.matches(&quot;\\d{4}&quot;)) {</span>
+<span class="fc" id="L626">            return ValidationResult.builder()</span>
+<span class="fc" id="L627">                    .addError(&quot;INVALID_EXPIRY_FORMAT: Expiry date must be in MMYY format&quot;)</span>
+<span class="fc" id="L628">                    .build();</span>
+        }
+
+        // Compare with pre-fetched card data
+<span class="fc" id="L632">        String storedExpiry = cardContext.getExpiryDate();</span>
+<span class="pc bpc" id="L633" title="1 of 4 branches missed.">        if (storedExpiry == null || !storedExpiry.equals(cardExp)) {</span>
+<span class="fc" id="L634">            logger.warn(&quot;Expiry date mismatch. Transaction: {}, Stored: {}&quot;, cardExp, storedExpiry);</span>
+<span class="fc" id="L635">            return ValidationResult.builder()</span>
+<span class="fc" id="L636">                    .addError(&quot;EXPIRED_CARD: Card has expired&quot;)</span>
+<span class="fc" id="L637">                    .build();</span>
+        }
+
+<span class="fc" id="L640">        logger.debug(&quot;Card expiry validation successful using pre-fetched data: {}&quot;, cardExp);</span>
+<span class="fc" id="L641">        return ValidationResult.builder().build();</span>
+    }
+
+    /**
+     * Validates business rules with early termination.
+     */
+    // private ValidationResult validateBusinessRules(
+    //         String cardNumber, String bin, TransactionType transactionType, 
+    //         Double amount, String merchantId) {
+    //     logger.debug(&quot;Validating business rules for transaction type: {}&quot;, transactionType);
+    //     return businessRuleValidator.validate(cardNumber, bin, transactionType, amount, merchantId);
+    // }
+    /**
+     * Extracts service code from transaction data.
+     *
+     * @param transactionData Transaction data
+     * @return Service code or null
+     */
+    private String extractServiceCode(Map&lt;Integer, String&gt; transactionData) {
+        // Try Track 2 first (Field 35)
+<span class="fc" id="L661">        String track2 = transactionData.get(35);</span>
+<span class="pc bpc" id="L662" title="1 of 4 branches missed.">        if (track2 != null &amp;&amp; track2.length() &gt;= 3) {</span>
+<span class="fc" id="L663">            String[] parts = track2.split(&quot;=&quot;);</span>
+<span class="pc bpc" id="L664" title="1 of 2 branches missed.">            if (parts.length &gt;= 2) {</span>
+<span class="fc" id="L665">                return parts[1].substring(4, 7);</span>
+            }
+        }
+
+<span class="fc" id="L669">        return null;</span>
+    }
+
+    /**
+     * Masks card number for logging.
+     *
+     * @param cardNumber Card number
+     * @return Masked card number
+     */
+    private String maskCardNumber(String cardNumber) {
+<span class="pc bpc" id="L679" title="1 of 4 branches missed.">        if (cardNumber == null || cardNumber.length() &lt; 8) {</span>
+<span class="fc" id="L680">            return &quot;****&quot;;</span>
+        }
+<span class="fc" id="L682">        return cardNumber.substring(0, 4) + &quot;****&quot; + cardNumber.substring(cardNumber.length() - 4);</span>
+    }
+
+    /**
+     * Performs quick validation (card and BIN only).
+     */
+    public ValidationResult quickValidate(String cardNumber, String bin) {
+<span class="fc" id="L689">        logger.debug(&quot;Performing quick validation for card: {}, BIN: {}&quot;,</span>
+<span class="fc" id="L690">                maskCardNumber(cardNumber), bin);</span>
+
+<span class="fc" id="L692">        ValidationResult.Builder resultBuilder = ValidationResult.builder();</span>
+
+        // Card validation
+<span class="fc" id="L695">        ValidationResult cardResult = validateCard(cardNumber);</span>
+<span class="fc bfc" id="L696" title="All 2 branches covered.">        if (!cardResult.isValid()) {</span>
+<span class="fc" id="L697">            resultBuilder.addErrors(cardResult.getErrors());</span>
+        }
+<span class="fc" id="L699">        resultBuilder.addWarnings(cardResult.getWarnings());</span>
+
+        // BIN validation
+<span class="fc" id="L702">        ValidationResult binResult = validateBin(bin);</span>
+<span class="fc bfc" id="L703" title="All 2 branches covered.">        if (!binResult.isValid()) {</span>
+<span class="fc" id="L704">            resultBuilder.addErrors(binResult.getErrors());</span>
+        }
+<span class="fc" id="L706">        resultBuilder.addWarnings(binResult.getWarnings());</span>
+
+<span class="fc" id="L708">        return resultBuilder.build();</span>
+    }
+
+    /**
+     * Gets supported transaction types.
+     *
+     * @return Set of supported transaction types
+     */
+    public java.util.Set&lt;TransactionType&gt; getSupportedTransactionTypes() {
+<span class="fc" id="L717">        return transactionValidatorFactory.getSupportedTransactionTypes();</span>
+    }
+
+    /**
+     * Validates card authentication using pre-fetched card data context. This
+     * method avoids additional database calls and uses cached card data.
+     *
+     * @param transactionData Transaction data
+     * @param cardContext Pre-fetched card data context
+     * @return Validation result
+     */
+    private ValidationResult validateCardAuthenticationWithContext(RequestContext requestContext, CardDataContext cardContext, TransactionType transactionType) {
+<span class="fc" id="L729">        Map&lt;Integer, String&gt; transactionData = requestContext.getFields();</span>
+<span class="fc" id="L730">        logger.debug(&quot;Validating card authentication with context for card: {}&quot;,</span>
+<span class="fc" id="L731">                maskCardNumber(transactionData.get(2)));</span>
+        try {
+<span class="fc" id="L733">            ValidationResult.Builder resultBuilder = ValidationResult.builder();</span>
+<span class="fc" id="L734">            String emvData = transactionData.get(55); // DE55 - ICC System Related Data</span>
+<span class="fc" id="L735">            ChipData chipData = null;</span>
+
+            // 1. CVM validation is local EMV parsing/business logic. Run it before
+            // CVV/PIN so invalid CVM data can fail without HSM calls.
+<span class="pc bpc" id="L739" title="1 of 4 branches missed.">            if (emvData != null &amp;&amp; !emvData.trim().isEmpty()) {</span>
+<span class="fc" id="L740">                chipData = requestContext.getParsedChipData(55);</span>
+<span class="fc" id="L741">                preserveOriginalDe55(requestContext, emvData, chipData);</span>
+<span class="fc" id="L742">                ValidationResult cvmResult = validateCvmWithContext(requestContext, chipData, transactionType);</span>
+<span class="fc bfc" id="L743" title="All 2 branches covered.">                if (!cvmResult.isValid()) {</span>
+<span class="fc" id="L744">                    resultBuilder.addErrors(cvmResult.getErrors());</span>
+<span class="fc" id="L745">                    resultBuilder.addWarnings(cvmResult.getWarnings());</span>
+<span class="fc" id="L746">                    return resultBuilder.build();</span>
+                }
+<span class="fc" id="L748">                resultBuilder.addWarnings(cvmResult.getWarnings());</span>
+<span class="fc" id="L749">            } else {</span>
+<span class="fc" id="L750">                logger.debug(&quot;No EMV data found, skipping CVM validation&quot;);</span>
+            }
+
+            // 2. CVV/iCVV/CVV2 validation - selected from transaction type and payload.
+<span class="fc" id="L754">            CvvVerificationRequest cvvRequest = resolveCvvVerificationRequest(requestContext, transactionType);</span>
+<span class="fc bfc" id="L755" title="All 2 branches covered.">            if (cvvRequest != null) {</span>
+<span class="fc bfc" id="L756" title="All 2 branches covered.">                if (!cvvRequest.hasSecurityCode()) {</span>
+<span class="fc" id="L757">                    resultBuilder.addError(&quot;CVV_VALIDATION_FAILED: Missing &quot; + cvvRequest.type + &quot; value&quot;);</span>
+<span class="fc" id="L758">                    String updatedDe48 = updateDE48(transactionData.get(48), &quot;N&quot;, cvvRequest);</span>
+<span class="fc" id="L759">                    transactionData.put(48, updatedDe48);</span>
+<span class="fc" id="L760">                    requestContext.setInternalResponseCode(InternalResCode.CVV_FAILURE);</span>
+<span class="fc" id="L761">                    return resultBuilder.build();</span>
+                }
+
+<span class="fc" id="L764">                logger.debug(&quot;Performing {} validation with pre-fetched data&quot;, cvvRequest.type);</span>
+<span class="fc" id="L765">                int cvvValid = validateCvvWithContext(transactionData, cardContext, cvvRequest);</span>
+<span class="fc bfc" id="L766" title="All 2 branches covered.">                if (cvvValid == 1) {</span>
+<span class="fc" id="L767">                    resultBuilder.addError(&quot;CVV_VALIDATION_FAILED: &quot; + cvvRequest.type + &quot; validation failed&quot;);</span>
+<span class="fc" id="L768">                    String updatedDe48 = updateDE48(transactionData.get(48), &quot;N&quot;, cvvRequest);</span>
+<span class="fc" id="L769">                    transactionData.put(48, updatedDe48);</span>
+<span class="fc" id="L770">                    requestContext.setInternalResponseCode(InternalResCode.CVV_FAILURE);</span>
+<span class="fc" id="L771">                    return resultBuilder.build();</span>
+<span class="fc bfc" id="L772" title="All 2 branches covered.">                } else if (cvvValid == 0) {</span>
+<span class="fc" id="L773">                    String updatedDe48 = updateDE48(transactionData.get(48), &quot;M&quot;, cvvRequest);</span>
+<span class="fc" id="L774">                    transactionData.put(48, updatedDe48);</span>
+<span class="pc bpc" id="L775" title="1 of 2 branches missed.">                } else if (cvvValid == 2) {</span>
+<span class="fc" id="L776">                    resultBuilder.addError(&quot;CVV_VALIDATION_FAILED: System error&quot;);</span>
+<span class="fc" id="L777">                    requestContext.setInternalResponseCode(InternalResCode.SYSTEM_ERROR);</span>
+<span class="fc" id="L778">                    return resultBuilder.build();</span>
+                }
+<span class="fc" id="L780">                logger.debug(&quot;{} validation successful&quot;, cvvRequest.type);</span>
+            }
+
+            // 3. PIN Verification (if PIN block is present) - using pre-fetched data
+<span class="fc" id="L784">            String pinBlock = transactionData.get(52); // DE52 - PIN Block</span>
+<span class="fc bfc" id="L785" title="All 4 branches covered.">            if (transactionType==TransactionType.PIN_CHANGE &amp;&amp; cmsPinTransactions!=null</span>
+<span class="pc bpc" id="L786" title="1 of 2 branches missed.">                    &amp;&amp; cmsPinTransactions.managed(cardContext.getCardData().getAuth_id())) {</span>
+                // Atomic change verifies the old PIN under the family lock after
+                // replay lookup. Do not reject a successful retry using the old PIN.
+<span class="fc" id="L789">                logger.debug(&quot;PIN verification deferred to atomic family PIN change&quot;);</span>
+<span class="pc bpc" id="L790" title="1 of 4 branches missed.">            } else if (pinBlock != null &amp;&amp; !pinBlock.trim().isEmpty()) {</span>
+<span class="fc" id="L791">                logger.debug(&quot;Performing PIN verification with pre-fetched data&quot;);</span>
+<span class="fc" id="L792">                InternalResCode pinValidationResult = validatePinWithContext(requestContext, cardContext);</span>
+<span class="fc bfc" id="L793" title="All 2 branches covered.">                if (pinValidationResult != InternalResCode.APPROVED) {</span>
+<span class="fc" id="L794">                    resultBuilder.addError(&quot;PIN_VERIFICATION_FAILED: PIN verification failed&quot;);</span>
+<span class="fc" id="L795">                    requestContext.setInternalResponseCode(pinValidationResult);</span>
+<span class="fc" id="L796">                    return resultBuilder.build();</span>
+                }
+<span class="fc" id="L798">                requestContext.setAttribute(&quot;issuerPinVerified&quot;, true);</span>
+<span class="fc" id="L799">                logger.debug(&quot;PIN verification successful&quot;);</span>
+<span class="fc" id="L800">            } else {</span>
+<span class="fc" id="L801">                logger.debug(&quot;No PIN block found, skipping PIN verification&quot;);</span>
+            }
+
+            // 4. Remaining EMV validations and ARQC/ARPC generation.
+<span class="fc bfc" id="L805" title="All 2 branches covered.">            if (chipData != null) {</span>
+<span class="fc" id="L806">                ValidationResult cvrResult = validateCvrWithContext(requestContext, chipData);</span>
+<span class="fc bfc" id="L807" title="All 2 branches covered.">                if (!cvrResult.isValid()) {</span>
+<span class="fc" id="L808">                    resultBuilder.addErrors(cvrResult.getErrors());</span>
+<span class="fc" id="L809">                    resultBuilder.addWarnings(cvrResult.getWarnings());</span>
+<span class="fc" id="L810">                    return resultBuilder.build();</span>
+                }
+<span class="fc" id="L812">                resultBuilder.addWarnings(cvrResult.getWarnings());</span>
+
+<span class="fc" id="L814">                ValidationResult tvrResult = validateTvrWithContext(requestContext, chipData);</span>
+<span class="fc bfc" id="L815" title="All 2 branches covered.">                if (!tvrResult.isValid()) {</span>
+<span class="fc" id="L816">                    resultBuilder.addErrors(tvrResult.getErrors());</span>
+<span class="fc" id="L817">                    resultBuilder.addWarnings(tvrResult.getWarnings());</span>
+<span class="fc" id="L818">                    return resultBuilder.build();</span>
+                }
+<span class="fc" id="L820">                resultBuilder.addWarnings(tvrResult.getWarnings());</span>
+
+<span class="fc" id="L822">                logger.debug(&quot;Performing EMV ARQC verification and ARPC generation with pre-fetched data&quot;);</span>
+<span class="fc" id="L823">                ValidationResult emvResult = validateEmvCryptogramsWithContext(requestContext, cardContext, transactionType);</span>
+<span class="fc bfc" id="L824" title="All 2 branches covered.">                if (!emvResult.isValid()) {</span>
+<span class="fc" id="L825">                    resultBuilder.addErrors(emvResult.getErrors());</span>
+<span class="pc bpc" id="L826" title="1 of 2 branches missed.">                    if (requestContext.getInternalResponseCode() == null) {</span>
+<span class="nc" id="L827">                        requestContext.setInternalResponseCode(InternalResCode.ARQC_FAIL);</span>
+                    }
+<span class="fc" id="L829">                    return resultBuilder.build();</span>
+                }
+<span class="fc" id="L831">                resultBuilder.addWarnings(emvResult.getWarnings());</span>
+<span class="fc" id="L832">                logger.debug(&quot;EMV cryptogram validation successful&quot;);</span>
+<span class="fc" id="L833">            } else {</span>
+<span class="fc" id="L834">                logger.debug(&quot;No EMV data found, skipping ARQC/ARPC validation&quot;);</span>
+            }
+
+<span class="fc" id="L837">            return resultBuilder.build();</span>
+
+<span class="nc" id="L839">        } catch (Exception e) {</span>
+<span class="nc" id="L840">            logger.error(&quot;Error during card authentication validation with context: {}&quot;, e.getMessage());</span>
+<span class="nc" id="L841">            requestContext.setInternalResponseCode(InternalResCode.SYSTEM_ERROR);</span>
+<span class="nc" id="L842">            return ValidationResult.builder().addError(&quot;CARD_AUTHENTICATION_ERROR: &quot; + e.getMessage()).build();</span>
+        }
+    }
+
+    private ValidationResult validateCvmWithContext(RequestContext requestContext, ChipData chipData, TransactionType transactionType) {
+<span class="pc bpc" id="L847" title="2 of 4 branches missed.">        if (chipData == null || chipData.isEmpty()) {</span>
+<span class="nc" id="L848">            return ValidationResult.builder()</span>
+<span class="nc" id="L849">                    .addError(&quot;MISSING_EMV_DATA: Chip data unavailable for CVM validation&quot;)</span>
+<span class="nc" id="L850">                    .build();</span>
+        }
+
+<span class="fc" id="L853">        BigDecimal transactionAmount = extractTransactionAmountInMinorUnits(requestContext.getFields());</span>
+<span class="pc bpc" id="L854" title="1 of 2 branches missed.">        boolean isContactless = isContactlessTransaction(transactionType)</span>
+<span class="pc bpc" id="L855" title="1 of 2 branches missed.">                || isContactlessPosEntryMode(requestContext.getFields().get(22));</span>
+<span class="fc" id="L856">        String terminalCapabilities = chipData.getTagValue(&quot;9F33&quot;);</span>
+<span class="fc" id="L857">        BinDetails binDetails = resolveBinDetails(requestContext.getBin());</span>
+<span class="fc" id="L858">        boolean offlinePinAllowed = isOfflinePinAllowed(binDetails);</span>
+
+<span class="fc" id="L860">        CvmValidationService.CvmValidationResult cvmResult = cvmValidationService.validateCvm(</span>
+                chipData,
+                transactionAmount,
+                isContactless,
+                terminalCapabilities,
+<span class="fc" id="L865">                hasPinBlock(requestContext.getFields()),</span>
+                offlinePinAllowed
+        );
+
+<span class="fc bfc" id="L869" title="All 2 branches covered.">        if (!cvmResult.isValid()) {</span>
+<span class="fc" id="L870">            requestContext.setInternalResponseCode(resolveCvmFailureCode(requestContext, chipData));</span>
+<span class="fc" id="L871">            return ValidationResult.builder()</span>
+<span class="fc" id="L872">                    .addError(&quot;CVM_VALIDATION_FAILED: &quot; + cvmResult.getValidationMessage())</span>
+<span class="fc" id="L873">                    .build();</span>
+        }
+
+<span class="fc" id="L876">        return ValidationResult.builder().build();</span>
+    }
+
+    private boolean hasPinBlock(Map&lt;Integer, String&gt; transactionData) {
+<span class="fc" id="L880">        String pinBlock = transactionData.get(52);</span>
+<span class="pc bpc" id="L881" title="3 of 4 branches missed.">        return pinBlock != null &amp;&amp; !pinBlock.trim().isEmpty();</span>
+    }
+
+    private ValidationResult validateCvrWithContext(RequestContext requestContext, ChipData chipData) {
+<span class="pc bpc" id="L885" title="2 of 4 branches missed.">        if (chipData == null || chipData.isEmpty()) {</span>
+<span class="nc" id="L886">            return ValidationResult.builder()</span>
+<span class="nc" id="L887">                    .addError(&quot;MISSING_EMV_DATA: Chip data unavailable for CVR validation&quot;)</span>
+<span class="nc" id="L888">                    .build();</span>
+        }
+
+       
+<span class="fc" id="L892">        CvrValidationService.CvrValidationResult cvrResult = cvrValidationService.validateCvr(chipData, requestContext.getScheme());</span>
+
+<span class="fc bfc" id="L894" title="All 2 branches covered.">        if (!cvrResult.isValid()) {</span>
+<span class="fc" id="L895">            requestContext.setInternalResponseCode(resolveCvrFailureCode(cvrResult));</span>
+<span class="fc" id="L896">            ValidationResult.Builder resultBuilder = ValidationResult.builder();</span>
+<span class="pc bpc" id="L897" title="2 of 4 branches missed.">            if (cvrResult.getErrors() != null &amp;&amp; !cvrResult.getErrors().isEmpty()) {</span>
+<span class="fc" id="L898">                resultBuilder.addErrors(cvrResult.getErrors());</span>
+            } else {
+<span class="nc" id="L900">                resultBuilder.addError(&quot;CVR_VALIDATION_FAILED: &quot; + cvrResult.getMessage());</span>
+            }
+<span class="fc" id="L902">            return resultBuilder.build();</span>
+        }
+
+<span class="fc" id="L905">        ValidationResult.Builder resultBuilder = ValidationResult.builder();</span>
+<span class="pc bpc" id="L906" title="1 of 4 branches missed.">        if (cvrResult.getWarnings() != null &amp;&amp; !cvrResult.getWarnings().isEmpty()) {</span>
+<span class="fc" id="L907">            resultBuilder.addWarnings(cvrResult.getWarnings());</span>
+        }
+<span class="fc" id="L909">        return resultBuilder.build();</span>
+    }
+
+    private ValidationResult validateTvrWithContext(RequestContext requestContext, ChipData chipData) {
+<span class="pc bpc" id="L913" title="2 of 4 branches missed.">        if (chipData == null || chipData.isEmpty()) {</span>
+<span class="nc" id="L914">            return ValidationResult.builder()</span>
+<span class="nc" id="L915">                    .addError(&quot;MISSING_EMV_DATA: Chip data unavailable for TVR validation&quot;)</span>
+<span class="nc" id="L916">                    .build();</span>
+        }
+
+<span class="fc" id="L919">        String tvrValue = chipData.getTagValue(&quot;95&quot;);</span>
+<span class="pc bpc" id="L920" title="1 of 4 branches missed.">        if (tvrValue == null || tvrValue.isBlank()) {</span>
+<span class="fc" id="L921">            requestContext.setInternalResponseCode(InternalResCode.FORMAT_ERROR);</span>
+<span class="fc" id="L922">            return ValidationResult.builder()</span>
+<span class="fc" id="L923">                    .addError(&quot;TVR_VALIDATION_FAILED: TVR tag 95 missing&quot;)</span>
+<span class="fc" id="L924">                    .build();</span>
+        }
+
+<span class="fc" id="L927">        TerminalVerificationResults tvr = new TerminalVerificationResults(tvrValue);</span>
+<span class="fc" id="L928">        BinDetails binDetails = resolveBinDetails(requestContext.getBin());</span>
+<span class="fc" id="L929">        boolean declineOnSdaFailure = shouldDeclineOnSdaFailure(binDetails);</span>
+<span class="fc" id="L930">        boolean declineOnDdaFailure = shouldDeclineOnDdaFailure(binDetails);</span>
+<span class="fc" id="L931">        boolean declineOnCdaFailure = shouldDeclineOnCdaFailure(binDetails);</span>
+
+<span class="fc" id="L933">        boolean valid = tvrValidationService.validateTvr(</span>
+                tvr,
+                declineOnSdaFailure,
+                declineOnDdaFailure,
+                declineOnCdaFailure);
+<span class="fc bfc" id="L938" title="All 2 branches covered.">        if (!valid) {</span>
+<span class="fc" id="L939">            InternalResCode internalResponseCode = resolveTvrFailureCode(tvr);</span>
+<span class="fc" id="L940">            logger.warn(&quot;TVR validation failed. resolvedInternalResponseCode={}&quot;, internalResponseCode);</span>
+<span class="fc" id="L941">            requestContext.setInternalResponseCode(internalResponseCode);</span>
+<span class="fc" id="L942">            return ValidationResult.builder()</span>
+<span class="fc" id="L943">                    .addError(&quot;TVR_VALIDATION_FAILED: TVR validation failed&quot;)</span>
+<span class="fc" id="L944">                    .build();</span>
+        }
+
+<span class="fc" id="L947">        ValidationResult.Builder resultBuilder = ValidationResult.builder();</span>
+<span class="pc bpc" id="L948" title="2 of 4 branches missed.">        if (!declineOnSdaFailure &amp;&amp; tvr.sdaFailed()) {</span>
+<span class="nc" id="L949">            resultBuilder.addWarning(&quot;TVR_SDA_FAILED_IGNORED: SDA failed but BIN configuration allows transaction to proceed&quot;);</span>
+        }
+<span class="pc bpc" id="L951" title="3 of 4 branches missed.">        if (!declineOnDdaFailure &amp;&amp; tvr.ddaFailed()) {</span>
+<span class="nc" id="L952">            resultBuilder.addWarning(&quot;TVR_DDA_FAILED_IGNORED: DDA failed but BIN configuration allows transaction to proceed&quot;);</span>
+        }
+<span class="pc bpc" id="L954" title="3 of 4 branches missed.">        if (!declineOnCdaFailure &amp;&amp; tvr.cdaFailed()) {</span>
+<span class="nc" id="L955">            resultBuilder.addWarning(&quot;TVR_CDA_FAILED_IGNORED: CDA failed but BIN configuration allows transaction to proceed&quot;);</span>
+        }
+
+<span class="fc" id="L958">        return resultBuilder.build();</span>
+    }
+
+    private BinDetails resolveBinDetails(String bin) {
+<span class="pc bpc" id="L962" title="2 of 4 branches missed.">        if (bin == null || bin.isBlank()) {</span>
+<span class="nc" id="L963">            return null;</span>
+        }
+<span class="fc" id="L965">        CacheInitializationService.BinInstitutionData binData = cacheInitializationService</span>
+<span class="fc" id="L966">                .loadBinInstitutionCache()</span>
+<span class="fc" id="L967">                .get(bin);</span>
+<span class="pc bpc" id="L968" title="1 of 2 branches missed.">        return binData == null ? null : binData.getBinDetails();</span>
+    }
+
+    private boolean shouldDeclineOnSdaFailure(BinDetails binDetails) {
+<span class="pc bpc" id="L972" title="3 of 4 branches missed.">        return binDetails != null &amp;&amp; binDetails.getDecline_on_sda_failure() != null</span>
+<span class="nc" id="L973">                ? binDetails.getDecline_on_sda_failure()</span>
+<span class="fc" id="L974">                : false;</span>
+    }
+
+    private boolean shouldDeclineOnDdaFailure(BinDetails binDetails) {
+<span class="pc bpc" id="L978" title="3 of 4 branches missed.">        return binDetails != null &amp;&amp; binDetails.getDecline_on_dda_failure() != null</span>
+<span class="nc" id="L979">                ? binDetails.getDecline_on_dda_failure()</span>
+<span class="fc" id="L980">                : true;</span>
+    }
+
+    private boolean shouldDeclineOnCdaFailure(BinDetails binDetails) {
+<span class="pc bpc" id="L984" title="3 of 4 branches missed.">        return binDetails != null &amp;&amp; binDetails.getDecline_on_cda_failure() != null</span>
+<span class="nc" id="L985">                ? binDetails.getDecline_on_cda_failure()</span>
+<span class="fc" id="L986">                : true;</span>
+    }
+
+    private boolean isOfflinePinAllowed(BinDetails binDetails) {
+<span class="pc bpc" id="L990" title="3 of 4 branches missed.">        return binDetails == null || binDetails.getAllow_offline_pin() == null</span>
+<span class="pc bnc" id="L991" title="All 2 branches missed.">                || binDetails.getAllow_offline_pin();</span>
+    }
+
+    /**
+     * Validates PIN using pre-fetched card data context. This method avoids
+     * additional database calls.
+     *
+     * @param transactionData Transaction data
+     * @param cardContext Pre-fetched card data context
+     * @return true if PIN is valid, false otherwise
+     */
+    private InternalResCode validatePinWithContext(RequestContext requestContext, CardDataContext cardContext) {
+<span class="fc" id="L1003">        Map&lt;Integer, String&gt; transactionData = requestContext.getFields();</span>
+        try {
+<span class="pc bpc" id="L1005" title="1 of 2 branches missed.">            if(cmsPinTransactions!=null) {</span>
+<span class="nc" id="L1006">                InternalResCode managed=cmsPinTransactions.verify(cardContext.getCardData().getAuth_id(),transactionData.get(52));</span>
+<span class="nc bnc" id="L1007" title="All 2 branches missed.">                if(managed!=null) return managed;</span>
+            }
+<span class="fc" id="L1009">            String pinBlock = transactionData.get(52);</span>
+<span class="fc" id="L1010">            String pan = transactionData.get(2); // DE2 - Primary Account Number</span>
+
+<span class="pc bpc" id="L1012" title="2 of 4 branches missed.">            if (pinBlock == null || pan == null) {</span>
+<span class="nc" id="L1013">                logger.warn(&quot;Missing PIN block or PAN for PIN verification&quot;);</span>
+<span class="nc" id="L1014">                return InternalResCode.INVALID_PIN;</span>
+            }
+
+            // Check if PIN is blocked using pre-fetched data
+<span class="fc bfc" id="L1018" title="All 2 branches covered.">            if (Boolean.TRUE.equals(cardContext.isPinBlocked())) {</span>
+<span class="fc" id="L1019">                logger.warn(&quot;PIN verification blocked for card: {}&quot;, maskCardNumber(pan));</span>
+<span class="fc" id="L1020">                return InternalResCode.RESTRICTED_CARD;</span>
+            }
+            // Check PIN try count against maximum allowed attempts
+            /*  Integer pinTryCount = cardContext.getPinRetryCount();
+            Integer maxPinTryCount = cardContext.getMaxPinRetry();
+
+            if (pinTryCount != null &amp;&amp; maxPinTryCount != null) {
+                if (pinTryCount &gt;= maxPinTryCount) {
+                    logger.warn(&quot;PIN try count ({}) has reached or exceeded maximum allowed ({}) for card: {}&quot;, pinTryCount, maxPinTryCount, maskCardNumber(pan));
+                    return InternalResCode.PIN_TRY_EXCEEDED;
+                }
+            }*/
+            // Extract BIN to determine scheme
+<span class="fc" id="L1033">            String scheme = resolveScheme(requestContext, pan);</span>
+
+            // Use NettyHsmService for PIN verification
+<span class="fc" id="L1036">            int pinValid = validatePinWithHsm(transactionData, pan, scheme, cardContext);</span>
+
+            // Convert the switch statement to a rule switch with return statements
+<span class="pc bpc" id="L1039" title="2 of 4 branches missed.">            return switch (pinValid) {</span>
+                case 1 -&gt; {
+<span class="fc" id="L1041">                    logger.debug(&quot;PIN verification successful for card: {}&quot;, maskCardNumber(pan));</span>
+<span class="fc" id="L1042">                    updatePinTryCount(cardContext.getCardData(), true);</span>
+<span class="fc" id="L1043">                    yield InternalResCode.APPROVED;</span>
+                }
+                case 0 -&gt; {
+<span class="fc" id="L1046">                    logger.warn(&quot;PIN verification failed for card: {}&quot;, maskCardNumber(pan));</span>
+<span class="fc" id="L1047">                    updatePinTryCount(cardContext.getCardData(), false);</span>
+<span class="fc" id="L1048">                    yield InternalResCode.INVALID_PIN;</span>
+                }
+                case 2 -&gt; {
+<span class="nc" id="L1051">                    logger.warn(&quot; system error in PIN verification for card: {}&quot;, maskCardNumber(pan));</span>
+<span class="nc" id="L1052">                    yield InternalResCode.SYSTEM_ERROR;</span>
+                }
+                default -&gt; {
+<span class="nc" id="L1055">                    logger.error(&quot;Unknown PIN verification result for card: {}&quot;, maskCardNumber(pan));</span>
+<span class="nc" id="L1056">                    yield InternalResCode.INVALID_PIN;</span>
+                }
+            };
+
+<span class="nc" id="L1060">        } catch (Exception e) {</span>
+<span class="nc" id="L1061">            logger.error(&quot;Error during PIN verification with context: {}&quot;, e.getMessage());</span>
+<span class="nc" id="L1062">            return InternalResCode.SYSTEM_ERROR;</span>
+        }
+    }
+
+    private void updatePinTryCount(CardData cardData, boolean isReset) {
+        // Update the PIN try count in the database or persistent store
+        // This assumes there is a CardDataContextRepository or similar persistence mechanism
+<span class="pc bpc" id="L1069" title="1 of 2 branches missed.">        if (cardDataService != null) {</span>
+            try {
+<span class="fc bfc" id="L1071" title="All 2 branches covered.">                if (isReset) {</span>
+<span class="pc bpc" id="L1072" title="1 of 2 branches missed.">                    if (cardData.getPin_retry_count() &gt; 0) {</span>
+<span class="fc" id="L1073">                        cardData.setPin_retry_count(0);</span>
+<span class="fc" id="L1074">                        cardDataService.updateCardData(cardData);</span>
+<span class="fc" id="L1075">                        logger.debug(&quot;Reset PIN try count in DB &quot;);</span>
+                    }
+                } else {
+<span class="fc" id="L1078">                    cardData.setPin_retry_count(cardData.getPin_retry_count() + 1);</span>
+<span class="fc" id="L1079">                    cardDataService.updateCardData(cardData);</span>
+<span class="fc" id="L1080">                    logger.debug(&quot;Updated PIN try count for auth ID: {}&quot;, cardData.getAuth_id());</span>
+                }
+<span class="nc" id="L1082">            } catch (Exception ex) {</span>
+<span class="nc" id="L1083">                logger.error(&quot;Failed to update PIN try count for auth ID: {}&quot;, cardData.getAuth_id());</span>
+<span class="pc" id="L1084">            }</span>
+        } else {
+<span class="nc" id="L1086">            logger.warn(&quot;CardDataService is not initialized; PIN try count not persisted for auth ID: {}&quot;, cardData.getAuth_id());</span>
+        }
+
+<span class="fc" id="L1089">    }</span>
+
+    /**
+     * Validates PIN using NettyHsmService.
+     *
+     * @param transactionData Transaction data
+     * @param cardNumber Card number
+     * @param scheme Card scheme
+     * @return true if PIN is valid, false otherwise
+     */
+    private int validatePinWithHsm(Map&lt;Integer, String&gt; transactionData, String cardNumber, String scheme, CardDataContext cardContext) {
+        try {
+<span class="fc" id="L1101">            String pinBlock = transactionData.get(52);</span>
+<span class="fc" id="L1102">            String pan = transactionData.get(2);</span>
+
+<span class="pc bpc" id="L1104" title="2 of 4 branches missed.">            if (pinBlock == null || pan == null) {</span>
+<span class="nc" id="L1105">                logger.warn(&quot;Missing PIN block or PAN for PIN verification&quot;);</span>
+<span class="nc" id="L1106">                return 2;</span>
+            }
+
+            // Get PIN offset from database or configuration
+<span class="fc" id="L1110">            String pinOffset = cardContext.getPvvOffset(); // This should be implemented based on your system</span>
+<span class="pc bpc" id="L1111" title="1 of 2 branches missed.">            if (pinOffset == null) {</span>
+<span class="nc" id="L1112">                logger.warn(&quot;No PIN offset found for card: {}&quot;, maskCardNumber(cardNumber));</span>
+<span class="nc" id="L1113">                return 2;</span>
+            }
+
+            // Use NettyHsmService for PIN verification
+<span class="fc" id="L1117">            String pinMethod = &quot;VISA&quot;;</span>
+<span class="fc" id="L1118">            String result = nettyHsmService.pinChangeAndVerify(pinBlock, pan, null, pinMethod, pinOffset, true);</span>
+<span class="fc" id="L1119">            String[] resultParts = result.split(&quot;;&quot;);</span>
+<span class="fc" id="L1120">            String pinVerifyResult = resultParts[0];</span>
+            //String newOffset = resultParts[1];
+<span class="fc bfc" id="L1122" title="All 2 branches covered.">            if (pinVerifyResult.equals(&quot;Y&quot;)) {</span>
+<span class="fc" id="L1123">                logger.debug(&quot;PIN verification successful via HSM for card: {}&quot;, maskCardNumber(cardNumber));</span>
+<span class="fc" id="L1124">                return 1;</span>
+            } else {
+<span class="fc" id="L1126">                logger.warn(&quot;PIN verification failed via HSM for card: {}. Result: {}&quot;, maskCardNumber(cardNumber), result);</span>
+<span class="fc" id="L1127">                return 0;</span>
+            }
+
+<span class="nc" id="L1130">        } catch (Exception e) {</span>
+<span class="nc" id="L1131">            logger.error(&quot;Error during HSM PIN verification: {}&quot;, e.getMessage());</span>
+<span class="nc" id="L1132">            e.printStackTrace();</span>
+<span class="nc" id="L1133">            return 2;</span>
+        }
+    }
+
+    /**
+     * Gets PIN offset for the card.
+     *
+     * @param pan Primary Account Number
+     * @return PIN offset
+     */
+    private String getPinOffset(String pan) {
+        // This should be implemented based on your key management system
+        // For now, return a default offset
+<span class="nc" id="L1146">        return &quot;5801&quot;;</span>
+    }
+
+    /**
+     * Validates CVV using pre-fetched card data context. This method avoids
+     * additional database calls.
+     *
+     * @param transactionData Transaction data
+     * @param cardContext Pre-fetched card data context
+     * @return true if CVV is valid, false otherwise
+     */
+    private int validateCvvWithContext(Map&lt;Integer, String&gt; transactionData, CardDataContext cardContext, CvvVerificationRequest cvvRequest) {
+        try {
+
+<span class="fc" id="L1160">            String pan = transactionData.get(2); // DE2 - Primary Account Number</span>
+<span class="pc bpc" id="L1161" title="1 of 2 branches missed.">            String expiryDate = cvvRequest.expiryDate != null ? cvvRequest.expiryDate : extractExpiryDate(transactionData);</span>
+
+            // Validate expiry date against pre-fetched data
+<span class="fc" id="L1164">            String storedExpiry = cardContext.getExpiryDate();</span>
+<span class="pc bpc" id="L1165" title="2 of 4 branches missed.">            if (storedExpiry == null || !storedExpiry.equals(expiryDate)) {</span>
+<span class="nc" id="L1166">                logger.warn(&quot;Expiry date mismatch for CVV validation. Transaction: {}, Stored: {}&quot;,</span>
+                        expiryDate, storedExpiry);
+<span class="nc" id="L1168">                return 1;</span>
+            }
+
+<span class="fc bfc" id="L1171" title="All 3 branches covered.">            return switch (cvvRequest.type) {</span>
+<span class="fc" id="L1172">                case ICVV -&gt; nettyHsmService.verifyIcvv(pan, expiryDate, cvvRequest.securityCode);</span>
+<span class="fc" id="L1173">                case CVV2 -&gt; nettyHsmService.verifyCvv2(pan, expiryDate, cvvRequest.securityCode);</span>
+<span class="fc" id="L1174">                case MAGSTRIPE -&gt; nettyHsmService.verifyMagstripeCvv(</span>
+                        pan, expiryDate, cvvRequest.serviceCode, cvvRequest.securityCode);
+            };
+
+<span class="fc" id="L1178">        } catch (Exception e) {</span>
+<span class="fc" id="L1179">            logger.error(&quot;Error during CVV validation with context: {}&quot;, e.getMessage());</span>
+<span class="fc" id="L1180">            return 2;</span>
+        }
+    }
+
+    private CvvVerificationRequest resolveCvvVerificationRequest(RequestContext requestContext, TransactionType transactionType) {
+<span class="fc" id="L1185">        Map&lt;Integer, String&gt; transactionData = requestContext.getFields();</span>
+<span class="fc" id="L1186">        String expiryDate = extractExpiryDate(transactionData);</span>
+
+<span class="fc bfc" id="L1188" title="All 2 branches covered.">        if (isCardNotPresentTransaction(transactionType)) {</span>
+<span class="fc" id="L1189">            String cvv2 = extractCvv2(requestContext);</span>
+<span class="fc" id="L1190">            return new CvvVerificationRequest(CvvVerificationType.CVV2, cvv2, CVV2_SERVICE_CODE, expiryDate);</span>
+        }
+
+<span class="fc bfc" id="L1193" title="All 2 branches covered.">        if (isEmvTransaction(transactionData, transactionType)) {</span>
+<span class="fc" id="L1194">            TrackSecurityData emvTrackData = extractEmvTrackSecurityData(requestContext);</span>
+<span class="pc bpc" id="L1195" title="1 of 2 branches missed.">            String icvv = emvTrackData != null ? emvTrackData.securityCode : null;</span>
+<span class="pc bpc" id="L1196" title="2 of 4 branches missed.">            String emvExpiry = emvTrackData != null &amp;&amp; emvTrackData.expiryDate != null</span>
+<span class="fc" id="L1197">                    ? emvTrackData.expiryDate</span>
+<span class="pc" id="L1198">                    : expiryDate;</span>
+<span class="fc" id="L1199">            return new CvvVerificationRequest(CvvVerificationType.ICVV, icvv, ICVV_SERVICE_CODE, emvExpiry);</span>
+        }
+
+<span class="fc" id="L1202">        TrackSecurityData trackSecurityData = extractTrackSecurityData(transactionData.get(35));</span>
+<span class="fc bfc" id="L1203" title="All 2 branches covered.">        if (trackSecurityData == null) {</span>
+<span class="fc" id="L1204">            return null;</span>
+        }
+<span class="fc" id="L1206">        return new CvvVerificationRequest(</span>
+                CvvVerificationType.MAGSTRIPE,
+                trackSecurityData.securityCode,
+                trackSecurityData.serviceCode,
+                trackSecurityData.expiryDate);
+    }
+
+    private boolean isCardNotPresentTransaction(TransactionType transactionType) {
+<span class="fc bfc" id="L1214" title="All 18 branches covered.">        return transactionType == TransactionType.ECOMMERCE</span>
+                || transactionType == TransactionType.MOTO
+                || transactionType == TransactionType.IVR_PURCHASE
+                || transactionType == TransactionType.EMI_PURCHASE
+                || transactionType == TransactionType.SI_REGISTRATION
+                || transactionType == TransactionType.SI_EDIT
+                || transactionType == TransactionType.SI_TRANSACTION
+                || transactionType == TransactionType.SI_DEREGISTRATION
+                || transactionType == TransactionType.SI_PDN;
+    }
+
+    private boolean isEmvTransaction(Map&lt;Integer, String&gt; transactionData, TransactionType transactionType) {
+<span class="fc" id="L1226">        String emvData = transactionData.get(55);</span>
+<span class="pc bpc" id="L1227" title="1 of 4 branches missed.">        if (emvData != null &amp;&amp; !emvData.isBlank()) {</span>
+<span class="fc" id="L1228">            return true;</span>
+        }
+<span class="pc bpc" id="L1230" title="6 of 12 branches missed.">        return transactionType == TransactionType.PURCHASE_CONTACT</span>
+                || transactionType == TransactionType.PURCHASE_CONTACTLESS
+                || transactionType == TransactionType.CASH_WITHDRAWAL_CONTACTLESS
+                || transactionType == TransactionType.CASH_AT_POS_CL
+                || transactionType == TransactionType.BALANCE_ENQUIRY_CL
+                || transactionType == TransactionType.SERVICE_CREATION_CONTACTLESS;
+    }
+
+    private TrackSecurityData extractEmvTrackSecurityData(RequestContext requestContext) {
+<span class="fc" id="L1239">        ChipData chipData = requestContext.getParsedChipData(55);</span>
+<span class="pc bpc" id="L1240" title="1 of 2 branches missed.">        if (chipData != null) {</span>
+<span class="fc" id="L1241">            String track2Equivalent = chipData.getTagValue(&quot;9F5B&quot;);</span>
+<span class="pc bpc" id="L1242" title="3 of 4 branches missed.">            if (track2Equivalent == null || track2Equivalent.isBlank()) {</span>
+<span class="fc" id="L1243">                track2Equivalent = chipData.getTagValue(&quot;57&quot;);</span>
+            }
+<span class="fc" id="L1245">            TrackSecurityData trackSecurityData = extractTrackSecurityData(track2Equivalent);</span>
+<span class="pc bpc" id="L1246" title="1 of 2 branches missed.">            if (trackSecurityData != null) {</span>
+<span class="fc" id="L1247">                return trackSecurityData;</span>
+            }
+        }
+<span class="nc" id="L1250">        return extractTrackSecurityData(requestContext.getFields().get(35));</span>
+    }
+
+    private TrackSecurityData extractTrackSecurityData(String trackData) {
+<span class="pc bpc" id="L1254" title="1 of 4 branches missed.">        if (trackData == null || trackData.isBlank()) {</span>
+<span class="fc" id="L1255">            return null;</span>
+        }
+
+<span class="fc" id="L1258">        String normalizedTrackData = trackData.trim().replace('d', 'D');</span>
+<span class="fc" id="L1259">        int separatorIndex = normalizedTrackData.indexOf('=');</span>
+<span class="fc bfc" id="L1260" title="All 2 branches covered.">        if (separatorIndex &lt; 0) {</span>
+<span class="fc" id="L1261">            separatorIndex = normalizedTrackData.indexOf('D');</span>
+        }
+<span class="pc bpc" id="L1263" title="2 of 4 branches missed.">        if (separatorIndex &lt; 0 || normalizedTrackData.length() &lt;= separatorIndex + 7) {</span>
+<span class="nc" id="L1264">            return null;</span>
+        }
+
+<span class="fc" id="L1267">        String rightSide = normalizedTrackData.substring(separatorIndex + 1);</span>
+<span class="pc bpc" id="L1268" title="1 of 2 branches missed.">        if (rightSide.endsWith(&quot;F&quot;)) {</span>
+<span class="nc" id="L1269">            rightSide = rightSide.substring(0, rightSide.length() - 1);</span>
+        }
+<span class="fc" id="L1271">        String expiryDate = rightSide.substring(0, 4);</span>
+<span class="fc" id="L1272">        String serviceCode = rightSide.substring(4, 7);</span>
+        //String securityCode = rightSide.length() &gt;= 18 ? rightSide.substring(7, 10) : null;
+<span class="pc bpc" id="L1274" title="1 of 2 branches missed.">        String securityCode = rightSide.length() &gt;= 18 ? rightSide.substring(15, 18) : null;</span>
+<span class="fc" id="L1275">        return new TrackSecurityData(expiryDate, serviceCode, normalizeSecurityCode(securityCode));</span>
+    }
+
+    private String extractCvv2(RequestContext requestContext) {
+<span class="fc" id="L1279">        Map&lt;String, String&gt; tlvMap = requestContext.getParsedTlv(48);</span>
+<span class="fc bfc" id="L1280" title="All 2 branches covered.">        for (String tag : DIRECT_CVV2_TLV_TAGS) {</span>
+<span class="fc" id="L1281">            String cvv2 = normalizeSecurityCode(tlvMap.get(tag));</span>
+<span class="fc bfc" id="L1282" title="All 2 branches covered.">            if (cvv2 != null) {</span>
+<span class="fc" id="L1283">                return cvv2;</span>
+            }
+<span class="fc" id="L1285">        }</span>
+<span class="fc" id="L1286">        return extractCvv2FromCavv(tlvMap.get(&quot;100&quot;));</span>
+    }
+
+    private String extractCvv2FromCavv(String cavv) {
+<span class="pc bpc" id="L1290" title="3 of 4 branches missed.">        if (cavv == null || cavv.isBlank()) {</span>
+<span class="fc" id="L1291">            return null;</span>
+        }
+        try {
+<span class="nc" id="L1294">            String cavvDecoded = new String(Base64.getDecoder().decode(cavv));</span>
+<span class="nc" id="L1295">            String paddedCavv = String.format(&quot;%-40s&quot;, cavvDecoded);</span>
+<span class="nc" id="L1296">            return normalizeSecurityCode(paddedCavv.substring(6, 10));</span>
+<span class="nc" id="L1297">        } catch (Exception ex) {</span>
+<span class="nc" id="L1298">            logger.warn(&quot;Unable to extract CVV2 from CAVV tag 100: {}&quot;, ex.getMessage());</span>
+<span class="nc" id="L1299">            return null;</span>
+        }
+    }
+
+    private String normalizeSecurityCode(String securityCode) {
+<span class="fc bfc" id="L1304" title="All 2 branches covered.">        if (securityCode == null) {</span>
+<span class="fc" id="L1305">            return null;</span>
+        }
+<span class="fc" id="L1307">        String normalized = securityCode.trim();</span>
+<span class="pc bpc" id="L1308" title="1 of 2 branches missed.">        return normalized.matches(&quot;\\d{3,4}&quot;) ? normalized : null;</span>
+    }
+
+    /**
+     * Validates EMV cryptograms using pre-fetched card data context. This
+     * method avoids additional database calls and uses cached card data.
+     *
+     * @param transactionData Transaction data
+     * @param cardContext Pre-fetched card data context
+     * @return Validation result
+     */
+    private ValidationResult validateEmvCryptogramsWithContext(RequestContext requestContext, CardDataContext cardContext, TransactionType transactionType) {
+<span class="fc" id="L1320">        Map&lt;Integer, String&gt; transactionData = requestContext.getFields();</span>
+<span class="fc" id="L1321">        ValidationResult.Builder resultBuilder = ValidationResult.builder();</span>
+<span class="fc" id="L1322">        ValidationResult vr = null;</span>
+        try {
+<span class="fc" id="L1324">            String emvData = transactionData.get(55);</span>
+<span class="fc" id="L1325">            String pan = transactionData.get(2);</span>
+
+<span class="pc bpc" id="L1327" title="2 of 4 branches missed.">            if (emvData == null || pan == null) {</span>
+<span class="nc" id="L1328">                return resultBuilder.addError(&quot;MISSING_EMV_DATA: EMV data or PAN is missing&quot;).build();</span>
+            }
+
+            // Check if ARQC validation is required for BIN
+            // Boolean arqcRequired = cardContext.isArqcValidationRequired();
+            // if (arqcRequired != null &amp;&amp; !arqcRequired) {
+            //     logger.debug(&quot;ARQC validation not required for this card, skipping&quot;);
+            //     return resultBuilder.build();
+            // }
+            // Extract BIN to determine scheme
+<span class="fc" id="L1338">            Scheme scheme = resolveSchemeEnum(requestContext, pan);</span>
+<span class="fc" id="L1339">            String emvMethod = determineEmvMethod(scheme.name());</span>
+
+            // Use NettyHsmService for ARQC verification
+<span class="fc" id="L1342">            InternalResCode arqcResult = validateArqcWithHsm(requestContext, scheme, emvMethod, transactionType);</span>
+
+<span class="fc bfc" id="L1344" title="All 2 branches covered.">            if (arqcResult != InternalResCode.APPROVED) {</span>
+<span class="pc bpc" id="L1345" title="1 of 2 branches missed.">                if (requestContext.getInternalResponseCode() == null) {</span>
+<span class="fc" id="L1346">                    requestContext.setInternalResponseCode(arqcResult);</span>
+                }
+<span class="fc" id="L1348">                return resultBuilder.addError(&quot;ARQC_VERIFICATION_FAILED: ARQC verification failed&quot;).build();</span>
+            }
+
+            // Generate ARPC response using pre-fetched data
+            // String arpc = generateArpcResponseWithContext(transactionData, cardContext);
+            // if (arpc != null) {
+            //     // Update DE55 with ARPC in tag 91
+            //     //String originalEmvData = transactionData.get(55);
+            //     //String updatedEmvData = EmvDataUpdater.updateArpc(originalEmvData, arpc);
+            //     String updatedEmvData = &quot;91&quot;+arpc;
+            //     // Add updated DE55 to the validation result
+            //     resultBuilder.addUpdatedDataElement(&quot;DE55&quot;, updatedEmvData);
+            //     resultBuilder.addUpdatedDataElement(&quot;ARPC&quot;, arpc);
+            //     logger.debug(&quot;ARPC generated and DE55 updated successfully: {}&quot;, arpc);
+            // } else {
+            //     resultBuilder.addWarning(&quot;ARPC_GENERATION_FAILED: Could not generate ARPC&quot;);
+            // }
+<span class="fc" id="L1365">            return resultBuilder.build();</span>
+
+<span class="nc" id="L1367">        } catch (Exception e) {</span>
+<span class="nc" id="L1368">            logger.error(&quot;Error during EMV cryptogram validation with context: {}&quot;, e.getMessage());</span>
+<span class="nc" id="L1369">            return resultBuilder.addError(&quot;EMV_CRYPTOGRAM_ERROR: &quot; + e.getMessage()).build();</span>
+        }
+    }
+
+    /**
+     * Validates ARQC using NettyHsmService.
+     *
+     * @param transactionData Transaction data
+     * @param scheme Card scheme
+     * @param emvMethod EMV method
+     * @return true if ARQC is valid, false otherwise
+     */
+    private InternalResCode validateArqcWithHsm(RequestContext requestContext, Scheme scheme, String emvMethod, TransactionType transactionType) {
+        try {
+<span class="fc" id="L1383">            Map&lt;Integer, String&gt; transactionData = requestContext.getFields();</span>
+<span class="fc" id="L1384">            String emvData = transactionData.get(55);</span>
+<span class="fc" id="L1385">            String pan = transactionData.get(2);</span>
+
+<span class="pc bpc" id="L1387" title="2 of 4 branches missed.">            if (emvData == null || pan == null) {</span>
+<span class="nc" id="L1388">                logger.warn(&quot;Missing EMV data or PAN for ARQC verification&quot;);</span>
+<span class="nc" id="L1389">                requestContext.setInternalResponseCode(InternalResCode.FORMAT_ERROR);</span>
+<span class="nc" id="L1390">                return InternalResCode.FORMAT_ERROR;</span>
+            }
+
+            // Parse EMV data to extract required fields
+            // This is a simplified implementation - actual ARQC verification
+            // depends on your HSM model and EMV implementation
+            // boolean arqcValid = cardAuthenticationService.verifyArqc(transactionData, scheme, emvMethod);
+<span class="fc" id="L1397">            ChipData chipData = requestContext.getParsedChipData(55);</span>
+<span class="pc bpc" id="L1398" title="1 of 2 branches missed.">            if (!new ChipDataParser().checkMandatoryTags(chipData, scheme.name(), false, transactionType)) {</span>
+<span class="nc" id="L1399">                logger.warn(&quot;Mandatory tags are missing for EMV data&quot;);</span>
+<span class="nc" id="L1400">                removeResponseDe55(transactionData);</span>
+<span class="nc" id="L1401">                requestContext.setInternalResponseCode(InternalResCode.FORMAT_ERROR);</span>
+<span class="nc" id="L1402">                return InternalResCode.FORMAT_ERROR;</span>
+            }
+<span class="fc" id="L1404">            String cardSequenceNumber = transactionData.get(23);</span>
+<span class="pc bpc" id="L1405" title="2 of 4 branches missed.">            String sequenceNumber = (cardSequenceNumber != null &amp;&amp; cardSequenceNumber.length() &gt; 1)</span>
+<span class="fc" id="L1406">                    ? cardSequenceNumber.substring(1)</span>
+<span class="pc" id="L1407">                    : &quot;0&quot;;</span>
+<span class="fc" id="L1408">            String arpc = nettyHsmService.verifyArqcAndGenerateArpc(chipData, scheme, emvMethod, pan, sequenceNumber, transactionType, false, &quot;000000000000&quot;, 'A');</span>
+<span class="fc" id="L1409">            String[] arpcParts = arpc.split(&quot;;&quot;);</span>
+<span class="fc" id="L1410">            String arpcResult = arpcParts[0];</span>
+<span class="fc" id="L1411">            String arpcValue = arpcParts[1];</span>
+<span class="fc bfc" id="L1412" title="All 2 branches covered.">            if (arpcResult.equals(&quot;Y&quot;)) {</span>
+<span class="fc" id="L1413">                logger.debug(&quot;ARQC verification successful via HSM for scheme: {}, method: {}&quot;, scheme, emvMethod);</span>
+<span class="fc" id="L1414">                transactionData.put(55, buildDe55WithOnlyTag91(arpcValue));</span>
+<span class="fc" id="L1415">                return InternalResCode.APPROVED;</span>
+            } else {
+<span class="fc" id="L1417">                logger.warn(&quot;ARQC verification failed via HSM for scheme: {}, method: {}&quot;, scheme, emvMethod);</span>
+<span class="fc" id="L1418">                return InternalResCode.ARQC_FAIL;</span>
+            }
+
+<span class="nc" id="L1421">        } catch (Exception e) {</span>
+<span class="nc" id="L1422">            logger.error(&quot;Error during HSM ARQC verification: {}&quot;, e.getMessage());</span>
+<span class="nc bnc" id="L1423" title="All 2 branches missed.">            if (requestContext.getInternalResponseCode() == null) {</span>
+<span class="nc" id="L1424">                requestContext.setInternalResponseCode(InternalResCode.SYSTEM_ERROR);</span>
+            }
+<span class="nc" id="L1426">            return InternalResCode.SYSTEM_ERROR;</span>
+        }
+    }
+
+    void updateDe55WithOnlyTag91(Map&lt;Integer, String&gt; transactionData, String arpcValue) {
+<span class="fc" id="L1431">        String de55 = buildDe55WithOnlyTag91(arpcValue);</span>
+<span class="pc bpc" id="L1432" title="1 of 2 branches missed.">        if (de55 == null) {</span>
+<span class="fc" id="L1433">            removeResponseDe55(transactionData);</span>
+<span class="fc" id="L1434">            return;</span>
+        }
+<span class="nc" id="L1436">        transactionData.put(55, de55);</span>
+<span class="nc" id="L1437">    }</span>
+
+    void removeResponseDe55(Map&lt;Integer, String&gt; transactionData) {
+<span class="fc" id="L1440">        transactionData.remove(55);</span>
+<span class="fc" id="L1441">    }</span>
+
+    String buildMiniStatementDe120(String de120) {
+<span class="fc" id="L1444">        List&lt;String&gt; records = List.of(</span>
+                &quot;260723      WDL     000000050000 DR&quot;,
+                &quot;260720      DEP     000000200000 CR&quot;,
+                &quot;260717      POS     000000035050 DR&quot;,
+                &quot;260714      TRF     000000100000 CR&quot;,
+                &quot;260710      WDL     000000001500 DR&quot;,
+                &quot;260706      POS     000000275075 DR&quot;,
+                &quot;260701      DEP     000000840000 CR&quot;,
+                &quot;260627      TRF     000000399999 DR&quot;,
+                &quot;260624      POS     000000012525 DR&quot;,
+                &quot;Balance     000000947551+             &quot;
+        );
+<span class="fc" id="L1456">        String statementData = records.stream()</span>
+<span class="fc" id="L1457">                .map(record -&gt; fixedWidth(record, 35))</span>
+<span class="fc" id="L1458">                .reduce(&quot;&quot;, String::concat);</span>
+
+<span class="fc" id="L1460">        return packNumericTlv(&quot;001&quot;, &quot;07&quot;)+</span>
+<span class="fc" id="L1461">        packNumericTlv(&quot;002&quot;, &quot;GDN&quot;)+</span>
+<span class="fc" id="L1462">        packNumericTlv(&quot;005&quot;, &quot;10&quot;)</span>
+<span class="fc" id="L1463">                + packNumericTlv(&quot;006&quot;, statementData);</span>
+    }
+
+    private String fixedWidth(String value, int width) {
+<span class="pc bpc" id="L1467" title="1 of 2 branches missed.">        String normalized = value == null ? &quot;&quot; : value;</span>
+<span class="fc bfc" id="L1468" title="All 2 branches covered.">        if (normalized.length() &gt; width) {</span>
+<span class="fc" id="L1469">            return normalized.substring(0, width);</span>
+        }
+<span class="fc" id="L1471">        return String.format(&quot;%-&quot; + width + &quot;s&quot;, normalized);</span>
+    }
+
+    private String packNumericTlv(String tag, String value) {
+<span class="fc" id="L1475">        return tag + String.format(&quot;%03d&quot;, value.length()) + value;</span>
+    }
+
+    String buildDe55WithOnlyTag91(String arpcValue) {
+<span class="pc bpc" id="L1479" title="1 of 4 branches missed.">        if (arpcValue == null || arpcValue.isBlank()) {</span>
+<span class="fc" id="L1480">            return null;</span>
+        }
+<span class="fc" id="L1482">        ChipData responseChipData = new ChipData();</span>
+<span class="fc" id="L1483">        responseChipData.setTagValue(&quot;91&quot;, arpcValue.trim());</span>
+<span class="fc" id="L1484">        return responseChipData.buildIccData();</span>
+    }
+
+    /**
+     * Determines the card scheme based on BIN.
+     *
+     * @param bin BIN (first 6 digits)
+     * @return Card scheme
+     */
+    private String determineScheme(String bin) {
+        // Simple BIN-based scheme determination
+<span class="nc bnc" id="L1495" title="All 2 branches missed.">        if (bin.startsWith(&quot;4&quot;)) {</span>
+<span class="nc" id="L1496">            return &quot;VISA&quot;;</span>
+<span class="nc bnc" id="L1497" title="All 2 branches missed.">        } else if (bin.startsWith(&quot;5&quot;)) {</span>
+<span class="nc" id="L1498">            return &quot;MASTERCARD&quot;;</span>
+<span class="nc bnc" id="L1499" title="All 2 branches missed.">        } else if (bin.startsWith(&quot;6&quot;)) {</span>
+<span class="nc" id="L1500">            return &quot;RUPAY&quot;;</span>
+        } else {
+<span class="nc" id="L1502">            return &quot;UNKNOWN&quot;;</span>
+        }
+    }
+
+    private BigDecimal extractTransactionAmountInMinorUnits(Map&lt;Integer, String&gt; transactionData) {
+<span class="fc" id="L1507">        String amountValue = transactionData.get(4);</span>
+<span class="pc bpc" id="L1508" title="2 of 4 branches missed.">        if (amountValue == null || amountValue.isBlank()) {</span>
+<span class="nc" id="L1509">            return BigDecimal.ZERO;</span>
+        }
+        try {
+<span class="fc" id="L1512">            return new BigDecimal(amountValue);</span>
+<span class="nc" id="L1513">        } catch (NumberFormatException ex) {</span>
+<span class="nc" id="L1514">            logger.warn(&quot;Unable to parse transaction amount from DE4 for CVM validation: {}&quot;, amountValue);</span>
+<span class="nc" id="L1515">            return BigDecimal.ZERO;</span>
+        }
+    }
+
+    private boolean isContactlessTransaction(TransactionType transactionType) {
+<span class="pc bpc" id="L1520" title="5 of 10 branches missed.">        return transactionType == TransactionType.PURCHASE_CONTACTLESS</span>
+                || transactionType == TransactionType.CASH_WITHDRAWAL_CONTACTLESS
+                || transactionType == TransactionType.CASH_AT_POS_CL
+                || transactionType == TransactionType.BALANCE_ENQUIRY_CL
+                || transactionType == TransactionType.SERVICE_CREATION_CONTACTLESS;
+    }
+
+    private boolean isContactlessPosEntryMode(String posEntryMode) {
+<span class="pc bpc" id="L1528" title="3 of 4 branches missed.">        if (posEntryMode == null || posEntryMode.isBlank()) {</span>
+<span class="fc" id="L1529">            return false;</span>
+        }
+<span class="nc" id="L1531">        String normalized = posEntryMode.trim();</span>
+<span class="nc bnc" id="L1532" title="All 2 branches missed.">        return &quot;070&quot;.equals(normalized)</span>
+<span class="nc bnc" id="L1533" title="All 2 branches missed.">                || &quot;071&quot;.equals(normalized)</span>
+<span class="nc bnc" id="L1534" title="All 2 branches missed.">                || &quot;910&quot;.equals(normalized)</span>
+<span class="nc bnc" id="L1535" title="All 2 branches missed.">                || &quot;911&quot;.equals(normalized);</span>
+    }
+
+    private InternalResCode resolveCvmFailureCode(RequestContext requestContext, ChipData chipData) {
+<span class="pc bpc" id="L1539" title="2 of 4 branches missed.">        if (chipData == null || !chipData.hasTag(&quot;9F34&quot;)) {</span>
+<span class="nc" id="L1540">            return InternalResCode.FORMAT_ERROR;</span>
+        }
+<span class="fc" id="L1542">        return InternalResCode.CVM_FAILED;</span>
+    }
+
+    private InternalResCode resolveCvrFailureCode(CvrValidationService.CvrValidationResult cvrResult) {
+<span class="pc bpc" id="L1546" title="1 of 2 branches missed.">        if (cvrResult.getErrors() != null) {</span>
+<span class="pc bpc" id="L1547" title="1 of 2 branches missed.">            for (String error : cvrResult.getErrors()) {</span>
+<span class="pc bpc" id="L1548" title="2 of 4 branches missed.">                if (error != null &amp;&amp; error.contains(&quot;PIN_TRY_LIMIT_EXCEEDED&quot;)) {</span>
+<span class="fc" id="L1549">                    return InternalResCode.PIN_TRY_EXCEEDED;</span>
+<span class="nc bnc" id="L1550" title="All 4 branches missed.">                }else if(error != null &amp;&amp; error.contains(&quot;CVR_VALIDATION_MANDATORY_MISSING&quot;)){</span>
+<span class="nc" id="L1551">                    return InternalResCode.FORMAT_ERROR;</span>
+                }
+<span class="nc" id="L1553">            }</span>
+        }
+<span class="nc" id="L1555">        return InternalResCode.CVR_FAILED;</span>
+    }
+
+    private InternalResCode resolveTvrFailureCode(TerminalVerificationResults tvr) {
+<span class="pc bpc" id="L1559" title="1 of 2 branches missed.">        if (tvr.expiredApplication()) {</span>
+<span class="nc" id="L1560">            return InternalResCode.EXPIRED_CARD;</span>
+        }
+<span class="pc bpc" id="L1562" title="1 of 2 branches missed.">        if (tvr.panInHotlist()) {</span>
+<span class="nc" id="L1563">            return InternalResCode.RESTRICTED_CARD;</span>
+        }
+<span class="pc bpc" id="L1565" title="2 of 4 branches missed.">        if (tvr.pinTryLimitExceeded() || tvr.cardholderVerificationNotSuccessful()) {</span>
+<span class="nc" id="L1566">            return InternalResCode.INVALID_PIN;</span>
+        }
+<span class="fc" id="L1568">        return InternalResCode.TVR_FAILED;</span>
+    }
+
+    private String resolveScheme(RequestContext requestContext, String pan) {
+<span class="pc bpc" id="L1572" title="2 of 4 branches missed.">        if (requestContext != null &amp;&amp; requestContext.getScheme() != null) {</span>
+<span class="fc" id="L1573">            return requestContext.getScheme().name();</span>
+        }
+<span class="nc bnc" id="L1575" title="All 2 branches missed.">        String bin = requestContext != null ? requestContext.getBin() : null;</span>
+<span class="nc bnc" id="L1576" title="All 8 branches missed.">        if ((bin == null || bin.isBlank()) &amp;&amp; pan != null &amp;&amp; pan.length() &gt;= 6) {</span>
+<span class="nc" id="L1577">            bin = pan.substring(0, 6);</span>
+        }
+<span class="nc bnc" id="L1579" title="All 4 branches missed.">        return (bin == null || bin.isBlank()) ? &quot;UNKNOWN&quot; : determineScheme(bin);</span>
+    }
+
+    private Scheme resolveSchemeEnum(RequestContext requestContext, String pan) {
+<span class="pc bpc" id="L1583" title="2 of 4 branches missed.">        if (requestContext != null &amp;&amp; requestContext.getScheme() != null) {</span>
+<span class="fc" id="L1584">            return requestContext.getScheme();</span>
+        }
+
+<span class="nc" id="L1587">        String resolvedScheme = resolveScheme(requestContext, pan);</span>
+        try {
+<span class="nc" id="L1589">            return Scheme.valueOf(resolvedScheme);</span>
+<span class="nc" id="L1590">        } catch (IllegalArgumentException ex) {</span>
+<span class="nc" id="L1591">            logger.warn(&quot;Unable to resolve scheme enum from '{}', defaulting to RUPAY&quot;, resolvedScheme);</span>
+<span class="nc" id="L1592">            return Scheme.RUPAY;</span>
+        }
+    }
+
+    /**
+     * Determines PIN method based on scheme.
+     *
+     * @param scheme Card scheme
+     * @return PIN method
+     */
+    private String determinePinMethod(String scheme) {
+<span class="nc bnc" id="L1603" title="All 4 branches missed.">        switch (scheme) {</span>
+            case &quot;VISA&quot;:
+<span class="nc" id="L1605">                return &quot;VISA&quot;;</span>
+            case &quot;MASTERCARD&quot;:
+<span class="nc" id="L1607">                return &quot;ISO9564&quot;;</span>
+            case &quot;RUPAY&quot;:
+<span class="nc" id="L1609">                return &quot;ISO9564&quot;;</span>
+            default:
+<span class="nc" id="L1611">                return &quot;ISO9564&quot;;</span>
+        }
+    }
+
+    /**
+     * Determines EMV method based on scheme.
+     *
+     * @param scheme Card scheme
+     * @return EMV method
+     */
+    private String determineEmvMethod(String scheme) {
+<span class="pc bpc" id="L1622" title="3 of 4 branches missed.">        switch (scheme) {</span>
+            case &quot;VISA&quot;:
+<span class="fc" id="L1624">                return &quot;VISA_EMV&quot;;</span>
+            case &quot;MASTERCARD&quot;:
+<span class="nc" id="L1626">                return &quot;MASTERCARD_EMV&quot;;</span>
+            case &quot;RUPAY&quot;:
+<span class="nc" id="L1628">                return &quot;RUPAY_EMV&quot;;</span>
+            default:
+<span class="nc" id="L1630">                return &quot;GENERIC_EMV&quot;;</span>
+        }
+    }
+
+    /**
+     * Extracts expiry date from transaction data.
+     *
+     * @param transactionData Transaction data
+     * @return Expiry date in MMYY format
+     */
+    private String extractExpiryDate(Map&lt;Integer, String&gt; transactionData) {
+        // Try DE14 first (expiry date)
+<span class="fc" id="L1642">        String expiryDate = transactionData.get(14);</span>
+<span class="pc bpc" id="L1643" title="2 of 4 branches missed.">        if (expiryDate != null &amp;&amp; expiryDate.length() &gt;= 4) {</span>
+<span class="fc" id="L1644">            return expiryDate.substring(0, 4);</span>
+        }
+
+        // Try Track 2 (DE35) for expiry date
+<span class="nc" id="L1648">        String track2 = transactionData.get(35);</span>
+<span class="nc bnc" id="L1649" title="All 4 branches missed.">        if (track2 != null &amp;&amp; track2.contains(&quot;=&quot;)) {</span>
+<span class="nc" id="L1650">            String[] parts = track2.split(&quot;=&quot;);</span>
+<span class="nc bnc" id="L1651" title="All 4 branches missed.">            if (parts.length &gt;= 2 &amp;&amp; parts[1].length() &gt;= 4) {</span>
+<span class="nc" id="L1652">                return parts[1].substring(0, 4);</span>
+            }
+        }
+
+<span class="nc" id="L1656">        return null;</span>
+    }
+
+    /**
+     * Extracts CVV from additional response data.
+     *
+     * @param additionalData Additional response data
+     * @return CVV value
+     */
+    private String extractCvvFromData(String additionalData) {
+        // This is a simplified extraction - actual implementation depends on data format
+<span class="nc bnc" id="L1667" title="All 4 branches missed.">        if (additionalData != null &amp;&amp; additionalData.length() &gt;= 3) {</span>
+            // Assume CVV is the last 3-4 digits
+<span class="nc" id="L1669">            return additionalData.substring(additionalData.length() - 3);</span>
+        }
+<span class="nc" id="L1671">        return null;</span>
+    }
+
+  
+    /**
+     * Gets ARPC key for the card.
+     *
+     * @param pan Primary Account Number
+     * @return ARPC key
+     */
+    private String getArpcKey(String pan) {
+        // This should be implemented based on your key management system
+        // For now, return a default key
+<span class="nc" id="L1684">        return &quot;DEFAULT_ARPC_KEY&quot;;</span>
+    }
+
+    /**
+     * Calls Accounting API for final authorization after successful card
+     * authentication.
+     *
+     * @param cardNumber Card number
+     * @param bin BIN
+     * @param transactionType Transaction type
+     * @param amount Transaction amount
+     * @param merchantId Merchant ID
+     * @param transactionData Transaction data
+     * @return Validation result
+     */
+    private ValidationResult callAccountingApiForAuthorization(
+            RequestContext requestContext,
+            CardDataContext cardContext) {
+<span class="fc" id="L1702">        TransactionType transactionType = requestContext.getTransactionType();</span>
+<span class="fc" id="L1703">        Map&lt;Integer, String&gt; transactionData = requestContext.getFields();</span>
+<span class="fc" id="L1704">        String cardNumber = requestContext.getCardNumber();</span>
+<span class="fc" id="L1705">        String bin = requestContext.getBin();</span>
+<span class="fc" id="L1706">        Double amount = requestContext.getAmount();</span>
+
+<span class="fc" id="L1708">        logger.debug(&quot;Calling Accounting API for authorization for card: {}, amount: {}&quot;,</span>
+<span class="fc" id="L1709">                maskCardNumber(cardNumber), amount);</span>
+
+        try {
+            // Convert amount to BigDecimal
+<span class="fc" id="L1713">            BigDecimal transactionAmount = BigDecimal.valueOf(amount);</span>
+
+            // Determine currency (default to USD, can be enhanced based on transaction data)
+<span class="fc" id="L1716">            String currency = &quot;USD&quot;;</span>
+<span class="fc bfc" id="L1717" title="All 2 branches covered.">            if (transactionData.containsKey(49)) {</span>
+<span class="fc" id="L1718">                String currencyCode = transactionData.get(49);</span>
+                // Map ISO 4217 currency codes
+<span class="fc bfc" id="L1720" title="All 4 branches covered.">                switch (currencyCode) {</span>
+                    case &quot;356&quot; -&gt;
+<span class="fc" id="L1722">                        currency = &quot;INR&quot;;</span>
+                    case &quot;840&quot; -&gt;
+<span class="fc" id="L1724">                        currency = &quot;USD&quot;;</span>
+                    case &quot;978&quot; -&gt;
+<span class="fc" id="L1726">                        currency = &quot;EUR&quot;;</span>
+                    default -&gt;
+<span class="fc" id="L1728">                        currency = &quot;USD&quot;;</span>
+                }
+            }
+
+            // Determine network based on BIN
+<span class="fc" id="L1733">            String network = resolveScheme(requestContext, cardNumber);</span>
+
+            // Get MTI from transaction data or use default
+<span class="fc" id="L1736">            String mti = transactionData.getOrDefault(0, &quot;0200&quot;);</span>
+
+            // Call Accounting API
+<span class="fc" id="L1739">            AccountingAuthorizationResponse authResponse = accountingApiService.authorizeTransaction(</span>
+<span class="fc" id="L1740">                    requestContext, transactionAmount, currency, mti, network, transactionType.name());</span>
+
+<span class="pc bpc" id="L1742" title="1 of 4 branches missed.">            if (authResponse != null &amp;&amp; &quot;00&quot;.equals(authResponse.getResponseCode())) {</span>
+<span class="fc" id="L1743">                logger.info(&quot;Accounting API authorization successful. Transaction ID: {}, Auth Code: {}&quot;,</span>
+<span class="fc" id="L1744">                        authResponse.getTransactionId(), authResponse.getAuthorizationCode());</span>
+                // CRITICAL: Store accounting transaction ID for reversal tracking
+<span class="fc" id="L1746">                String uniqueTxnId = requestContext.getUniqueTransactionId();</span>
+<span class="pc bpc" id="L1747" title="1 of 2 branches missed.">                if (uniqueTxnId != null) {</span>
+                    // Store accounting txn ID in a field that will be available later
+<span class="fc" id="L1749">                    transactionData.put(901, authResponse.getTransactionId());</span>
+                    
+                    // Mark accounting approved in context
+                    // Note: You'll need to inject AutomaticReversalService here
+                    // automaticReversalService.markAccountingApproved(uniqueTxnId, authResponse.getTransactionId());
+                }
+<span class="pc bpc" id="L1755" title="2 of 6 branches missed.">                if (transactionType == TransactionType.BALANCE_ENQUIRY</span>
+                        || transactionType == TransactionType.BALANCE_ENQUIRY_CL
+                        || transactionType == TransactionType.CASH_WITHDRAWAL) {
+<span class="fc" id="L1758">                    BigDecimal balanceAvailable = resolveAvailableBalance(authResponse);</span>
+<span class="fc" id="L1759">                    BigDecimal ledgerBalance = resolveLedgerBalance(authResponse, balanceAvailable);</span>
+<span class="fc bfc" id="L1760" title="All 2 branches covered.">                    if (isPrepaidAtmSource(requestContext, cardContext)) {</span>
+<span class="fc" id="L1761">                        PrepaidCardBalanceSnapshot snapshot = prepaidCardBalanceSnapshotService.updateFromAccountingAvailable(</span>
+<span class="fc" id="L1762">                                requestContext.getPanHash(),</span>
+<span class="fc" id="L1763">                                cardContext.getCardData().getCard_id(),</span>
+<span class="fc" id="L1764">                                transactionData.getOrDefault(49, &quot;356&quot;),</span>
+                                balanceAvailable,
+<span class="fc" id="L1766">                                resolveAccountingLedgerBalance(authResponse),</span>
+                                transactionAmount,
+<span class="fc" id="L1768">                                isDebitBalanceUpdate(transactionType));</span>
+<span class="fc" id="L1769">                        ledgerBalance = snapshot.getLedgerBalance();</span>
+<span class="fc" id="L1770">                        balanceAvailable = snapshot.getAvailableBalance();</span>
+                    }
+<span class="fc" id="L1772">                    String de54 = packResponseBalanceDe54(</span>
+                            requestContext, transactionType, cardContext, ledgerBalance, balanceAvailable);
+<span class="fc" id="L1774">                    logger.debug(&quot;{} DE54 ledger: {}, available: {}, packed length: {}&quot;,</span>
+                            transactionType,
+<span class="fc" id="L1776">                            ledgerBalance, balanceAvailable, de54.length());</span>
+<span class="fc" id="L1777">                    transactionData.put(54, de54);</span>
+                }
+<span class="pc bpc" id="L1779" title="12 of 20 branches missed.">                if (transactionType == TransactionType.PURCHASE || transactionType == TransactionType.PURCHASE_CONTACTLESS || transactionType == TransactionType.PURCHASE_WITHCASHBACK || transactionType == TransactionType.CASH_AT_POS || transactionType == TransactionType.CASH_AT_POS_CL </span>
+                    || transactionType == TransactionType.CASH_WITHDRAWAL
+                    || transactionType == TransactionType.BALANCE_ENQUIRY
+                    || transactionType == TransactionType.MINI_STATEMENT
+                    || transactionType == TransactionType.PIN_CHANGE
+                    || transactionType == TransactionType.MONEY_LOAD){
+<span class="pc bpc" id="L1785" title="1 of 2 branches missed.">                    if (authResponse.getNcmcData() != null) {</span>
+<span class="nc" id="L1786">                        BigDecimal updateAmount = authResponse.getNcmcData().getUpdateAmount().setScale(2);</span>
+                        //--------------------------------- Temporary Global Balance Update  , shoul be removed after the real accounting api integration---------------------------------
+<span class="nc bnc" id="L1788" title="All 2 branches missed.">                        String tempGbsMode = tempGbs == null ? &quot;no-update&quot; : tempGbs.trim().toLowerCase();</span>
+<span class="nc bnc" id="L1789" title="All 2 branches missed.">                        if (tempGbsMode.equals(&quot;credit&quot;)) {</span>
+<span class="nc bnc" id="L1790" title="All 2 branches missed.">                            if (transactionType == TransactionType.MONEY_LOAD) {</span>
+<span class="nc" id="L1791">                                updateAmount = updateAmount.add(BigDecimal.valueOf(100));</span>
+                            } else {
+<span class="nc" id="L1793">                                updateAmount = BigDecimal.valueOf(50);</span>
+                            }
+<span class="nc" id="L1795">                            updateAmount = updateAmount.multiply(BigDecimal.valueOf(1));</span>
+<span class="nc bnc" id="L1796" title="All 2 branches missed.">                        } else if (tempGbsMode.equals(&quot;credit-less&quot;)) {</span>
+<span class="nc" id="L1797">                            logger.info( &quot; in credit-less : {}&quot;,updateAmount);</span>
+<span class="nc bnc" id="L1798" title="All 2 branches missed.">                            if (transactionType == TransactionType.MONEY_LOAD) {</span>
+<span class="nc" id="L1799">                                updateAmount = updateAmount.subtract(BigDecimal.valueOf(50));</span>
+                            } else {
+<span class="nc" id="L1801">                                updateAmount = BigDecimal.valueOf(20);</span>
+                            }
+<span class="nc" id="L1803">                            logger.info( &quot; in credit-less : {}&quot;,updateAmount);</span>
+                            //updateAmount = updateAmount.multiply(BigDecimal.valueOf(1));
+<span class="nc bnc" id="L1805" title="All 2 branches missed.">                        } else if (tempGbsMode.equals(&quot;credit-more&quot;)) {</span>
+<span class="nc bnc" id="L1806" title="All 2 branches missed.">                            if (transactionType == TransactionType.MONEY_LOAD) {</span>
+<span class="nc" id="L1807">                                updateAmount = updateAmount.add(BigDecimal.valueOf(99 ));</span>
+                            } else {
+<span class="nc" id="L1809">                                updateAmount = BigDecimal.valueOf(100);</span>
+                            }
+                            //updateAmount = updateAmount.multiply(BigDecimal.valueOf(1));
+<span class="nc bnc" id="L1812" title="All 2 branches missed.">                        } else if (tempGbsMode.equals(&quot;debit&quot;)) {</span>
+<span class="nc bnc" id="L1813" title="All 2 branches missed.">                            if (transactionType != TransactionType.MONEY_LOAD) {</span>
+<span class="nc" id="L1814">                                updateAmount = BigDecimal.valueOf(20);</span>
+                            }
+<span class="nc" id="L1816">                            updateAmount = updateAmount.multiply(BigDecimal.valueOf(-1));</span>
+                        } else {
+<span class="nc" id="L1818">                            updateAmount = updateAmount.multiply(BigDecimal.valueOf(0));</span>
+                        }
+                        //--------------------------------- Temporary Global Balance Update  , should be removed after the real accounting api integration---------------------------------
+<span class="nc" id="L1821">                        char balanceType = 'A';</span>
+<span class="nc bnc" id="L1822" title="All 2 branches missed.">                        if (updateAmount.compareTo(BigDecimal.ZERO) &lt; 0) {</span>
+<span class="nc" id="L1823">                            balanceType = 'D';</span>
+<span class="nc bnc" id="L1824" title="All 2 branches missed.">                        } else if (updateAmount.compareTo(BigDecimal.ZERO) &gt; 0) {</span>
+<span class="nc" id="L1825">                            balanceType = 'C';</span>
+                        }
+<span class="nc bnc" id="L1827" title="All 2 branches missed.">                        updateAmount = updateAmount.compareTo(BigDecimal.ZERO) &lt; 0 ? updateAmount.multiply(BigDecimal.valueOf(-1)) : updateAmount;</span>
+                        //String emvData = transactionData.get(55);
+<span class="nc" id="L1829">                        String pan = transactionData.get(2);</span>
+<span class="nc" id="L1830">                        Scheme scheme = resolveSchemeEnum(requestContext, pan);</span>
+<span class="nc" id="L1831">                        String emvMethod = determineEmvMethod(scheme.name());</span>
+<span class="nc" id="L1832">                        ChipData chipData = getOriginalChipData(requestContext);</span>
+<span class="nc bnc" id="L1833" title="All 2 branches missed.">                        if (!new ChipDataParser().checkMandatoryTags(chipData, scheme.name(), false, transactionType)) {</span>
+<span class="nc" id="L1834">                            logger.warn(&quot;Mandatory tags are missing for EMV data&quot;);</span>
+<span class="nc" id="L1835">                            removeResponseDe55(transactionData);</span>
+<span class="nc" id="L1836">                            requestContext.setInternalResponseCode(InternalResCode.FORMAT_ERROR);</span>
+<span class="nc" id="L1837">                            return ValidationResult.builder()</span>
+<span class="nc" id="L1838">                                    .addError(&quot;EMV_TAG_MISSING: Mandatory tags are missing for EMV data&quot;)</span>
+<span class="nc" id="L1839">                                    .build();</span>
+                        }
+
+                      // long balanceAmountMinorUnits = updateAmount.movePointRight(2).setScale(0, RoundingMode.DOWN).longValue();
+                       // String balanceAmt = String.format(&quot;%012d&quot;, balanceAmountMinorUnits);
+<span class="nc" id="L1844">                        String balanceAmt = String.format(&quot;%012d&quot;, updateAmount.movePointRight(2).longValue());</span>
+
+<span class="nc" id="L1846">                        logger.info(&quot; Before ARPC regeneration : {}&quot;,balanceAmt);</span>
+<span class="nc" id="L1847">                        String arpc = nettyHsmService.verifyArqcAndGenerateArpc(chipData, scheme, emvMethod, pan, transactionData.get(23).substring(1), transactionType, true, balanceAmt, balanceType);</span>
+<span class="nc" id="L1848">                        logger.debug(&quot;ARPC generated via HSM {}&quot;, arpc);</span>
+<span class="nc" id="L1849">                        String[] arpcParts = arpc.split(&quot;;&quot;);</span>
+                        //String arpcResult = arpcParts[0];
+<span class="nc" id="L1851">                        String arpcValue = arpcParts[1];</span>
+<span class="nc bnc" id="L1852" title="All 2 branches missed.">                        if (!arpcValue.trim().isEmpty()) {</span>
+<span class="nc" id="L1853">                            logger.debug(&quot;ARQC verification via HSM for scheme: {}, method: {}&quot;, scheme, emvMethod);</span>
+<span class="nc" id="L1854">                            transactionData.put(55, buildDe55WithOnlyTag91(arpcValue));</span>
+<span class="nc" id="L1855">                            logger.debug(&quot;ARPC verification via HSM for scheme: {}, method: {}&quot;, scheme, emvMethod);</span>
+                            //return ResCode.ARQC_VERIFIED;
+                        } else {
+<span class="nc" id="L1858">                            logger.warn(&quot;No ARQC verification via HSM for scheme: {}, method: {}&quot;, scheme, emvMethod);</span>
+                            //return ResCode.ARQC_FAIL;
+                        }
+<span class="nc" id="L1861">	                    } else {</span>
+<span class="fc" id="L1862">	                        logger.warn(&quot;No NCMC Data in response from accounting API processing as normal txn&quot;);</span>
+	                        //return ResCode.NCMC_DATA_MISSING;
+<span class="pc bpc" id="L1864" title="1 of 2 branches missed.">	                        if (transactionData.containsKey(55)) {</span>
+<span class="nc" id="L1865">	                            ChipData chipData = requestContext.getParsedChipData(55);</span>
+<span class="nc" id="L1866">	                            String tag91 = chipData.getTagValue(&quot;91&quot;);</span>
+<span class="nc" id="L1867">	                            updateDe55WithOnlyTag91(transactionData, tag91);</span>
+<span class="nc" id="L1868">	                        }</span>
+	                    }
+	                } else { // this else block to process other tans purchase, cash at pos, cash at pos contactless, balance enquiry, balance enquiry contactless, money load, etc.
+<span class="nc" id="L1871">	                    logger.debug(&quot;Processing as normal txn with out ARPC regeneration, updating DE55 with ARPC from previous transaction&quot;);</span>
+<span class="nc bnc" id="L1872" title="All 2 branches missed.">	                    if (transactionData.containsKey(55)) {</span>
+<span class="nc" id="L1873">	                        ChipData chipData = requestContext.getParsedChipData(55);</span>
+<span class="nc" id="L1874">	                        String tag91 = chipData.getTagValue(&quot;91&quot;);</span>
+<span class="nc" id="L1875">	                        updateDe55WithOnlyTag91(transactionData, tag91);</span>
+	                    }
+	                }
+
+                // Add authorization details to the result
+<span class="fc" id="L1880">                ValidationResult.Builder resultBuilder = ValidationResult.builder();</span>
+<span class="fc" id="L1881">                resultBuilder.addUpdatedDataElement(&quot;AUTH_CODE&quot;, authResponse.getAuthorizationCode());</span>
+<span class="fc" id="L1882">                resultBuilder.addUpdatedDataElement(&quot;TRANSACTION_ID&quot;, authResponse.getTransactionId());</span>
+<span class="fc" id="L1883">                resultBuilder.addUpdatedDataElement(&quot;AUTHORIZED_AMOUNT&quot;, authResponse.getAuthorizedAmount().toString());</span>
+
+<span class="fc" id="L1885">                return resultBuilder.build();</span>
+            } else {
+<span class="fc" id="L1887">                return buildAccountingDeclineResult(requestContext, authResponse);</span>
+            }
+
+<span class="fc" id="L1890">        } catch (Exception e) {</span>
+<span class="fc" id="L1891">            logger.error(&quot;Error calling Accounting API for authorization: {}&quot;, e.getMessage(), e);</span>
+<span class="fc" id="L1892">            requestContext.setInternalResponseCode(InternalResCode.SYSTEM_ERROR);</span>
+<span class="fc" id="L1893">            return ValidationResult.builder()</span>
+<span class="fc" id="L1894">                    .addError(&quot;AUTHORIZATION_API_ERROR: &quot; + e.getMessage())</span>
+<span class="fc" id="L1895">                    .build();</span>
+        }
+    }
+
+    private BigDecimal resolveAvailableBalance(AccountingAuthorizationResponse authResponse) {
+<span class="pc bpc" id="L1900" title="2 of 4 branches missed.">        if (authResponse == null || authResponse.getAvailableBalance() == null</span>
+<span class="pc bpc" id="L1901" title="1 of 2 branches missed.">                || authResponse.getAvailableBalance().getAvailable() == null) {</span>
+<span class="nc" id="L1902">            return BigDecimal.ZERO;</span>
+        }
+<span class="fc" id="L1904">        return authResponse.getAvailableBalance().getAvailable();</span>
+    }
+
+    private BigDecimal resolveLedgerBalance(AccountingAuthorizationResponse authResponse, BigDecimal availableBalance) {
+<span class="fc" id="L1908">        BigDecimal ledgerBalance = null;</span>
+<span class="fc" id="L1909">        ledgerBalance = resolveAccountingLedgerBalance(authResponse);</span>
+<span class="pc bpc" id="L1910" title="2 of 4 branches missed.">        if (ledgerBalance == null || ledgerBalance.compareTo(availableBalance) == 0) {</span>
+<span class="nc" id="L1911">            ledgerBalance = availableBalance.add(BigDecimal.ONE);</span>
+        }
+<span class="fc" id="L1913">        return ledgerBalance;</span>
+    }
+
+    private BigDecimal resolveAccountingLedgerBalance(AccountingAuthorizationResponse authResponse) {
+<span class="pc bpc" id="L1917" title="2 of 4 branches missed.">        if (authResponse != null &amp;&amp; authResponse.getAvailableBalance() != null) {</span>
+<span class="fc" id="L1918">            return authResponse.getAvailableBalance().getLedger();</span>
+        }
+<span class="nc" id="L1920">        return null;</span>
+    }
+
+    private String packResponseBalanceDe54(
+            RequestContext requestContext,
+            TransactionType transactionType,
+            CardDataContext cardContext,
+            BigDecimal ledgerBalance,
+            BigDecimal availableBalance) {
+<span class="fc bfc" id="L1929" title="All 2 branches covered.">        if (isPrepaidBalanceEnquiry(transactionType, cardContext)</span>
+<span class="fc bfc" id="L1930" title="All 2 branches covered.">                &amp;&amp; isPrepaidAtmSource(requestContext, cardContext)) {</span>
+<span class="fc" id="L1931">            return packPrepaidAtmBalanceDe54(ledgerBalance, availableBalance);</span>
+        }
+<span class="fc" id="L1933">        return De54data.packBalanceEnquiryDe54(ledgerBalance, availableBalance);</span>
+    }
+
+    private boolean isPrepaidBalanceEnquiry(TransactionType transactionType, CardDataContext cardContext) {
+<span class="pc bpc" id="L1937" title="3 of 8 branches missed.">        return (transactionType == TransactionType.BALANCE_ENQUIRY</span>
+                || transactionType == TransactionType.BALANCE_ENQUIRY_CL
+                || transactionType == TransactionType.CASH_WITHDRAWAL)
+                &amp;&amp; cardContext != null
+<span class="pc bpc" id="L1941" title="1 of 2 branches missed.">                &amp;&amp; cardContext.getCardData() != null</span>
+<span class="fc bfc" id="L1942" title="All 2 branches covered.">                &amp;&amp; Character.valueOf('P').equals(cardContext.getCardData().getCard_type());</span>
+    }
+
+    private boolean isPrepaidAtmSource(RequestContext requestContext, CardDataContext cardContext) {
+<span class="pc bpc" id="L1946" title="1 of 2 branches missed.">        if (cardContext == null</span>
+<span class="pc bpc" id="L1947" title="1 of 2 branches missed.">                || cardContext.getCardData() == null</span>
+<span class="fc bfc" id="L1948" title="All 2 branches covered.">                || !Character.valueOf('P').equals(cardContext.getCardData().getCard_type())) {</span>
+<span class="fc" id="L1949">            return false;</span>
+        }
+<span class="fc" id="L1951">        return isAtmSource(requestContext);</span>
+    }
+
+    private boolean isAtmSource(RequestContext requestContext) {
+<span class="pc bpc" id="L1955" title="1 of 2 branches missed.">        if (requestContext == null) {</span>
+<span class="nc" id="L1956">            return false;</span>
+        }
+<span class="fc" id="L1958">        String merchantType = requestContext.getFields().get(18);</span>
+<span class="fc bfc" id="L1959" title="All 2 branches covered.">        if (&quot;6011&quot;.equals(merchantType)) {</span>
+<span class="fc" id="L1960">            return true;</span>
+        }
+<span class="pc bpc" id="L1962" title="1 of 2 branches missed.">        if (requestContext.getScheme() == Scheme.RUPAY) {</span>
+            try {
+<span class="fc" id="L1964">                String source = requestContext.getParsedTlv(48).get(&quot;051&quot;);</span>
+<span class="pc bpc" id="L1965" title="1 of 4 branches missed.">                return source != null &amp;&amp; source.trim().toUpperCase().startsWith(&quot;ATM&quot;);</span>
+<span class="nc" id="L1966">            } catch (Exception ex) {</span>
+<span class="nc" id="L1967">                logger.debug(&quot;Unable to parse DE48 tag 051 for ATM source detection: {}&quot;, ex.getMessage());</span>
+            }
+        }
+<span class="nc" id="L1970">        return false;</span>
+    }
+
+    private String packPrepaidAtmBalanceDe54(BigDecimal ledgerBalance, BigDecimal availableBalance) {
+<span class="fc" id="L1974">        return De54data.packBalanceResponseDe54(&quot;00&quot;, &quot;01&quot;, &quot;02&quot;, ledgerBalance, availableBalance);</span>
+    }
+
+    private boolean isDebitBalanceUpdate(TransactionType transactionType) {
+<span class="pc bpc" id="L1978" title="1 of 2 branches missed.">        return transactionType == TransactionType.CASH_WITHDRAWAL;</span>
+    }
+
+    ValidationResult buildAccountingDeclineResult(
+            RequestContext requestContext,
+            AccountingAuthorizationResponse authResponse) {
+<span class="fc bfc" id="L1984" title="All 2 branches covered.">        String errorMsg = authResponse != null</span>
+<span class="fc" id="L1985">                ? authResponse.getErrorMessage() : &quot;Unknown authorization error&quot;;</span>
+<span class="fc" id="L1986">        logger.warn(&quot;Accounting API authorization declined: {}&quot;, errorMsg);</span>
+
+<span class="fc" id="L1988">        requestContext.setInternalResponseCode(</span>
+<span class="fc bfc" id="L1989" title="All 2 branches covered.">                mapExternalErrorCodeToInternal(authResponse != null ? authResponse.getErrorCode() : null));</span>
+<span class="fc" id="L1990">        return ValidationResult.builder()</span>
+<span class="fc" id="L1991">                .addError(&quot;AUTHORIZATION_FAILED: &quot; + errorMsg)</span>
+<span class="fc" id="L1992">                .build();</span>
+    }
+
+    private void preserveOriginalDe55(RequestContext requestContext, String emvData, ChipData chipData) {
+<span class="pc bpc" id="L1996" title="1 of 2 branches missed.">        if (requestContext.getAttribute(ORIGINAL_DE55_ATTRIBUTE) == null) {</span>
+<span class="fc" id="L1997">            requestContext.setAttribute(ORIGINAL_DE55_ATTRIBUTE, emvData);</span>
+<span class="fc" id="L1998">            requestContext.setAttribute(ORIGINAL_CHIP_DATA_ATTRIBUTE, chipData);</span>
+        }
+<span class="fc" id="L2000">    }</span>
+
+    private ChipData getOriginalChipData(RequestContext requestContext) {
+<span class="nc" id="L2003">        Object originalChipData = requestContext.getAttribute(ORIGINAL_CHIP_DATA_ATTRIBUTE);</span>
+<span class="nc bnc" id="L2004" title="All 2 branches missed.">        if (originalChipData instanceof ChipData chipData) {</span>
+<span class="nc" id="L2005">            return chipData;</span>
+        }
+
+<span class="nc" id="L2008">        Object originalDe55 = requestContext.getAttribute(ORIGINAL_DE55_ATTRIBUTE);</span>
+<span class="nc bnc" id="L2009" title="All 4 branches missed.">        if (originalDe55 instanceof String de55 &amp;&amp; !de55.isBlank()) {</span>
+<span class="nc" id="L2010">            ChipData chipData = new ChipDataParser().parseChipData(de55);</span>
+<span class="nc" id="L2011">            requestContext.setAttribute(ORIGINAL_CHIP_DATA_ATTRIBUTE, chipData);</span>
+<span class="nc" id="L2012">            return chipData;</span>
+        }
+
+<span class="nc" id="L2015">        return requestContext.getParsedChipData(55);</span>
+    }
+
+    private InternalResCode mapExternalErrorCodeToInternal(String errorCode) {
+<span class="fc bfc" id="L2019" title="All 4 branches covered.">        if (errorCode == null || errorCode.isBlank()) {</span>
+<span class="fc" id="L2020">            return InternalResCode.DO_NOT_HONOR;</span>
+        }
+<span class="fc bfc" id="L2022" title="All 12 branches covered.">        return switch (errorCode) {</span>
+<span class="fc" id="L2023">            case &quot;51&quot; -&gt; InternalResCode.INSUFFICIENT_FUNDS;</span>
+<span class="fc" id="L2024">            case &quot;54&quot; -&gt; InternalResCode.EXPIRED_CARD;</span>
+<span class="fc" id="L2025">            case &quot;55&quot; -&gt; InternalResCode.INVALID_PIN;</span>
+<span class="fc" id="L2026">            case &quot;57&quot; -&gt; InternalResCode.REVERSAL_NOT_PERMITTED;</span>
+<span class="fc" id="L2027">            case &quot;61&quot; -&gt; InternalResCode.EXCEEDS_LIMIT;</span>
+<span class="fc" id="L2028">            case &quot;62&quot; -&gt; InternalResCode.RESTRICTED_CARD;</span>
+<span class="fc" id="L2029">            case &quot;63&quot; -&gt; InternalResCode.SECURITY_VIOLATION;</span>
+<span class="fc" id="L2030">            case &quot;75&quot; -&gt; InternalResCode.PIN_TRY_EXCEEDED;</span>
+<span class="fc" id="L2031">            case &quot;91&quot; -&gt; InternalResCode.ISSUER_INOPERATIVE;</span>
+<span class="fc" id="L2032">            case &quot;94&quot; -&gt; InternalResCode.DUPLICATE_TRANSACTION;</span>
+<span class="fc" id="L2033">            case &quot;96&quot; -&gt; InternalResCode.SYSTEM_ERROR;</span>
+<span class="fc" id="L2034">            default -&gt; InternalResCode.DO_NOT_HONOR;</span>
+        };
+    }
+
+
+  /*  @Async(&quot;accountingApiExecutor&quot;)
+    public CompletableFuture&lt;AccountingAuthorizationResponse&gt; authorizeTransactionAsync(
+            Map&lt;Integer, String&gt; transactionData,
+            BigDecimal amount,
+            String currency,
+            String mti,
+            String network,
+            String transactionType) {
+
+        AccountingAuthorizationResponse response = accountingApiService.authorizeTransaction(
+                transactionData, amount, currency, mti, network, transactionType);
+        return CompletableFuture.completedFuture(response);
+    }*/
+
+    public String updateDE48(String de48, String matcher, TransactionType transactionType) {
+<span class="fc" id="L2054">        return updateDE48(de48, matcher,</span>
+<span class="fc bfc" id="L2055" title="All 2 branches covered.">                transactionType == TransactionType.ECOMMERCE</span>
+<span class="fc" id="L2056">                        ? CvvVerificationType.CVV2</span>
+<span class="fc" id="L2057">                        : CvvVerificationType.ICVV);</span>
+    }
+
+    private String updateDE48(String de48, String matcher, CvvVerificationRequest cvvRequest) {
+<span class="fc" id="L2061">        return updateDE48(de48, matcher, cvvRequest.type);</span>
+    }
+
+    private String updateDE48(String de48, String matcher, CvvVerificationType cvvType) {
+        // Update DE48 tag data if present and required
+        // DE48 - Additional Data Private
+<span class="fc" id="L2067">        logger.debug(&quot;DE48 tag data: {}&quot;, de48);</span>
+        try {
+<span class="fc" id="L2069">            Map&lt;String, String&gt; tlvMap = new java.util.LinkedHashMap&lt;&gt;();</span>
+<span class="pc bpc" id="L2070" title="1 of 4 branches missed.">            if (de48 != null &amp;&amp; !de48.trim().isEmpty()) {</span>
+<span class="fc" id="L2071">                logger.debug(&quot;Processing DE48 tag data for update&quot;);</span>
+<span class="fc" id="L2072">                tlvMap.putAll(com.logicpoint.iso8583.validation.TlvUtils.parseTlv(de48));</span>
+            }
+
+<span class="fc bfc" id="L2075" title="All 2 branches covered.">            String resultTag = cvvType == CvvVerificationType.CVV2 ? &quot;053&quot; : &quot;054&quot;;</span>
+<span class="fc" id="L2076">            tlvMap.put(resultTag, matcher);</span>
+<span class="fc" id="L2077">            tlvMap.remove(&quot;058&quot;);</span>
+
+<span class="fc" id="L2079">            StringBuilder updatedDe48 = new StringBuilder();</span>
+<span class="fc bfc" id="L2080" title="All 2 branches covered.">            for (Map.Entry&lt;String, String&gt; entry : tlvMap.entrySet()) {</span>
+<span class="fc" id="L2081">                String tag = entry.getKey();</span>
+<span class="fc" id="L2082">                String value = entry.getValue();</span>
+<span class="fc" id="L2083">                String length = String.format(&quot;%03d&quot;, value.length());</span>
+<span class="fc" id="L2084">                updatedDe48.append(tag).append(length).append(value);</span>
+<span class="fc" id="L2085">            }</span>
+<span class="fc" id="L2086">            logger.info(&quot;DE48 tag {} updated in transaction data&quot;, updatedDe48);</span>
+<span class="fc" id="L2087">            return updatedDe48.toString();</span>
+<span class="fc" id="L2088">        } catch (Exception ex) {</span>
+<span class="fc" id="L2089">            logger.warn(&quot;Failed to parse or update DE48 tag data: {}&quot;, ex.getMessage());</span>
+<span class="fc" id="L2090">            return de48; // Return original if update fails</span>
+        }
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.14.202510111229</span></div></body></html>

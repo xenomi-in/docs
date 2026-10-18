@@ -1,0 +1,155 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>ResponseCodeCacheService.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">iso8583-processor</a> &gt; <a href="index.source.html" class="el_package">com.logicpoint.iso8583.service</a> &gt; <span class="el_source">ResponseCodeCacheService.java</span></div><h1>ResponseCodeCacheService.java</h1><pre class="source lang-java linenums">package com.logicpoint.iso8583.service;
+
+import com.logicpoint.iso8583.context.RequestContext;
+import com.logicpoint.iso8583.entity.CanonicalResponseCode;
+import com.logicpoint.iso8583.repository.CanonicalResponseCodeRepository;
+import com.logicpoint.iso8583.responsecode.CanonicalResponseCodeCacheValue;
+import com.logicpoint.iso8583.responsecode.InternalResCode;
+import com.logicpoint.iso8583.responsecode.ResolvedResponseCode;
+import com.logicpoint.iso8583.responsecode.SchemeResponseView;
+import com.logicpoint.iso8583.util.Scheme;
+import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
+import org.springframework.scheduling.annotation.Scheduled;
+import org.springframework.stereotype.Service;
+
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
+
+<span class="fc" id="L20">@Slf4j</span>
+@Service
+@RequiredArgsConstructor
+public class ResponseCodeCacheService {
+
+    private final CanonicalResponseCodeRepository repository;
+
+    private volatile Map&lt;String, CanonicalResponseCodeCacheValue&gt; byInternalCode = Map.of();
+    private volatile Map&lt;String, Map&lt;String, SchemeResponseView&gt;&gt; bySchemeThenInternalCode = Map.of();
+
+    @Scheduled(fixedDelayString = &quot;${response.code.cache.refresh.ms:300000}&quot;)
+    public void refreshCache() {
+<span class="fc" id="L32">        List&lt;CanonicalResponseCode&gt; rows = repository.findByActiveTrue();</span>
+
+<span class="fc" id="L34">        Map&lt;String, CanonicalResponseCodeCacheValue&gt; internalCache = new HashMap&lt;&gt;();</span>
+<span class="fc" id="L35">        Map&lt;String, Map&lt;String, SchemeResponseView&gt;&gt; schemeCache = new HashMap&lt;&gt;();</span>
+<span class="fc" id="L36">        schemeCache.put(&quot;RUPAY&quot;, new HashMap&lt;&gt;());</span>
+<span class="fc" id="L37">        schemeCache.put(&quot;VISA&quot;, new HashMap&lt;&gt;());</span>
+<span class="fc" id="L38">        schemeCache.put(&quot;MASTERCARD&quot;, new HashMap&lt;&gt;());</span>
+
+<span class="fc bfc" id="L40" title="All 2 branches covered.">        for (CanonicalResponseCode row : rows) {</span>
+<span class="fc" id="L41">            CanonicalResponseCodeCacheValue value = CanonicalResponseCodeCacheValue.builder()</span>
+<span class="fc" id="L42">                    .internalCode(row.getInternalCode())</span>
+<span class="fc" id="L43">                    .canonicalDescription(row.getCanonicalDescription())</span>
+<span class="fc" id="L44">                    .isoDefaultResponseCode(row.getIsoDefaultResponseCode())</span>
+<span class="fc" id="L45">                    .rupayResponseCode(row.getRupayResponseCode())</span>
+<span class="fc" id="L46">                    .rupayDescription(row.getRupayDescription())</span>
+<span class="fc" id="L47">                    .visaResponseCode(row.getVisaResponseCode())</span>
+<span class="fc" id="L48">                    .visaDescription(row.getVisaDescription())</span>
+<span class="fc" id="L49">                    .mastercardResponseCode(row.getMastercardResponseCode())</span>
+<span class="fc" id="L50">                    .mastercardDescription(row.getMastercardDescription())</span>
+<span class="fc" id="L51">                    .category(row.getCategory())</span>
+<span class="fc" id="L52">                    .declineType(row.getDeclineType())</span>
+<span class="fc" id="L53">                    .retryable(row.isRetryable())</span>
+<span class="fc" id="L54">                    .reversalRequired(row.isReversalRequired())</span>
+<span class="fc" id="L55">                    .adviceAction(row.getAdviceAction())</span>
+<span class="fc" id="L56">                    .build();</span>
+
+<span class="fc" id="L58">            internalCache.put(row.getInternalCode(), value);</span>
+
+<span class="fc" id="L60">            schemeCache.get(&quot;RUPAY&quot;).put(row.getInternalCode(),</span>
+<span class="fc" id="L61">                    new SchemeResponseView(&quot;RUPAY&quot;, fallback(row.getRupayResponseCode(), row.getIsoDefaultResponseCode()), fallback(row.getRupayDescription(), row.getCanonicalDescription())));</span>
+<span class="fc" id="L62">            schemeCache.get(&quot;VISA&quot;).put(row.getInternalCode(),</span>
+<span class="fc" id="L63">                    new SchemeResponseView(&quot;VISA&quot;, fallback(row.getVisaResponseCode(), row.getIsoDefaultResponseCode()), fallback(row.getVisaDescription(), row.getCanonicalDescription())));</span>
+<span class="fc" id="L64">            schemeCache.get(&quot;MASTERCARD&quot;).put(row.getInternalCode(),</span>
+<span class="fc" id="L65">                    new SchemeResponseView(&quot;MASTERCARD&quot;, fallback(row.getMastercardResponseCode(), row.getIsoDefaultResponseCode()), fallback(row.getMastercardDescription(), row.getCanonicalDescription())));</span>
+<span class="fc" id="L66">        }</span>
+
+<span class="fc" id="L68">        Map&lt;String, Map&lt;String, SchemeResponseView&gt;&gt; immutableSchemeCache = new HashMap&lt;&gt;();</span>
+<span class="fc" id="L69">        schemeCache.forEach((scheme, mapping) -&gt; immutableSchemeCache.put(scheme, Map.copyOf(mapping)));</span>
+
+<span class="fc" id="L71">        this.byInternalCode = Map.copyOf(internalCache);</span>
+<span class="fc" id="L72">        this.bySchemeThenInternalCode = Map.copyOf(immutableSchemeCache);</span>
+<span class="fc" id="L73">        log.info(&quot;Loaded {} canonical response codes into cache&quot;, byInternalCode.size());</span>
+<span class="fc" id="L74">    }</span>
+
+    public CanonicalResponseCodeCacheValue getByInternalCode(String internalCode) {
+<span class="nc" id="L77">        return byInternalCode.get(internalCode);</span>
+    }
+
+    public SchemeResponseView getBySchemeAndInternalCode(String scheme, String internalCode) {
+<span class="fc" id="L81">        Map&lt;String, SchemeResponseView&gt; schemeMappings = bySchemeThenInternalCode.get(normalizeScheme(scheme));</span>
+<span class="pc bpc" id="L82" title="1 of 2 branches missed.">        if (schemeMappings == null) {</span>
+<span class="nc" id="L83">            return null;</span>
+        }
+<span class="fc" id="L85">        return schemeMappings.get(internalCode);</span>
+    }
+
+    public ResolvedResponseCode resolve(String internalCode, Scheme scheme) {
+<span class="fc" id="L89">        CanonicalResponseCodeCacheValue row = byInternalCode.get(internalCode);</span>
+<span class="pc bpc" id="L90" title="1 of 2 branches missed.">        if (row == null) {</span>
+<span class="nc" id="L91">            row = byInternalCode.get(&quot;SYSTEM_ERROR&quot;);</span>
+        }
+
+<span class="pc bpc" id="L94" title="1 of 2 branches missed.">        if (row == null) {</span>
+<span class="nc" id="L95">            return new ResolvedResponseCode(</span>
+                    internalCode,
+<span class="nc bnc" id="L97" title="All 2 branches missed.">                    scheme != null ? scheme.name() : &quot;DEFAULT&quot;,</span>
+                    &quot;96&quot;,
+                    &quot;System malfunction&quot;,
+                    &quot;ERROR&quot;,
+                    &quot;TECHNICAL&quot;,
+                    true,
+                    true,
+                    &quot;SEND_REVERSAL&quot;
+            );
+        }
+
+<span class="pc bpc" id="L108" title="1 of 2 branches missed.">        String schemeName = scheme != null ? scheme.name() : &quot;DEFAULT&quot;;</span>
+<span class="fc" id="L109">        SchemeResponseView schemeView = getBySchemeAndInternalCode(schemeName, row.getInternalCode());</span>
+
+<span class="fc" id="L111">        return new ResolvedResponseCode(</span>
+<span class="fc" id="L112">                row.getInternalCode(),</span>
+                schemeName,
+<span class="pc bpc" id="L114" title="1 of 2 branches missed.">                schemeView != null ? schemeView.getResponseCode() : row.getIsoDefaultResponseCode(),</span>
+<span class="pc bpc" id="L115" title="1 of 2 branches missed.">                schemeView != null ? schemeView.getDescription() : row.getCanonicalDescription(),</span>
+<span class="fc" id="L116">                row.getCategory(),</span>
+<span class="fc" id="L117">                row.getDeclineType(),</span>
+<span class="fc" id="L118">                row.isRetryable(),</span>
+<span class="fc" id="L119">                row.isReversalRequired(),</span>
+<span class="fc" id="L120">                row.getAdviceAction()</span>
+        );
+    }
+
+    public ResolvedResponseCode resolve(InternalResCode internalCode, Scheme scheme) {
+<span class="pc bpc" id="L125" title="1 of 2 branches missed.">        return resolve(internalCode != null ? internalCode.name() : InternalResCode.SYSTEM_ERROR.name(), scheme);</span>
+    }
+
+    public ResolvedResponseCode applyToDe39(Map&lt;Integer, String&gt; fields, InternalResCode internalCode, Scheme scheme) {
+<span class="fc" id="L129">        ResolvedResponseCode resolved = resolve(internalCode, scheme);</span>
+<span class="fc" id="L130">        fields.put(39, resolved.getResponseCode());</span>
+<span class="fc" id="L131">        log.info(&quot;Applied response code. internalCode={}, scheme={}, de39={}, description={}&quot;,</span>
+<span class="fc" id="L132">                resolved.getInternalCode(),</span>
+<span class="fc" id="L133">                resolved.getScheme(),</span>
+<span class="fc" id="L134">                resolved.getResponseCode(),</span>
+<span class="fc" id="L135">                resolved.getDescription());</span>
+<span class="fc" id="L136">        return resolved;</span>
+    }
+
+    public ResolvedResponseCode applyToDe39(RequestContext requestContext) {
+<span class="nc" id="L140">        return applyToDe39(</span>
+<span class="nc" id="L141">                requestContext.getFields(),</span>
+<span class="nc bnc" id="L142" title="All 2 branches missed.">                requestContext.getInternalResponseCode() != null ? requestContext.getInternalResponseCode() : InternalResCode.SYSTEM_ERROR,</span>
+<span class="nc" id="L143">                requestContext.getScheme()</span>
+        );
+    }
+
+    private String fallback(String value, String fallback) {
+<span class="pc bpc" id="L148" title="1 of 4 branches missed.">        return value == null || value.isBlank() ? fallback : value;</span>
+    }
+
+    private String normalizeScheme(String scheme) {
+<span class="pc bpc" id="L152" title="1 of 2 branches missed.">        return scheme == null ? &quot;DEFAULT&quot; : scheme.toUpperCase();</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.14.202510111229</span></div></body></html>

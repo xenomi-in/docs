@@ -1,0 +1,217 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>PurchaseTransactionValidator.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">iso8583-processor</a> &gt; <a href="index.source.html" class="el_package">com.logicpoint.iso8583.validation.transaction.impl</a> &gt; <span class="el_source">PurchaseTransactionValidator.java</span></div><h1>PurchaseTransactionValidator.java</h1><pre class="source lang-java linenums">package com.logicpoint.iso8583.validation.transaction.impl;
+
+import com.logicpoint.iso8583.validation.ValidationResult;
+import com.logicpoint.iso8583.validation.TransactionType;
+import org.springframework.stereotype.Service;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+import java.util.ArrayList;
+import java.util.List;
+import java.util.Map;
+import com.logicpoint.iso8583.util.rupay.De54data;
+import com.logicpoint.iso8583.util.rupay.RuPayDe61Parser;
+import com.logicpoint.iso8583.util.rupay.RuPayDe61Parser.RuPayDE61Subfields;
+/**
+ * Validator for purchase transactions with specific business rules.
+ */
+@Service
+<span class="fc" id="L18">public class PurchaseTransactionValidator extends AbstractTransactionTypeValidator {</span>
+<span class="fc" id="L19">    Logger log = LoggerFactory.getLogger(PurchaseTransactionValidator.class);</span>
+    private static final double MAX_PURCHASE_AMOUNT = 10000.0; // $10,000
+    
+    @Override
+    public ValidationResult validateTransactionType(TransactionType transactionType, Map&lt;Integer, String&gt; transactionData) {
+<span class="fc" id="L24">        List&lt;String&gt; errors = new ArrayList&lt;&gt;();</span>
+        
+<span class="fc bfc" id="L26" title="All 10 branches covered.">        if (transactionType == TransactionType.PURCHASE || transactionType == TransactionType.PURCHASE_CONTACTLESS || transactionType == TransactionType.PURCHASE_WITHCASHBACK || transactionType == TransactionType.PREAUTH || transactionType == TransactionType.PURCHASE_FALLBACK) {</span>
+<span class="fc" id="L27">            log.info(&quot;Purchase Transaction Validated - txn Type: {}&quot;, transactionType);</span>
+        }else{
+<span class="fc" id="L29">            errors.add(&quot;INVALID_TRANSACTION_TYPE: Expected PURCHASE, PURCHASE_CONTACTLESS or PURCHASE_WITHCASHBACK transaction&quot;);</span>
+<span class="fc" id="L30">            return new ValidationResult(errors, new ArrayList&lt;&gt;());</span>
+        }
+<span class="fc bfc" id="L32" title="All 2 branches covered.">        if(transactionType == TransactionType.PREAUTH){</span>
+<span class="fc" id="L33">            log.info(&quot;Preauth Transaction Validated - txn Type: {}&quot;, transactionType);</span>
+        // INSERT_YOUR_CODE
+
+<span class="fc" id="L36">        String mcc = transactionData.get(18);</span>
+<span class="fc bfc" id="L37" title="All 2 branches covered.">        if (!isValidRuPayPreAuthMcc(mcc)) {</span>
+<span class="fc" id="L38">            errors.add(&quot;MCC_NOT_ALLOWED: Merchant Category Code (MCC) is invalid or not supported fro Preauth transactions.&quot;);</span>
+<span class="fc" id="L39">            return new ValidationResult(errors, new ArrayList&lt;&gt;());</span>
+        }
+
+        }
+        
+<span class="fc bfc" id="L44" title="All 2 branches covered.">        if(transactionType == TransactionType.PURCHASE_WITHCASHBACK){</span>
+<span class="fc bfc" id="L45" title="All 2 branches covered.">            if(!purchaseWithCashback(transactionData)){</span>
+<span class="fc" id="L46">                errors.add(&quot;INVALID_TRANSACTION: PURCHASE_WITHCASHBACK validation failed &quot;);</span>
+<span class="fc" id="L47">                return new ValidationResult(errors, new ArrayList&lt;&gt;());</span>
+            }
+        }
+        // cheking is crossboarder txn 
+<span class="fc" id="L51">        int isInternationalTransaction = InternationalTxnValidation.isInternationalTransaction(transactionData);</span>
+<span class="fc bfc" id="L52" title="All 2 branches covered.">        if(isInternationalTransaction == 0){</span>
+<span class="fc" id="L53">            errors.add(&quot;INVALID_TRANSACTION: International transaction validation failed &quot;);</span>
+<span class="fc" id="L54">            return new ValidationResult(errors, new ArrayList&lt;&gt;());</span>
+        }
+
+
+        // Additional purchase-specific validations can be added here
+        // For example, merchant category code validation, and DE61 validation etc.
+<span class="fc" id="L60">        String mcc = transactionData.get(18);</span>
+<span class="fc" id="L61">        String De61 = transactionData.get(61);</span>
+<span class="fc" id="L62">        RuPayDe61Parser.RuPayDE61Data de61data = RuPayDe61Parser.parseDE61(De61);</span>
+<span class="fc bfc" id="L63" title="All 2 branches covered.">        if(de61data.hasErrors()){</span>
+<span class="fc" id="L64">            errors.addAll(de61data.getErrors());</span>
+<span class="fc" id="L65">            return new ValidationResult(errors, new ArrayList&lt;&gt;()); </span>
+        }
+<span class="fc" id="L67">        log.info(&quot;De61data: {}&quot;, de61data.getSubfieldValue(RuPayDE61Subfields.CARD_DATA_INPUT_CAPABILITY));</span>
+<span class="fc" id="L68">        Enum cardDataInputCapability = de61data.getCardDataInputCapability();</span>
+
+<span class="fc bfc" id="L70" title="All 2 branches covered.">        if(transactionType == TransactionType.PURCHASE){</span>
+<span class="fc" id="L71">            String sf1=de61data.getSubfieldValue(RuPayDE61Subfields.CARD_DATA_INPUT_CAPABILITY);</span>
+<span class="fc bfc" id="L72" title="All 2 branches covered.">            if(!List.of(&quot;0&quot;,&quot;2&quot;,&quot;4&quot;,&quot;8&quot;).contains(sf1)){</span>
+<span class="fc" id="L73">                errors.add(&quot;INVALID_DE61: SF1 Expected 0,2,4,8&quot;);</span>
+<span class="fc" id="L74">                return new ValidationResult(errors, new ArrayList&lt;&gt;());</span>
+            }
+<span class="fc" id="L76">            String sf5=de61data.getSubfieldValue(RuPayDE61Subfields.CARDHOLDER_PRESENT);</span>
+<span class="fc bfc" id="L77" title="All 2 branches covered.">            if(!List.of(&quot;0&quot;,&quot;1&quot;).contains(sf5)){</span>
+<span class="fc" id="L78">                errors.add(&quot;INVALID_DE61: SF5 Expected 0,1&quot;);</span>
+<span class="fc" id="L79">                return new ValidationResult(errors, new ArrayList&lt;&gt;());</span>
+            }
+<span class="fc" id="L81">            String sf6=de61data.getSubfieldValue(RuPayDE61Subfields.CARD_PRESENT);</span>
+<span class="fc bfc" id="L82" title="All 2 branches covered.">            if(!List.of(&quot;0&quot;,&quot;2&quot;).contains(sf6)){</span>
+<span class="fc" id="L83">                errors.add(&quot;INVALID_DE61: SF6 Expected 0,2&quot;);</span>
+<span class="fc" id="L84">                return new ValidationResult(errors, new ArrayList&lt;&gt;());</span>
+            }
+<span class="fc" id="L86">            String sf7=de61data.getSubfieldValue(RuPayDE61Subfields.CARD_DATA_INPUT_MODE);</span>
+<span class="fc bfc" id="L87" title="All 2 branches covered.">            if(!List.of(&quot;0&quot;,&quot;3&quot;).contains(sf7)){</span>
+<span class="fc" id="L88">                errors.add(&quot;INVALID_DE61: SF7 Expected 0,3&quot;);</span>
+<span class="fc" id="L89">                return new ValidationResult(errors, new ArrayList&lt;&gt;());</span>
+            }
+<span class="fc" id="L91">            String sf8=de61data.getSubfieldValue(RuPayDE61Subfields.CARDHOLDER_AUTH_METHOD);</span>
+<span class="fc bfc" id="L92" title="All 2 branches covered.">            if(!List.of(&quot;0&quot;,&quot;2&quot;).contains(sf8)){</span>
+<span class="fc" id="L93">                errors.add(&quot;INVALID_DE61: SF8 Expected 0,2&quot;);</span>
+<span class="fc" id="L94">                return new ValidationResult(errors, new ArrayList&lt;&gt;());</span>
+            }
+            
+<span class="fc bfc" id="L97" title="All 2 branches covered.">        } else if(transactionType == TransactionType.PURCHASE_CONTACTLESS){</span>
+            // Check if the transaction amount is greater than 5000.00
+<span class="fc" id="L99">            String amountStr = transactionData.get(4); // DE4: Transaction amount (usually in smallest currency unit, e.g., paise)</span>
+<span class="pc bpc" id="L100" title="1 of 4 branches missed.">            if (amountStr != null &amp;&amp; !amountStr.isEmpty()) {</span>
+                try {
+                    
+<span class="fc" id="L103">                    Double amount = Double.parseDouble(amountStr)/100.0;</span>
+<span class="fc" id="L104">                    log.info(&quot;Txn Amount: {}&quot;, amount);</span>
+                    // Assuming amount is in paise (INR), so 5000.00 INR = 500000 paise
+<span class="fc bfc" id="L106" title="All 4 branches covered.">                    if (amount &gt; 5000.00 &amp;&amp; !transactionData.containsKey(52)) {</span>
+<span class="fc" id="L107">                        errors.add(&quot;INVALID_TRANSACTION: Transaction amount exceeds 5000.00 INR for contactless purchase with out PIN&quot;);</span>
+<span class="fc" id="L108">                        return new ValidationResult(errors, new ArrayList&lt;&gt;());</span>
+                    }
+<span class="fc" id="L110">                } catch (NumberFormatException ex) {</span>
+<span class="fc" id="L111">                    errors.add(&quot;INVALID_AMOUNT: Unable to parse transaction amount&quot;);</span>
+<span class="fc" id="L112">                    return new ValidationResult(errors, new ArrayList&lt;&gt;());</span>
+<span class="fc" id="L113">                }</span>
+            } else {
+<span class="fc" id="L115">                errors.add(&quot;MISSING_AMOUNT: Transaction amount (DE4) is required&quot;);</span>
+<span class="fc" id="L116">                return new ValidationResult(errors, new ArrayList&lt;&gt;());</span>
+            }
+
+<span class="fc" id="L119">            String sf1=de61data.getSubfieldValue(RuPayDE61Subfields.CARD_DATA_INPUT_CAPABILITY);</span>
+<span class="fc bfc" id="L120" title="All 2 branches covered.">            if(!List.of(&quot;0&quot;,&quot;7&quot;,&quot;8&quot;).contains(sf1)){</span>
+<span class="fc" id="L121">                errors.add(&quot;INVALID_DE61: SF1 Expected 0,7,8&quot;);</span>
+<span class="fc" id="L122">                return new ValidationResult(errors, new ArrayList&lt;&gt;());</span>
+            }
+<span class="fc" id="L124">            String sf5=de61data.getSubfieldValue(RuPayDE61Subfields.CARDHOLDER_PRESENT);</span>
+<span class="fc bfc" id="L125" title="All 2 branches covered.">            if(!List.of(&quot;0&quot;,&quot;1&quot;).contains(sf5)){</span>
+<span class="fc" id="L126">                errors.add(&quot;INVALID_DE61: SF5 Expected 0,1&quot;);</span>
+<span class="fc" id="L127">                return new ValidationResult(errors, new ArrayList&lt;&gt;());</span>
+            }
+<span class="fc" id="L129">            String sf6=de61data.getSubfieldValue(RuPayDE61Subfields.CARD_PRESENT);</span>
+<span class="fc bfc" id="L130" title="All 2 branches covered.">            if(!List.of(&quot;0&quot;,&quot;1&quot;,&quot;2&quot;).contains(sf6)){</span>
+<span class="fc" id="L131">                errors.add(&quot;INVALID_DE61: SF6 Expected 0,1,2&quot;);</span>
+<span class="fc" id="L132">                return new ValidationResult(errors, new ArrayList&lt;&gt;());</span>
+            }
+<span class="fc" id="L134">            String sf7=de61data.getSubfieldValue(RuPayDE61Subfields.CARD_DATA_INPUT_MODE);</span>
+<span class="fc bfc" id="L135" title="All 2 branches covered.">            if(!List.of(&quot;0&quot;,&quot;4&quot;).contains(sf7)){</span>
+<span class="fc" id="L136">                errors.add(&quot;INVALID_DE61: SF7 Expected 0,4&quot;);</span>
+<span class="fc" id="L137">                return new ValidationResult(errors, new ArrayList&lt;&gt;());</span>
+            }
+<span class="fc" id="L139">            String sf8=de61data.getSubfieldValue(RuPayDE61Subfields.CARDHOLDER_AUTH_METHOD);</span>
+<span class="fc bfc" id="L140" title="All 2 branches covered.">            if(!List.of(&quot;0&quot;,&quot;1&quot;,&quot;2&quot;,&quot;3&quot;).contains(sf8)){</span>
+<span class="fc" id="L141">                errors.add(&quot;INVALID_DE61: SF8 Expected 0,1,2&quot;);</span>
+<span class="fc" id="L142">                return new ValidationResult(errors, new ArrayList&lt;&gt;());</span>
+            }
+           }
+
+<span class="fc" id="L146">           return new ValidationResult(errors, new ArrayList&lt;&gt;());</span>
+            
+          
+
+        
+    }
+    private boolean purchaseWithCashback(Map&lt;Integer, String&gt; transactionData){
+<span class="fc" id="L153">        String sf54=transactionData.get(54);</span>
+<span class="pc bpc" id="L154" title="1 of 4 branches missed.">        if(sf54 == null || sf54.isEmpty()){</span>
+<span class="fc" id="L155">            return false;</span>
+        }else {
+            // Parse DE54 field to extract cashback amount and validate format
+            // DE54 format: 01-02: Account type, 03-04: Amount type, 05-07: Currency code, 08: Amount sign, 09-20: Amount
+           
+<span class="fc" id="L160">            long amount=Long.parseLong(transactionData.get(4));</span>
+<span class="fc" id="L161">            log.info(&quot;Other Amount:{}, length:{}&quot;, sf54,sf54.length());</span>
+<span class="fc" id="L162">            De54data.RuPayDe54Data de54data = De54data.parseDe54(sf54.trim());</span>
+<span class="fc" id="L163">            log.info(&quot;De54data: {}&quot;, de54data);</span>
+
+<span class="fc" id="L165">            long cashback=de54data.getAmount();</span>
+<span class="pc bpc" id="L166" title="3 of 10 branches missed.">            if(!de54data.getAccountType().equals(&quot;90&quot;)||!de54data.getAmountType().equals(&quot;90&quot;) || de54data.getAmountSign() != 'D' || !de54data.getCurrencyCode().equals(&quot;356&quot;) || cashback &gt;= amount){</span>
+<span class="fc" id="L167">                log.info(&quot;PURCHASE_WITHCASHBACK: Cashback is greater than amount: {} or invalid account type or amount type or amount sign or currency code&quot;, cashback);</span>
+<span class="fc" id="L168">                return false;</span>
+            }
+<span class="fc" id="L170">        return true;</span>
+        }
+    }
+    
+    @Override
+    protected double getMaxAmountForTransactionType(TransactionType transactionType) {
+<span class="fc bfc" id="L176" title="All 2 branches covered.">        if (transactionType == TransactionType.PURCHASE) {</span>
+<span class="fc" id="L177">            return MAX_PURCHASE_AMOUNT;</span>
+        }
+<span class="fc" id="L179">        return Double.MAX_VALUE;</span>
+    }
+    
+    @Override
+    protected boolean isVelocityLimitExceeded(TransactionType transactionType, String cardNumber) {
+        // In a real implementation, this would check against a database
+        // for velocity limits specific to purchase transactions
+        // For now, return false (no limit exceeded)
+<span class="fc" id="L187">        return false;</span>
+    }
+
+    private boolean isValidRuPayPreAuthMcc(String mcc) {
+<span class="pc bpc" id="L191" title="1 of 4 branches missed.">        if (mcc == null || mcc.isEmpty()) {</span>
+<span class="fc" id="L192">            return false;</span>
+        }
+
+<span class="fc" id="L195">        if (Map.of(</span>
+                &quot;7011&quot;, &quot;Hotel Bookings&quot;,
+                &quot;8062&quot;, &quot;Hospitals&quot;,
+                &quot;4112&quot;, &quot;Passenger Railways&quot;,
+                &quot;4121&quot;, &quot;Cab Booking&quot;
+<span class="fc bfc" id="L200" title="All 2 branches covered.">        ).containsKey(mcc)) {</span>
+<span class="fc" id="L201">            return true;</span>
+        }
+
+        try {
+<span class="fc" id="L205">            int mccValue = Integer.parseInt(mcc);</span>
+<span class="pc bpc" id="L206" title="1 of 4 branches missed.">            return mccValue &gt;= 3351 &amp;&amp; mccValue &lt;= 3441;</span>
+<span class="fc" id="L207">        } catch (NumberFormatException ex) {</span>
+<span class="fc" id="L208">            return false;</span>
+        }
+    }
+    
+    @Override
+    public String getValidatorType() {
+<span class="fc" id="L214">        return &quot;PURCHASE_TRANSACTION_VALIDATOR&quot;;</span>
+    }
+} 
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.14.202510111229</span></div></body></html>

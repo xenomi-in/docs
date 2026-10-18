@@ -1,0 +1,125 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>ISOException.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">iso8583-processor</a> &gt; <a href="index.source.html" class="el_package">com.logicpoint.iso8583.exception</a> &gt; <span class="el_source">ISOException.java</span></div><h1>ISOException.java</h1><pre class="source lang-java linenums">package com.logicpoint.iso8583.exception;
+
+    import java.io.PrintStream;
+    import java.io.PrintWriter;
+
+/**
+  * Author: LogicPoint Systems
+  * Version: 1.0
+  * Date: 2025-07-23
+  */
+ /**
+  * Signals that an ISO exception of some sort has occurred. 
+  *
+  * @author  &lt;a href=&quot;mailto:apr@cs.com.uy&quot;&gt;Alejandro P. Revilla&lt;/a&gt;
+  * @version $Revision$ $Date$
+  */
+ public class ISOException extends Exception  {
+ 
+     private static final long serialVersionUID = -777216335204861186L;
+     /**
+      * @serial
+      */
+<span class="fc" id="L23">     Throwable nested = null;</span>
+ 
+     /**
+      * Constructs an &lt;code&gt;ISOException&lt;/code&gt; with no detail message. 
+      */
+     public ISOException() {
+<span class="fc" id="L29">         super();</span>
+<span class="fc" id="L30">     }</span>
+ 
+     /**
+      * Constructs an &lt;code&gt;ISOException&lt;/code&gt; with the specified detail 
+      * message. 
+      *
+      * @param   s   the detail message.
+      */
+     public ISOException(String s) {
+<span class="fc" id="L39">         super(s);</span>
+<span class="fc" id="L40">     }</span>
+ 
+     /**
+      * Constructs an &lt;code&gt;ISOException&lt;/code&gt; with a nested
+      * exception
+      * @param nested another exception
+      */
+     public ISOException (Throwable nested) {
+<span class="fc" id="L48">         super(nested.toString());</span>
+<span class="fc" id="L49">         this.nested = nested;</span>
+<span class="fc" id="L50">     }</span>
+ 
+     /**
+      * Constructs an &lt;code&gt;ISOException&lt;/code&gt; with a detail Message nested
+      * exception
+      * @param   s   the detail message.
+      * @param nested another exception
+      */
+     public ISOException (String s, Throwable nested) {
+<span class="fc" id="L59">         super(s);</span>
+<span class="fc" id="L60">         this.nested = nested;</span>
+<span class="fc" id="L61">     }</span>
+ 
+     /**
+      * @return nested exception (may be null)
+      */
+     public Throwable getNested() {
+<span class="fc" id="L67">         return nested;</span>
+     }
+ 
+     protected String getTagName() {
+<span class="fc" id="L71">         return &quot;iso-exception&quot;;</span>
+     }
+     public void dump (PrintStream p, String indent) {
+<span class="fc" id="L74">         String inner = indent + &quot;  &quot;;</span>
+<span class="fc" id="L75">         p.println (indent + &quot;&lt;&quot;+getTagName()+&quot;&gt;&quot;);</span>
+<span class="fc" id="L76">         p.println (inner  + getMessage());</span>
+<span class="fc bfc" id="L77" title="All 2 branches covered.">         if (nested != null) {</span>
+<span class="fc bfc" id="L78" title="All 2 branches covered.">             if (nested instanceof ISOException) </span>
+<span class="fc" id="L79">                 ((ISOException)nested).dump (p, inner);</span>
+             else {
+<span class="fc" id="L81">                 p.println (inner + &quot;&lt;nested-exception&gt;&quot;);</span>
+<span class="fc" id="L82">                 p.print   (inner);</span>
+<span class="fc" id="L83">                 nested.printStackTrace (p);</span>
+<span class="fc" id="L84">                 p.println (inner + &quot;&lt;/nested-exception&gt;&quot;);</span>
+             }
+         }
+<span class="fc" id="L87">         p.print (inner);</span>
+<span class="fc" id="L88">         printStackTrace (p);</span>
+<span class="fc" id="L89">         p.println (indent + &quot;&lt;/&quot;+getTagName()+&quot;&gt;&quot;);</span>
+<span class="fc" id="L90">     }</span>
+     public String toString() {
+<span class="fc" id="L92">         StringBuilder buf = new StringBuilder (super.toString());</span>
+<span class="fc bfc" id="L93" title="All 2 branches covered.">         if (nested != null) {</span>
+<span class="fc" id="L94">             buf.append (&quot; (&quot;);</span>
+<span class="fc" id="L95">             buf.append (nested.toString());</span>
+<span class="fc" id="L96">             buf.append (&quot;)&quot;);</span>
+         }
+<span class="fc" id="L98">         return buf.toString();</span>
+     }
+ 
+     public void printStackTrace() {
+<span class="nc" id="L102">         super.printStackTrace();</span>
+<span class="nc bnc" id="L103" title="All 2 branches missed.">         if (nested != null) {</span>
+<span class="nc" id="L104">             System.err.print(&quot;Nested:&quot;);</span>
+<span class="nc" id="L105">             nested.printStackTrace();</span>
+         }
+<span class="nc" id="L107">     }</span>
+ 
+     public void printStackTrace(PrintStream ps) {
+<span class="fc" id="L110">         super.printStackTrace(ps);</span>
+<span class="fc bfc" id="L111" title="All 2 branches covered.">         if (nested != null) {</span>
+<span class="fc" id="L112">             ps.print(&quot;Nested:&quot;);</span>
+<span class="fc" id="L113">             nested.printStackTrace(ps);</span>
+         }
+<span class="fc" id="L115">     }</span>
+ 
+     public void printStackTrace(PrintWriter pw) {
+<span class="fc" id="L118">         super.printStackTrace(pw);</span>
+<span class="pc bpc" id="L119" title="1 of 2 branches missed.">         if (nested != null) {</span>
+<span class="fc" id="L120">             pw.print(&quot;Nested:&quot;);</span>
+<span class="fc" id="L121">             nested.printStackTrace(pw);</span>
+         }
+<span class="fc" id="L123">     }</span>
+ }
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.14.202510111229</span></div></body></html>

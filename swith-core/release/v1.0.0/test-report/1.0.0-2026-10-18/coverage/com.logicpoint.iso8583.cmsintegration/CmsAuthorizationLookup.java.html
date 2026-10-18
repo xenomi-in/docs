@@ -1,0 +1,66 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>CmsAuthorizationLookup.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">iso8583-processor</a> &gt; <a href="index.source.html" class="el_package">com.logicpoint.iso8583.cmsintegration</a> &gt; <span class="el_source">CmsAuthorizationLookup.java</span></div><h1>CmsAuthorizationLookup.java</h1><pre class="source lang-java linenums">package com.logicpoint.iso8583.cmsintegration;
+
+import static com.logicpoint.iso8583.cmsintegration.CmsContracts.*;
+import tools.jackson.databind.json.JsonMapper;
+import com.logicpoint.iso8583.context.RequestContext;
+import com.logicpoint.iso8583.entity.CardData;
+import com.logicpoint.iso8583.repository.CardDataRepository;
+import com.logicpoint.iso8583.service.CardDataEncryptionService;
+import jakarta.persistence.EntityManager;
+import org.springframework.jdbc.core.JdbcTemplate;
+import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
+import java.util.*;
+
+@Service
+public class CmsAuthorizationLookup {
+    private final JdbcTemplate db;
+    private final JsonMapper json;
+    private final CardDataRepository cards;
+    private final CardDataEncryptionService crypto;
+    private final EntityManager em;
+    public CmsAuthorizationLookup(JdbcTemplate db,JsonMapper json,CardDataRepository cards,
+<span class="fc" id="L23">            CardDataEncryptionService crypto,EntityManager em) {</span>
+<span class="fc" id="L24">        this.db=db; this.json=json; this.cards=cards; this.crypto=crypto; this.em=em;</span>
+<span class="fc" id="L25">    }</span>
+    @Transactional(readOnly=true)
+    public CardData lookup(RequestContext request, String hmac, int institution) {
+<span class="fc" id="L28">        List&lt;Map&lt;String,Object&gt;&gt; rows=db.queryForList(&quot;&quot;&quot;</span>
+            select p.*,m.home_country_code,exists(select 1 from cms_pan_family_block b
+                where b.cms_institution_id=p.cms_institution_id and b.pan_family_id=p.pan_family_id) as family_blocked
+            from cms_card_profile p join cms_institution_mapping m using(cms_institution_id)
+            where m.switch_institution_id=? and p.pan_lookup_hmac=?
+<span class="fc" id="L33">            &quot;&quot;&quot;,institution,hmac);</span>
+<span class="fc bfc" id="L34" title="All 2 branches covered.">        if(rows.isEmpty()) return null; // Legacy cards continue through their existing path.</span>
+<span class="fc" id="L35">        String expiry=request.getFields().get(14), sequence=request.getFields().get(23);</span>
+<span class="pc bpc" id="L36" title="1 of 4 branches missed.">        if(expiry==null || !expiry.matches(&quot;[0-9]{2}(0[1-9]|1[0-2])&quot;)) throw CmsIntegrationException.bad(&quot;Expiry evidence required&quot;);</span>
+<span class="pc bpc" id="L37" title="1 of 4 branches missed.">        if(sequence!=null &amp;&amp; !sequence.matches(&quot;[0-9]{3}&quot;)) throw CmsIntegrationException.bad(&quot;Invalid sequence evidence&quot;);</span>
+<span class="fc" id="L38">        List&lt;Map&lt;String,Object&gt;&gt; matches=rows.stream().filter(r-&gt;expiry.equals(r.get(&quot;expiry_yymm&quot;)))</span>
+<span class="pc bpc" id="L39" title="2 of 4 branches missed.">                .filter(r-&gt;sequence==null || sequence.equals(r.get(&quot;physical_sequence&quot;))).toList();</span>
+<span class="fc bfc" id="L40" title="All 2 branches covered.">        if(matches.size()!=1) throw CmsIntegrationException.bad(&quot;Card evidence is unknown or ambiguous&quot;);</span>
+<span class="fc" id="L41">        Map&lt;String,Object&gt; row=matches.getFirst();</span>
+        Profile profile;
+<span class="fc" id="L43">        try { profile=json.readValue(row.get(&quot;profile&quot;).toString(),Profile.class); }</span>
+<span class="fc" id="L44">        catch(Exception e) { throw CmsIntegrationException.unavailable(&quot;Authorization profile is unreadable&quot;); }</span>
+<span class="fc" id="L45">        CmsAuthorizationPolicy.enforce(profile,request,row.get(&quot;home_country_code&quot;).toString(),Boolean.TRUE.equals(row.get(&quot;family_blocked&quot;)));</span>
+<span class="fc" id="L46">        CardData card=cards.findById(((Number)row.get(&quot;auth_id&quot;)).longValue()).orElseThrow(()-&gt;CmsIntegrationException.unavailable(&quot;Card material missing&quot;));</span>
+        // Do not hydrate clear fields into a managed entity: Hibernate dirty checking could persist them.
+<span class="fc" id="L48">        em.detach(card);</span>
+<span class="fc" id="L49">        crypto.hydrateDecryptedFields(card,institution);</span>
+<span class="fc" id="L50">        card.setStatus(profile.effectiveStatus().name());</span>
+<span class="fc" id="L51">        request.setAttribute(&quot;cmsCardId&quot;,row.get(&quot;cms_card_id&quot;));</span>
+<span class="fc" id="L52">        request.setAttribute(&quot;cmsAuthorizationRevision&quot;,row.get(&quot;authorization_revision&quot;));</span>
+<span class="fc" id="L53">        return card;</span>
+    }
+    public boolean isManaged(String hmac) {
+<span class="fc bfc" id="L56" title="All 2 branches covered.">        return !db.queryForList(&quot;select 1 from cms_card_profile where pan_lookup_hmac=? limit 1&quot;,hmac).isEmpty();</span>
+    }
+    public boolean isManaged(Long authId) {
+<span class="pc bpc" id="L59" title="1 of 2 branches missed.">        return !db.queryForList(&quot;select 1 from cms_card_profile where auth_id=?&quot;,authId).isEmpty();</span>
+    }
+    public void updatePinCounters(CardData card) {
+<span class="fc" id="L62">        db.update(&quot;update card_data set pin_retry_count=?,pin_blocked=?,updated_at=now() where auth_id=?&quot;,</span>
+<span class="fc" id="L63">                card.getPin_retry_count(),card.getPin_blocked(),card.getAuth_id());</span>
+<span class="fc" id="L64">    }</span>
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.14.202510111229</span></div></body></html>

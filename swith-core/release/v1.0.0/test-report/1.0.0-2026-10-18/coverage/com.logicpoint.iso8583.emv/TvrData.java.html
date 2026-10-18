@@ -1,0 +1,211 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>TvrData.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">iso8583-processor</a> &gt; <a href="index.source.html" class="el_package">com.logicpoint.iso8583.emv</a> &gt; <span class="el_source">TvrData.java</span></div><h1>TvrData.java</h1><pre class="source lang-java linenums">package com.logicpoint.iso8583.emv;
+
+ import com.logicpoint.iso8583.util.ISOUtil;
+ 
+ import java.io.PrintStream;
+ import java.util.Objects;
+
+ 
+ /**
+  * Terminal verification results (TVR) parser.
+  */
+ public final class TvrData  {
+     
+     private final byte[] tvr;
+ 
+<span class="fc" id="L16">     public TvrData(byte[] tvr) {</span>
+<span class="fc" id="L17">         Objects.requireNonNull(tvr);</span>
+<span class="fc bfc" id="L18" title="All 2 branches covered.">         if (tvr.length != 5)</span>
+<span class="fc" id="L19">             throw new IllegalArgumentException(&quot;TVR length must be 5.&quot;);</span>
+<span class="fc" id="L20">         this.tvr = tvr;</span>
+<span class="fc" id="L21">     }</span>
+ 
+     public TvrData(String hexTVR) {
+<span class="fc" id="L24">         this(ISOUtil.hex2byte(hexTVR));</span>
+<span class="fc" id="L25">     }</span>
+ 
+     public boolean offlineDataProcNotPerformed() {
+<span class="fc" id="L28">         return isBitOn(tvr[0], 8);</span>
+     }
+ 
+     public boolean sdaFailed() {
+<span class="fc" id="L32">         return isBitOn(tvr[0], 7);</span>
+     }
+ 
+     public boolean iccDataMissing() {
+<span class="fc" id="L36">         return isBitOn(tvr[0], 6);</span>
+     }
+ 
+     public boolean panInHotlist() {
+<span class="fc" id="L40">         return isBitOn(tvr[0], 5);</span>
+     }
+ 
+     public boolean ddaFailed() {
+<span class="fc" id="L44">         return isBitOn(tvr[0], 4);</span>
+     }
+ 
+     public boolean cdaFailed() {
+<span class="fc" id="L48">         return isBitOn(tvr[0], 3);</span>
+     }
+ 
+     public boolean sdaSelected() {
+<span class="fc" id="L52">         return isBitOn(tvr[0], 2);</span>
+     }
+ 
+     public boolean rfu() {
+<span class="nc bnc" id="L56" title="All 4 branches missed.">         return !isBitOn(tvr[0], 1) || !isBitOn(tvr[1], 1) ||</span>
+<span class="nc bnc" id="L57" title="All 4 branches missed.">                 !isBitOn(tvr[1], 2) || !isBitOn(tvr[1], 3) ||</span>
+<span class="nc bnc" id="L58" title="All 4 branches missed.">                 !isBitOn(tvr[2], 2) || !isBitOn(tvr[2], 1) ||</span>
+<span class="nc bnc" id="L59" title="All 4 branches missed.">                 !isBitOn(tvr[3], 3) || !isBitOn(tvr[3], 2) ||</span>
+<span class="nc bnc" id="L60" title="All 2 branches missed.">                 !isBitOn(tvr[3], 1) ||</span>
+<span class="nc bnc" id="L61" title="All 4 branches missed.">                 (isBitOn(tvr[4], 2) &amp;&amp; isBitOn(tvr[4], 1));</span>
+     }
+ 
+     public boolean cardAndTerminalDiffApps() {
+<span class="fc" id="L65">         return isBitOn(tvr[1], 8);</span>
+     }
+ 
+     public boolean expiredApplication() {
+<span class="fc" id="L69">         return isBitOn(tvr[1], 7);</span>
+     }
+ 
+     public boolean applicationNotEffective() {
+<span class="fc" id="L73">         return isBitOn(tvr[1], 6);</span>
+     }
+ 
+     public boolean serviceNotAllowedForCardProduct() {
+<span class="fc" id="L77">         return isBitOn(tvr[1], 5);</span>
+     }
+ 
+     public boolean newCard() {
+<span class="fc" id="L81">         return isBitOn(tvr[1], 4);</span>
+     }
+ 
+     public boolean cardholderVerificationNotSuccessful() {
+<span class="fc" id="L85">         return isBitOn(tvr[2], 8);</span>
+     }
+ 
+     public boolean unrecognisedCVM() {
+<span class="fc" id="L89">         return isBitOn(tvr[2], 7);</span>
+     }
+ 
+     public boolean pinTryLimitExceeded() {
+<span class="fc" id="L93">         return isBitOn(tvr[2], 6);</span>
+     }
+ 
+     public boolean pinRequiredButNoPinPadPresent() {
+<span class="fc" id="L97">         return isBitOn(tvr[2], 5);</span>
+     }
+ 
+     public boolean pinRequiredButNotEntered() {
+<span class="fc" id="L101">         return isBitOn(tvr[2], 4);</span>
+     }
+ 
+     public boolean onlinePINEntered() {
+<span class="fc" id="L105">         return isBitOn(tvr[2], 3);</span>
+     }
+ 
+     public boolean transactionExceedsFloorLimit() {
+<span class="fc" id="L109">         return isBitOn(tvr[3], 8);</span>
+     }
+ 
+     public boolean lowerConsecutiveOfflineLimitExceeded() {
+<span class="fc" id="L113">         return isBitOn(tvr[3], 7);</span>
+     }
+ 
+     public boolean upperConsecutiveOfflineLimitExceeded() {
+<span class="fc" id="L117">         return isBitOn(tvr[3], 6);</span>
+     }
+ 
+     public boolean transactionSelectedRandomlyOnlineProcessing() {
+<span class="fc" id="L121">         return isBitOn(tvr[3], 5);</span>
+     }
+ 
+     public boolean merchantForcedTransactionOnline() {
+<span class="fc" id="L125">         return isBitOn(tvr[3], 4);</span>
+     }
+ 
+     public boolean defaultTDOLUsed() {
+<span class="fc" id="L129">         return isBitOn(tvr[4], 8);</span>
+     }
+ 
+     public boolean issuerAuthenticationFailed() {
+<span class="fc" id="L133">         return isBitOn(tvr[4], 7);</span>
+     }
+ 
+     public boolean scriptFailedBeforeFinalGenerateAC() {
+<span class="fc" id="L137">         return isBitOn(tvr[4], 6);</span>
+     }
+ 
+     public boolean scriptFailedAfterFinalGenerateAC() {
+<span class="fc" id="L141">         return isBitOn(tvr[4], 5);</span>
+     }
+ 
+     public boolean relayResistanceThresholdExceeded() {
+<span class="nc" id="L145">         return isBitOn(tvr[4], 4);</span>
+     }
+ 
+     public boolean relayResistanceTimeLimitsExceeded() {
+<span class="nc" id="L149">         return isBitOn(tvr[4], 3);</span>
+     }
+ 
+     public boolean relayResistanceProtocolNotSupported() {
+<span class="pc bpc" id="L153" title="2 of 4 branches missed.">         return !isBitOn(tvr[4], 2) &amp;&amp; !isBitOn(tvr[4], 1);</span>
+     }
+ 
+     public boolean relayResistanceProtocolNotPerformed() {
+<span class="pc bpc" id="L157" title="2 of 4 branches missed.">         return !isBitOn(tvr[4], 2) &amp;&amp; isBitOn(tvr[4], 1);</span>
+     }
+ 
+     public boolean relayResistanceProtocolPerformed() {
+<span class="pc bpc" id="L161" title="2 of 4 branches missed.">         return isBitOn(tvr[4], 2) &amp;&amp; !isBitOn(tvr[4], 1);</span>
+     }
+ 
+     private boolean isBitOn(byte value, int position) {
+<span class="fc bfc" id="L165" title="All 2 branches covered.">         return ((value &gt;&gt; (position - 1)) &amp; 1) == 1;</span>
+     }
+ 
+     
+     public void dump(PrintStream p, String indent) {
+<span class="fc" id="L170">         String inner = indent + &quot;  &quot;;</span>
+<span class="fc" id="L171">         p.printf(&quot;%s&lt;terminal-verification-results value='%s'&gt;%n&quot;, indent, ISOUtil.hexString(tvr));</span>
+<span class="fc" id="L172">         p.printf(&quot;%sByte 1: %s%n&quot;, inner, String.format(&quot;%8s&quot;, Integer.toBinaryString(tvr[0] &amp; 0xFF)).replace(' ', '0'));</span>
+<span class="fc" id="L173">         p.printf(&quot;%sByte 2: %s%n&quot;, inner, String.format(&quot;%8s&quot;, Integer.toBinaryString(tvr[1] &amp; 0xFF)).replace(' ', '0'));</span>
+<span class="fc" id="L174">         p.printf(&quot;%sByte 3: %s%n&quot;, inner, String.format(&quot;%8s&quot;, Integer.toBinaryString(tvr[2] &amp; 0xFF)).replace(' ', '0'));</span>
+<span class="fc" id="L175">         p.printf(&quot;%sByte 4: %s%n&quot;, inner, String.format(&quot;%8s&quot;, Integer.toBinaryString(tvr[3] &amp; 0xFF)).replace(' ', '0'));</span>
+<span class="fc" id="L176">         p.printf(&quot;%sByte 5: %s%n&quot;, inner, String.format(&quot;%8s&quot;, Integer.toBinaryString(tvr[4] &amp; 0xFF)).replace(' ', '0'));</span>
+<span class="fc" id="L177">         p.printf(&quot;%s&lt;/terminal-verification-results&gt;%n&quot;, indent);</span>
+<span class="fc" id="L178">     }</span>
+ 
+ public static void main(String[] args) {
+<span class="nc" id="L181">    TvrData tvrData = new TvrData(&quot;0000048000&quot;); </span>
+<span class="nc" id="L182">    tvrData.dump(System.out, &quot;&quot;);</span>
+<span class="nc" id="L183">    System.out.println(&quot;Offline Data Proc Not Performed: &quot; + tvrData.offlineDataProcNotPerformed());</span>
+<span class="nc" id="L184">    System.out.println(&quot;Sda Failed: &quot; + tvrData.sdaFailed());</span>
+<span class="nc" id="L185">    System.out.println(&quot;Icc Data Missing: &quot; + tvrData.iccDataMissing());</span>
+<span class="nc" id="L186">    System.out.println(&quot;Pan In Hotlist: &quot; + tvrData.panInHotlist());</span>
+<span class="nc" id="L187">    System.out.println(&quot;Dda Failed: &quot; + tvrData.ddaFailed());</span>
+<span class="nc" id="L188">    System.out.println(&quot;Cda Failed: &quot; + tvrData.cdaFailed());</span>
+<span class="nc" id="L189">    System.out.println(&quot;Sda Selected: &quot; + tvrData.sdaSelected());</span>
+<span class="nc" id="L190">    System.out.println(&quot;Rfu: &quot; + tvrData.rfu());</span>
+<span class="nc" id="L191">    System.out.println(&quot;Card And Terminal Diff Apps: &quot; + tvrData.cardAndTerminalDiffApps());</span>
+<span class="nc" id="L192">    System.out.println(&quot;Expired Application: &quot; + tvrData.expiredApplication());</span>
+<span class="nc" id="L193">    System.out.println(&quot;Application Not Effective: &quot; + tvrData.applicationNotEffective());</span>
+<span class="nc" id="L194">    System.out.println(&quot;Service Not Allowed For Card Product: &quot; + tvrData.serviceNotAllowedForCardProduct());</span>
+<span class="nc" id="L195">    System.out.println(&quot;New Card: &quot; + tvrData.newCard());</span>
+<span class="nc" id="L196">    System.out.println(&quot;Cardholder Verification Not Successful: &quot; + tvrData.cardholderVerificationNotSuccessful());</span>
+<span class="nc" id="L197">    System.out.println(&quot;Unrecognised CVM: &quot; + tvrData.unrecognisedCVM());</span>
+<span class="nc" id="L198">    System.out.println(&quot;Pin Try Limit Exceeded: &quot; + tvrData.pinTryLimitExceeded());</span>
+<span class="nc" id="L199">    System.out.println(&quot;Pin Required But No Pin Pad Present: &quot; + tvrData.pinRequiredButNoPinPadPresent());</span>
+<span class="nc" id="L200">    System.out.println(&quot;Pin Required But Not Entered: &quot; + tvrData.pinRequiredButNotEntered());</span>
+<span class="nc" id="L201">    System.out.println(&quot;Online PIN Entered: &quot; + tvrData.onlinePINEntered());</span>
+<span class="nc" id="L202">    System.out.println(&quot;Transaction Exceeds Floor Limit: &quot; + tvrData.transactionExceedsFloorLimit());</span>
+<span class="nc" id="L203">    System.out.println(&quot;Lower Consecutive Offline Limit Exceeded: &quot; + tvrData.lowerConsecutiveOfflineLimitExceeded());</span>
+<span class="nc" id="L204">    System.out.println(&quot;Upper Consecutive Offline Limit Exceeded: &quot; + tvrData.upperConsecutiveOfflineLimitExceeded());</span>
+<span class="nc" id="L205">    System.out.println(&quot;Transaction Selected Randomly Online Processing: &quot; + tvrData.transactionSelectedRandomlyOnlineProcessing());</span>
+<span class="nc" id="L206">    System.out.println(&quot;Merchant Forced Transaction Online: &quot; + tvrData.merchantForcedTransactionOnline());</span>
+
+<span class="nc" id="L208">    tvrData.dump(System.out, &quot;&quot;);</span>
+<span class="nc" id="L209"> }</span>
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.14.202510111229</span></div></body></html>

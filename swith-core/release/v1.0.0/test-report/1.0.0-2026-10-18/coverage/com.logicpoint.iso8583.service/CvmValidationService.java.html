@@ -1,0 +1,376 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>CvmValidationService.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">iso8583-processor</a> &gt; <a href="index.source.html" class="el_package">com.logicpoint.iso8583.service</a> &gt; <span class="el_source">CvmValidationService.java</span></div><h1>CvmValidationService.java</h1><pre class="source lang-java linenums">package com.logicpoint.iso8583.service;
+
+import com.logicpoint.iso8583.emv.CardholderVerificationMethodResults;
+import com.logicpoint.iso8583.emv.ChipData;
+import com.logicpoint.iso8583.util.CardVerificationMethod;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+import org.springframework.beans.factory.annotation.Value;
+import org.springframework.stereotype.Service;
+
+import java.math.BigDecimal;
+import java.util.LinkedHashMap;
+import java.util.Map;
+
+/**
+ * Service for Cardholder Verification Method (CVM) validation and processing.
+ * Provides business logic for CVM validation based on EMV specifications and
+ * payment scheme requirements.
+ * 
+ * @author Logic Point Systems
+ * @version 1.0.0
+ */
+@Service
+<span class="fc" id="L24">public class CvmValidationService {</span>
+
+<span class="fc" id="L26">    private static final Logger logger = LoggerFactory.getLogger(CvmValidationService.class);</span>
+    
+    private static final String TAG_9F34 = &quot;9F34&quot;; // Cardholder Verification Method Results
+    
+<span class="fc" id="L30">    @Value(&quot;${scheme.rupay.cvm.contactless-cvm-limit:5000}&quot;)</span>
+    private BigDecimal contactlessCvmLimit = new BigDecimal(&quot;5000&quot;);
+
+<span class="fc" id="L33">    @Value(&quot;${scheme.rupay.cvm.contactless-no-cvm-limit:2500}&quot;)</span>
+    private BigDecimal contactlessNoCvmLimit = new BigDecimal(&quot;2500&quot;);
+    
+    /**
+     * Validates CVM for a given transaction based on EMV data and transaction context
+     * 
+     * @param chipData EMV chip data containing CVM information
+     * @param transactionAmount Transaction amount in cents
+     * @param isContactless Whether this is a contactless transaction
+     * @param terminalCapabilities Terminal capabilities for CVM support
+     * @return CvmValidationResult containing validation details
+     */
+    public CvmValidationResult validateCvm(ChipData chipData, BigDecimal transactionAmount, 
+                                         boolean isContactless, String terminalCapabilities) {
+<span class="fc" id="L47">        return validateCvm(chipData, transactionAmount, isContactless, terminalCapabilities, false);</span>
+    }
+
+    public CvmValidationResult validateCvm(ChipData chipData, BigDecimal transactionAmount,
+                                         boolean isContactless, String terminalCapabilities,
+                                         boolean pinBlockPresent) {
+<span class="fc" id="L53">        return validateCvm(chipData, transactionAmount, isContactless, terminalCapabilities, pinBlockPresent, true);</span>
+    }
+
+    public CvmValidationResult validateCvm(ChipData chipData, BigDecimal transactionAmount,
+                                         boolean isContactless, String terminalCapabilities,
+                                         boolean pinBlockPresent,
+                                         boolean offlinePinAllowed) {
+<span class="fc" id="L60">        transactionAmount= transactionAmount.divide(new BigDecimal(100));</span>
+<span class="fc" id="L61">        logger.debug(&quot;Starting CVM validation for transaction amount: {}, contactless: {}&quot;, </span>
+<span class="fc" id="L62">                    transactionAmount, isContactless);</span>
+        
+<span class="pc bpc" id="L64" title="1 of 4 branches missed.">        if (chipData == null || chipData.isEmpty()) {</span>
+<span class="fc" id="L65">            logger.warn(&quot;Chip data is null or empty, CVM validation failed&quot;);</span>
+<span class="fc" id="L66">            return CvmValidationResult.failed(&quot;No chip data available for CVM validation&quot;);</span>
+        }
+        
+        // Extract CVM Results from tag 9F34
+<span class="fc" id="L70">        String cvmHex = chipData.getTagValue(TAG_9F34);</span>
+<span class="pc bpc" id="L71" title="1 of 4 branches missed.">        if (cvmHex == null || cvmHex.isEmpty()) {</span>
+<span class="fc" id="L72">            logger.warn(&quot;CVM Results (9F34) not found in chip data&quot;);</span>
+<span class="fc" id="L73">            return CvmValidationResult.failed(&quot;CVM Results not found in chip data&quot;);</span>
+        }
+        
+        try {
+<span class="fc" id="L77">            CardholderVerificationMethodResults cvmResults = new CardholderVerificationMethodResults(cvmHex);</span>
+            
+            // Perform comprehensive CVM validation
+<span class="fc" id="L80">            return performCvmValidation(cvmResults, transactionAmount, isContactless, terminalCapabilities, pinBlockPresent, offlinePinAllowed);</span>
+            
+<span class="fc" id="L82">        } catch (IllegalArgumentException e) {</span>
+<span class="fc" id="L83">            logger.error(&quot;Invalid CVM Results format: {}&quot;, cvmHex, e);</span>
+<span class="fc" id="L84">            return CvmValidationResult.failed(&quot;Invalid CVM Results format: &quot; + e.getMessage());</span>
+        }
+    }
+    
+    /**
+     * Performs comprehensive CVM validation based on EMV specifications
+     */
+    private CvmValidationResult performCvmValidation(CardholderVerificationMethodResults cvmResults, 
+                                                   BigDecimal transactionAmount, boolean isContactless, 
+                                                   String terminalCapabilities,
+                                                   boolean pinBlockPresent,
+                                                   boolean offlinePinAllowed) {
+        
+<span class="fc" id="L97">        logger.debug(&quot;CVM Code: {}, Condition Code: {}, CVM Result: {}&quot;,</span>
+<span class="fc" id="L98">                    cvmResults.getCvmCodeDescription(),</span>
+<span class="fc" id="L99">                    cvmResults.getConditionCodeDescription(),</span>
+<span class="fc" id="L100">                    cvmResults.getCvmResultsDescription());</span>
+
+<span class="pc bpc" id="L102" title="1 of 4 branches missed.">        if (cvmResults.isOnlinePinVerificationPerformed() &amp;&amp; cvmResults.isCvmResultUnknown()) {</span>
+<span class="fc" id="L103">            logger.debug(&quot;Allowing unknown CVM result for online PIN verification; PIN is validated separately&quot;);</span>
+        }
+
+<span class="fc bfc" id="L106" title="All 4 branches covered.">        if (cvmResults.isOnlinePinVerificationPerformed() &amp;&amp; !pinBlockPresent) {</span>
+<span class="fc" id="L107">            return CvmValidationResult.failed(&quot;Online PIN selected but DE52 PIN data is missing&quot;);</span>
+        }
+
+<span class="fc bfc" id="L110" title="All 2 branches covered.">        if (cvmResults.isOfflinePinVerificationPerformed()) {</span>
+<span class="fc bfc" id="L111" title="All 2 branches covered.">            if (!offlinePinAllowed) {</span>
+<span class="fc" id="L112">                return CvmValidationResult.failed(&quot;Offline PIN is not allowed for this BIN&quot;);</span>
+            }
+<span class="fc bfc" id="L114" title="All 2 branches covered.">            if (!cvmResults.isCvmSuccessful()) {</span>
+<span class="fc" id="L115">                return CvmValidationResult.failed(&quot;Offline PIN selected but CVM result is not successful&quot;);</span>
+            }
+<span class="fc" id="L117">            logger.debug(&quot;Offline PIN selected in 9F34; accepting CVM result without issuer PIN re-verification&quot;);</span>
+        }
+        
+        // Check if CVM is valid for transaction processing
+<span class="fc bfc" id="L121" title="All 2 branches covered.">        if (!cvmResults.isValidForTransaction()) {</span>
+<span class="fc" id="L122">            String reason = String.format(&quot;CVM validation failed: %s - %s&quot;, </span>
+<span class="fc" id="L123">                                        cvmResults.getCvmCodeDescription(), </span>
+<span class="fc" id="L124">                                        cvmResults.getCvmResultsDescription());</span>
+<span class="fc" id="L125">            logger.warn(reason);</span>
+<span class="fc" id="L126">            return CvmValidationResult.failed(reason);</span>
+        }
+        
+        // Validate CVM based on transaction context
+<span class="fc" id="L130">        CvmValidationResult result = validateCvmByContext(cvmResults, transactionAmount, isContactless, pinBlockPresent);</span>
+        
+<span class="fc bfc" id="L132" title="All 2 branches covered.">        if (result.isValid()) {</span>
+<span class="fc" id="L133">            logger.debug(&quot;CVM validation successful: {}&quot;, result.getValidationMessage());</span>
+        } else {
+<span class="fc" id="L135">            logger.warn(&quot;CVM validation failed: {}&quot;, result.getValidationMessage());</span>
+        }
+        
+<span class="fc" id="L138">        return result;</span>
+    }
+    
+    /**
+     * Validates CVM based on transaction context (amount, contactless, etc.)
+     */
+    private CvmValidationResult validateCvmByContext(CardholderVerificationMethodResults cvmResults, 
+                                                   BigDecimal transactionAmount, boolean isContactless,
+                                                   boolean pinBlockPresent) {
+        
+        // For contactless transactions, check CVM limits
+<span class="fc bfc" id="L149" title="All 2 branches covered.">        if (isContactless) {</span>
+<span class="fc" id="L150">            return validateContactlessCvm(cvmResults, transactionAmount, pinBlockPresent);</span>
+        }
+        
+        // For contact transactions, validate based on CVM performed
+<span class="fc" id="L154">        return validateContactCvm(cvmResults);</span>
+    }
+    
+    /**
+     * Validates CVM for contactless transactions
+     */
+    private CvmValidationResult validateContactlessCvm(CardholderVerificationMethodResults cvmResults, 
+                                                     BigDecimal transactionAmount,
+                                                     boolean pinBlockPresent) {
+        
+        // Check if this is a contactless no-CVM transaction
+<span class="fc bfc" id="L165" title="All 4 branches covered.">        if (cvmResults.isContactlessNoCvm() || cvmResults.isNoCvmPerformed()) {</span>
+            // For contactless no-CVM, check if amount is within limit
+<span class="fc bfc" id="L167" title="All 2 branches covered.">            if (transactionAmount.compareTo(contactlessNoCvmLimit) &gt; 0) {</span>
+<span class="fc" id="L168">                String reason = String.format(&quot;Contactless no-CVM transaction exceeds limit. Amount: %s, Limit: %s&quot;, </span>
+                                            transactionAmount, contactlessNoCvmLimit);
+<span class="fc" id="L170">                return CvmValidationResult.failed(reason);</span>
+            }
+<span class="fc" id="L172">            return CvmValidationResult.successful(&quot;Contactless no-CVM transaction within limit&quot;);</span>
+        }
+
+<span class="fc bfc" id="L175" title="All 2 branches covered.">        if (cvmResults.isOfflinePinVerificationPerformed()) {</span>
+<span class="fc" id="L176">            return CvmValidationResult.successful(&quot;Contactless offline PIN accepted; PIN verified by ICC/terminal&quot;);</span>
+        }
+
+<span class="pc bpc" id="L179" title="1 of 4 branches missed.">        if (pinBlockPresent &amp;&amp; cvmResults.isPinVerificationPerformed()) {</span>
+<span class="fc" id="L180">            return CvmValidationResult.successful(&quot;Contactless PIN CVM accepted for issuer PIN verification&quot;);</span>
+        }
+        
+        // For contactless with CVM, check if amount is within CVM limit
+<span class="fc bfc" id="L184" title="All 2 branches covered.">        if (transactionAmount.compareTo(contactlessCvmLimit) &gt; 0) {</span>
+<span class="fc" id="L185">            String reason = String.format(&quot;Contactless transaction exceeds CVM limit. Amount: %s, Limit: %s&quot;, </span>
+                                        transactionAmount, contactlessCvmLimit);
+<span class="fc" id="L187">            return CvmValidationResult.failed(reason);</span>
+        }
+        
+        // Validate the CVM performed
+<span class="pc bpc" id="L191" title="1 of 2 branches missed.">        if (cvmResults.isCvmSuccessful()) {</span>
+<span class="fc" id="L192">            return CvmValidationResult.successful(&quot;Contactless CVM successful&quot;);</span>
+        }
+        
+<span class="nc" id="L195">        return CvmValidationResult.failed(&quot;Contactless CVM validation failed&quot;);</span>
+    }
+    
+    /**
+     * Validates CVM for contact transactions
+     */
+    private CvmValidationResult validateContactCvm(CardholderVerificationMethodResults cvmResults) {
+        
+        // Check if CVM was successful
+<span class="fc bfc" id="L204" title="All 2 branches covered.">        if (cvmResults.isCvmSuccessful()) {</span>
+<span class="fc" id="L205">            return CvmValidationResult.successful(&quot;Contact CVM successful&quot;);</span>
+        }
+
+        // Some terminals populate 9F34 with online PIN as the performed CVM but
+        // leave the result byte as 00. In issuer flows we verify the PIN
+        // separately via HSM, so this should not be treated as a decline here.
+<span class="pc bpc" id="L211" title="3 of 4 branches missed.">        if (cvmResults.isOnlinePinVerificationPerformed() &amp;&amp; cvmResults.isCvmResultUnknown()) {</span>
+<span class="nc" id="L212">            return CvmValidationResult.successful(&quot;Contact online PIN accepted with unknown CVM result&quot;);</span>
+        }
+
+<span class="pc bpc" id="L215" title="1 of 2 branches missed.">        if (cvmResults.isOfflinePinVerificationPerformed()) {</span>
+<span class="nc" id="L216">            return CvmValidationResult.successful(&quot;Contact offline PIN accepted; PIN verified by ICC/terminal&quot;);</span>
+        }
+        
+        // Check if no CVM was required
+<span class="pc bpc" id="L220" title="1 of 2 branches missed.">        if (cvmResults.isNoCvmRequired()) {</span>
+<span class="nc" id="L221">            return CvmValidationResult.successful(&quot;No CVM required for contact transaction&quot;);</span>
+        }
+        
+        // Check if CVM is not applicable
+<span class="fc bfc" id="L225" title="All 2 branches covered.">        if (cvmResults.isCvmNotApplicable()) {</span>
+<span class="fc" id="L226">            return CvmValidationResult.successful(&quot;CVM not applicable for this transaction&quot;);</span>
+        }
+        
+<span class="fc" id="L229">        return CvmValidationResult.failed(&quot;Contact CVM validation failed&quot;);</span>
+    }
+    
+    /**
+     * Determines the appropriate CVM method based on transaction context
+     * 
+     * @param transactionAmount Transaction amount in cents
+     * @param isContactless Whether this is a contactless transaction
+     * @param terminalCapabilities Terminal capabilities
+     * @return Recommended CVM method
+     */
+    public CardVerificationMethod determineRecommendedCvm(BigDecimal transactionAmount, 
+                                                         boolean isContactless, 
+                                                         String terminalCapabilities) {
+        
+<span class="fc bfc" id="L244" title="All 2 branches covered.">        if (isContactless) {</span>
+            // For contactless transactions
+<span class="fc bfc" id="L246" title="All 2 branches covered.">            if (transactionAmount.compareTo(contactlessNoCvmLimit) &lt;= 0) {</span>
+<span class="fc" id="L247">                return CardVerificationMethod.NO_CVM_CONTACTLESS;</span>
+<span class="fc bfc" id="L248" title="All 2 branches covered.">            } else if (transactionAmount.compareTo(contactlessCvmLimit) &lt;= 0) {</span>
+<span class="fc" id="L249">                return CardVerificationMethod.OFFLINE_PIN;</span>
+            } else {
+<span class="fc" id="L251">                return CardVerificationMethod.ONLINE_PIN;</span>
+            }
+        } else {
+            // For contact transactions
+<span class="fc bfc" id="L255" title="All 2 branches covered.">            if (transactionAmount.compareTo(new BigDecimal(&quot;10000&quot;)) &lt;= 0) { // $100.00</span>
+<span class="fc" id="L256">                return CardVerificationMethod.OFFLINE_PIN;</span>
+            } else {
+<span class="fc" id="L258">                return CardVerificationMethod.ONLINE_PIN;</span>
+            }
+        }
+    }
+    
+    /**
+     * Checks if terminal supports the required CVM method
+     * 
+     * @param cvmMethod Required CVM method
+     * @param terminalCapabilities Terminal capabilities hex string
+     * @return true if terminal supports the CVM method
+     */
+    public boolean isCvmSupportedByTerminal(CardVerificationMethod cvmMethod, String terminalCapabilities) {
+        
+<span class="fc bfc" id="L272" title="All 4 branches covered.">        if (terminalCapabilities == null || terminalCapabilities.length() &lt; 6) {</span>
+<span class="fc" id="L273">            logger.warn(&quot;Invalid terminal capabilities format&quot;);</span>
+<span class="fc" id="L274">            return false;</span>
+        }
+        
+        try {
+            // Parse terminal capabilities (3 bytes)
+<span class="fc" id="L279">            int byte1 = Integer.parseInt(terminalCapabilities.substring(0, 2), 16);</span>
+<span class="fc" id="L280">            int byte2 = Integer.parseInt(terminalCapabilities.substring(2, 4), 16);</span>
+            
+<span class="pc bpc" id="L282" title="2 of 6 branches missed.">            return switch (cvmMethod) {</span>
+<span class="pc bpc" id="L283" title="1 of 2 branches missed.">                case ONLINE_PIN -&gt; (byte1 &amp; 0x80) != 0; // Check if terminal supports online PIN (byte 1, bit 8)</span>
+<span class="pc bpc" id="L284" title="1 of 2 branches missed.">                case OFFLINE_PIN -&gt; (byte1 &amp; 0x40) != 0; // Check if terminal supports offline PIN (byte 1, bit 7)</span>
+<span class="pc bpc" id="L285" title="1 of 2 branches missed.">                case SIGNATURE -&gt; (byte1 &amp; 0x20) != 0; // Check if terminal supports signature (byte 1, bit 6)</span>
+<span class="fc" id="L286">                case NO_CVM, NO_CVM_CONTACTLESS -&gt; true; // All terminals support no CVM</span>
+<span class="nc bnc" id="L287" title="All 2 branches missed.">                case BIOMETRIC, BIOMETRIC_PIN, BIOMETRIC_SIGNATURE -&gt; (byte2 &amp; 0x80) != 0; // Check if terminal supports biometric (byte 2, bit 8)</span>
+<span class="nc" id="L288">                default -&gt; false;</span>
+            };
+            
+<span class="fc" id="L291">        } catch (NumberFormatException e) {</span>
+<span class="fc" id="L292">            logger.error(&quot;Error parsing terminal capabilities: {}&quot;, terminalCapabilities, e);</span>
+<span class="fc" id="L293">            return false;</span>
+        }
+    }
+    
+    /**
+     * Gets CVM validation statistics for monitoring
+     * 
+     * @param chipData EMV chip data
+     * @return Map containing CVM statistics
+     */
+    public Map&lt;String, Object&gt; getCvmStatistics(ChipData chipData) {
+<span class="pc bpc" id="L304" title="1 of 4 branches missed.">        if (chipData == null || !chipData.hasTag(TAG_9F34)) {</span>
+<span class="fc" id="L305">            return Map.of(&quot;error&quot;, &quot;No CVM data available&quot;);</span>
+        }
+        
+        try {
+<span class="fc" id="L309">            String cvmHex = chipData.getTagValue(TAG_9F34);</span>
+<span class="fc" id="L310">            CardholderVerificationMethodResults cvmResults = new CardholderVerificationMethodResults(cvmHex);</span>
+            
+<span class="fc" id="L312">            Map&lt;String, Object&gt; statistics = new LinkedHashMap&lt;&gt;();</span>
+<span class="fc" id="L313">            statistics.put(&quot;cvmCode&quot;, cvmResults.getCvmCode());</span>
+<span class="fc" id="L314">            statistics.put(&quot;cvmCodeDescription&quot;, cvmResults.getCvmCodeDescription());</span>
+<span class="fc" id="L315">            statistics.put(&quot;conditionCode&quot;, cvmResults.getConditionCode());</span>
+<span class="fc" id="L316">            statistics.put(&quot;conditionCodeDescription&quot;, cvmResults.getConditionCodeDescription());</span>
+<span class="fc" id="L317">            statistics.put(&quot;cvmResult&quot;, cvmResults.getCvmResults());</span>
+<span class="fc" id="L318">            statistics.put(&quot;cvmResultDescription&quot;, cvmResults.getCvmResultsDescription());</span>
+<span class="fc" id="L319">            statistics.put(&quot;isValidForTransaction&quot;, cvmResults.isValidForTransaction());</span>
+<span class="fc" id="L320">            statistics.put(&quot;isPinVerificationPerformed&quot;, cvmResults.isPinVerificationPerformed());</span>
+<span class="fc" id="L321">            statistics.put(&quot;isSignatureVerificationPerformed&quot;, cvmResults.isSignatureVerificationPerformed());</span>
+<span class="fc" id="L322">            statistics.put(&quot;isBiometricVerificationPerformed&quot;, cvmResults.isBiometricVerificationPerformed());</span>
+<span class="fc" id="L323">            statistics.put(&quot;isNoCvmRequired&quot;, cvmResults.isNoCvmRequired());</span>
+<span class="fc" id="L324">            statistics.put(&quot;isContactlessNoCvm&quot;, cvmResults.isContactlessNoCvm());</span>
+<span class="fc" id="L325">            return statistics;</span>
+            
+<span class="fc" id="L327">        } catch (Exception e) {</span>
+<span class="fc" id="L328">            logger.error(&quot;Error generating CVM statistics&quot;, e);</span>
+<span class="fc" id="L329">            return Map.of(&quot;error&quot;, &quot;Error parsing CVM data: &quot; + e.getMessage());</span>
+        }
+    }
+    
+    /**
+     * Result class for CVM validation
+     */
+    public static class CvmValidationResult {
+        private final boolean valid;
+        private final String validationMessage;
+        private final String cvmCode;
+        private final String cvmResult;
+        
+<span class="fc" id="L342">        private CvmValidationResult(boolean valid, String validationMessage, String cvmCode, String cvmResult) {</span>
+<span class="fc" id="L343">            this.valid = valid;</span>
+<span class="fc" id="L344">            this.validationMessage = validationMessage;</span>
+<span class="fc" id="L345">            this.cvmCode = cvmCode;</span>
+<span class="fc" id="L346">            this.cvmResult = cvmResult;</span>
+<span class="fc" id="L347">        }</span>
+        
+        public static CvmValidationResult successful(String message) {
+<span class="fc" id="L350">            return new CvmValidationResult(true, message, null, null);</span>
+        }
+        
+        public static CvmValidationResult failed(String message) {
+<span class="fc" id="L354">            return new CvmValidationResult(false, message, null, null);</span>
+        }
+        
+        public static CvmValidationResult successful(String message, String cvmCode, String cvmResult) {
+<span class="fc" id="L358">            return new CvmValidationResult(true, message, cvmCode, cvmResult);</span>
+        }
+        
+        public static CvmValidationResult failed(String message, String cvmCode, String cvmResult) {
+<span class="nc" id="L362">            return new CvmValidationResult(false, message, cvmCode, cvmResult);</span>
+        }
+        
+<span class="fc" id="L365">        public boolean isValid() { return valid; }</span>
+<span class="fc" id="L366">        public String getValidationMessage() { return validationMessage; }</span>
+<span class="fc" id="L367">        public String getCvmCode() { return cvmCode; }</span>
+<span class="fc" id="L368">        public String getCvmResult() { return cvmResult; }</span>
+        
+        @Override
+        public String toString() {
+<span class="fc" id="L372">            return String.format(&quot;CvmValidationResult{valid=%s, message='%s'}&quot;, valid, validationMessage);</span>
+        }
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.14.202510111229</span></div></body></html>

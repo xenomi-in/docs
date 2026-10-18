@@ -1,0 +1,91 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>EntryMode.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">iso8583-processor</a> &gt; <a href="index.source.html" class="el_package">com.logicpoint.iso8583.util</a> &gt; <span class="el_source">EntryMode.java</span></div><h1>EntryMode.java</h1><pre class="source lang-java linenums">package com.logicpoint.iso8583.util;
+
+import io.swagger.v3.oas.annotations.media.Schema;
+
+<span class="fc" id="L5">@Schema(description = &quot;ISO 8583 Card Entry Modes&quot;)</span>
+public enum EntryMode {
+<span class="fc" id="L7">    @Schema(description = &quot;Manual Entry&quot;)</span>
+    MANUAL(&quot;01&quot;, &quot;Manual Entry&quot;),
+    
+<span class="fc" id="L10">    @Schema(description = &quot;Magnetic Stripe Read&quot;)</span>
+    MAGNETIC_STRIPE(&quot;02&quot;, &quot;Magnetic Stripe Read&quot;),
+    
+<span class="fc" id="L13">    @Schema(description = &quot;Bar Code&quot;)</span>
+    BAR_CODE(&quot;03&quot;, &quot;Bar Code&quot;),
+    
+<span class="fc" id="L16">    @Schema(description = &quot;OCR&quot;)</span>
+    OCR(&quot;04&quot;, &quot;OCR&quot;),
+    
+<span class="fc" id="L19">    @Schema(description = &quot;ICC with Chip&quot;)</span>
+    ICC(&quot;05&quot;, &quot;ICC with Chip&quot;),
+    
+<span class="fc" id="L22">    @Schema(description = &quot;Contactless ICC&quot;)</span>
+    CONTACTLESS_ICC(&quot;07&quot;, &quot;Contactless ICC&quot;),
+    
+<span class="fc" id="L25">    @Schema(description = &quot;Contactless Magnetic Stripe&quot;)</span>
+    CONTACTLESS_MSR(&quot;91&quot;, &quot;Contactless Magnetic Stripe&quot;),
+    
+<span class="fc" id="L28">    @Schema(description = &quot;QR Code&quot;)</span>
+    QR_CODE(&quot;92&quot;, &quot;QR Code&quot;),
+    
+<span class="fc" id="L31">    @Schema(description = &quot;NFC&quot;)</span>
+    NFC(&quot;93&quot;, &quot;NFC&quot;),
+    
+<span class="fc" id="L34">    @Schema(description = &quot;UPI&quot;)</span>
+    UPI(&quot;94&quot;, &quot;UPI&quot;),
+    
+<span class="fc" id="L37">    @Schema(description = &quot;Unknown Entry Mode&quot;)</span>
+    UNKNOWN(&quot;99&quot;, &quot;Unknown Entry Mode&quot;);
+
+    private final String code;
+    private final String description;
+
+<span class="fc" id="L43">    EntryMode(String code, String description) {</span>
+<span class="fc" id="L44">        this.code = code;</span>
+<span class="fc" id="L45">        this.description = description;</span>
+<span class="fc" id="L46">    }</span>
+
+    @Schema(description = &quot;Entry Mode Code&quot;)
+    public String getCode() {
+<span class="fc" id="L50">        return code;</span>
+    }
+
+    @Schema(description = &quot;Entry Mode Description&quot;)
+    public String getDescription() {
+<span class="fc" id="L55">        return description;</span>
+    }
+
+    public static EntryMode fromCode(String code) {
+<span class="fc bfc" id="L59" title="All 2 branches covered.">        if (code == null) {</span>
+<span class="fc" id="L60">            return UNKNOWN;</span>
+        }
+        
+<span class="fc bfc" id="L63" title="All 2 branches covered.">        for (EntryMode mode : values()) {</span>
+<span class="fc bfc" id="L64" title="All 2 branches covered.">            if (mode.getCode().equals(code)) {</span>
+<span class="fc" id="L65">                return mode;</span>
+            }
+        }
+<span class="fc" id="L68">        return UNKNOWN;</span>
+    }
+
+    public boolean isContactless() {
+<span class="fc bfc" id="L72" title="All 6 branches covered.">        return this == CONTACTLESS_ICC || this == CONTACTLESS_MSR || this == NFC;</span>
+    }
+
+    public boolean isChip() {
+<span class="fc bfc" id="L76" title="All 4 branches covered.">        return this == ICC || this == CONTACTLESS_ICC;</span>
+    }
+
+    public boolean isMagneticStripe() {
+<span class="fc bfc" id="L80" title="All 4 branches covered.">        return this == MAGNETIC_STRIPE || this == CONTACTLESS_MSR;</span>
+    }
+
+    public boolean isManual() {
+<span class="fc bfc" id="L84" title="All 2 branches covered.">        return this == MANUAL;</span>
+    }
+
+    public boolean isDigital() {
+<span class="fc bfc" id="L88" title="All 4 branches covered.">        return this == QR_CODE || this == UPI;</span>
+    }
+} 
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.14.202510111229</span></div></body></html>

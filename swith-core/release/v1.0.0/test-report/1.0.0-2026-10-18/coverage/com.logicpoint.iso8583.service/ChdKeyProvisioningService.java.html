@@ -1,0 +1,112 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>ChdKeyProvisioningService.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">iso8583-processor</a> &gt; <a href="index.source.html" class="el_package">com.logicpoint.iso8583.service</a> &gt; <span class="el_source">ChdKeyProvisioningService.java</span></div><h1>ChdKeyProvisioningService.java</h1><pre class="source lang-java linenums">package com.logicpoint.iso8583.service;
+
+import java.security.SecureRandom;
+import java.util.Arrays;
+import java.util.LinkedHashMap;
+import java.util.Map;
+
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+import org.springframework.beans.factory.annotation.Value;
+import org.springframework.boot.context.event.ApplicationReadyEvent;
+import org.springframework.context.event.EventListener;
+import org.springframework.stereotype.Service;
+
+import com.logicpoint.iso8583.entity.KeyManagement;
+
+@Service
+public class ChdKeyProvisioningService {
+
+<span class="fc" id="L20">    private static final Logger logger = LoggerFactory.getLogger(ChdKeyProvisioningService.class);</span>
+    private static final int KEY_SIZE_BYTES = 32;
+
+    private final KeyManagementService keyManagementService;
+    private final NettyHsmService nettyHsmService;
+    private final ChdKeyCacheService chdKeyCacheService;
+<span class="fc" id="L26">    private final SecureRandom secureRandom = new SecureRandom();</span>
+
+    @Value(&quot;${chd.encryption.enabled:false}&quot;)
+    private boolean encryptionEnabled;
+
+    @Value(&quot;${chd.encryption.auto-provision-keys:false}&quot;)
+    private boolean autoProvisionKeys;
+
+    @Value(&quot;${chd.encryption.institution-id:1}&quot;)
+    private Integer institutionId;
+
+    @Value(&quot;${chd.encryption.wrapping-key-type:DEK}&quot;)
+    private String wrappingKeyType;
+
+    @Value(&quot;${chd.encryption.card-key-algorithm:AES-256-GCM}&quot;)
+    private String cardKeyAlgorithm;
+
+    @Value(&quot;${chd.encryption.txn-key-algorithm:AES-256-GCM}&quot;)
+    private String txnKeyAlgorithm;
+
+    @Value(&quot;${chd.encryption.hmac-key-algorithm:HMAC-SHA-256}&quot;)
+    private String hmacKeyAlgorithm;
+
+    public ChdKeyProvisioningService(KeyManagementService keyManagementService,
+                                     NettyHsmService nettyHsmService,
+<span class="fc" id="L51">                                     ChdKeyCacheService chdKeyCacheService) {</span>
+<span class="fc" id="L52">        this.keyManagementService = keyManagementService;</span>
+<span class="fc" id="L53">        this.nettyHsmService = nettyHsmService;</span>
+<span class="fc" id="L54">        this.chdKeyCacheService = chdKeyCacheService;</span>
+<span class="fc" id="L55">    }</span>
+
+    @EventListener(ApplicationReadyEvent.class)
+    public void ensureProvisionedKeys() {
+<span class="fc bfc" id="L59" title="All 4 branches covered.">        if (!encryptionEnabled || !autoProvisionKeys) {</span>
+<span class="fc" id="L60">            return;</span>
+        }
+
+<span class="fc" id="L63">        provisionDefaultKeys(institutionId);</span>
+<span class="fc" id="L64">    }</span>
+
+    public Map&lt;String, String&gt; provisionDefaultKeys() {
+<span class="nc" id="L67">        return provisionDefaultKeys(institutionId);</span>
+    }
+
+    public Map&lt;String, String&gt; provisionDefaultKeys(Integer targetInstitutionId) {
+<span class="fc" id="L71">        Map&lt;String, String&gt; result = new LinkedHashMap&lt;&gt;();</span>
+<span class="fc" id="L72">        result.put(ChdKeyCacheService.CARD_KEY_TYPE, provisionIfMissing(targetInstitutionId, ChdKeyCacheService.CARD_KEY_TYPE, cardKeyAlgorithm));</span>
+<span class="fc" id="L73">        result.put(ChdKeyCacheService.TXN_KEY_TYPE, provisionIfMissing(targetInstitutionId, ChdKeyCacheService.TXN_KEY_TYPE, txnKeyAlgorithm));</span>
+<span class="fc" id="L74">        result.put(ChdKeyCacheService.PAN_HMAC_KEY_TYPE, provisionIfMissing(targetInstitutionId, ChdKeyCacheService.PAN_HMAC_KEY_TYPE, hmacKeyAlgorithm));</span>
+<span class="fc" id="L75">        chdKeyCacheService.refresh();</span>
+<span class="fc" id="L76">        return result;</span>
+    }
+
+    private String provisionIfMissing(Integer targetInstitutionId, String appKeyType, String algorithm) {
+<span class="fc" id="L80">        KeyManagement existingKey = keyManagementService.getCurrentInstitutionKey(targetInstitutionId, appKeyType);</span>
+<span class="fc bfc" id="L81" title="All 2 branches covered.">        if (existingKey != null) {</span>
+<span class="fc" id="L82">            logger.info(&quot;CHD key {} already exists at institution {}&quot;, appKeyType, targetInstitutionId);</span>
+<span class="fc" id="L83">            return &quot;EXISTS&quot;;</span>
+        }
+
+<span class="fc" id="L86">        byte[] clearKey = new byte[KEY_SIZE_BYTES];</span>
+<span class="fc" id="L87">        secureRandom.nextBytes(clearKey);</span>
+
+        try {
+<span class="fc" id="L90">            HsmWrappedKeyResult wrappedKeyResult = nettyHsmService.wrapClearChdKey(clearKey, targetInstitutionId, wrappingKeyType, true);</span>
+<span class="fc bfc" id="L91" title="All 2 branches covered.">            if (wrappedKeyResult == null) {</span>
+<span class="fc" id="L92">                logger.error(&quot;Unable to provision CHD key {} through HSM&quot;, appKeyType);</span>
+<span class="fc" id="L93">                return &quot;FAILED&quot;;</span>
+            }
+
+<span class="fc" id="L96">            keyManagementService.saveInstitutionWrappedKey(</span>
+                    targetInstitutionId,
+                    appKeyType,
+<span class="fc" id="L99">                    wrappedKeyResult.getWrappedKey(),</span>
+<span class="fc" id="L100">                    wrappedKeyResult.getKcv(),</span>
+                    algorithm,
+                    wrappingKeyType + &quot;:&quot; + targetInstitutionId,
+                    &quot;SYSTEM-CHD&quot;);
+
+<span class="fc" id="L105">            logger.info(&quot;Provisioned CHD key {} for institution {}&quot;, appKeyType, targetInstitutionId);</span>
+<span class="fc" id="L106">            return &quot;CREATED&quot;;</span>
+        } finally {
+<span class="fc" id="L108">            Arrays.fill(clearKey, (byte) 0);</span>
+        }
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.14.202510111229</span></div></body></html>

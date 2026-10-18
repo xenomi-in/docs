@@ -1,0 +1,139 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>EmvDataUpdater.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">iso8583-processor</a> &gt; <a href="index.source.html" class="el_package">com.logicpoint.iso8583.util</a> &gt; <span class="el_source">EmvDataUpdater.java</span></div><h1>EmvDataUpdater.java</h1><pre class="source lang-java linenums">package com.logicpoint.iso8583.util;
+
+import java.util.HashMap;
+import java.util.Map;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
+
+/**
+ * Utility class for updating EMV data elements.
+ * Provides methods to update specific tags in EMV data (DE55).
+ * 
+ * @author LogicPoint Systems
+ * @version 1.0
+ * @since 2025-01-27
+ */
+<span class="nc" id="L16">public class EmvDataUpdater {</span>
+    
+<span class="fc" id="L18">    private static final Pattern TAG_PATTERN = Pattern.compile(&quot;([0-9A-F]{2})([0-9A-F]{2})([0-9A-F]*)&quot;);</span>
+    
+    /**
+     * Updates a specific tag in EMV data.
+     * 
+     * @param emvData The original EMV data (DE55)
+     * @param tag The tag to update (e.g., &quot;91&quot; for ARPC)
+     * @param newValue The new value for the tag
+     * @return Updated EMV data with the new tag value
+     */
+    public static String updateTag(String emvData, String tag, String newValue) {
+<span class="pc bpc" id="L29" title="1 of 6 branches missed.">        if (emvData == null || tag == null || newValue == null) {</span>
+<span class="fc" id="L30">            return emvData;</span>
+        }
+        
+        // Parse EMV data into tags
+<span class="fc" id="L34">        Map&lt;String, String&gt; tags = parseEmvData(emvData);</span>
+        
+        // Update the specific tag
+<span class="fc" id="L37">        tags.put(tag, newValue);</span>
+        
+        // Reconstruct EMV data
+<span class="fc" id="L40">        return reconstructEmvData(tags);</span>
+    }
+    
+    /**
+     * Updates tag 91 (ARPC) in EMV data.
+     * 
+     * @param emvData The original EMV data (DE55)
+     * @param arpcValue The new ARPC value
+     * @return Updated EMV data with new ARPC value
+     */
+    public static String updateArpc(String emvData, String arpcValue) {
+<span class="fc" id="L51">        return updateTag(emvData, &quot;91&quot;, arpcValue);</span>
+    }
+    
+    /**
+     * Parses EMV data into a map of tag-value pairs.
+     * 
+     * @param emvData The EMV data to parse
+     * @return Map of tag-value pairs
+     */
+    public static Map&lt;String, String&gt; parseEmvData(String emvData) {
+<span class="fc" id="L61">        Map&lt;String, String&gt; tags = new HashMap&lt;&gt;();</span>
+        
+<span class="fc bfc" id="L63" title="All 4 branches covered.">        if (emvData == null || emvData.isEmpty()) {</span>
+<span class="fc" id="L64">            return tags;</span>
+        }
+        
+<span class="fc" id="L67">        Matcher matcher = TAG_PATTERN.matcher(emvData);</span>
+<span class="fc bfc" id="L68" title="All 2 branches covered.">        while (matcher.find()) {</span>
+<span class="fc" id="L69">            String tag = matcher.group(1);</span>
+<span class="fc" id="L70">            String length = matcher.group(2);</span>
+<span class="fc" id="L71">            String value = matcher.group(3);</span>
+            
+<span class="pc bpc" id="L73" title="2 of 4 branches missed.">            if (value != null &amp;&amp; value.length() &gt; 0) {</span>
+<span class="fc" id="L74">                tags.put(tag, value);</span>
+            }
+<span class="fc" id="L76">        }</span>
+        
+<span class="fc" id="L78">        return tags;</span>
+    }
+    
+    /**
+     * Reconstructs EMV data from a map of tag-value pairs.
+     * 
+     * @param tags Map of tag-value pairs
+     * @return Reconstructed EMV data
+     */
+    public static String reconstructEmvData(Map&lt;String, String&gt; tags) {
+<span class="fc bfc" id="L88" title="All 4 branches covered.">        if (tags == null || tags.isEmpty()) {</span>
+<span class="fc" id="L89">            return &quot;&quot;;</span>
+        }
+        
+<span class="fc" id="L92">        StringBuilder emvData = new StringBuilder();</span>
+        
+<span class="fc bfc" id="L94" title="All 2 branches covered.">        for (Map.Entry&lt;String, String&gt; entry : tags.entrySet()) {</span>
+<span class="fc" id="L95">            String tag = entry.getKey();</span>
+<span class="fc" id="L96">            String value = entry.getValue();</span>
+            
+<span class="fc bfc" id="L98" title="All 4 branches covered.">            if (value != null &amp;&amp; !value.isEmpty()) {</span>
+<span class="fc" id="L99">                String length = String.format(&quot;%02X&quot;, value.length());</span>
+<span class="fc" id="L100">                emvData.append(tag).append(length).append(value);</span>
+            }
+<span class="fc" id="L102">        }</span>
+        
+<span class="fc" id="L104">        return emvData.toString();</span>
+    }
+    
+    /**
+     * Gets a specific tag value from EMV data.
+     * 
+     * @param emvData The EMV data to search
+     * @param tag The tag to find
+     * @return The tag value or null if not found
+     */
+    public static String getTagValue(String emvData, String tag) {
+<span class="fc bfc" id="L115" title="All 4 branches covered.">        if (emvData == null || tag == null) {</span>
+<span class="fc" id="L116">            return null;</span>
+        }
+        
+<span class="fc" id="L119">        Map&lt;String, String&gt; tags = parseEmvData(emvData);</span>
+<span class="fc" id="L120">        return tags.get(tag);</span>
+    }
+    
+    /**
+     * Checks if a specific tag exists in EMV data.
+     * 
+     * @param emvData The EMV data to check
+     * @param tag The tag to look for
+     * @return true if the tag exists, false otherwise
+     */
+    public static boolean hasTag(String emvData, String tag) {
+<span class="fc bfc" id="L131" title="All 4 branches covered.">        if (emvData == null || tag == null) {</span>
+<span class="fc" id="L132">            return false;</span>
+        }
+        
+<span class="fc" id="L135">        Map&lt;String, String&gt; tags = parseEmvData(emvData);</span>
+<span class="fc" id="L136">        return tags.containsKey(tag);</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.14.202510111229</span></div></body></html>

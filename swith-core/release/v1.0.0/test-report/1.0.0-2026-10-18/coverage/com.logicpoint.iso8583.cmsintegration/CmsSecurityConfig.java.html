@@ -1,0 +1,56 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>CmsSecurityConfig.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">iso8583-processor</a> &gt; <a href="index.source.html" class="el_package">com.logicpoint.iso8583.cmsintegration</a> &gt; <span class="el_source">CmsSecurityConfig.java</span></div><h1>CmsSecurityConfig.java</h1><pre class="source lang-java linenums">package com.logicpoint.iso8583.cmsintegration;
+
+import org.springframework.beans.factory.annotation.Value;
+import org.springframework.context.annotation.Bean;
+import org.springframework.context.annotation.Configuration;
+import org.springframework.core.annotation.Order;
+import org.springframework.security.config.annotation.web.builders.HttpSecurity;
+import org.springframework.security.config.http.SessionCreationPolicy;
+import org.springframework.security.oauth2.core.*;
+import org.springframework.security.oauth2.jwt.*;
+import org.springframework.security.web.SecurityFilterChain;
+import org.springframework.security.web.access.intercept.AuthorizationFilter;
+import org.springframework.web.filter.OncePerRequestFilter;
+import jakarta.servlet.*;
+import jakarta.servlet.http.*;
+import java.io.IOException;
+
+@Configuration
+public class CmsSecurityConfig {
+    @Bean
+    @Order(1)
+    SecurityFilterChain cmsIntegrationSecurity(HttpSecurity http,
+            @Value(&quot;${switch.cms.jwk-set-uri:http://localhost:9000/realms/cms/protocol/openid-connect/certs}&quot;) String jwks,
+            @Value(&quot;${switch.cms.issuer:http://localhost:9000/realms/cms}&quot;) String issuer,
+            @Value(&quot;${switch.cms.client-id:cms-switch-client}&quot;) String client,
+            @Value(&quot;${switch.cms.require-mtls:true}&quot;) boolean mtls) throws Exception {
+        NimbusJwtDecoder decoder = NimbusJwtDecoder.withJwkSetUri(jwks).build();
+        decoder.setJwtValidator(new org.springframework.security.oauth2.core.DelegatingOAuth2TokenValidator&lt;&gt;(
+                JwtValidators.createDefaultWithIssuer(issuer), jwt -&gt; {
+                    boolean valid = jwt.getExpiresAt()!=null &amp;&amp; jwt.getAudience().contains(&quot;switch-internal&quot;)
+                            &amp;&amp; client.equals(jwt.getClaimAsString(&quot;azp&quot;));
+                    return valid ? OAuth2TokenValidatorResult.success() : OAuth2TokenValidatorResult.failure(
+                            new OAuth2Error(&quot;invalid_token&quot;, &quot;Invalid service audience or client&quot;, null));
+                }));
+        http.securityMatcher(&quot;/internal/v1/**&quot;, &quot;/api/v1/cards/onboard&quot;)
+                .csrf(csrf -&gt; csrf.disable())
+                .sessionManagement(s -&gt; s.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
+                .authorizeHttpRequests(a -&gt; a.requestMatchers(&quot;/api/v1/cards/onboard&quot;).denyAll()
+                        .anyRequest().hasAuthority(&quot;SCOPE_switch:card-authorization:write&quot;))
+                .oauth2ResourceServer(o -&gt; o.jwt(j -&gt; j.decoder(decoder)));
+<span class="fc" id="L41">        http.addFilterBefore(new OncePerRequestFilter() {</span>
+            @Override protected void doFilterInternal(HttpServletRequest request, HttpServletResponse response,
+                    FilterChain chain) throws ServletException, IOException {
+<span class="fc" id="L44">                Object chainAttribute=request.getAttribute(&quot;jakarta.servlet.request.X509Certificate&quot;);</span>
+<span class="pc bpc" id="L45" title="2 of 8 branches missed.">                if (mtls &amp;&amp; (!request.isSecure() || !(chainAttribute instanceof java.security.cert.X509Certificate[] certificates)</span>
+                        || certificates.length==0)) {
+<span class="fc" id="L47">                    response.sendError(403, &quot;Direct mutually authenticated TLS is required&quot;);</span>
+<span class="fc" id="L48">                    return;</span>
+                }
+<span class="fc" id="L50">                chain.doFilter(request, response);</span>
+<span class="fc" id="L51">            }</span>
+        }, AuthorizationFilter.class);
+        return http.build();
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.14.202510111229</span></div></body></html>

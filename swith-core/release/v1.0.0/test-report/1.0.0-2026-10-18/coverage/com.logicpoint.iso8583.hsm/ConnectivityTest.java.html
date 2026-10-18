@@ -1,0 +1,81 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>ConnectivityTest.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">iso8583-processor</a> &gt; <a href="index.source.html" class="el_package">com.logicpoint.iso8583.hsm</a> &gt; <span class="el_source">ConnectivityTest.java</span></div><h1>ConnectivityTest.java</h1><pre class="source lang-java linenums">package com.logicpoint.iso8583.hsm;
+
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
+import java.io.IOException;
+import java.net.Socket;
+import java.net.InetSocketAddress;
+
+/**
+ * Simple connectivity test to verify basic TCP connection to HSM.
+ * 
+ * @author LogicPoint Systems
+ * @version 1.0
+ */
+<span class="nc" id="L16">public class ConnectivityTest {</span>
+    
+<span class="nc" id="L18">    private static final Logger logger = LoggerFactory.getLogger(ConnectivityTest.class);</span>
+    
+    public static void main(String[] args) {
+<span class="nc" id="L21">        String host = &quot;ap-india-central-crypto-uat.virtucrypt.com&quot;;</span>
+<span class="nc" id="L22">        int port = 4121;</span>
+        
+<span class="nc" id="L24">        logger.info(&quot;=== Basic TCP Connectivity Test ===&quot;);</span>
+<span class="nc" id="L25">        logger.info(&quot;Testing connection to {}:{}&quot;, host, port);</span>
+        
+<span class="nc" id="L27">        Socket socket = null;</span>
+        try {
+            // Test basic TCP connectivity
+<span class="nc" id="L30">            logger.info(&quot;Attempting TCP connection...&quot;);</span>
+<span class="nc" id="L31">            socket = new Socket();</span>
+<span class="nc" id="L32">            socket.connect(new InetSocketAddress(host, port), 10000); // 10 second timeout</span>
+            
+<span class="nc bnc" id="L34" title="All 2 branches missed.">            if (socket.isConnected()) {</span>
+<span class="nc" id="L35">                logger.info(&quot;✅ TCP connection successful!&quot;);</span>
+<span class="nc" id="L36">                logger.info(&quot;Local address: {}&quot;, socket.getLocalAddress());</span>
+<span class="nc" id="L37">                logger.info(&quot;Remote address: {}&quot;, socket.getInetAddress());</span>
+                
+                // Test if we can send data
+<span class="nc" id="L40">                logger.info(&quot;Testing data transmission...&quot;);</span>
+<span class="nc" id="L41">                String testMessage = &quot;[AOECHO;BJ0;AGEcho Test.;]&quot;;</span>
+<span class="nc" id="L42">                socket.getOutputStream().write(testMessage.getBytes(&quot;UTF-8&quot;));</span>
+<span class="nc" id="L43">                socket.getOutputStream().flush();</span>
+<span class="nc" id="L44">                logger.info(&quot;✅ Data sent successfully&quot;);</span>
+                
+                // Try to read response
+<span class="nc" id="L47">                logger.info(&quot;Attempting to read response...&quot;);</span>
+<span class="nc" id="L48">                byte[] buffer = new byte[1024];</span>
+<span class="nc" id="L49">                int bytesRead = socket.getInputStream().read(buffer);</span>
+                
+<span class="nc bnc" id="L51" title="All 2 branches missed.">                if (bytesRead &gt; 0) {</span>
+<span class="nc" id="L52">                    String response = new String(buffer, 0, bytesRead, &quot;UTF-8&quot;);</span>
+<span class="nc" id="L53">                    logger.info(&quot;✅ Received response: {}&quot;, response);</span>
+<span class="nc" id="L54">                } else {</span>
+<span class="nc" id="L55">                    logger.warn(&quot;⚠️ No response received from server&quot;);</span>
+                }
+                
+<span class="nc" id="L58">            } else {</span>
+<span class="nc" id="L59">                logger.error(&quot;❌ TCP connection failed&quot;);</span>
+            }
+            
+<span class="nc" id="L62">        } catch (IOException e) {</span>
+<span class="nc" id="L63">            logger.error(&quot;❌ Connection failed: {}&quot;, e.getMessage());</span>
+<span class="nc bnc" id="L64" title="All 2 branches missed.">            if (e.getCause() != null) {</span>
+<span class="nc" id="L65">                logger.error(&quot;Root cause: {}&quot;, e.getCause().getMessage());</span>
+            }
+        } finally {
+<span class="nc bnc" id="L68" title="All 2 branches missed.">            if (socket != null) {</span>
+                try {
+<span class="nc" id="L70">                    socket.close();</span>
+<span class="nc" id="L71">                    logger.info(&quot;Socket closed&quot;);</span>
+<span class="nc" id="L72">                } catch (IOException e) {</span>
+<span class="nc" id="L73">                    logger.warn(&quot;Error closing socket: {}&quot;, e.getMessage());</span>
+<span class="nc" id="L74">                }</span>
+            }
+        }
+        
+<span class="nc" id="L78">        logger.info(&quot;=== Connectivity Test Completed ===&quot;);</span>
+<span class="nc" id="L79">    }</span>
+} 
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.14.202510111229</span></div></body></html>

@@ -1,0 +1,50 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>CmsExceptionAdvice.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">iso8583-processor</a> &gt; <a href="index.source.html" class="el_package">com.logicpoint.iso8583.cmsintegration</a> &gt; <span class="el_source">CmsExceptionAdvice.java</span></div><h1>CmsExceptionAdvice.java</h1><pre class="source lang-java linenums">package com.logicpoint.iso8583.cmsintegration;
+
+import org.springframework.core.annotation.Order;
+import org.springframework.http.ResponseEntity;
+import org.springframework.web.bind.annotation.*;
+import java.util.Map;
+
+@Order(-100)
+@RestControllerAdvice(assignableTypes={CmsCardController.class,CmsPinController.class})
+<span class="fc" id="L10">public class CmsExceptionAdvice {</span>
+<span class="fc" id="L11">    private static final org.slf4j.Logger log = org.slf4j.LoggerFactory.getLogger(CmsExceptionAdvice.class);</span>
+    @ExceptionHandler(CmsIntegrationException.class)
+    ResponseEntity&lt;?&gt; known(CmsIntegrationException e) {
+<span class="fc" id="L14">        log.warn(&quot;CMS integration rejected status={} reason={}&quot;, e.status, e.getMessage());</span>
+<span class="fc" id="L15">        return ResponseEntity.status(e.status).body(Map.of(&quot;success&quot;,false,&quot;message&quot;,e.getMessage()));</span>
+    }
+    @ExceptionHandler({org.springframework.http.converter.HttpMessageNotReadableException.class,
+            org.springframework.web.bind.MissingRequestHeaderException.class,
+            org.springframework.web.method.annotation.MethodArgumentTypeMismatchException.class})
+<span class="nc" id="L20">    ResponseEntity&lt;?&gt; bad(Exception e) { log.warn(&quot;CMS integration invalid request exceptionType={}&quot;, e.getClass().getSimpleName()); return ResponseEntity.badRequest().body(Map.of(&quot;success&quot;,false,&quot;message&quot;,&quot;Invalid request&quot;)); }</span>
+    @ExceptionHandler(Exception.class)
+    ResponseEntity&lt;?&gt; unexpected(Exception e) {
+<span class="fc" id="L23">        java.sql.SQLException sql = null;</span>
+<span class="fc" id="L24">        Throwable cause = e;</span>
+<span class="pc bpc" id="L25" title="1 of 4 branches missed.">        for (int depth = 0; cause != null &amp;&amp; depth &lt; 20; depth++, cause = cause.getCause()) {</span>
+<span class="pc bpc" id="L26" title="1 of 2 branches missed.">            if (cause instanceof java.sql.SQLException failure) {</span>
+<span class="nc" id="L27">                sql = failure;</span>
+<span class="nc" id="L28">                break;</span>
+            }
+        }
+<span class="fc" id="L31">        log.warn(&quot;CMS integration failed exceptionType={} reasonCode={} sqlState={} sqlErrorCode={}&quot;,</span>
+<span class="fc" id="L32">                e.getClass().getSimpleName(), diagnosticCode(e),</span>
+<span class="pc bpc" id="L33" title="2 of 4 branches missed.">                sql == null ? &quot;none&quot; : sql.getSQLState(), sql == null ? 0 : sql.getErrorCode());</span>
+        // Hibernate and JSON exceptions may include rejected sensitive values. Never echo or log their messages.
+<span class="fc" id="L35">        return ResponseEntity.status(503).body(Map.of(&quot;success&quot;,false,&quot;message&quot;,&quot;Integration temporarily unavailable; query command receipt before retrying&quot;));</span>
+    }
+
+    private static String diagnosticCode(Throwable failure) {
+<span class="fc bfc" id="L39" title="All 2 branches covered.">        for (Throwable cause = failure; cause != null; cause = cause.getCause()) {</span>
+<span class="fc" id="L40">            String message = cause.getMessage();</span>
+<span class="pc bpc" id="L41" title="1 of 2 branches missed.">            if (message == null) continue;</span>
+<span class="pc bpc" id="L42" title="1 of 2 branches missed.">            if (message.startsWith(&quot;CMS registration requires encryption&quot;)) return &quot;CHD_PERSISTENCE_MODE_INVALID&quot;;</span>
+<span class="pc bpc" id="L43" title="1 of 2 branches missed.">            if (message.startsWith(&quot;PAN encryption could not&quot;)) return &quot;CHD_CARD_KEY_UNAVAILABLE&quot;;</span>
+<span class="pc bpc" id="L44" title="1 of 2 branches missed.">            if (message.startsWith(&quot;Expiry encryption could not&quot;)) return &quot;CHD_CARD_KEY_UNAVAILABLE&quot;;</span>
+<span class="pc bpc" id="L45" title="1 of 2 branches missed.">            if (message.startsWith(&quot;Protected PAN lookup could not&quot;)) return &quot;CHD_PAN_LOOKUP_UNAVAILABLE&quot;;</span>
+        }
+<span class="fc" id="L47">        return &quot;UNCLASSIFIED_FAILURE&quot;;</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.14.202510111229</span></div></body></html>

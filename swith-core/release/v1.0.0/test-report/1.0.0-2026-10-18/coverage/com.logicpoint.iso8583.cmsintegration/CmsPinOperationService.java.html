@@ -1,0 +1,169 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>CmsPinOperationService.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">iso8583-processor</a> &gt; <a href="index.source.html" class="el_package">com.logicpoint.iso8583.cmsintegration</a> &gt; <span class="el_source">CmsPinOperationService.java</span></div><h1>CmsPinOperationService.java</h1><pre class="source lang-java linenums">package com.logicpoint.iso8583.cmsintegration;
+
+import tools.jackson.databind.json.JsonMapper;
+
+import tools.jackson.databind.*;
+import com.logicpoint.iso8583.entity.CardData;
+import com.logicpoint.iso8583.repository.CardDataRepository;
+import com.logicpoint.iso8583.service.CardDataEncryptionService;
+import org.springframework.beans.factory.ObjectProvider;
+import org.springframework.jdbc.core.JdbcTemplate;
+import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
+import static com.logicpoint.iso8583.cmsintegration.CmsPinContracts.*;
+import java.time.Instant;
+import java.util.*;
+
+@Service
+public class CmsPinOperationService {
+    private final JdbcTemplate db;
+    private final JsonMapper json;
+    private final CardDataRepository cards;
+    private final CardDataEncryptionService crypto;
+    private final CmsPinOperationExecutor executor;
+    private final CmsPinMaterialDecoder materials;
+    private final CmsPinAuthorizationVerifier authorization;
+
+    public CmsPinOperationService(JdbcTemplate db,JsonMapper json,CardDataRepository cards,
+            CardDataEncryptionService crypto,ObjectProvider&lt;CmsPinOperationExecutor&gt; executors,
+<span class="fc" id="L29">            CmsPinMaterialDecoder materials,ObjectProvider&lt;CmsPinAuthorizationVerifier&gt; authorizations) {</span>
+<span class="fc" id="L30">        this.db=db; this.json=json; this.cards=cards; this.crypto=crypto;</span>
+<span class="fc" id="L31">        this.executor=executors.getIfAvailable();</span>
+<span class="fc" id="L32">        this.materials=materials;</span>
+<span class="fc" id="L33">        this.authorization=authorizations.getIfAvailable();</span>
+<span class="fc" id="L34">    }</span>
+
+    @Transactional
+    public JsonNode submit(UUID tenant,UUID family,PinCommand command) {
+<span class="pc bpc" id="L38" title="1 of 4 branches missed.">        if(!tenant.equals(command.institutionId()) || !family.equals(command.panFamilyReference()))</span>
+<span class="fc" id="L39">            throw CmsIntegrationException.bad(&quot;Command institution and PAN family must match the resource path&quot;);</span>
+<span class="fc" id="L40">        String fingerprint=hash(command);</span>
+<span class="fc" id="L41">        db.queryForList(&quot;select pg_advisory_xact_lock(hashtextextended(?,0))&quot;,&quot;cms-pin-operation:&quot;+tenant+&quot;:&quot;+command.operationId());</span>
+        // Coordinate registration/cutover while collecting family members for persistence.
+<span class="fc" id="L43">        db.queryForList(&quot;select pg_advisory_xact_lock(hashtextextended(?,0))&quot;,&quot;cms-tenant:&quot;+tenant);</span>
+<span class="fc" id="L44">        lock(tenant,family);</span>
+<span class="fc" id="L45">        List&lt;Map&lt;String,Object&gt;&gt; prior=db.queryForList(&quot;select request_hash,receipt::text from cms_pin_operation where cms_institution_id=? and operation_id=?&quot;,tenant,command.operationId());</span>
+<span class="fc bfc" id="L46" title="All 2 branches covered.">        if(!prior.isEmpty()) {</span>
+<span class="fc bfc" id="L47" title="All 2 branches covered.">            if(!fingerprint.equals(prior.getFirst().get(&quot;request_hash&quot;))) throw CmsIntegrationException.conflict(&quot;Operation ID payload conflict&quot;);</span>
+<span class="fc" id="L48">            return tree(prior.getFirst().get(&quot;receipt&quot;).toString());</span>
+        }
+<span class="fc bfc" id="L50" title="All 2 branches covered.">        if(db.queryForList(&quot;select 1 from cms_card_profile where cms_institution_id=? and pan_family_id=? limit 1&quot;,tenant,family).isEmpty())</span>
+<span class="fc" id="L51">            throw new CmsIntegrationException(404,&quot;PAN family is not registered&quot;);</span>
+<span class="fc bfc" id="L52" title="All 2 branches covered.">        PinOperationReceipt receipt=command.operation()==Operation.CONFIGURE_PIN_PROFILE</span>
+<span class="fc" id="L53">                ? configure(tenant,family,command) : execute(tenant,family,command);</span>
+<span class="fc" id="L54">        String encoded=encode(receipt);</span>
+<span class="fc" id="L55">        db.update(&quot;insert into cms_pin_operation(cms_institution_id,operation_id,pan_family_id,operation_type,request_hash,status,receipt) values(?,?,?,?,?,?,?::jsonb)&quot;,</span>
+<span class="fc" id="L56">                tenant,command.operationId(),family,command.operation().name(),fingerprint,receipt.status().name(),encoded);</span>
+<span class="fc" id="L57">        return tree(encoded);</span>
+    }
+
+    private PinOperationReceipt configure(UUID tenant,UUID family,PinCommand command) {
+<span class="pc bpc" id="L61" title="2 of 4 branches missed.">        if(command.profile()==null || command.protectedPinMaterial()!=null)</span>
+<span class="nc" id="L62">            throw CmsIntegrationException.bad(&quot;CONFIGURE_PIN_PROFILE requires profile and no protectedPinMaterial&quot;);</span>
+<span class="fc" id="L63">        List&lt;Map&lt;String,Object&gt;&gt; rows=profile(tenant,family);</span>
+<span class="pc bpc" id="L64" title="1 of 2 branches missed.">        long currentPin=rows.isEmpty()?0:number(rows.getFirst(),&quot;active_pin_version&quot;);</span>
+<span class="pc bpc" id="L65" title="1 of 2 branches missed.">        long currentPolicy=rows.isEmpty()?0:number(rows.getFirst(),&quot;policy_profile_version&quot;);</span>
+<span class="fc" id="L66">        expected(command,currentPin);</span>
+<span class="pc bpc" id="L67" title="1 of 2 branches missed.">        if(command.policyProfileVersion()&lt;=currentPolicy) throw CmsIntegrationException.conflict(&quot;Policy/profile version must increase&quot;);</span>
+<span class="pc bpc" id="L68" title="3 of 4 branches missed.">        if(currentPin&gt;0 &amp;&amp; !command.profile().equals(read(rows.getFirst().get(&quot;profile&quot;).toString(),PinProfile.class)))</span>
+<span class="nc" id="L69">            throw CmsIntegrationException.conflict(&quot;Active PIN profile is immutable; cryptographic migration is required&quot;);</span>
+<span class="pc bpc" id="L70" title="1 of 4 branches missed.">        if(command.profile().establishment()==Establishment.CUSTOMER_SELECTED &amp;&amp; command.profile().delivery()!=Delivery.NONE)</span>
+<span class="fc" id="L71">            throw CmsIntegrationException.bad(&quot;Customer-selected PIN cannot request a PIN mailer&quot;);</span>
+<span class="pc bpc" id="L72" title="3 of 4 branches missed.">        if(command.profile().establishment()==Establishment.HSM_GENERATED &amp;&amp; command.profile().delivery()!=Delivery.PIN_MAILER)</span>
+<span class="nc" id="L73">            throw CmsIntegrationException.bad(&quot;HSM-generated initial PIN requires PIN_MAILER delivery&quot;);</span>
+<span class="fc" id="L74">        db.update(&quot;insert into cms_pin_profile(cms_institution_id,pan_family_id,policy_profile_version,active_pin_version,profile) values(?,?,?,?,?::jsonb) on conflict(cms_institution_id,pan_family_id) do update set policy_profile_version=excluded.policy_profile_version,profile=excluded.profile,updated_at=now()&quot;,</span>
+<span class="fc" id="L75">                tenant,family,command.policyProfileVersion(),currentPin,encode(command.profile()));</span>
+<span class="fc" id="L76">        return receipt(command,Status.COMPLETED,currentPin,null,null);</span>
+    }
+
+    private PinOperationReceipt execute(UUID tenant,UUID family,PinCommand command) {
+<span class="pc bpc" id="L80" title="1 of 2 branches missed.">        if(command.profile()!=null) throw CmsIntegrationException.bad(&quot;Only CONFIGURE_PIN_PROFILE carries profile&quot;);</span>
+<span class="fc" id="L81">        List&lt;Map&lt;String,Object&gt;&gt; rows=profile(tenant,family);</span>
+<span class="pc bpc" id="L82" title="1 of 2 branches missed.">        if(rows.isEmpty()) throw CmsIntegrationException.conflict(&quot;PIN profile is not configured&quot;);</span>
+<span class="fc" id="L83">        Map&lt;String,Object&gt; row=rows.getFirst();</span>
+<span class="fc" id="L84">        long policy=number(row,&quot;policy_profile_version&quot;), current=number(row,&quot;active_pin_version&quot;);</span>
+<span class="pc bpc" id="L85" title="1 of 2 branches missed.">        if(command.policyProfileVersion()!=policy) throw CmsIntegrationException.conflict(&quot;Stale policy/profile version&quot;);</span>
+<span class="fc" id="L86">        expected(command,current);</span>
+<span class="fc" id="L87">        PinProfile configured=read(row.get(&quot;profile&quot;).toString(),PinProfile.class);</span>
+<span class="pc bpc" id="L88" title="3 of 4 branches missed.">        if(command.operation()==Operation.INITIALIZE_SELECTED_PIN &amp;&amp; configured.establishment()!=Establishment.CUSTOMER_SELECTED)</span>
+<span class="nc" id="L89">            throw CmsIntegrationException.conflict(&quot;Configured profile does not allow customer PIN selection&quot;);</span>
+<span class="pc bpc" id="L90" title="1 of 4 branches missed.">        if(command.operation()==Operation.GENERATE_INITIAL_PIN &amp;&amp; configured.establishment()!=Establishment.HSM_GENERATED)</span>
+<span class="nc" id="L91">            throw CmsIntegrationException.conflict(&quot;Configured profile does not allow generated initial PIN&quot;);</span>
+<span class="pc bpc" id="L92" title="2 of 6 branches missed.">        if((command.operation()==Operation.INITIALIZE_SELECTED_PIN || command.operation()==Operation.GENERATE_INITIAL_PIN) &amp;&amp; current!=0)</span>
+<span class="nc" id="L93">            throw CmsIntegrationException.conflict(&quot;Initial PIN is already established&quot;);</span>
+<span class="pc bpc" id="L94" title="2 of 6 branches missed.">        if((command.operation()==Operation.CHANGE_PIN || command.operation()==Operation.RESET_PIN) &amp;&amp; current==0)</span>
+<span class="nc" id="L95">            throw CmsIntegrationException.conflict(&quot;PIN must be established before change or reset&quot;);</span>
+<span class="fc" id="L96">        PinMaterial material=null;</span>
+<span class="fc bfc" id="L97" title="All 2 branches covered.">        if(command.operation()==Operation.GENERATE_INITIAL_PIN) {</span>
+<span class="pc bpc" id="L98" title="1 of 2 branches missed.">            if(command.protectedPinMaterial()!=null)</span>
+<span class="nc" id="L99">                throw CmsIntegrationException.bad(&quot;GENERATE_INITIAL_PIN does not accept protectedPinMaterial&quot;);</span>
+        } else {
+<span class="fc" id="L101">            material=materials.decode(command);</span>
+        }
+<span class="pc bpc" id="L103" title="1 of 6 branches missed.">        if(executor==null || (material!=null &amp;&amp; authorization==null))</span>
+<span class="fc" id="L104">            throw CmsIntegrationException.unavailable(&quot;PIN HSM or customer authorization integration is not configured&quot;);</span>
+<span class="fc bfc" id="L105" title="All 2 branches covered.">        if(material!=null) authorization.verify(command,material);</span>
+<span class="fc" id="L106">        CmsPinOperationExecutor.Result result=executor.execute(command,configured,material);</span>
+<span class="pc bpc" id="L107" title="1 of 4 branches missed.">        if(result==null || !result.completed())</span>
+<span class="fc" id="L108">            throw CmsIntegrationException.unavailable(&quot;PIN execution outcome requires reconciliation; retry the same operation ID&quot;);</span>
+<span class="fc" id="L109">        return applyResult(command,result,current);</span>
+    }
+
+    private PinOperationReceipt applyResult(PinCommand command,CmsPinOperationExecutor.Result result,long current) {
+<span class="fc" id="L113">        UUID tenant=command.institutionId(), family=command.panFamilyReference();</span>
+<span class="fc bfc" id="L114" title="All 2 branches covered.">        if(result.failureCode()!=null) return receipt(command,Status.FAILED,current,null,result.failureCode());</span>
+<span class="pc bpc" id="L115" title="2 of 4 branches missed.">        if(result.verificationValue()==null || !result.verificationValue().matches(&quot;[0-9]{4,12}&quot;))</span>
+<span class="nc" id="L116">            throw CmsIntegrationException.unavailable(&quot;HSM returned no valid verification value&quot;);</span>
+<span class="pc bpc" id="L117" title="3 of 6 branches missed.">        if(command.operation()==Operation.GENERATE_INITIAL_PIN &amp;&amp; (result.mailerReference()==null || result.mailerReference().isBlank()))</span>
+<span class="nc" id="L118">            throw CmsIntegrationException.unavailable(&quot;Generated PIN has no mailer reference&quot;);</span>
+<span class="fc" id="L119">        long next=Math.addExact(current,1);</span>
+<span class="fc" id="L120">        persistVerificationValue(tenant,family,result.verificationValue());</span>
+<span class="fc" id="L121">        db.update(&quot;update cms_pin_profile set active_pin_version=?,updated_at=now() where cms_institution_id=? and pan_family_id=?&quot;,next,tenant,family);</span>
+<span class="fc" id="L122">        return receipt(command,Status.COMPLETED,next,result.mailerReference(),null);</span>
+    }
+
+    /** Called by the transaction entry point while holding the same family lock. */
+    @Transactional(propagation=org.springframework.transaction.annotation.Propagation.MANDATORY)
+    public JsonNode commitNetwork(PinCommand command,String fingerprint,CmsPinOperationExecutor.Result result) {
+<span class="nc" id="L128">        var row=profile(command.institutionId(),command.panFamilyReference()).getFirst();</span>
+<span class="nc" id="L129">        long current=number(row,&quot;active_pin_version&quot;);</span>
+<span class="nc" id="L130">        expected(command,current);</span>
+<span class="nc bnc" id="L131" title="All 2 branches missed.">        if(number(row,&quot;policy_profile_version&quot;)!=command.policyProfileVersion())</span>
+<span class="nc" id="L132">            throw CmsIntegrationException.conflict(&quot;Stale policy/profile version&quot;);</span>
+<span class="nc" id="L133">        String encoded=encode(applyResult(command,result,current));</span>
+<span class="nc" id="L134">        db.update(&quot;insert into cms_pin_operation(cms_institution_id,operation_id,pan_family_id,operation_type,request_hash,status,receipt) values(?,?,?,?,?,?,?::jsonb)&quot;,</span>
+<span class="nc" id="L135">                command.institutionId(),command.operationId(),command.panFamilyReference(),command.operation().name(),</span>
+<span class="nc" id="L136">                fingerprint,tree(encoded).path(&quot;status&quot;).asText(),encoded);</span>
+<span class="nc" id="L137">        return tree(encoded);</span>
+    }
+
+    private void persistVerificationValue(UUID tenant,UUID family,String value) {
+<span class="fc" id="L141">        Integer institution=db.queryForObject(&quot;select switch_institution_id from cms_institution_mapping where cms_institution_id=?&quot;,Integer.class,tenant);</span>
+<span class="pc" id="L142">        List&lt;Long&gt; ids=db.query(&quot;select auth_id from cms_card_profile where cms_institution_id=? and pan_family_id=?&quot;,(rs,n)-&gt;rs.getLong(1),tenant,family);</span>
+<span class="pc bpc" id="L143" title="1 of 2 branches missed.">        for(Long id:ids) {</span>
+<span class="nc" id="L144">            CardData card=cards.findById(id).orElseThrow();</span>
+<span class="nc" id="L145">            crypto.hydrateDecryptedFields(card,institution);</span>
+<span class="nc" id="L146">            card.setOld_pvv_offest(card.getPvv_offest()); card.setPvv_offest(value);</span>
+<span class="nc" id="L147">            card.setPin_retry_count(0); card.setPin_blocked(false);</span>
+<span class="nc" id="L148">            crypto.prepareProtectedForPersistence(card,institution); cards.save(card);</span>
+<span class="nc" id="L149">        }</span>
+<span class="fc" id="L150">        cards.flush();</span>
+<span class="fc" id="L151">    }</span>
+
+    @Transactional(readOnly=true)
+    public JsonNode get(UUID tenant,UUID operation) {
+<span class="pc" id="L155">        List&lt;String&gt; rows=db.query(&quot;select receipt::text from cms_pin_operation where cms_institution_id=? and operation_id=?&quot;,(rs,n)-&gt;rs.getString(1),tenant,operation);</span>
+<span class="fc bfc" id="L156" title="All 2 branches covered.">        if(rows.isEmpty()) throw new CmsIntegrationException(404,&quot;PIN operation not found&quot;);</span>
+<span class="fc" id="L157">        return tree(rows.getFirst());</span>
+    }
+<span class="fc" id="L159">    private List&lt;Map&lt;String,Object&gt;&gt; profile(UUID t,UUID f){return db.queryForList(&quot;select * from cms_pin_profile where cms_institution_id=? and pan_family_id=? for update&quot;,t,f);}</span>
+<span class="fc" id="L160">    private long number(Map&lt;String,Object&gt; row,String key){return ((Number)row.get(key)).longValue();}</span>
+<span class="pc bpc" id="L161" title="1 of 2 branches missed.">    private void expected(PinCommand c,long actual){if(c.expectedPinVersion()!=actual) throw CmsIntegrationException.conflict(&quot;Stale expected PIN version&quot;);}</span>
+<span class="fc" id="L162">    private void lock(UUID t,UUID f){db.queryForList(&quot;select pg_advisory_xact_lock(hashtextextended(?,0))&quot;,&quot;cms-pin-family:&quot;+t+&quot;:&quot;+f);}</span>
+<span class="fc" id="L163">    private PinOperationReceipt receipt(PinCommand c,Status s,long v,String mailer,String failure){return new PinOperationReceipt(c.operationId(),c.institutionId(),c.panFamilyReference(),c.operation(),s,c.policyProfileVersion(),v,mailer,failure,Instant.now());}</span>
+<span class="pc" id="L164">    private String hash(Object o){try{byte[] d=java.security.MessageDigest.getInstance(&quot;SHA-256&quot;).digest(encode(o).getBytes(java.nio.charset.StandardCharsets.UTF_8));return java.util.HexFormat.of().formatHex(d);}catch(Exception e){throw new IllegalStateException(e);}}</span>
+<span class="pc" id="L165">    private String encode(Object o){try{return json.writeValueAsString(o);}catch(Exception e){throw CmsIntegrationException.bad(&quot;Invalid PIN command&quot;);}}</span>
+<span class="pc" id="L166">    private JsonNode tree(String s){try{return json.readTree(s);}catch(Exception e){throw CmsIntegrationException.unavailable(&quot;Invalid stored PIN operation&quot;);}}</span>
+<span class="pc" id="L167">    private &lt;T&gt;T read(String s,Class&lt;T&gt; t){try{return json.readValue(s,t);}catch(Exception e){throw CmsIntegrationException.unavailable(&quot;Invalid stored PIN profile&quot;);}}</span>
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.14.202510111229</span></div></body></html>

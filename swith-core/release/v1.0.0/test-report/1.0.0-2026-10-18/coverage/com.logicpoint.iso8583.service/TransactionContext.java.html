@@ -1,0 +1,87 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>TransactionContext.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">iso8583-processor</a> &gt; <a href="index.source.html" class="el_package">com.logicpoint.iso8583.service</a> &gt; <span class="el_source">TransactionContext.java</span></div><h1>TransactionContext.java</h1><pre class="source lang-java linenums">package com.logicpoint.iso8583.service;
+
+import lombok.Data;
+import java.time.LocalDateTime;
+import java.util.Map;
+import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.concurrent.atomic.AtomicReference;
+
+/**
+ * Lightweight transaction context - optimized for performance
+ */
+@Data
+public class TransactionContext {
+    // Use primitives and atomic references for minimal overhead
+    private final String uniqueTransactionId;
+<span class="fc" id="L16">    private final AtomicReference&lt;String&gt; accountingTxnId = new AtomicReference&lt;&gt;();</span>
+<span class="fc" id="L17">    private final AtomicBoolean accountingApproved = new AtomicBoolean(false);</span>
+<span class="fc" id="L18">    private final AtomicBoolean responseSent = new AtomicBoolean(false);</span>
+<span class="fc" id="L19">    private final AtomicBoolean reversalTriggered = new AtomicBoolean(false);</span>
+    private final long createdAtEpochMillis;
+<span class="fc" id="L21">    private final AtomicReference&lt;Long&gt; lastTouchedEpochMillis = new AtomicReference&lt;&gt;();</span>
+    
+    // Store only essential data - not full field map
+    private final String transactionId;
+    private final String originalRrn;
+    private final String originalStan;
+    private final String originalAmount;
+    private final String originalMti;
+    private final String currency;
+    private final String network;
+    
+    // Lazy load full fields only when reversal needed
+    private transient Map&lt;Integer, String&gt; fullFields;
+    
+<span class="fc" id="L35">    public TransactionContext(String uniqueTransactionId, String transactionId, String network, Map&lt;Integer, String&gt; fields) {</span>
+<span class="fc" id="L36">        this.uniqueTransactionId = uniqueTransactionId;</span>
+<span class="fc" id="L37">        this.transactionId = transactionId;</span>
+<span class="fc" id="L38">        this.originalRrn = fields.get(37);</span>
+<span class="fc" id="L39">        this.originalStan = fields.get(11);</span>
+<span class="fc" id="L40">        this.originalAmount = fields.get(4);</span>
+<span class="fc" id="L41">        this.originalMti = fields.get(0);</span>
+<span class="fc" id="L42">        this.currency = fields.get(49);</span>
+<span class="fc" id="L43">        this.network = network;</span>
+<span class="fc" id="L44">        this.createdAtEpochMillis = System.currentTimeMillis();</span>
+<span class="fc" id="L45">        this.lastTouchedEpochMillis.set(createdAtEpochMillis);</span>
+        // Store full fields only if reversal might be needed
+<span class="fc" id="L47">        this.fullFields = null; // Lazy initialization</span>
+<span class="fc" id="L48">    }</span>
+    
+    public void setFullFieldsForReversal(Map&lt;Integer, String&gt; fields) {
+<span class="fc" id="L51">        this.fullFields = new java.util.HashMap&lt;&gt;(fields);</span>
+<span class="fc" id="L52">        touch();</span>
+<span class="fc" id="L53">    }</span>
+    
+    public void markAccountingApproved(String accountingTxnId) {
+<span class="fc" id="L56">        this.accountingTxnId.set(accountingTxnId);</span>
+<span class="fc" id="L57">        this.accountingApproved.set(true);</span>
+<span class="fc" id="L58">        touch();</span>
+<span class="fc" id="L59">    }</span>
+    
+    public void markResponseSent() {
+<span class="fc" id="L62">        this.responseSent.set(true);</span>
+<span class="fc" id="L63">        touch();</span>
+<span class="fc" id="L64">    }</span>
+    
+    public boolean requiresReversal() {
+<span class="fc bfc" id="L67" title="All 6 branches covered.">        return accountingApproved.get() &amp;&amp; !responseSent.get() &amp;&amp; !reversalTriggered.get();</span>
+    }
+    
+    public String getAccountingTransactionId() {
+<span class="fc" id="L71">        return accountingTxnId.get();</span>
+    }
+
+    public long getAgeMillis() {
+<span class="fc" id="L75">        return System.currentTimeMillis() - createdAtEpochMillis;</span>
+    }
+
+    public long getIdleMillis() {
+<span class="fc" id="L79">        Long lastTouched = lastTouchedEpochMillis.get();</span>
+<span class="fc bfc" id="L80" title="All 2 branches covered.">        return lastTouched == null ? getAgeMillis() : System.currentTimeMillis() - lastTouched;</span>
+    }
+
+    public void touch() {
+<span class="fc" id="L84">        lastTouchedEpochMillis.set(System.currentTimeMillis());</span>
+<span class="fc" id="L85">    }</span>
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.14.202510111229</span></div></body></html>

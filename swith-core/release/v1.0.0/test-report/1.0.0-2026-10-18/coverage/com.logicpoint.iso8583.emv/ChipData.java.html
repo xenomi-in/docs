@@ -1,0 +1,209 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>ChipData.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">iso8583-processor</a> &gt; <a href="index.source.html" class="el_package">com.logicpoint.iso8583.emv</a> &gt; <span class="el_source">ChipData.java</span></div><h1>ChipData.java</h1><pre class="source lang-java linenums">package com.logicpoint.iso8583.emv;
+
+
+import java.util.*;
+
+/**
+ * Container for parsed EMV chip data.
+ * 
+ * Author: @logicpoint  
+ * Date: 2025-07-11
+ * Version: 1.0.0
+ * Description: This class is used to parse the EMV chip data.
+ * 
+ * 
+ */
+public class ChipData {
+    private final Map&lt;String, String&gt; tags;
+    private final Map&lt;String, String&gt; tagDescriptions;
+
+<span class="fc" id="L20">    public ChipData() {</span>
+<span class="fc" id="L21">        this.tags = new HashMap&lt;&gt;();</span>
+<span class="fc" id="L22">        this.tagDescriptions = initializeTagDescriptions();</span>
+<span class="fc" id="L23">    }</span>
+
+<span class="fc" id="L25">    public ChipData(Map&lt;String, String&gt; tags) {</span>
+<span class="fc" id="L26">        this.tags = new HashMap&lt;&gt;(tags);</span>
+<span class="fc" id="L27">        this.tagDescriptions = initializeTagDescriptions();</span>
+<span class="fc" id="L28">    }</span>
+
+    /**
+     * Gets value for a specific tag.
+     */
+    public String getTagValue(String tag) {
+<span class="fc" id="L34">        return tags.get(tag);</span>
+    }
+
+    public void removeTag(String tag) {
+<span class="fc" id="L38">        tags.remove(tag);</span>
+<span class="fc" id="L39">    }</span>
+    public void removeAllTags() {
+<span class="nc" id="L41">        tags.clear();</span>
+<span class="nc" id="L42">    }</span>
+    /**
+     * Sets value for a specific tag.
+     */
+    public void setTagValue(String tag, String value) {
+<span class="fc" id="L47">        tags.put(tag, value);</span>
+<span class="fc" id="L48">    }</span>
+    /**
+     * Checks if tag exists.
+     */
+    public boolean hasTag(String tag) {
+<span class="fc" id="L53">        return tags.containsKey(tag);</span>
+    }
+
+    /**
+     * Gets all tags.
+     */
+    public Set&lt;String&gt; getAllTags() {
+<span class="fc" id="L60">        return new HashSet&lt;&gt;(tags.keySet());</span>
+    }
+
+    /**
+     * Builds ICC data.
+     */
+    public String buildIccData() {
+<span class="fc" id="L67">        return new ChipDataParser().packTlv(tags);</span>
+    }
+
+    /**
+     * Gets tag description.
+     */
+    public String getTagDescription(String tag) {
+<span class="nc" id="L74">        return tagDescriptions.getOrDefault(tag, &quot;Unknown Tag&quot;);</span>
+    }
+
+    /**
+     * Checks if chip data is empty.
+     */
+    public boolean isEmpty() {
+<span class="fc" id="L81">        return tags.isEmpty();</span>
+    }
+
+    /**
+     * Gets size of chip data.
+     */
+    public int size() {
+<span class="nc" id="L88">        return tags.size();</span>
+    }
+
+    /**
+     * Gets all tag-value pairs.
+     */
+    public Map&lt;String, String&gt; getAllTagsAndValues() {
+<span class="fc" id="L95">        return new HashMap&lt;&gt;(tags);</span>
+    }
+
+    /**
+     * Gets formatted chip data for logging.
+     */
+    public String getFormattedData() {
+<span class="nc bnc" id="L102" title="All 2 branches missed.">        if (tags.isEmpty()) {</span>
+<span class="nc" id="L103">            return &quot;No EMV data&quot;;</span>
+        }
+
+<span class="nc" id="L106">        StringBuilder sb = new StringBuilder();</span>
+<span class="nc" id="L107">        sb.append(&quot;EMV Data:\n&quot;);</span>
+        
+<span class="nc bnc" id="L109" title="All 2 branches missed.">        for (Map.Entry&lt;String, String&gt; entry : tags.entrySet()) {</span>
+<span class="nc" id="L110">            String tag = entry.getKey();</span>
+<span class="nc" id="L111">            String value = entry.getValue();</span>
+<span class="nc" id="L112">            String description = getTagDescription(tag);</span>
+            
+<span class="nc" id="L114">            sb.append(String.format(&quot;  %s (%s): %s\n&quot;, tag, description, value));</span>
+<span class="nc" id="L115">        }</span>
+        
+<span class="nc" id="L117">        return sb.toString();</span>
+    }
+
+    /**
+     * Initializes tag descriptions.
+     */
+    private Map&lt;String, String&gt; initializeTagDescriptions() {
+<span class="fc" id="L124">        Map&lt;String, String&gt; descriptions = new HashMap&lt;&gt;();</span>
+        
+        // Amount related
+<span class="fc" id="L127">        descriptions.put(&quot;9F02&quot;, &quot;Amount, Authorized (Numeric)&quot;);</span>
+<span class="fc" id="L128">        descriptions.put(&quot;9F03&quot;, &quot;Amount, Other (Numeric)&quot;);</span>
+<span class="fc" id="L129">        descriptions.put(&quot;9F04&quot;, &quot;Amount, Other (Binary)&quot;);</span>
+        
+        // Country and currency
+<span class="fc" id="L132">        descriptions.put(&quot;9F1A&quot;, &quot;Terminal Country Code&quot;);</span>
+<span class="fc" id="L133">        descriptions.put(&quot;5F2A&quot;, &quot;Transaction Currency Code&quot;);</span>
+        
+        // Application data
+<span class="fc" id="L136">        descriptions.put(&quot;82&quot;, &quot;Application Interchange Profile&quot;);</span>
+<span class="fc" id="L137">        descriptions.put(&quot;9F36&quot;, &quot;Application Transaction Counter&quot;);</span>
+<span class="fc" id="L138">        descriptions.put(&quot;9F37&quot;, &quot;Unpredictable Number&quot;);</span>
+<span class="fc" id="L139">        descriptions.put(&quot;9F10&quot;, &quot;Issuer Application Data&quot;);</span>
+        
+        // Cryptogram data
+<span class="fc" id="L142">        descriptions.put(&quot;9F26&quot;, &quot;Application Cryptogram&quot;);</span>
+<span class="fc" id="L143">        descriptions.put(&quot;9F27&quot;, &quot;Cryptogram Information Data&quot;);</span>
+        
+        // Terminal data
+<span class="fc" id="L146">        descriptions.put(&quot;9F33&quot;, &quot;Terminal Capabilities&quot;);</span>
+<span class="fc" id="L147">        descriptions.put(&quot;9F34&quot;, &quot;Cardholder Verification Method Results&quot;);</span>
+<span class="fc" id="L148">        descriptions.put(&quot;9F35&quot;, &quot;Terminal Type&quot;);</span>
+<span class="fc" id="L149">        descriptions.put(&quot;9F1E&quot;, &quot;Interface Device Serial Number&quot;);</span>
+        
+        // Application identifiers
+<span class="fc" id="L152">        descriptions.put(&quot;84&quot;, &quot;Dedicated File Name&quot;);</span>
+<span class="fc" id="L153">        descriptions.put(&quot;9F08&quot;, &quot;Application Version Number&quot;);</span>
+<span class="fc" id="L154">        descriptions.put(&quot;9F09&quot;, &quot;Application Version Number&quot;);</span>
+        
+        // Merchant data
+<span class="fc" id="L157">        descriptions.put(&quot;9F15&quot;, &quot;Merchant Category Code&quot;);</span>
+<span class="fc" id="L158">        descriptions.put(&quot;9F16&quot;, &quot;Merchant Identifier&quot;);</span>
+<span class="fc" id="L159">        descriptions.put(&quot;9F4E&quot;, &quot;Merchant Name and Location&quot;);</span>
+        
+        // Transaction data
+<span class="fc" id="L162">        descriptions.put(&quot;9F21&quot;, &quot;Transaction Time&quot;);</span>
+<span class="fc" id="L163">        descriptions.put(&quot;9F20&quot;, &quot;Transaction Date&quot;);</span>
+<span class="fc" id="L164">        descriptions.put(&quot;9F41&quot;, &quot;Transaction Sequence Counter&quot;);</span>
+        
+        // Application identifiers
+<span class="fc" id="L167">        descriptions.put(&quot;9F42&quot;, &quot;Application Identifier (Terminal)&quot;);</span>
+<span class="fc" id="L168">        descriptions.put(&quot;9F44&quot;, &quot;Application Identifier (ICC)&quot;);</span>
+        
+        // Public key data
+<span class="fc" id="L171">        descriptions.put(&quot;9F46&quot;, &quot;ICC Public Key Certificate&quot;);</span>
+<span class="fc" id="L172">        descriptions.put(&quot;9F47&quot;, &quot;ICC Public Key Exponent&quot;);</span>
+<span class="fc" id="L173">        descriptions.put(&quot;9F48&quot;, &quot;ICC Public Key Remainder&quot;);</span>
+        
+        // Authentication data
+<span class="fc" id="L176">        descriptions.put(&quot;9F49&quot;, &quot;Dynamic Data Authentication Data Object List&quot;);</span>
+<span class="fc" id="L177">        descriptions.put(&quot;9F4A&quot;, &quot;Static Data Authentication Tag List&quot;);</span>
+<span class="fc" id="L178">        descriptions.put(&quot;9F4B&quot;, &quot;Signed Dynamic Application Data&quot;);</span>
+        
+        // Log data
+<span class="fc" id="L181">        descriptions.put(&quot;9F4D&quot;, &quot;Log Entry&quot;);</span>
+<span class="fc" id="L182">        descriptions.put(&quot;9F4F&quot;, &quot;Log Format&quot;);</span>
+        
+        // ICC dynamic data
+<span class="fc" id="L185">        descriptions.put(&quot;9F4C&quot;, &quot;ICC Dynamic Number&quot;);</span>
+        
+        // Cumulative amounts
+<span class="fc" id="L188">        descriptions.put(&quot;9F54&quot;, &quot;Cumulative Total Transaction Amount&quot;);</span>
+<span class="fc" id="L189">        descriptions.put(&quot;9F55&quot;, &quot;Cumulative Total Transaction Amount Upper Limit&quot;);</span>
+        
+        // Issuer data
+<span class="fc" id="L192">        descriptions.put(&quot;9F56&quot;, &quot;Issuer Counter&quot;);</span>
+<span class="fc" id="L193">        descriptions.put(&quot;9F57&quot;, &quot;Issuer Action Code - Default&quot;);</span>
+<span class="fc" id="L194">        descriptions.put(&quot;9F58&quot;, &quot;Issuer Action Code - Denial&quot;);</span>
+<span class="fc" id="L195">        descriptions.put(&quot;9F59&quot;, &quot;Issuer Action Code - Online&quot;);</span>
+        
+        // Account data
+<span class="fc" id="L198">        descriptions.put(&quot;9F5A&quot;, &quot;Application Primary Account Number&quot;);</span>
+<span class="fc" id="L199">        descriptions.put(&quot;9F5B&quot;, &quot;Track 2 Equivalent Data&quot;);</span>
+        
+<span class="fc" id="L201">        return descriptions;</span>
+    }
+
+    @Override
+    public String toString() {
+<span class="nc" id="L206">        return getFormattedData();</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.14.202510111229</span></div></body></html>

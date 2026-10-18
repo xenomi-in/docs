@@ -1,0 +1,395 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>CardVerificationResult.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">iso8583-processor</a> &gt; <a href="index.source.html" class="el_package">com.logicpoint.iso8583.emv</a> &gt; <span class="el_source">CardVerificationResult.java</span></div><h1>CardVerificationResult.java</h1><pre class="source lang-java linenums">package com.logicpoint.iso8583.emv;
+
+import com.logicpoint.iso8583.util.ISOUtil;
+import com.logicpoint.iso8583.emv.IssuerApplicationData.Format;
+import java.io.PrintStream;
+import java.util.Objects;
+
+/**
+ * Card Verification Result (CVR) parser.
+ * Parses CVR from Issuer Application Data (IAD, tag 9F10).
+ * 
+ * CVR length varies by IAD format:
+ * - EMV Format A: 5 bytes (10 hex chars)
+ * - VIS format: 4 bytes (8 hex chars) or 5 bytes (10 hex chars)
+ * - M/CHIP: 6 bytes (12 hex chars)
+ * - RuPay EMV Format A: 8 bytes (16 hex chars)
+ * 
+ * Based on EMV 4.3 Book 3 specifications
+ * 
+ * @author Logic Point Systems
+ * @version 1.0.0
+ */
+public final class CardVerificationResult {
+
+    private final byte[] cvr;
+    private final Format iadFormat;
+    private final int cvrLength;
+
+    /**
+     * Constructor with hex string CVR
+     * 
+     * @param hexCVR Hexadecimal representation of CVR
+     * @param iadFormat IAD format to determine CVR structure
+     */
+<span class="fc" id="L35">    public CardVerificationResult(String hexCVR, Format iadFormat) {</span>
+<span class="fc" id="L36">        Objects.requireNonNull(hexCVR, &quot;CVR data cannot be null&quot;);</span>
+<span class="fc" id="L37">        Objects.requireNonNull(iadFormat, &quot;IAD format cannot be null&quot;);</span>
+        
+<span class="fc" id="L39">        this.iadFormat = iadFormat;</span>
+<span class="fc" id="L40">        this.cvr = ISOUtil.hex2byte(hexCVR);</span>
+<span class="fc" id="L41">        this.cvrLength = cvr.length;</span>
+        
+        // Validate CVR length based on format
+<span class="fc" id="L44">        validateCvrLength();</span>
+<span class="fc" id="L45">    }</span>
+
+    /**
+     * Constructor with byte array CVR
+     */
+<span class="fc" id="L50">    public CardVerificationResult(byte[] cvr, Format iadFormat) {</span>
+<span class="fc" id="L51">        Objects.requireNonNull(cvr, &quot;CVR data cannot be null&quot;);</span>
+<span class="fc" id="L52">        Objects.requireNonNull(iadFormat, &quot;IAD format cannot be null&quot;);</span>
+        
+<span class="fc" id="L54">        this.iadFormat = iadFormat;</span>
+<span class="fc" id="L55">        this.cvr = cvr.clone();</span>
+<span class="fc" id="L56">        this.cvrLength = cvr.length;</span>
+        
+<span class="fc" id="L58">        validateCvrLength();</span>
+<span class="fc" id="L59">    }</span>
+
+    private void validateCvrLength() {
+<span class="fc bfc" id="L62" title="All 4 branches covered.">        switch (iadFormat) {</span>
+            case EMV_FORMAT_A:
+            case RUPAY_EMV_FORMAT_A:
+<span class="fc bfc" id="L65" title="All 4 branches covered.">                if (cvrLength != 5 &amp;&amp; cvrLength != 8) {</span>
+<span class="fc" id="L66">                    throw new IllegalArgumentException(</span>
+<span class="fc" id="L67">                        String.format(&quot;CVR length must be 5 or 8 bytes for %s format, got: %d&quot;, </span>
+<span class="fc" id="L68">                                    iadFormat, cvrLength));</span>
+                }
+                break;
+            case VIS:
+<span class="fc bfc" id="L72" title="All 4 branches covered.">                if (cvrLength != 4 &amp;&amp; cvrLength != 5) {</span>
+<span class="fc" id="L73">                    throw new IllegalArgumentException(</span>
+<span class="fc" id="L74">                        String.format(&quot;CVR length must be 4 or 5 bytes for %s format, got: %d&quot;, </span>
+<span class="fc" id="L75">                                    iadFormat, cvrLength));</span>
+                }
+                break;
+            case M_CHIP:
+<span class="fc bfc" id="L79" title="All 2 branches covered.">                if (cvrLength != 6) {</span>
+<span class="fc" id="L80">                    throw new IllegalArgumentException(</span>
+<span class="fc" id="L81">                        String.format(&quot;CVR length must be 6 bytes for %s format, got: %d&quot;, </span>
+<span class="fc" id="L82">                                    iadFormat, cvrLength));</span>
+                }
+                break;
+            default:
+                // Accept any length for unknown/other formats
+                break;
+        }
+<span class="fc" id="L89">    }</span>
+
+    private boolean isBitOn(byte value, int position) {
+<span class="fc bfc" id="L92" title="All 2 branches covered.">        return ((value &gt;&gt; (position - 1)) &amp; 1) == 1;</span>
+    }
+
+    // ========== Byte 1 Checks (Common across formats) ==========
+
+    /**
+     * Gets the first GENERATE AC cryptogram type (lower nibble of byte 1)
+     * 0x1 = AAC, 0x2 = TC, 0x5 = ARQC
+     */
+    public int getFirstGenerateAcCryptogramType() {
+<span class="fc bfc" id="L102" title="All 2 branches covered.">        if (cvrLength &lt; 1) return 0;</span>
+<span class="fc" id="L103">        return cvr[0] &amp; 0x0F; // Lower nibble</span>
+    }
+
+    /**
+     * Gets the second GENERATE AC cryptogram type (upper nibble of byte 1)
+     */
+    public int getSecondGenerateAcCryptogramType() {
+<span class="fc bfc" id="L110" title="All 2 branches covered.">        if (cvrLength &lt; 1) return 0;</span>
+<span class="fc" id="L111">        return (cvr[0] &gt;&gt; 4) &amp; 0x0F; // Upper nibble</span>
+    }
+
+    /**
+     * Checks if CDA (Combined DDA/Application Cryptogram Generation) was performed
+     */
+    public boolean cdaPerformed() {
+<span class="fc bfc" id="L118" title="All 2 branches covered.">        if (cvrLength &lt; 2) return false;</span>
+<span class="fc" id="L119">        return isBitOn(cvr[1], 8);</span>
+    }
+
+    /**
+     * Checks if offline DDA (Dynamic Data Authentication) was performed
+     */
+    public boolean offlineDdaPerformed() {
+<span class="pc bpc" id="L126" title="1 of 2 branches missed.">        if (cvrLength &lt; 2) return false;</span>
+<span class="fc" id="L127">        return isBitOn(cvr[1], 7);</span>
+    }
+
+    /**
+     * Checks if issuer authentication was not performed
+     */
+    public boolean issuerAuthenticationNotPerformed() {
+<span class="pc bpc" id="L134" title="1 of 2 branches missed.">        if (cvrLength &lt; 2) return false;</span>
+<span class="fc" id="L135">        return isBitOn(cvr[1], 6);</span>
+    }
+
+    /**
+     * Checks if issuer authentication failed
+     */
+    public boolean issuerAuthenticationFailed() {
+<span class="pc bpc" id="L142" title="1 of 2 branches missed.">        if (cvrLength &lt; 2) return false;</span>
+<span class="fc" id="L143">        return isBitOn(cvr[1], 5);</span>
+    }
+
+    // ========== Byte 2 Checks ==========
+
+    /**
+     * Gets the PIN Try Counter (lower nibble of byte 2)
+     * Indicates how many PIN tries remain (0x0-0xF)
+     */
+    public int getPinTryCounter() {
+<span class="fc bfc" id="L153" title="All 2 branches covered.">        if (cvrLength &lt; 2) return -1;</span>
+<span class="fc" id="L154">        return (cvr[1] &gt;&gt; 4) &amp; 0x0F;</span>
+    }
+
+    /**
+     * Checks if offline PIN verification was performed
+     */
+    public boolean offlinePinVerificationPerformed() {
+<span class="pc bpc" id="L161" title="1 of 2 branches missed.">        if (cvrLength &lt; 2) return false;</span>
+<span class="fc" id="L162">        return isBitOn(cvr[1], 4);</span>
+    }
+
+    /**
+     * Checks if offline PIN verification was performed but not successful
+     */
+    public boolean offlinePinVerificationFailed() {
+<span class="pc bpc" id="L169" title="1 of 2 branches missed.">        if (cvrLength &lt; 2) return false;</span>
+<span class="fc" id="L170">        return isBitOn(cvr[1], 3);</span>
+    }
+
+    /**
+     * Checks if PIN try limit was exceeded
+     */
+    public boolean pinTryLimitExceeded() {
+<span class="pc bpc" id="L177" title="1 of 2 branches missed.">        if (cvrLength &lt; 2) return false;</span>
+<span class="fc" id="L178">        return isBitOn(cvr[1], 2);</span>
+    }
+
+    /**
+     * Checks if last online transaction was not completed
+     */
+    public boolean lastOnlineTransactionNotCompleted() {
+<span class="pc bpc" id="L185" title="1 of 2 branches missed.">        if (cvrLength &lt; 2) return false;</span>
+<span class="fc" id="L186">        return isBitOn(cvr[1], 1);</span>
+    }
+
+    // ========== Byte 3 Checks ==========
+
+    /**
+     * Checks if lower offline transaction count limit was exceeded
+     */
+    public boolean lowerOfflineTransactionCountLimitExceeded() {
+<span class="fc bfc" id="L195" title="All 2 branches covered.">        if (cvrLength &lt; 3) return false;</span>
+<span class="fc" id="L196">        return isBitOn(cvr[2], 8);</span>
+    }
+
+    /**
+     * Checks if upper offline transaction count limit was exceeded
+     */
+    public boolean upperOfflineTransactionCountLimitExceeded() {
+<span class="pc bpc" id="L203" title="1 of 2 branches missed.">        if (cvrLength &lt; 3) return false;</span>
+<span class="fc" id="L204">        return isBitOn(cvr[2], 7);</span>
+    }
+
+    /**
+     * Checks if lower cumulative offline amount limit was exceeded
+     */
+    public boolean lowerCumulativeOfflineAmountLimitExceeded() {
+<span class="pc bpc" id="L211" title="1 of 2 branches missed.">        if (cvrLength &lt; 3) return false;</span>
+<span class="fc" id="L212">        return isBitOn(cvr[2], 6);</span>
+    }
+
+    /**
+     * Checks if upper cumulative offline amount limit was exceeded
+     */
+    public boolean upperCumulativeOfflineAmountLimitExceeded() {
+<span class="pc bpc" id="L219" title="1 of 2 branches missed.">        if (cvrLength &lt; 3) return false;</span>
+<span class="fc" id="L220">        return isBitOn(cvr[2], 5);</span>
+    }
+
+    // ========== Byte 4 Checks ==========
+
+    /**
+     * Gets number of successfully processed issuer script commands
+     * (bits 8-5 of byte 4)
+     */
+    public int getIssuerScriptCommandsProcessed() {
+<span class="fc bfc" id="L230" title="All 2 branches covered.">        if (cvrLength &lt; 4) return 0;</span>
+<span class="fc" id="L231">        return (cvr[3] &gt;&gt; 4) &amp; 0x0F;</span>
+    }
+
+    /**
+     * Checks if issuer script processing failed
+     */
+    public boolean issuerScriptProcessingFailed() {
+<span class="pc bpc" id="L238" title="1 of 2 branches missed.">        if (cvrLength &lt; 4) return false;</span>
+<span class="fc" id="L239">        return isBitOn(cvr[3], 4);</span>
+    }
+
+    /**
+     * Checks if offline data authentication failed on previous transaction
+     */
+    public boolean offlineDataAuthFailedOnPreviousTransaction() {
+<span class="pc bpc" id="L246" title="1 of 2 branches missed.">        if (cvrLength &lt; 4) return false;</span>
+<span class="fc" id="L247">        return isBitOn(cvr[3], 3);</span>
+    }
+
+    /**
+     * Checks if &quot;Go Online on Next Transaction&quot; flag was set
+     */
+    public boolean goOnlineOnNextTransactionSet() {
+<span class="pc bpc" id="L254" title="1 of 2 branches missed.">        if (cvrLength &lt; 4) return false;</span>
+<span class="fc" id="L255">        return isBitOn(cvr[3], 2);</span>
+    }
+
+    /**
+     * Checks if unable to go online
+     */
+    public boolean unableToGoOnline() {
+<span class="pc bpc" id="L262" title="1 of 2 branches missed.">        if (cvrLength &lt; 4) return false;</span>
+<span class="fc" id="L263">        return isBitOn(cvr[3], 1);</span>
+    }
+
+    // ========== RuPay Specific Checks (Byte 6-8) ==========
+
+    /**
+     * Checks if this is a RuPay format CVR
+     */
+    public boolean isRuPayFormat() {
+<span class="fc bfc" id="L272" title="All 4 branches covered.">        return iadFormat == Format.RUPAY_EMV_FORMAT_A &amp;&amp; cvrLength &gt;= 8;</span>
+    }
+
+    // Additional RuPay-specific bit checks can be added here for bytes 5-8
+
+    // ========== Validation Methods ==========
+
+    /**
+     * Validates if CVR indicates transaction should proceed
+     * @return true if transaction can proceed based on CVR
+     */
+    public boolean isValidForTransaction() {
+        // Critical failures - must decline
+<span class="fc bfc" id="L285" title="All 2 branches covered.">        if (pinTryLimitExceeded()) {</span>
+<span class="fc" id="L286">            return false;</span>
+        }
+
+<span class="fc bfc" id="L289" title="All 2 branches covered.">        if (issuerAuthenticationFailed()) {</span>
+<span class="fc" id="L290">            return false;</span>
+        }
+
+        // Offline PIN failed - should decline unless online auth is available
+<span class="pc bpc" id="L294" title="1 of 4 branches missed.">        if (offlinePinVerificationFailed() &amp;&amp; offlinePinVerificationPerformed()) {</span>
+<span class="fc" id="L295">            return false;</span>
+        }
+
+        // Offline limits exceeded - should force online authorization
+        // These are warnings, not hard failures
+<span class="pc bpc" id="L300" title="1 of 2 branches missed.">        if (upperOfflineTransactionCountLimitExceeded() || </span>
+<span class="pc bpc" id="L301" title="1 of 2 branches missed.">            upperCumulativeOfflineAmountLimitExceeded()) {</span>
+            // Force online authorization but don't decline
+        }
+
+        // Issuer script failed - may require online authorization
+<span class="pc bpc" id="L306" title="1 of 2 branches missed.">        if (issuerScriptProcessingFailed()) {</span>
+            // May require online auth but not necessarily a decline
+        }
+
+<span class="fc" id="L310">        return true;</span>
+    }
+
+    /**
+     * Checks if CVR requires online authorization
+     */
+    public boolean requiresOnlineAuthorization() {
+<span class="fc bfc" id="L317" title="All 2 branches covered.">        return upperOfflineTransactionCountLimitExceeded() ||</span>
+<span class="fc bfc" id="L318" title="All 2 branches covered.">               upperCumulativeOfflineAmountLimitExceeded() ||</span>
+<span class="fc bfc" id="L319" title="All 2 branches covered.">               lowerOfflineTransactionCountLimitExceeded() ||</span>
+<span class="fc bfc" id="L320" title="All 2 branches covered.">               lowerCumulativeOfflineAmountLimitExceeded() ||</span>
+<span class="fc bfc" id="L321" title="All 2 branches covered.">               goOnlineOnNextTransactionSet() ||</span>
+<span class="fc bfc" id="L322" title="All 2 branches covered.">               offlinePinVerificationFailed() ||</span>
+<span class="fc bfc" id="L323" title="All 2 branches covered.">               issuerScriptProcessingFailed() ||</span>
+<span class="fc bfc" id="L324" title="All 2 branches covered.">               lastOnlineTransactionNotCompleted() ||</span>
+<span class="fc bfc" id="L325" title="All 2 branches covered.">               unableToGoOnline();</span>
+    }
+
+    // ========== Utility Methods ==========
+
+    /**
+     * Gets the raw CVR as byte array
+     */
+    public byte[] getRawCvr() {
+<span class="fc" id="L334">        return cvr.clone();</span>
+    }
+
+    /**
+     * Gets CVR as hex string
+     */
+    public String getHexCvr() {
+<span class="fc" id="L341">        return ISOUtil.hexString(cvr);</span>
+    }
+
+    /**
+     * Gets IAD format
+     */
+    public Format getIadFormat() {
+<span class="fc" id="L348">        return iadFormat;</span>
+    }
+
+    /**
+     * Gets CVR length in bytes
+     */
+    public int getCvrLength() {
+<span class="fc" id="L355">        return cvrLength;</span>
+    }
+
+    /**
+     * Dumps CVR information to PrintStream
+     */
+    public void dump(PrintStream p, String indent) {
+<span class="fc" id="L362">        String inner = indent + &quot;  &quot;;</span>
+<span class="fc" id="L363">        p.printf(&quot;%s&lt;card-verification-result format='%s' value='%s'&gt;%n&quot;, </span>
+<span class="fc" id="L364">                indent, iadFormat, getHexCvr());</span>
+        
+<span class="fc" id="L366">        p.printf(&quot;%sByte 1 - First GC: 0x%X, Second GC: 0x%X%n&quot;, </span>
+<span class="fc" id="L367">                inner, getFirstGenerateAcCryptogramType(), getSecondGenerateAcCryptogramType());</span>
+        
+<span class="pc bpc" id="L369" title="1 of 2 branches missed.">        if (cvrLength &gt;= 2) {</span>
+<span class="fc" id="L370">            p.printf(&quot;%sByte 2 - PIN Try Counter: %d, Offline PIN Performed: %s, Failed: %s%n&quot;,</span>
+<span class="fc" id="L371">                    inner, getPinTryCounter(), </span>
+<span class="fc" id="L372">                    offlinePinVerificationPerformed(), offlinePinVerificationFailed());</span>
+        }
+        
+<span class="pc bpc" id="L375" title="1 of 2 branches missed.">        if (cvrLength &gt;= 3) {</span>
+<span class="fc" id="L376">            p.printf(&quot;%sByte 3 - Limits: Lower Count: %s, Upper Count: %s, Lower Amount: %s, Upper Amount: %s%n&quot;,</span>
+                    inner,
+<span class="fc" id="L378">                    lowerOfflineTransactionCountLimitExceeded(),</span>
+<span class="fc" id="L379">                    upperOfflineTransactionCountLimitExceeded(),</span>
+<span class="fc" id="L380">                    lowerCumulativeOfflineAmountLimitExceeded(),</span>
+<span class="fc" id="L381">                    upperCumulativeOfflineAmountLimitExceeded());</span>
+        }
+        
+<span class="fc" id="L384">        p.printf(&quot;%sValid for Transaction: %s%n&quot;, inner, isValidForTransaction());</span>
+<span class="fc" id="L385">        p.printf(&quot;%sRequires Online Auth: %s%n&quot;, inner, requiresOnlineAuthorization());</span>
+<span class="fc" id="L386">        p.printf(&quot;%s&lt;/card-verification-result&gt;%n&quot;, indent);</span>
+<span class="fc" id="L387">    }</span>
+
+    @Override
+    public String toString() {
+<span class="fc" id="L391">        return String.format(&quot;CVR[Format=%s, Value=%s, Valid=%s, RequiresOnline=%s]&quot;,</span>
+<span class="fc" id="L392">                iadFormat, getHexCvr(), isValidForTransaction(), requiresOnlineAuthorization());</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.14.202510111229</span></div></body></html>

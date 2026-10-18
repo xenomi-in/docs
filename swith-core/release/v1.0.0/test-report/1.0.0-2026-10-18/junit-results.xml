@@ -1,0 +1,1260 @@
+<?xml version='1.0' encoding='utf-8'?>
+<testsuites name="Switch Core 1.0.0" tests="961" failures="0" errors="0" skipped="16">
+  <testsuite name="com.logicpoint.iso8583.CircularDependencyFixTest" tests="2" failures="0" errors="0" skipped="0" time="0.01">
+    <testcase classname="com.logicpoint.iso8583.CircularDependencyFixTest" name="testKeepAliveServiceMethods" time="0.001" />
+    <testcase classname="com.logicpoint.iso8583.CircularDependencyFixTest" name="testCircularDependencyResolution" time="0.001" />
+  </testsuite>
+  <testsuite name="com.logicpoint.iso8583.CircularDependencyTest" tests="2" failures="0" errors="0" skipped="0" time="0.025">
+    <testcase classname="com.logicpoint.iso8583.CircularDependencyTest" name="testCircularDependencyResolution" time="0.001" />
+    <testcase classname="com.logicpoint.iso8583.CircularDependencyTest" name="testKeepAliveServiceInterface" time="0.002" />
+  </testsuite>
+  <testsuite name="com.logicpoint.iso8583.cmsintegration.CmsAuthorizationLookupTest" tests="5" failures="0" errors="0" skipped="0" time="0.01">
+    <testcase classname="com.logicpoint.iso8583.cmsintegration.CmsAuthorizationLookupTest" name="rejectsMissingExpiryMalformedSequenceAndAmbiguousEvidence" time="0.002" />
+    <testcase classname="com.logicpoint.iso8583.cmsintegration.CmsAuthorizationLookupTest" name="managementChecksAndPinCounterUpdateDelegateToDatabase" time="0.0" />
+    <testcase classname="com.logicpoint.iso8583.cmsintegration.CmsAuthorizationLookupTest" name="mapsUnreadableProfileAndMissingCardMaterialToUnavailable" time="0.004" />
+    <testcase classname="com.logicpoint.iso8583.cmsintegration.CmsAuthorizationLookupTest" name="returnsNullForLegacyCardWithoutCmsProfile" time="0.0" />
+    <testcase classname="com.logicpoint.iso8583.cmsintegration.CmsAuthorizationLookupTest" name="successfulLookupDetachesHydratesAndAddsCmsContext" time="0.003" />
+  </testsuite>
+  <testsuite name="com.logicpoint.iso8583.cmsintegration.CmsAuthorizationPolicyTest" tests="6" failures="0" errors="0" skipped="0" time="0.002">
+    <testcase classname="com.logicpoint.iso8583.cmsintegration.CmsAuthorizationPolicyTest" name="virtualReadyDoesNotEnablePhysical" time="0.001" />
+    <testcase classname="com.logicpoint.iso8583.cmsintegration.CmsAuthorizationPolicyTest" name="contactlessLimitEnforced" time="0.001" />
+    <testcase classname="com.logicpoint.iso8583.cmsintegration.CmsAuthorizationPolicyTest" name="exactLimitPassesButOneMinorUnitOverFails" time="0.0" />
+    <testcase classname="com.logicpoint.iso8583.cmsintegration.CmsAuthorizationPolicyTest" name="frozenAndFamilyBlockedDecline" time="0.0" />
+    <testcase classname="com.logicpoint.iso8583.cmsintegration.CmsAuthorizationPolicyTest" name="internationalAndUnconvertedCurrencyDecline" time="0.0" />
+    <testcase classname="com.logicpoint.iso8583.cmsintegration.CmsAuthorizationPolicyTest" name="missingCountryFailsClosed" time="0.0" />
+  </testsuite>
+  <testsuite name="com.logicpoint.iso8583.cmsintegration.CmsCardControllerTest" tests="3" failures="0" errors="0" skipped="0" time="0.047">
+    <testcase classname="com.logicpoint.iso8583.cmsintegration.CmsCardControllerTest" name="rejectsInvalidPayloadAndIdempotencyMismatchBeforeDelegation" time="0.023" />
+    <testcase classname="com.logicpoint.iso8583.cmsintegration.CmsCardControllerTest" name="delegatesValidRegistrationUpdateAndCutoverRequests" time="0.023" />
+    <testcase classname="com.logicpoint.iso8583.cmsintegration.CmsCardControllerTest" name="delegatesProfileAndCommandReads" time="0.001" />
+  </testsuite>
+  <testsuite name="com.logicpoint.iso8583.cmsintegration.CmsCardIntegrationServiceMutationTest" tests="4" failures="0" errors="0" skipped="0" time="0.054">
+    <testcase classname="com.logicpoint.iso8583.cmsintegration.CmsCardIntegrationServiceMutationTest" name="updateRejectsChangingExistingPhysicalSequence" time="0.035" />
+    <testcase classname="com.logicpoint.iso8583.cmsintegration.CmsCardIntegrationServiceMutationTest" name="updateRejectsCommandPayloadConflictBeforeTakingTenantLock" time="0.002" />
+    <testcase classname="com.logicpoint.iso8583.cmsintegration.CmsCardIntegrationServiceMutationTest" name="updateAppliesValidLifecycleRevisionAndPersistsReceipt" time="0.013" />
+    <testcase classname="com.logicpoint.iso8583.cmsintegration.CmsCardIntegrationServiceMutationTest" name="cutoverRejectsSameCardAndNonReplacedPredecessor" time="0.003" />
+  </testsuite>
+  <testsuite name="com.logicpoint.iso8583.cmsintegration.CmsCardIntegrationServiceReadTest" tests="4" failures="0" errors="0" skipped="0" time="0.005">
+    <testcase classname="com.logicpoint.iso8583.cmsintegration.CmsCardIntegrationServiceReadTest" name="returnsCardProfileAndPermanentFamilyBlockState" time="0.003" />
+    <testcase classname="com.logicpoint.iso8583.cmsintegration.CmsCardIntegrationServiceReadTest" name="returnsStoredCommandReceipt" time="0.001" />
+    <testcase classname="com.logicpoint.iso8583.cmsintegration.CmsCardIntegrationServiceReadTest" name="missingCommandReturnsNotFound" time="0.0" />
+    <testcase classname="com.logicpoint.iso8583.cmsintegration.CmsCardIntegrationServiceReadTest" name="missingCardReturnsNotFound" time="0.001" />
+  </testsuite>
+  <testsuite name="com.logicpoint.iso8583.cmsintegration.CmsCardIntegrationServiceRegistrationTest" tests="2" failures="0" errors="0" skipped="0" time="0.009">
+    <testcase classname="com.logicpoint.iso8583.cmsintegration.CmsCardIntegrationServiceRegistrationTest" name="cutoverRejectsCardsMappedToDifferentAccounts" time="0.004" />
+    <testcase classname="com.logicpoint.iso8583.cmsintegration.CmsCardIntegrationServiceRegistrationTest" name="registerPersistsProtectedCardAndReturnsPendingReceipt" time="0.004" />
+  </testsuite>
+  <testsuite name="com.logicpoint.iso8583.cmsintegration.CmsCardSecurityTest" tests="7" failures="0" errors="0" skipped="0" time="0.455">
+    <testcase classname="com.logicpoint.iso8583.cmsintegration.CmsCardSecurityTest" name="missingClientCertificateDenied" time="0.003" />
+    <testcase classname="com.logicpoint.iso8583.cmsintegration.CmsCardSecurityTest" name="legacyOnboardingDenied" time="0.002" />
+    <testcase classname="com.logicpoint.iso8583.cmsintegration.CmsCardSecurityTest" name="missingWriteScopeDenied" time="0.052" />
+    <testcase classname="com.logicpoint.iso8583.cmsintegration.CmsCardSecurityTest" name="sameServiceTokenCanAccessMultipleInstitutionsWithoutClaim" time="0.02" />
+    <testcase classname="com.logicpoint.iso8583.cmsintegration.CmsCardSecurityTest" name="unknownClearMaterialFieldRejected" time="0.006" />
+    <testcase classname="com.logicpoint.iso8583.cmsintegration.CmsCardSecurityTest" name="unauthenticatedDenied" time="0.002" />
+    <testcase classname="com.logicpoint.iso8583.cmsintegration.CmsCardSecurityTest" name="validIdentityReachesController" time="0.002" />
+  </testsuite>
+  <testsuite name="com.logicpoint.iso8583.cmsintegration.CmsDatabaseIntegrationTest" tests="9" failures="0" errors="0" skipped="9" time="0.0">
+    <testcase classname="com.logicpoint.iso8583.cmsintegration.CmsDatabaseIntegrationTest" name="replayIsDurableAndDoesNotResetPinCounters" time="0.0">
+      <skipped message="Environment variable [CMS_SWITCH_TEST_DB] does not exist" />
+    </testcase>
+    <testcase classname="com.logicpoint.iso8583.cmsintegration.CmsDatabaseIntegrationTest" name="permanentFamilyBlockRejectsSuccessorActivation" time="0.0">
+      <skipped message="Environment variable [CMS_SWITCH_TEST_DB] does not exist" />
+    </testcase>
+    <testcase classname="com.logicpoint.iso8583.cmsintegration.CmsDatabaseIntegrationTest" name="sameKeyChangedBodyRejected" time="0.0">
+      <skipped message="Environment variable [CMS_SWITCH_TEST_DB] does not exist" />
+    </testcase>
+    <testcase classname="com.logicpoint.iso8583.cmsintegration.CmsDatabaseIntegrationTest" name="staleUpdateCannotUndoFreeze" time="0.0">
+      <skipped message="Environment variable [CMS_SWITCH_TEST_DB] does not exist" />
+    </testcase>
+    <testcase classname="com.logicpoint.iso8583.cmsintegration.CmsDatabaseIntegrationTest" name="concurrentDuplicateHasSingleEffect" time="0.0">
+      <skipped message="Environment variable [CMS_SWITCH_TEST_DB] does not exist" />
+    </testcase>
+    <testcase classname="com.logicpoint.iso8583.cmsintegration.CmsDatabaseIntegrationTest" name="cutoverRollsBackBothSidesOnSecondFailure" time="0.0">
+      <skipped message="Environment variable [CMS_SWITCH_TEST_DB] does not exist" />
+    </testcase>
+    <testcase classname="com.logicpoint.iso8583.cmsintegration.CmsDatabaseIntegrationTest" name="lookupUsesExpiryAndSequenceAndRejectsAmbiguity" time="0.0">
+      <skipped message="Environment variable [CMS_SWITCH_TEST_DB] does not exist" />
+    </testcase>
+    <testcase classname="com.logicpoint.iso8583.cmsintegration.CmsDatabaseIntegrationTest" name="differentTenantCannotReadCard" time="0.0">
+      <skipped message="Environment variable [CMS_SWITCH_TEST_DB] does not exist" />
+    </testcase>
+    <testcase classname="com.logicpoint.iso8583.cmsintegration.CmsDatabaseIntegrationTest" name="successfulCutoverAndReplay" time="0.0">
+      <skipped message="Environment variable [CMS_SWITCH_TEST_DB] does not exist" />
+    </testcase>
+  </testsuite>
+  <testsuite name="com.logicpoint.iso8583.cmsintegration.CmsFuturexPinExecutorTest" tests="2" failures="0" errors="0" skipped="0" time="0.087">
+    <testcase classname="com.logicpoint.iso8583.cmsintegration.CmsFuturexPinExecutorTest" name="differentInputKeysAreResolvedIndependently" time="0.002" />
+    <testcase classname="com.logicpoint.iso8583.cmsintegration.CmsFuturexPinExecutorTest" name="wrongOldPinCannotGenerateNewPvv" time="0.0" />
+  </testsuite>
+  <testsuite name="com.logicpoint.iso8583.cmsintegration.CmsMaterialDecoderTest" tests="6" failures="0" errors="0" skipped="0" time="0.489">
+    <testcase classname="com.logicpoint.iso8583.cmsintegration.CmsMaterialDecoderTest" name="cvvIsRejectedEvenInsideEncryptedMaterial" time="0.006" />
+    <testcase classname="com.logicpoint.iso8583.cmsintegration.CmsMaterialDecoderTest" name="corruptedCiphertextRejected" time="0.004" />
+    <testcase classname="com.logicpoint.iso8583.cmsintegration.CmsMaterialDecoderTest" name="decryptsBoundMaterial" time="0.005" />
+    <testcase classname="com.logicpoint.iso8583.cmsintegration.CmsMaterialDecoderTest" name="rejectsPinMaterialDuringCardRegistration" time="0.008" />
+    <testcase classname="com.logicpoint.iso8583.cmsintegration.CmsMaterialDecoderTest" name="crossCardSubstitutionRejected" time="0.005" />
+    <testcase classname="com.logicpoint.iso8583.cmsintegration.CmsMaterialDecoderTest" name="expiredMaterialRejected" time="0.004" />
+  </testsuite>
+  <testsuite name="com.logicpoint.iso8583.cmsintegration.CmsPinControllerAdditionalTest" tests="1" failures="0" errors="0" skipped="0" time="0.005">
+    <testcase classname="com.logicpoint.iso8583.cmsintegration.CmsPinControllerAdditionalTest" name="delegatesValidSubmissionAndReceiptRead" time="0.005" />
+  </testsuite>
+  <testsuite name="com.logicpoint.iso8583.cmsintegration.CmsPinControllerTest" tests="1" failures="0" errors="0" skipped="0" time="0.113">
+    <testcase classname="com.logicpoint.iso8583.cmsintegration.CmsPinControllerTest" name="rejectsMissingVersionAndMapsUnavailableWithoutLeakingMaterial" time="0.113" />
+  </testsuite>
+  <testsuite name="com.logicpoint.iso8583.cmsintegration.CmsPinGrantVerifierTest" tests="3" failures="0" errors="0" skipped="0" time="0.002">
+    <testcase classname="com.logicpoint.iso8583.cmsintegration.CmsPinGrantVerifierTest" name="rejectsMissingExpiredConsumedOrDuplicateGrant(int)[1]" time="0.001" />
+    <testcase classname="com.logicpoint.iso8583.cmsintegration.CmsPinGrantVerifierTest" name="rejectsMissingExpiredConsumedOrDuplicateGrant(int)[2]" time="0.0" />
+    <testcase classname="com.logicpoint.iso8583.cmsintegration.CmsPinGrantVerifierTest" name="consumesMatchingOneTimeAuthorizationGrant" time="0.001" />
+  </testsuite>
+  <testsuite name="com.logicpoint.iso8583.cmsintegration.CmsPinHsmTest" tests="3" failures="0" errors="0" skipped="0" time="0.002">
+    <testcase classname="com.logicpoint.iso8583.cmsintegration.CmsPinHsmTest" name="unsupportedMethodAndDisabledExecutionNeverCallHsm" time="0.0" />
+    <testcase classname="com.logicpoint.iso8583.cmsintegration.CmsPinHsmTest" name="declinesWrongPinAndRejectsMalformedResponses" time="0.0" />
+    <testcase classname="com.logicpoint.iso8583.cmsintegration.CmsPinHsmTest" name="generationAndVerificationUseSameExplicitPvkAndPvki" time="0.001" />
+  </testsuite>
+  <testsuite name="com.logicpoint.iso8583.cmsintegration.CmsPinMaterialDecoderTest" tests="8" failures="0" errors="0" skipped="0" time="0.511">
+    <testcase classname="com.logicpoint.iso8583.cmsintegration.CmsPinMaterialDecoderTest" name="rejectsExpiredAndExcessiveLifetime" time="0.087" />
+    <testcase classname="com.logicpoint.iso8583.cmsintegration.CmsPinMaterialDecoderTest" name="rejectsCurrentPinForReset" time="0.006" />
+    <testcase classname="com.logicpoint.iso8583.cmsintegration.CmsPinMaterialDecoderTest" name="rejectsUnknownClearPinAndInvalidBlock" time="0.012" />
+    <testcase classname="com.logicpoint.iso8583.cmsintegration.CmsPinMaterialDecoderTest" name="acceptsEncryptedChangeAndReset" time="0.01" />
+    <testcase classname="com.logicpoint.iso8583.cmsintegration.CmsPinMaterialDecoderTest" name="rejectsWrongKeyIdAndTamperingWithoutLeakingData" time="0.009" />
+    <testcase classname="com.logicpoint.iso8583.cmsintegration.CmsPinMaterialDecoderTest" name="redactsSensitiveRecords" time="0.005" />
+    <testcase classname="com.logicpoint.iso8583.cmsintegration.CmsPinMaterialDecoderTest" name="rejectsMissingCurrentPinForChange" time="0.007" />
+    <testcase classname="com.logicpoint.iso8583.cmsintegration.CmsPinMaterialDecoderTest" name="rejectsSubstitutionOfEveryBinding" time="0.031" />
+  </testsuite>
+  <testsuite name="com.logicpoint.iso8583.cmsintegration.CmsPinOperationServiceCoverageTest" tests="9" failures="0" errors="0" skipped="0" time="0.021">
+    <testcase classname="com.logicpoint.iso8583.cmsintegration.CmsPinOperationServiceCoverageTest" name="rejectsReusedOperationIdWithDifferentPayload" time="0.002" />
+    <testcase classname="com.logicpoint.iso8583.cmsintegration.CmsPinOperationServiceCoverageTest" name="configuresCustomerSelectedPinProfileWithoutChangingPinVersion" time="0.004" />
+    <testcase classname="com.logicpoint.iso8583.cmsintegration.CmsPinOperationServiceCoverageTest" name="rejectsPendingOrInvalidHsmResultsForReconciliation" time="0.003" />
+    <testcase classname="com.logicpoint.iso8583.cmsintegration.CmsPinOperationServiceCoverageTest" name="recordsExecutorBusinessFailureWithoutUpdatingPinMaterial" time="0.003" />
+    <testcase classname="com.logicpoint.iso8583.cmsintegration.CmsPinOperationServiceCoverageTest" name="rejectsOperationsForUnregisteredFamilies" time="0.001" />
+    <testcase classname="com.logicpoint.iso8583.cmsintegration.CmsPinOperationServiceCoverageTest" name="generatesInitialPinAndAdvancesVersionWhenMailerAndVerificationValueAreValid" time="0.004" />
+    <testcase classname="com.logicpoint.iso8583.cmsintegration.CmsPinOperationServiceCoverageTest" name="readsStoredReceiptAndReturnsNotFoundForUnknownOperation" time="0.001" />
+    <testcase classname="com.logicpoint.iso8583.cmsintegration.CmsPinOperationServiceCoverageTest" name="rejectsPathIdentityMismatchBeforeDatabaseWork" time="0.001" />
+    <testcase classname="com.logicpoint.iso8583.cmsintegration.CmsPinOperationServiceCoverageTest" name="rejectsInconsistentProfileDeliveryRules" time="0.001" />
+  </testsuite>
+  <testsuite name="com.logicpoint.iso8583.cmsintegration.CmsPinOperationServiceTest" tests="3" failures="0" errors="0" skipped="0" time="0.127">
+    <testcase classname="com.logicpoint.iso8583.cmsintegration.CmsPinOperationServiceTest" name="invalidAuthorizationPreventsHsmCall" time="0.093" />
+    <testcase classname="com.logicpoint.iso8583.cmsintegration.CmsPinOperationServiceTest" name="missingAdaptersFailWithoutCommittingPendingReceipt" time="0.003" />
+    <testcase classname="com.logicpoint.iso8583.cmsintegration.CmsPinOperationServiceTest" name="replayReturnsReceiptBeforeDecryptingExpiredEnvelope" time="0.002" />
+  </testsuite>
+  <testsuite name="com.logicpoint.iso8583.cmsintegration.CmsPinStateAndKeysTest" tests="8" failures="0" errors="0" skipped="0" time="0.046">
+    <testcase classname="com.logicpoint.iso8583.cmsintegration.CmsPinStateAndKeysTest" name="blockedCombinesCardRetryAndPermanentFamilyBlockSources" time="0.04" />
+    <testcase classname="com.logicpoint.iso8583.cmsintegration.CmsPinStateAndKeysTest" name="profileAndDecoderFailClosedForMissingOrInvalidStoredData" time="0.003" />
+    <testcase classname="com.logicpoint.iso8583.cmsintegration.CmsPinStateAndKeysTest" name="familyLookupAndConfigurationHandlePresentAndMissingRows" time="0.0" />
+    <testcase classname="com.logicpoint.iso8583.cmsintegration.CmsPinStateAndKeysTest" name="countersResetOnSuccessAndIncrementFamilyOnFailure" time="0.001" />
+    <testcase classname="com.logicpoint.iso8583.cmsintegration.CmsPinStateAndKeysTest" name="cardRejectsUnregisteredFamily" time="0.0" />
+    <testcase classname="com.logicpoint.iso8583.cmsintegration.CmsPinStateAndKeysTest" name="locksTenantAndFamilyWithDistinctAdvisoryKeys" time="0.001" />
+    <testcase classname="com.logicpoint.iso8583.cmsintegration.CmsPinStateAndKeysTest" name="keyResolutionRequiresOneNonEmptyNonTr31Binding" time="0.001" />
+    <testcase classname="com.logicpoint.iso8583.cmsintegration.CmsPinStateAndKeysTest" name="cardLoadsDetachesAndDecryptsRepresentativeFamilyCard" time="0.0" />
+  </testsuite>
+  <testsuite name="com.logicpoint.iso8583.cmsintegration.CmsPinTransactionServiceTest" tests="2" failures="0" errors="0" skipped="0" time="0.005">
+    <testcase classname="com.logicpoint.iso8583.cmsintegration.CmsPinTransactionServiceTest" name="authenticationUsesFreshFamilyPvvAndProfile" time="0.003" />
+    <testcase classname="com.logicpoint.iso8583.cmsintegration.CmsPinTransactionServiceTest" name="successfulNetworkReplayDoesNotReverifyOldPin" time="0.002" />
+  </testsuite>
+  <testsuite name="com.logicpoint.iso8583.cmsintegration.CmsProfileRulesTest" tests="5" failures="0" errors="0" skipped="0" time="0.001">
+    <testcase classname="com.logicpoint.iso8583.cmsintegration.CmsProfileRulesTest" name="freezeRequiresNewLifecycleRevision" time="0.001" />
+    <testcase classname="com.logicpoint.iso8583.cmsintegration.CmsProfileRulesTest" name="permanentBlockCannotBeReleased" time="0.0" />
+    <testcase classname="com.logicpoint.iso8583.cmsintegration.CmsProfileRulesTest" name="duplicateDimensionsRejected" time="0.0" />
+    <testcase classname="com.logicpoint.iso8583.cmsintegration.CmsProfileRulesTest" name="terminalCardCannotReopen" time="0.0" />
+    <testcase classname="com.logicpoint.iso8583.cmsintegration.CmsProfileRulesTest" name="staleAndSkippedRevisionsRejected" time="0.0" />
+  </testsuite>
+  <testsuite name="com.logicpoint.iso8583.cmsintegration.CmsRegistrationPersistenceTest" tests="7" failures="0" errors="0" skipped="7" time="0.0">
+    <testcase classname="com.logicpoint.iso8583.cmsintegration.CmsRegistrationPersistenceTest" name="registrationStoresOnlyCiphertextAndReplaysWithoutDuplicate" time="0.0">
+      <skipped message="Environment variable [CMS_SWITCH_TEST_DB] does not exist" />
+    </testcase>
+    <testcase classname="com.logicpoint.iso8583.cmsintegration.CmsRegistrationPersistenceTest" name="bindingPinsExactKeyAndRejectsWrongInstitutionOrExpiredKey" time="0.0">
+      <skipped message="Environment variable [CMS_SWITCH_TEST_DB] does not exist" />
+    </testcase>
+    <testcase classname="com.logicpoint.iso8583.cmsintegration.CmsRegistrationPersistenceTest" name="encryptionFailureRollsBackAllocatedCardAndReceipt" time="0.0">
+      <skipped message="Environment variable [CMS_SWITCH_TEST_DB] does not exist" />
+    </testcase>
+    <testcase classname="com.logicpoint.iso8583.cmsintegration.CmsRegistrationPersistenceTest" name="competingResetsHaveOnlyOneVersionWinner" time="0.0">
+      <skipped message="Environment variable [CMS_SWITCH_TEST_DB] does not exist" />
+    </testcase>
+    <testcase classname="com.logicpoint.iso8583.cmsintegration.CmsRegistrationPersistenceTest" name="pinEncryptionFailureRollsBackGrantVersionAndReceipt" time="0.0">
+      <skipped message="Environment variable [CMS_SWITCH_TEST_DB] does not exist" />
+    </testcase>
+    <testcase classname="com.logicpoint.iso8583.cmsintegration.CmsRegistrationPersistenceTest" name="pinCommitEncryptsEverySiblingAndReplayDoesNotReuseGrant" time="0.0">
+      <skipped message="Environment variable [CMS_SWITCH_TEST_DB] does not exist" />
+    </testcase>
+    <testcase classname="com.logicpoint.iso8583.cmsintegration.CmsRegistrationPersistenceTest" name="transactionChangePersistsFamilyPvvAndNextAuthenticationUsesIt" time="0.0">
+      <skipped message="Environment variable [CMS_SWITCH_TEST_DB] does not exist" />
+    </testcase>
+  </testsuite>
+  <testsuite name="com.logicpoint.iso8583.config.AccountingJsonMigrationTest" tests="2" failures="0" errors="0" skipped="0" time="0.067">
+    <testcase classname="com.logicpoint.iso8583.config.AccountingJsonMigrationTest" name="applicationAndAccountingClientShareOneJackson3Mapper" time="0.029" />
+    <testcase classname="com.logicpoint.iso8583.config.AccountingJsonMigrationTest" name="accountingJsonKeepsFieldNamesNullOmissionAndResponseAliases" time="0.036" />
+  </testsuite>
+  <testsuite name="com.logicpoint.iso8583.config.IssuerActionGatewayContextTest" tests="1" failures="0" errors="0" skipped="0" time="1.262">
+    <testcase classname="com.logicpoint.iso8583.config.IssuerActionGatewayContextTest" name="bootAutoConfigurationProvidesBuilderForIssuerGateway" time="1.262" />
+  </testsuite>
+  <testsuite name="com.logicpoint.iso8583.config.RawDataLoggingTest" tests="2" failures="0" errors="0" skipped="0" time="0.002">
+    <testcase classname="com.logicpoint.iso8583.config.RawDataLoggingTest" name="rawLoggingIsDisabledByDefault" time="0.001" />
+    <testcase classname="com.logicpoint.iso8583.config.RawDataLoggingTest" name="productionProfileRejectsRawLogging" time="0.0" />
+  </testsuite>
+  <testsuite name="com.logicpoint.iso8583.config.SwitchApiSecurityConfigTest" tests="6" failures="0" errors="0" skipped="0" time="2.593">
+    <testcase classname="com.logicpoint.iso8583.config.SwitchApiSecurityConfigTest" name="unknownAuthenticatedRouteIsDenied" time="0.334" />
+    <testcase classname="com.logicpoint.iso8583.config.SwitchApiSecurityConfigTest" name="transactionWithDedicatedScopePassesSecurity" time="0.09" />
+    <testcase classname="com.logicpoint.iso8583.config.SwitchApiSecurityConfigTest" name="transactionRejectsWrongScope" time="0.003" />
+    <testcase classname="com.logicpoint.iso8583.config.SwitchApiSecurityConfigTest" name="transactionRequiresAuthentication" time="0.003" />
+    <testcase classname="com.logicpoint.iso8583.config.SwitchApiSecurityConfigTest" name="healthPassesSecurityWithoutAuthentication" time="0.005" />
+    <testcase classname="com.logicpoint.iso8583.config.SwitchApiSecurityConfigTest" name="hsmExecutionDoesNotAcceptTransactionScope" time="0.002" />
+  </testsuite>
+  <testsuite name="com.logicpoint.iso8583.controller.CacheManagementControllerTest" tests="4" failures="0" errors="0" skipped="0" time="0.048">
+    <testcase classname="com.logicpoint.iso8583.controller.CacheManagementControllerTest" name="cacheStatusReportsSizeAndHandlesFailure" time="0.044" />
+    <testcase classname="com.logicpoint.iso8583.controller.CacheManagementControllerTest" name="refreshEndpointsMapDependencyFailuresToServerError" time="0.001" />
+    <testcase classname="com.logicpoint.iso8583.controller.CacheManagementControllerTest" name="refreshEndpointsReturnSuccess" time="0.0" />
+    <testcase classname="com.logicpoint.iso8583.controller.CacheManagementControllerTest" name="clearCacheDispatchesKnownNamesRejectsUnknownAndHandlesFailure" time="0.001" />
+  </testsuite>
+  <testsuite name="com.logicpoint.iso8583.controller.CardOnboardingControllerTest" tests="6" failures="0" errors="0" skipped="0" time="0.051">
+    <testcase classname="com.logicpoint.iso8583.controller.CardOnboardingControllerTest" name="mapsExplicitOptionalValuesAndNormalizedStatus" time="0.048" />
+    <testcase classname="com.logicpoint.iso8583.controller.CardOnboardingControllerTest" name="rejectsExistingCardUsingHmacLookup" time="0.001" />
+    <testcase classname="com.logicpoint.iso8583.controller.CardOnboardingControllerTest" name="shortPanCannotResolveInstitution" time="0.0" />
+    <testcase classname="com.logicpoint.iso8583.controller.CardOnboardingControllerTest" name="returnsBadRequestWhenInstitutionCannotBeResolved" time="0.0" />
+    <testcase classname="com.logicpoint.iso8583.controller.CardOnboardingControllerTest" name="resolvesInstitutionMapsDefaultsEncryptsSavesAndRefreshesCache" time="0.001" />
+    <testcase classname="com.logicpoint.iso8583.controller.CardOnboardingControllerTest" name="fallsBackToPlainPanDuplicateLookupWhenHmacUnavailable" time="0.001" />
+  </testsuite>
+  <testsuite name="com.logicpoint.iso8583.controller.HsmCmdControllerSecurityTest" tests="1" failures="0" errors="0" skipped="0" time="0.0">
+    <testcase classname="com.logicpoint.iso8583.controller.HsmCmdControllerSecurityTest" name="rawHsmExecutionIsUnavailableByDefault" time="0.0" />
+  </testsuite>
+  <testsuite name="com.logicpoint.iso8583.controller.HsmCmdControllerTest" tests="3" failures="0" errors="0" skipped="0" time="0.142">
+    <testcase classname="com.logicpoint.iso8583.controller.HsmCmdControllerTest" name="exposesKeepAliveStatusHealthCheckAndDetailedStats" time="0.138" />
+    <testcase classname="com.logicpoint.iso8583.controller.HsmCmdControllerTest" name="panEncryptionValidatesInputResolutionAndEncryptionResult" time="0.002" />
+    <testcase classname="com.logicpoint.iso8583.controller.HsmCmdControllerTest" name="exposesConnectionCommandPoolAndKeyOperations" time="0.001" />
+  </testsuite>
+  <testsuite name="com.logicpoint.iso8583.controller.Iso8583ControllerTest" tests="6" failures="0" errors="0" skipped="0" time="0.056">
+    <testcase classname="com.logicpoint.iso8583.controller.Iso8583ControllerTest" name="transactionEnrichesMetadataWithoutOverwritingExistingValues" time="0.052" />
+    <testcase classname="com.logicpoint.iso8583.controller.Iso8583ControllerTest" name="keyExchangeAcceptsNullRequestForServiceLevelValidation" time="0.001" />
+    <testcase classname="com.logicpoint.iso8583.controller.Iso8583ControllerTest" name="nullTransactionRequestIsPassedThroughWithoutMetadataMutation" time="0.0" />
+    <testcase classname="com.logicpoint.iso8583.controller.Iso8583ControllerTest" name="keyExchangeMapsSuccessBadRequestAndUnexpectedFailure" time="0.002" />
+    <testcase classname="com.logicpoint.iso8583.controller.Iso8583ControllerTest" name="exposesHealthVersionAndRoutingReadiness" time="0.0" />
+    <testcase classname="com.logicpoint.iso8583.controller.Iso8583ControllerTest" name="transactionReturnsServerErrorWhenAsyncProcessingFails" time="0.001" />
+  </testsuite>
+  <testsuite name="com.logicpoint.iso8583.controller.IssuerMandateRevocationControllerTest" tests="1" failures="0" errors="0" skipped="0" time="0.027">
+    <testcase classname="com.logicpoint.iso8583.controller.IssuerMandateRevocationControllerTest" name="delegatesRevocationAndReturnsServiceResult" time="0.027" />
+  </testsuite>
+  <testsuite name="com.logicpoint.iso8583.emv.CardVerificationResultTest" tests="31" failures="0" errors="0" skipped="0" time="0.014">
+    <testcase classname="com.logicpoint.iso8583.emv.CardVerificationResultTest" name="eachAdvisoryFlagRequiresOnlineAuthorization(byte, byte, byte)[1]" time="0.001" />
+    <testcase classname="com.logicpoint.iso8583.emv.CardVerificationResultTest" name="eachAdvisoryFlagRequiresOnlineAuthorization(byte, byte, byte)[2]" time="0.0" />
+    <testcase classname="com.logicpoint.iso8583.emv.CardVerificationResultTest" name="eachAdvisoryFlagRequiresOnlineAuthorization(byte, byte, byte)[3]" time="0.0" />
+    <testcase classname="com.logicpoint.iso8583.emv.CardVerificationResultTest" name="eachAdvisoryFlagRequiresOnlineAuthorization(byte, byte, byte)[4]" time="0.001" />
+    <testcase classname="com.logicpoint.iso8583.emv.CardVerificationResultTest" name="eachAdvisoryFlagRequiresOnlineAuthorization(byte, byte, byte)[5]" time="0.0" />
+    <testcase classname="com.logicpoint.iso8583.emv.CardVerificationResultTest" name="eachAdvisoryFlagRequiresOnlineAuthorization(byte, byte, byte)[6]" time="0.0" />
+    <testcase classname="com.logicpoint.iso8583.emv.CardVerificationResultTest" name="eachAdvisoryFlagRequiresOnlineAuthorization(byte, byte, byte)[7]" time="0.0" />
+    <testcase classname="com.logicpoint.iso8583.emv.CardVerificationResultTest" name="eachAdvisoryFlagRequiresOnlineAuthorization(byte, byte, byte)[8]" time="0.001" />
+    <testcase classname="com.logicpoint.iso8583.emv.CardVerificationResultTest" name="eachAdvisoryFlagRequiresOnlineAuthorization(byte, byte, byte)[9]" time="0.0" />
+    <testcase classname="com.logicpoint.iso8583.emv.CardVerificationResultTest" name="dumpAndToStringExposeParsedSummary" time="0.001" />
+    <testcase classname="com.logicpoint.iso8583.emv.CardVerificationResultTest" name="criticalFlagsDeclineTransaction(byte)[1]" time="0.0" />
+    <testcase classname="com.logicpoint.iso8583.emv.CardVerificationResultTest" name="criticalFlagsDeclineTransaction(byte)[2]" time="0.0" />
+    <testcase classname="com.logicpoint.iso8583.emv.CardVerificationResultTest" name="criticalFlagsDeclineTransaction(byte)[3]" time="0.0" />
+    <testcase classname="com.logicpoint.iso8583.emv.CardVerificationResultTest" name="rejectsNullDataAndNullFormat" time="0.0" />
+    <testcase classname="com.logicpoint.iso8583.emv.CardVerificationResultTest" name="rawCvrIsDefensivelyCopiedOnInputAndOutput" time="0.001" />
+    <testcase classname="com.logicpoint.iso8583.emv.CardVerificationResultTest" name="rupayFormatRequiresEightBytes" time="0.0" />
+    <testcase classname="com.logicpoint.iso8583.emv.CardVerificationResultTest" name="acceptsAllDocumentedFormatLengths(Format, int)[1]" time="0.001" />
+    <testcase classname="com.logicpoint.iso8583.emv.CardVerificationResultTest" name="acceptsAllDocumentedFormatLengths(Format, int)[2]" time="0.0" />
+    <testcase classname="com.logicpoint.iso8583.emv.CardVerificationResultTest" name="acceptsAllDocumentedFormatLengths(Format, int)[3]" time="0.0" />
+    <testcase classname="com.logicpoint.iso8583.emv.CardVerificationResultTest" name="acceptsAllDocumentedFormatLengths(Format, int)[4]" time="0.0" />
+    <testcase classname="com.logicpoint.iso8583.emv.CardVerificationResultTest" name="acceptsAllDocumentedFormatLengths(Format, int)[5]" time="0.0" />
+    <testcase classname="com.logicpoint.iso8583.emv.CardVerificationResultTest" name="acceptsAllDocumentedFormatLengths(Format, int)[6]" time="0.0" />
+    <testcase classname="com.logicpoint.iso8583.emv.CardVerificationResultTest" name="acceptsAllDocumentedFormatLengths(Format, int)[7]" time="0.0" />
+    <testcase classname="com.logicpoint.iso8583.emv.CardVerificationResultTest" name="acceptsAllDocumentedFormatLengths(Format, int)[8]" time="0.001" />
+    <testcase classname="com.logicpoint.iso8583.emv.CardVerificationResultTest" name="zeroedCvrIsValidAndDoesNotRequireOnlineAuthorization" time="0.0" />
+    <testcase classname="com.logicpoint.iso8583.emv.CardVerificationResultTest" name="decodesCryptogramTypesAndAllCommonFlags" time="0.0" />
+    <testcase classname="com.logicpoint.iso8583.emv.CardVerificationResultTest" name="unknownFormatAllowsShortDataAndUsesSafeDefaults" time="0.0" />
+    <testcase classname="com.logicpoint.iso8583.emv.CardVerificationResultTest" name="rejectsLengthsThatDoNotMatchFormat(Format, byte[])[1]" time="0.001" />
+    <testcase classname="com.logicpoint.iso8583.emv.CardVerificationResultTest" name="rejectsLengthsThatDoNotMatchFormat(Format, byte[])[2]" time="0.0" />
+    <testcase classname="com.logicpoint.iso8583.emv.CardVerificationResultTest" name="rejectsLengthsThatDoNotMatchFormat(Format, byte[])[3]" time="0.001" />
+    <testcase classname="com.logicpoint.iso8583.emv.CardVerificationResultTest" name="rejectsLengthsThatDoNotMatchFormat(Format, byte[])[4]" time="0.0" />
+  </testsuite>
+  <testsuite name="com.logicpoint.iso8583.emv.CardholderVerificationMethodResultsTest" tests="20" failures="0" errors="0" skipped="0" time="0.006">
+    <testcase classname="com.logicpoint.iso8583.emv.CardholderVerificationMethodResultsTest" name="testRawByteArray" time="0.0" />
+    <testcase classname="com.logicpoint.iso8583.emv.CardholderVerificationMethodResultsTest" name="testTransactionValidation" time="0.0" />
+    <testcase classname="com.logicpoint.iso8583.emv.CardholderVerificationMethodResultsTest" name="testCreateWithByteArray" time="0.0" />
+    <testcase classname="com.logicpoint.iso8583.emv.CardholderVerificationMethodResultsTest" name="testToString" time="0.0" />
+    <testcase classname="com.logicpoint.iso8583.emv.CardholderVerificationMethodResultsTest" name="testCreateWithHexString" time="0.0" />
+    <testcase classname="com.logicpoint.iso8583.emv.CardholderVerificationMethodResultsTest" name="testSuccessfulCvm" time="0.0" />
+    <testcase classname="com.logicpoint.iso8583.emv.CardholderVerificationMethodResultsTest" name="testNoCvmRequired" time="0.0" />
+    <testcase classname="com.logicpoint.iso8583.emv.CardholderVerificationMethodResultsTest" name="testFailedCvmRequired" time="0.0" />
+    <testcase classname="com.logicpoint.iso8583.emv.CardholderVerificationMethodResultsTest" name="testInvalidByteArrayLength" time="0.0" />
+    <testcase classname="com.logicpoint.iso8583.emv.CardholderVerificationMethodResultsTest" name="testHexRepresentation" time="0.0" />
+    <testcase classname="com.logicpoint.iso8583.emv.CardholderVerificationMethodResultsTest" name="testCvmCodeDescriptions" time="0.0" />
+    <testcase classname="com.logicpoint.iso8583.emv.CardholderVerificationMethodResultsTest" name="testFailedCvm" time="0.0" />
+    <testcase classname="com.logicpoint.iso8583.emv.CardholderVerificationMethodResultsTest" name="testPinVerification" time="0.0" />
+    <testcase classname="com.logicpoint.iso8583.emv.CardholderVerificationMethodResultsTest" name="testVariousCvmStates" time="0.0" />
+    <testcase classname="com.logicpoint.iso8583.emv.CardholderVerificationMethodResultsTest" name="testSignatureVerification" time="0.001" />
+    <testcase classname="com.logicpoint.iso8583.emv.CardholderVerificationMethodResultsTest" name="testEdgeCases" time="0.0" />
+    <testcase classname="com.logicpoint.iso8583.emv.CardholderVerificationMethodResultsTest" name="testNullByteArray" time="0.0" />
+    <testcase classname="com.logicpoint.iso8583.emv.CardholderVerificationMethodResultsTest" name="testEqualsAndHashCode" time="0.0" />
+    <testcase classname="com.logicpoint.iso8583.emv.CardholderVerificationMethodResultsTest" name="testBiometricVerification" time="0.0" />
+    <testcase classname="com.logicpoint.iso8583.emv.CardholderVerificationMethodResultsTest" name="testCvmResultDescriptions" time="0.0" />
+  </testsuite>
+  <testsuite name="com.logicpoint.iso8583.emv.ChipDataParserTest" tests="13" failures="0" errors="0" skipped="0" time="0.009">
+    <testcase classname="com.logicpoint.iso8583.emv.ChipDataParserTest" name="validatesContactAndContactlessMandatoryTags" time="0.0" />
+    <testcase classname="com.logicpoint.iso8583.emv.ChipDataParserTest" name="recognizesPinAndContactlessHelpersAndUnknownTypes" time="0.003" />
+    <testcase classname="com.logicpoint.iso8583.emv.ChipDataParserTest" name="contactMandatoryTagRulesRejectInvalidAmountsAndAllowZeroForPermittedTransactions" time="0.001" />
+    <testcase classname="com.logicpoint.iso8583.emv.ChipDataParserTest" name="parsesOneAndTwoByteTagsAndExposesTheirValues" time="0.0" />
+    <testcase classname="com.logicpoint.iso8583.emv.ChipDataParserTest" name="validatesCoreCryptogramTags" time="0.0" />
+    <testcase classname="com.logicpoint.iso8583.emv.ChipDataParserTest" name="packsTagsAndConvertsHexToReadableText" time="0.001" />
+    <testcase classname="com.logicpoint.iso8583.emv.ChipDataParserTest" name="recognizesSuccessfulCvmTypes(String, String)[1]" time="0.001" />
+    <testcase classname="com.logicpoint.iso8583.emv.ChipDataParserTest" name="recognizesSuccessfulCvmTypes(String, String)[2]" time="0.0" />
+    <testcase classname="com.logicpoint.iso8583.emv.ChipDataParserTest" name="recognizesSuccessfulCvmTypes(String, String)[3]" time="0.0" />
+    <testcase classname="com.logicpoint.iso8583.emv.ChipDataParserTest" name="recognizesSuccessfulCvmTypes(String, String)[4]" time="0.0" />
+    <testcase classname="com.logicpoint.iso8583.emv.ChipDataParserTest" name="recognizesSuccessfulCvmTypes(String, String)[5]" time="0.0" />
+    <testcase classname="com.logicpoint.iso8583.emv.ChipDataParserTest" name="extractsAndDescribesCvmResultsIncludingInvalidData" time="0.001" />
+    <testcase classname="com.logicpoint.iso8583.emv.ChipDataParserTest" name="malformedOrIncompleteTlvReturnsOnlySafelyParsedData" time="0.0" />
+  </testsuite>
+  <testsuite name="com.logicpoint.iso8583.emv.IssuerApplicationDataTest" tests="12" failures="0" errors="0" skipped="0" time="0.004">
+    <testcase classname="com.logicpoint.iso8583.emv.IssuerApplicationDataTest" name="dumpIncludesParsedRupayCountersAndIddDetails" time="0.001" />
+    <testcase classname="com.logicpoint.iso8583.emv.IssuerApplicationDataTest" name="parsesOtherFormatUsingEmbeddedCvrLength" time="0.0" />
+    <testcase classname="com.logicpoint.iso8583.emv.IssuerApplicationDataTest" name="parsesEmvFormatAWhenBothFormatMarkersArePresent" time="0.0" />
+    <testcase classname="com.logicpoint.iso8583.emv.IssuerApplicationDataTest" name="parsesMchipEighteenByteLayout" time="0.0" />
+    <testcase classname="com.logicpoint.iso8583.emv.IssuerApplicationDataTest" name="parsesMchipTwentyAndTwentyEightByteLayoutsWithLastOnlineAtc" time="0.0" />
+    <testcase classname="com.logicpoint.iso8583.emv.IssuerApplicationDataTest" name="parsesRupay0105Layout" time="0.0" />
+    <testcase classname="com.logicpoint.iso8583.emv.IssuerApplicationDataTest" name="parsesRupayCountersAndDiscretionaryData" time="0.001" />
+    <testcase classname="com.logicpoint.iso8583.emv.IssuerApplicationDataTest" name="parsesShortVisaIssuerApplicationData" time="0.0" />
+    <testcase classname="com.logicpoint.iso8583.emv.IssuerApplicationDataTest" name="parsesVisaFormatTwoFromByteArray" time="0.0" />
+    <testcase classname="com.logicpoint.iso8583.emv.IssuerApplicationDataTest" name="dumpIncludesEveryAvailableMchipSection" time="0.0" />
+    <testcase classname="com.logicpoint.iso8583.emv.IssuerApplicationDataTest" name="rupaySupplementaryParsersReturnNullWhenFieldsAreUnavailable" time="0.0" />
+    <testcase classname="com.logicpoint.iso8583.emv.IssuerApplicationDataTest" name="rejectsNullAndTooShortInput" time="0.001" />
+  </testsuite>
+  <testsuite name="com.logicpoint.iso8583.emv.TerminalVerificationResultsTest" tests="3" failures="0" errors="0" skipped="0" time="0.002">
+    <testcase classname="com.logicpoint.iso8583.emv.TerminalVerificationResultsTest" name="decodesEveryDefinedFlagFromAllBitsSetAndClear" time="0.001" />
+    <testcase classname="com.logicpoint.iso8583.emv.TerminalVerificationResultsTest" name="validatesCriticalAuthenticationCvmAndApplicationFailures" time="0.0" />
+    <testcase classname="com.logicpoint.iso8583.emv.TerminalVerificationResultsTest" name="validatesInputAndProducesDiagnosticDump" time="0.001" />
+  </testsuite>
+  <testsuite name="com.logicpoint.iso8583.emv.TvrDataTest" tests="2" failures="0" errors="0" skipped="0" time="0.002">
+    <testcase classname="com.logicpoint.iso8583.emv.TvrDataTest" name="validatesLengthAndDumpsRawBytes" time="0.002" />
+    <testcase classname="com.logicpoint.iso8583.emv.TvrDataTest" name="decodesAllDefinedBits" time="0.0" />
+  </testsuite>
+  <testsuite name="com.logicpoint.iso8583.exception.ExceptionHandlingTest" tests="5" failures="0" errors="0" skipped="0" time="0.004">
+    <testcase classname="com.logicpoint.iso8583.exception.ExceptionHandlingTest" name="isoExceptionPrintStackTraceOverloadsIncludeNestedCause" time="0.001" />
+    <testcase classname="com.logicpoint.iso8583.exception.ExceptionHandlingTest" name="isoExceptionConstructorsAndTextRenderingHandleNestedExceptions" time="0.001" />
+    <testcase classname="com.logicpoint.iso8583.exception.ExceptionHandlingTest" name="globalHandlerMapsDomainAndUnexpectedExceptions" time="0.0" />
+    <testcase classname="com.logicpoint.iso8583.exception.ExceptionHandlingTest" name="reversalExceptionsExposeOriginalTransactionContext" time="0.001" />
+    <testcase classname="com.logicpoint.iso8583.exception.ExceptionHandlingTest" name="domainExceptionsPreserveCodesMessagesAndCauses" time="0.0" />
+  </testsuite>
+  <testsuite name="com.logicpoint.iso8583.hsm.HsmUtilitiesTest" tests="5" failures="0" errors="0" skipped="0" time="0.005">
+    <testcase classname="com.logicpoint.iso8583.hsm.HsmUtilitiesTest" name="buildsAndParsesFuturexCommandsInFieldOrder" time="0.001" />
+    <testcase classname="com.logicpoint.iso8583.hsm.HsmUtilitiesTest" name="readsStructuredHsmJsonResponses" time="0.001" />
+    <testcase classname="com.logicpoint.iso8583.hsm.HsmUtilitiesTest" name="parsesFuturexErrorsAndRejectsMalformedCommands" time="0.0" />
+    <testcase classname="com.logicpoint.iso8583.hsm.HsmUtilitiesTest" name="dataEncryptorReportsMissingKeyInsteadOfProducingData" time="0.0" />
+    <testcase classname="com.logicpoint.iso8583.hsm.HsmUtilitiesTest" name="replacesDuplicateFieldsAndExposesTheParsedFieldMap" time="0.001" />
+  </testsuite>
+  <testsuite name="com.logicpoint.iso8583.hsm.SimpleNettyHsmClientCoverageTest" tests="21" failures="0" errors="0" skipped="0" time="6.311">
+    <testcase classname="com.logicpoint.iso8583.hsm.SimpleNettyHsmClientCoverageTest" name="noSslClientTimesOutWhenItsHandlerReceivesButDoesNotPublishResponse" time="0.188" />
+    <testcase classname="com.logicpoint.iso8583.hsm.SimpleNettyHsmClientCoverageTest" name="tlsClientReplacesConnectionClosedByServer" time="2.057" />
+    <testcase classname="com.logicpoint.iso8583.hsm.SimpleNettyHsmClientCoverageTest" name="springLifecycleInitializationUsesInjectedPoolSettings" time="0.006" />
+    <testcase classname="com.logicpoint.iso8583.hsm.SimpleNettyHsmClientCoverageTest" name="tlsConvenienceConstructorUsesDefaultPoolSize" time="0.002" />
+    <testcase classname="com.logicpoint.iso8583.hsm.SimpleNettyHsmClientCoverageTest" name="uninitializedSpringClientReportsEmptyPoolAndRejectsMessages" time="0.001" />
+    <testcase classname="com.logicpoint.iso8583.hsm.SimpleNettyHsmClientCoverageTest" name="tlsClientClosesConnectionWhenResponseTimesOut" time="0.53" />
+    <testcase classname="com.logicpoint.iso8583.hsm.SimpleNettyHsmClientCoverageTest" name="keepAliveCallbackFailuresDoNotBreakHsmCommunication" time="0.443" />
+    <testcase classname="com.logicpoint.iso8583.hsm.SimpleNettyHsmClientCoverageTest" name="noSslClientWrapsConnectionFailureForSynchronousCaller" time="0.003" />
+    <testcase classname="com.logicpoint.iso8583.hsm.SimpleNettyHsmClientCoverageTest" name="tlsClientReturnsNullAfterConnectionRetriesAreExhausted" time="0.004" />
+    <testcase classname="com.logicpoint.iso8583.hsm.SimpleNettyHsmClientCoverageTest" name="noSslClientReusesConnectionAfterResponseTimeout" time="0.248" />
+    <testcase classname="com.logicpoint.iso8583.hsm.SimpleNettyHsmClientCoverageTest" name="noSslSynchronousClientPreservesTimeoutCause" time="0.125" />
+    <testcase classname="com.logicpoint.iso8583.hsm.SimpleNettyHsmClientCoverageTest" name="noSslClientRejectsMessageWhenEventLoopHasStopped" time="0.003" />
+    <testcase classname="com.logicpoint.iso8583.hsm.SimpleNettyHsmClientCoverageTest" name="tlsClientLoadsClientCertificateFromFilesystem" time="0.33" />
+    <testcase classname="com.logicpoint.iso8583.hsm.SimpleNettyHsmClientCoverageTest" name="tlsClientQueuesRequestUntilSingleConnectionReturnsToPool" time="0.873" />
+    <testcase classname="com.logicpoint.iso8583.hsm.SimpleNettyHsmClientCoverageTest" name="tlsClientSendsMessageReusesConnectionAndTracksPoolState" time="0.335" />
+    <testcase classname="com.logicpoint.iso8583.hsm.SimpleNettyHsmClientCoverageTest" name="tlsClientDiscardsConnectionThatExceededMaximumAge" time="0.372" />
+    <testcase classname="com.logicpoint.iso8583.hsm.SimpleNettyHsmClientCoverageTest" name="idleCleanupRetainsHealthyChannelsAndClosesStaleChannels" time="0.008" />
+    <testcase classname="com.logicpoint.iso8583.hsm.SimpleNettyHsmClientCoverageTest" name="noSslConvenienceConstructorUsesDefaultPoolSize" time="0.004" />
+    <testcase classname="com.logicpoint.iso8583.hsm.SimpleNettyHsmClientCoverageTest" name="tlsClientLoadsClientCertificateFromClasspath" time="0.385" />
+    <testcase classname="com.logicpoint.iso8583.hsm.SimpleNettyHsmClientCoverageTest" name="tlsClientRejectsMissingCertificatePathDuringInitialization" time="0.001" />
+    <testcase classname="com.logicpoint.iso8583.hsm.SimpleNettyHsmClientCoverageTest" name="tlsClientDiscardsConnectionThatExceededIdleLimit" time="0.389" />
+  </testsuite>
+  <testsuite name="com.logicpoint.iso8583.mcc.MccConfigServiceTest" tests="3" failures="0" errors="0" skipped="0" time="0.143">
+    <testcase classname="com.logicpoint.iso8583.mcc.MccConfigServiceTest" name="compiledRulesSupportEveryOpcodeActionAndSkipUnknownValues" time="0.0" />
+    <testcase classname="com.logicpoint.iso8583.mcc.MccConfigServiceTest" name="emptyMasterDataProducesUnloadedConfiguration" time="0.136" />
+    <testcase classname="com.logicpoint.iso8583.mcc.MccConfigServiceTest" name="compilesValidityGroupOverridesAndOrderedRules" time="0.005" />
+  </testsuite>
+  <testsuite name="com.logicpoint.iso8583.mcc.MccRuleEngineTest" tests="23" failures="0" errors="0" skipped="0" time="0.079">
+    <testcase classname="com.logicpoint.iso8583.mcc.MccRuleEngineTest" name="allowsValidMccWithoutMatchingRuleAndPublishesAttributes(String)[1]" time="0.052" />
+    <testcase classname="com.logicpoint.iso8583.mcc.MccRuleEngineTest" name="allowsValidMccWithoutMatchingRuleAndPublishesAttributes(String)[2]" time="0.001" />
+    <testcase classname="com.logicpoint.iso8583.mcc.MccRuleEngineTest" name="allowsValidMccWithoutMatchingRuleAndPublishesAttributes(String)[3]" time="0.0" />
+    <testcase classname="com.logicpoint.iso8583.mcc.MccRuleEngineTest" name="allowsValidMccWithoutMatchingRuleAndPublishesAttributes(String)[4]" time="0.001" />
+    <testcase classname="com.logicpoint.iso8583.mcc.MccRuleEngineTest" name="allowsValidMccWithoutMatchingRuleAndPublishesAttributes(String)[5]" time="0.0" />
+    <testcase classname="com.logicpoint.iso8583.mcc.MccRuleEngineTest" name="appliesMatchedDeclineRuleAndConfiguredReason" time="0.004" />
+    <testcase classname="com.logicpoint.iso8583.mcc.MccRuleEngineTest" name="declinesWhenConfigurationIsNotLoaded" time="0.0" />
+    <testcase classname="com.logicpoint.iso8583.mcc.MccRuleEngineTest" name="declinesMccNotValidForScheme" time="0.001" />
+    <testcase classname="com.logicpoint.iso8583.mcc.MccRuleEngineTest" name="amountRuleStepsUpAndInvalidReasonFallsBackToNotAllowed" time="0.0" />
+    <testcase classname="com.logicpoint.iso8583.mcc.MccRuleEngineTest" name="declinesMissingMcc(String)[1]" time="0.001" />
+    <testcase classname="com.logicpoint.iso8583.mcc.MccRuleEngineTest" name="declinesMissingMcc(String)[2]" time="0.0" />
+    <testcase classname="com.logicpoint.iso8583.mcc.MccRuleEngineTest" name="declinesMissingMcc(String)[3]" time="0.0" />
+    <testcase classname="com.logicpoint.iso8583.mcc.MccRuleEngineTest" name="declinesMalformedMcc(String)[1]" time="0.0" />
+    <testcase classname="com.logicpoint.iso8583.mcc.MccRuleEngineTest" name="declinesMalformedMcc(String)[2]" time="0.0" />
+    <testcase classname="com.logicpoint.iso8583.mcc.MccRuleEngineTest" name="declinesMalformedMcc(String)[3]" time="0.001" />
+    <testcase classname="com.logicpoint.iso8583.mcc.MccRuleEngineTest" name="declinesMalformedMcc(String)[4]" time="0.001" />
+    <testcase classname="com.logicpoint.iso8583.mcc.MccRuleEngineTest" name="declinesMalformedMcc(String)[5]" time="0.0" />
+    <testcase classname="com.logicpoint.iso8583.mcc.MccRuleEngineTest" name="declinesMalformedMcc(String)[6]" time="0.001" />
+    <testcase classname="com.logicpoint.iso8583.mcc.MccRuleEngineTest" name="declinesInvalidInstitution(String)[1]" time="0.001" />
+    <testcase classname="com.logicpoint.iso8583.mcc.MccRuleEngineTest" name="declinesInvalidInstitution(String)[2]" time="0.001" />
+    <testcase classname="com.logicpoint.iso8583.mcc.MccRuleEngineTest" name="declinesInvalidInstitution(String)[3]" time="0.0" />
+    <testcase classname="com.logicpoint.iso8583.mcc.MccRuleEngineTest" name="declinesInvalidInstitution(String)[4]" time="0.0" />
+    <testcase classname="com.logicpoint.iso8583.mcc.MccRuleEngineTest" name="declinesInvalidInstitution(String)[5]" time="0.001" />
+  </testsuite>
+  <testsuite name="com.logicpoint.iso8583.mcc.MccSupportTypesTest" tests="11" failures="0" errors="0" skipped="0" time="0.313">
+    <testcase classname="com.logicpoint.iso8583.mcc.MccSupportTypesTest" name="repositoryMapsAllRows" time="0.298" />
+    <testcase classname="com.logicpoint.iso8583.mcc.MccSupportTypesTest" name="tableAppliesSchemeValidityAndGroupFallbackBoundaries" time="0.0" />
+    <testcase classname="com.logicpoint.iso8583.mcc.MccSupportTypesTest" name="mapsEverySchemeToStableSlot(Scheme, int)[1]" time="0.001" />
+    <testcase classname="com.logicpoint.iso8583.mcc.MccSupportTypesTest" name="mapsEverySchemeToStableSlot(Scheme, int)[2]" time="0.0" />
+    <testcase classname="com.logicpoint.iso8583.mcc.MccSupportTypesTest" name="mapsEverySchemeToStableSlot(Scheme, int)[3]" time="0.0" />
+    <testcase classname="com.logicpoint.iso8583.mcc.MccSupportTypesTest" name="mapsEverySchemeToStableSlot(Scheme, int)[4]" time="0.0" />
+    <testcase classname="com.logicpoint.iso8583.mcc.MccSupportTypesTest" name="mapsEverySchemeToStableSlot(Scheme, int)[5]" time="0.001" />
+    <testcase classname="com.logicpoint.iso8583.mcc.MccSupportTypesTest" name="mapsEverySchemeToStableSlot(Scheme, int)[6]" time="0.0" />
+    <testcase classname="com.logicpoint.iso8583.mcc.MccSupportTypesTest" name="mapsEverySchemeToStableSlot(Scheme, int)[7]" time="0.0" />
+    <testcase classname="com.logicpoint.iso8583.mcc.MccSupportTypesTest" name="repositoryReturnsEmptyListsWhenTablesAreUnavailable" time="0.004" />
+    <testcase classname="com.logicpoint.iso8583.mcc.MccSupportTypesTest" name="unknownAndMissingSchemesUseDefaultSlot" time="0.001" />
+  </testsuite>
+  <testsuite name="com.logicpoint.iso8583.model.MessageTypeTest" tests="5" failures="0" errors="0" skipped="0" time="0.002">
+    <testcase classname="com.logicpoint.iso8583.model.MessageTypeTest" name="classifiesNetworkManagementRequestsAndResponses" time="0.001" />
+    <testcase classname="com.logicpoint.iso8583.model.MessageTypeTest" name="rejectsInvalidMtiValues" time="0.0" />
+    <testcase classname="com.logicpoint.iso8583.model.MessageTypeTest" name="classifiesReversalRequestsAndResponses" time="0.0" />
+    <testcase classname="com.logicpoint.iso8583.model.MessageTypeTest" name="classifiesIssuerActionRequestAndResponse" time="0.0" />
+    <testcase classname="com.logicpoint.iso8583.model.MessageTypeTest" name="classifiesAuthorizationAndFinancialRequestsAndResponses" time="0.0" />
+  </testsuite>
+  <testsuite name="com.logicpoint.iso8583.notification.client.NotificationClientIntegrationTest" tests="3" failures="0" errors="0" skipped="0" time="2.318">
+    <testcase classname="com.logicpoint.iso8583.notification.client.NotificationClientIntegrationTest" name="doesNotRetryHttp400" time="0.939" />
+    <testcase classname="com.logicpoint.iso8583.notification.client.NotificationClientIntegrationTest" name="retriesHttp503AndThenSucceeds" time="0.023" />
+    <testcase classname="com.logicpoint.iso8583.notification.client.NotificationClientIntegrationTest" name="publishesAndCapturesEventAndTraceHeaders" time="0.005" />
+  </testsuite>
+  <testsuite name="com.logicpoint.iso8583.notification.exception.NotificationExceptionTest" tests="2" failures="0" errors="0" skipped="0" time="0.002">
+    <testcase classname="com.logicpoint.iso8583.notification.exception.NotificationExceptionTest" name="exceptionTypesPreserveMessageCauseAndRetrySemantics" time="0.001" />
+    <testcase classname="com.logicpoint.iso8583.notification.exception.NotificationExceptionTest" name="messageOnlyConstructorsLeaveCauseUnset" time="0.0" />
+  </testsuite>
+  <testsuite name="com.logicpoint.iso8583.notification.mapper.DeclinedTransactionNotificationMapperTest" tests="4" failures="0" errors="0" skipped="0" time="0.004">
+    <testcase classname="com.logicpoint.iso8583.notification.mapper.DeclinedTransactionNotificationMapperTest" name="mapsAtmTransactionTypeToAtmChannel" time="0.003" />
+    <testcase classname="com.logicpoint.iso8583.notification.mapper.DeclinedTransactionNotificationMapperTest" name="mapsEcommerceIsoFieldsToEcommChannelWhenTransactionTypeIsUnknown" time="0.0" />
+    <testcase classname="com.logicpoint.iso8583.notification.mapper.DeclinedTransactionNotificationMapperTest" name="mapsEcommerceTransactionTypeToEcommChannel" time="0.001" />
+    <testcase classname="com.logicpoint.iso8583.notification.mapper.DeclinedTransactionNotificationMapperTest" name="mapsDeclinedAuthorizationContextToNotificationRequest" time="0.0" />
+  </testsuite>
+  <testsuite name="com.logicpoint.iso8583.notification.service.NotificationServiceImplTest" tests="4" failures="0" errors="0" skipped="0" time="0.017">
+    <testcase classname="com.logicpoint.iso8583.notification.service.NotificationServiceImplTest" name="skipsWhenDisabled" time="0.002" />
+    <testcase classname="com.logicpoint.iso8583.notification.service.NotificationServiceImplTest" name="swallowsNotificationFailures" time="0.011" />
+    <testcase classname="com.logicpoint.iso8583.notification.service.NotificationServiceImplTest" name="publishesDeclinedAuthorizations" time="0.003" />
+    <testcase classname="com.logicpoint.iso8583.notification.service.NotificationServiceImplTest" name="skipsApprovedAuthorizations" time="0.0" />
+  </testsuite>
+  <testsuite name="com.logicpoint.iso8583.service.AccountingApiServiceHttpTest" tests="6" failures="0" errors="0" skipped="0" time="0.084">
+    <testcase classname="com.logicpoint.iso8583.service.AccountingApiServiceHttpTest" name="rejectsUnsuccessfulLoginAndAuthorizationResponses" time="0.053" />
+    <testcase classname="com.logicpoint.iso8583.service.AccountingApiServiceHttpTest" name="returnsParsedBusinessDeclineFromHttp400" time="0.007" />
+    <testcase classname="com.logicpoint.iso8583.service.AccountingApiServiceHttpTest" name="convertsTransportAndServerFailuresToDomainRuntimeFailures" time="0.004" />
+    <testcase classname="com.logicpoint.iso8583.service.AccountingApiServiceHttpTest" name="authorizesAndReversesWhileReusingCachedToken" time="0.011" />
+    <testcase classname="com.logicpoint.iso8583.service.AccountingApiServiceHttpTest" name="mapsAuthorizationFieldsAndTransactionVariants" time="0.007" />
+    <testcase classname="com.logicpoint.iso8583.service.AccountingApiServiceHttpTest" name="malformedAndEmptyDeclinesCannotBeParsed" time="0.001" />
+  </testsuite>
+  <testsuite name="com.logicpoint.iso8583.service.AccountingApiServiceTest" tests="4" failures="0" errors="0" skipped="0" time="0.003">
+    <testcase classname="com.logicpoint.iso8583.service.AccountingApiServiceTest" name="resolvesAtmAuthenticationMethodFromTransactionType" time="0.0" />
+    <testcase classname="com.logicpoint.iso8583.service.AccountingApiServiceTest" name="parsesHttp400BusinessDeclineAsAuthorizationResponse" time="0.002" />
+    <testcase classname="com.logicpoint.iso8583.service.AccountingApiServiceTest" name="resolvesChannelsFromIsoFieldsWhenTransactionTypeIsNotChannelSpecific" time="0.0" />
+    <testcase classname="com.logicpoint.iso8583.service.AccountingApiServiceTest" name="resolvesEcommerceAuthenticationMethodFromTransactionType" time="0.0" />
+  </testsuite>
+  <testsuite name="com.logicpoint.iso8583.service.AesGcmCryptoServiceTest" tests="4" failures="0" errors="0" skipped="0" time="0.001">
+    <testcase classname="com.logicpoint.iso8583.service.AesGcmCryptoServiceTest" name="encryptsAndDecryptsWithAuthenticatedContext" time="0.0" />
+    <testcase classname="com.logicpoint.iso8583.service.AesGcmCryptoServiceTest" name="rejectsTamperingAndInvalidKeys" time="0.001" />
+    <testcase classname="com.logicpoint.iso8583.service.AesGcmCryptoServiceTest" name="supportsNoAadAndUsesFreshInitializationVectors" time="0.0" />
+    <testcase classname="com.logicpoint.iso8583.service.AesGcmCryptoServiceTest" name="handlesNullsAndComputesStableUppercaseHmac" time="0.0" />
+  </testsuite>
+  <testsuite name="com.logicpoint.iso8583.service.AuthorizationValidationServicesTest" tests="8" failures="0" errors="0" skipped="0" time="0.009">
+    <testcase classname="com.logicpoint.iso8583.service.AuthorizationValidationServicesTest" name="installmentValidationSkipsDisabledUnsupportedAndIncompleteInputs" time="0.001" />
+    <testcase classname="com.logicpoint.iso8583.service.AuthorizationValidationServicesTest" name="tokenValidationSkipsUnsupportedAndNonTokenizedDataWhenConfigured" time="0.001" />
+    <testcase classname="com.logicpoint.iso8583.service.AuthorizationValidationServicesTest" name="posDataValidationCoversMissingShortInvalidAndValidSubfields" time="0.003" />
+    <testcase classname="com.logicpoint.iso8583.service.AuthorizationValidationServicesTest" name="installmentValidationCoversMissingMalformedShortAndInvalidData" time="0.0" />
+    <testcase classname="com.logicpoint.iso8583.service.AuthorizationValidationServicesTest" name="privateDataValidationCoversMissingMalformedInvalidAndValidTlv" time="0.002" />
+    <testcase classname="com.logicpoint.iso8583.service.AuthorizationValidationServicesTest" name="installmentValidationAcceptsValidDataAndStoresParsedAttributes" time="0.0" />
+    <testcase classname="com.logicpoint.iso8583.service.AuthorizationValidationServicesTest" name="posDataValidationHandlesOutOfRangeCustomPositionAndDescriptionFallback" time="0.0" />
+    <testcase classname="com.logicpoint.iso8583.service.AuthorizationValidationServicesTest" name="tokenValidationCoversIndicatorDataAndResultOutcomes" time="0.001" />
+  </testsuite>
+  <testsuite name="com.logicpoint.iso8583.service.AutomaticReversalServiceTest" tests="3" failures="0" errors="0" skipped="0" time="0.053">
+    <testcase classname="com.logicpoint.iso8583.service.AutomaticReversalServiceTest" name="registeredTransactionTriggersReversalOnlyAfterAccountingApproval" time="0.052" />
+    <testcase classname="com.logicpoint.iso8583.service.AutomaticReversalServiceTest" name="cleanupRemovesStaleContextsAndRetryHookIsSafe" time="0.001" />
+    <testcase classname="com.logicpoint.iso8583.service.AutomaticReversalServiceTest" name="sentResponseCompletesTransactionAndIgnoresLaterCallbacks" time="0.0" />
+  </testsuite>
+  <testsuite name="com.logicpoint.iso8583.service.CacheInitializationServiceTest" tests="4" failures="0" errors="0" skipped="0" time="0.132">
+    <testcase classname="com.logicpoint.iso8583.service.CacheInitializationServiceTest" name="missingConfiguredCacheFailsFastAndNullBackedDataIsInactive" time="0.033" />
+    <testcase classname="com.logicpoint.iso8583.service.CacheInitializationServiceTest" name="loadsCardCacheAndRefreshesNamedCaches" time="0.001" />
+    <testcase classname="com.logicpoint.iso8583.service.CacheInitializationServiceTest" name="initializesAndReusesBinInstitutionCache" time="0.0" />
+    <testcase classname="com.logicpoint.iso8583.service.CacheInitializationServiceTest" name="malformedRepositoryRecordsAreSkippedDuringWarmup" time="0.097" />
+  </testsuite>
+  <testsuite name="com.logicpoint.iso8583.service.CacheUpdateServiceTest" tests="3" failures="0" errors="0" skipped="0" time="0.029">
+    <testcase classname="com.logicpoint.iso8583.service.CacheUpdateServiceTest" name="refreshesIndividualCachesAndReloadsTheirData" time="0.027" />
+    <testcase classname="com.logicpoint.iso8583.service.CacheUpdateServiceTest" name="publishesAndRoutesCacheEventsWhileIgnoringUnknownNames" time="0.001" />
+    <testcase classname="com.logicpoint.iso8583.service.CacheUpdateServiceTest" name="allCacheEventClearsEveryConfiguredCacheAndReloadsBinData" time="0.001" />
+  </testsuite>
+  <testsuite name="com.logicpoint.iso8583.service.CanonicalResponseCodeSeedServiceTest" tests="2" failures="0" errors="0" skipped="0" time="0.005">
+    <testcase classname="com.logicpoint.iso8583.service.CanonicalResponseCodeSeedServiceTest" name="seedIfRequiredDoesNotOverwriteExistingDbConfiguredResponseCodes" time="0.004" />
+    <testcase classname="com.logicpoint.iso8583.service.CanonicalResponseCodeSeedServiceTest" name="applyToDe39UsesDbConfiguredRuPayCodeForTvrFailed" time="0.001" />
+  </testsuite>
+  <testsuite name="com.logicpoint.iso8583.service.CardAuthenticationServiceTest" tests="2" failures="0" errors="0" skipped="0" time="0.001">
+    <testcase classname="com.logicpoint.iso8583.service.CardAuthenticationServiceTest" name="placeholderCvvPinAndGenerationOperationsReturnUnsupportedResults" time="0.0" />
+    <testcase classname="com.logicpoint.iso8583.service.CardAuthenticationServiceTest" name="placeholderArqcOperationParsesEmvPayloadBeforeReturningUnsupported" time="0.0" />
+  </testsuite>
+  <testsuite name="com.logicpoint.iso8583.service.CardDataEncryptionServiceTest" tests="1" failures="0" errors="0" skipped="0" time="0.001">
+    <testcase classname="com.logicpoint.iso8583.service.CardDataEncryptionServiceTest" name="cardPersistenceUsesCardKeyWithoutRequiringTransactionOrPanHmacKeys" time="0.001" />
+  </testsuite>
+  <testsuite name="com.logicpoint.iso8583.service.CardDataServiceTest" tests="14" failures="0" errors="0" skipped="0" time="0.01">
+    <testcase classname="com.logicpoint.iso8583.service.CardDataServiceTest" name="updateProtectsAndPersistsLegacyCard" time="0.001" />
+    <testcase classname="com.logicpoint.iso8583.service.CardDataServiceTest" name="transactionEligibilityRejectsInvalidInactiveExpiredAndBlockedCards" time="0.001" />
+    <testcase classname="com.logicpoint.iso8583.service.CardDataServiceTest" name="transactionEligibilityAcceptsActiveUnexpiredUnblockedCard" time="0.001" />
+    <testcase classname="com.logicpoint.iso8583.service.CardDataServiceTest" name="requestLookupRejectsMissingContextPanAndLookupHash" time="0.0" />
+    <testcase classname="com.logicpoint.iso8583.service.CardDataServiceTest" name="unmanagedApiCannotReadCmsManagedCardByPlainPan" time="0.001" />
+    <testcase classname="com.logicpoint.iso8583.service.CardDataServiceTest" name="panLookupReturnsAndHydratesDirectRepositoryMatch" time="0.001" />
+    <testcase classname="com.logicpoint.iso8583.service.CardDataServiceTest" name="panLookupReportsNotFoundAndRepositoryFailures" time="0.001" />
+    <testcase classname="com.logicpoint.iso8583.service.CardDataServiceTest" name="requestLookupComputesHashAndReturnsCmsManagedCard" time="0.001" />
+    <testcase classname="com.logicpoint.iso8583.service.CardDataServiceTest" name="requestLookupMapsPolicyOrRepositoryFailureToRestrictedCard" time="0.0" />
+    <testcase classname="com.logicpoint.iso8583.service.CardDataServiceTest" name="panLookupRejectsNullAndBlankPan" time="0.001" />
+    <testcase classname="com.logicpoint.iso8583.service.CardDataServiceTest" name="updateReturnsFalseWhenProtectionOrPersistenceFails" time="0.0" />
+    <testcase classname="com.logicpoint.iso8583.service.CardDataServiceTest" name="updateRejectsNullAndUpdatesCmsManagedCounters" time="0.001" />
+    <testcase classname="com.logicpoint.iso8583.service.CardDataServiceTest" name="realtimeLookupFallsBackToPanHmac" time="0.0" />
+    <testcase classname="com.logicpoint.iso8583.service.CardDataServiceTest" name="requestLookupFallsBackToLegacyRepositoryAndHydratesCard" time="0.0" />
+  </testsuite>
+  <testsuite name="com.logicpoint.iso8583.service.ChdKeyCacheServiceTest" tests="3" failures="0" errors="0" skipped="0" time="0.04">
+    <testcase classname="com.logicpoint.iso8583.service.ChdKeyCacheServiceTest" name="disabledEncryptionSkipsStartupLoadAndReportsNotReady" time="0.036" />
+    <testcase classname="com.logicpoint.iso8583.service.ChdKeyCacheServiceTest" name="failedUnwrapAndMissingLookupReturnNullWithoutPublishingKey" time="0.003" />
+    <testcase classname="com.logicpoint.iso8583.service.ChdKeyCacheServiceTest" name="refreshLoadsCurrentAndHistoricalKeysAndBuildsStatus" time="0.001" />
+  </testsuite>
+  <testsuite name="com.logicpoint.iso8583.service.ChdKeyProvisioningServiceTest" tests="4" failures="0" errors="0" skipped="0" time="0.002">
+    <testcase classname="com.logicpoint.iso8583.service.ChdKeyProvisioningServiceTest" name="startupProvisioningIsSkippedWhenEncryptionIsDisabled" time="0.001" />
+    <testcase classname="com.logicpoint.iso8583.service.ChdKeyProvisioningServiceTest" name="enabledStartupUsesConfiguredDefaultInstitution" time="0.0" />
+    <testcase classname="com.logicpoint.iso8583.service.ChdKeyProvisioningServiceTest" name="provisioningReportsExistingCreatedAndFailedKeysThenRefreshesCache" time="0.001" />
+    <testcase classname="com.logicpoint.iso8583.service.ChdKeyProvisioningServiceTest" name="startupProvisioningIsSkippedUnlessBothFlagsAreEnabled" time="0.0" />
+  </testsuite>
+  <testsuite name="com.logicpoint.iso8583.service.CvmValidationServiceCertificationTest" tests="5" failures="0" errors="0" skipped="0" time="0.002">
+    <testcase classname="com.logicpoint.iso8583.service.CvmValidationServiceCertificationTest" name="contactlessPurchaseAboveCvmLimitFailsWhenPinBlockIsNotPresent" time="0.001" />
+    <testcase classname="com.logicpoint.iso8583.service.CvmValidationServiceCertificationTest" name="contactNoCvmPerformedUnknownResultStillFails" time="0.0" />
+    <testcase classname="com.logicpoint.iso8583.service.CvmValidationServiceCertificationTest" name="contactlessPurchaseAboveCvmLimitPassesWhenPinBlockIsPresent" time="0.0" />
+    <testcase classname="com.logicpoint.iso8583.service.CvmValidationServiceCertificationTest" name="contactlessNoCvmPerformedUnknownResultFailsAboveNoCvmLimit" time="0.001" />
+    <testcase classname="com.logicpoint.iso8583.service.CvmValidationServiceCertificationTest" name="contactlessNoCvmPerformedUnknownResultPassesWithinNoCvmLimit" time="0.0" />
+  </testsuite>
+  <testsuite name="com.logicpoint.iso8583.service.CvmValidationServiceOfflinePinTest" tests="5" failures="0" errors="0" skipped="0" time="0.001">
+    <testcase classname="com.logicpoint.iso8583.service.CvmValidationServiceOfflinePinTest" name="rejectsOnlinePinWithoutDe52" time="0.0" />
+    <testcase classname="com.logicpoint.iso8583.service.CvmValidationServiceOfflinePinTest" name="rejectsOfflinePinWhenBinDisablesOfflinePin" time="0.0" />
+    <testcase classname="com.logicpoint.iso8583.service.CvmValidationServiceOfflinePinTest" name="acceptsOfflineEncipheredPinWithoutDe52ForContactless" time="0.0" />
+    <testcase classname="com.logicpoint.iso8583.service.CvmValidationServiceOfflinePinTest" name="rejectsOfflinePinWithoutSuccessfulCvmResult" time="0.0" />
+    <testcase classname="com.logicpoint.iso8583.service.CvmValidationServiceOfflinePinTest" name="acceptsOfflinePlaintextPinWithoutDe52" time="0.0" />
+  </testsuite>
+  <testsuite name="com.logicpoint.iso8583.service.CvmValidationServiceTest" tests="19" failures="0" errors="0" skipped="0" time="0.082">
+    <testcase classname="com.logicpoint.iso8583.service.CvmValidationServiceTest" name="testValidateFailedCvmRequired" time="0.064" />
+    <testcase classname="com.logicpoint.iso8583.service.CvmValidationServiceTest" name="testGetCvmStatisticsError" time="0.007" />
+    <testcase classname="com.logicpoint.iso8583.service.CvmValidationServiceTest" name="testValidateContactlessNoCvmExceedingLimit" time="0.001" />
+    <testcase classname="com.logicpoint.iso8583.service.CvmValidationServiceTest" name="testGetCvmStatisticsMissingData" time="0.0" />
+    <testcase classname="com.logicpoint.iso8583.service.CvmValidationServiceTest" name="testValidateSuccessfulCvmContact" time="0.001" />
+    <testcase classname="com.logicpoint.iso8583.service.CvmValidationServiceTest" name="testValidateContactlessCvmExceedingLimit" time="0.001" />
+    <testcase classname="com.logicpoint.iso8583.service.CvmValidationServiceTest" name="testValidateMissingCvmResults" time="0.0" />
+    <testcase classname="com.logicpoint.iso8583.service.CvmValidationServiceTest" name="testValidateFailedCvm" time="0.001" />
+    <testcase classname="com.logicpoint.iso8583.service.CvmValidationServiceTest" name="testGetCvmStatistics" time="0.0" />
+    <testcase classname="com.logicpoint.iso8583.service.CvmValidationServiceTest" name="testVariousCvmScenarios" time="0.001" />
+    <testcase classname="com.logicpoint.iso8583.service.CvmValidationServiceTest" name="testDetermineRecommendedCvmContact" time="0.0" />
+    <testcase classname="com.logicpoint.iso8583.service.CvmValidationServiceTest" name="testDetermineRecommendedCvmContactless" time="0.001" />
+    <testcase classname="com.logicpoint.iso8583.service.CvmValidationServiceTest" name="testCvmValidationResult" time="0.0" />
+    <testcase classname="com.logicpoint.iso8583.service.CvmValidationServiceTest" name="testValidateInvalidCvmFormat" time="0.001" />
+    <testcase classname="com.logicpoint.iso8583.service.CvmValidationServiceTest" name="testValidateNullChipData" time="0.0" />
+    <testcase classname="com.logicpoint.iso8583.service.CvmValidationServiceTest" name="testIsCvmSupportedByTerminalInvalid" time="0.001" />
+    <testcase classname="com.logicpoint.iso8583.service.CvmValidationServiceTest" name="testValidateContactlessCvmWithinLimit" time="0.001" />
+    <testcase classname="com.logicpoint.iso8583.service.CvmValidationServiceTest" name="testIsCvmSupportedByTerminal" time="0.001" />
+    <testcase classname="com.logicpoint.iso8583.service.CvmValidationServiceTest" name="testValidateContactlessNoCvmWithinLimit" time="0.0" />
+  </testsuite>
+  <testsuite name="com.logicpoint.iso8583.service.CvrValidationServiceTest" tests="9" failures="0" errors="0" skipped="0" time="0.004">
+    <testcase classname="com.logicpoint.iso8583.service.CvrValidationServiceTest" name="validateCvrReturnsSuccessfulResultForCleanCvr" time="0.001" />
+    <testcase classname="com.logicpoint.iso8583.service.CvrValidationServiceTest" name="validateCvrRejectsCriticalCardVerificationFailures(String, String, String)[1]" time="0.001" />
+    <testcase classname="com.logicpoint.iso8583.service.CvrValidationServiceTest" name="validateCvrRejectsCriticalCardVerificationFailures(String, String, String)[2]" time="0.0" />
+    <testcase classname="com.logicpoint.iso8583.service.CvrValidationServiceTest" name="validateCvrRejectsCriticalCardVerificationFailures(String, String, String)[3]" time="0.0" />
+    <testcase classname="com.logicpoint.iso8583.service.CvrValidationServiceTest" name="validateCvrCollectsAllAdvisoryFlagsAndRequiresOnlineAuthorization" time="0.0" />
+    <testcase classname="com.logicpoint.iso8583.service.CvrValidationServiceTest" name="validateCvrReportsMalformedIssuerApplicationData" time="0.001" />
+    <testcase classname="com.logicpoint.iso8583.service.CvrValidationServiceTest" name="validationResultFactoriesDefensivelyCopyCollectionsAndDescribeState" time="0.0" />
+    <testcase classname="com.logicpoint.iso8583.service.CvrValidationServiceTest" name="parseCvrFromIadNormalizesSchemeAndReturnsParsedCvr" time="0.0" />
+    <testcase classname="com.logicpoint.iso8583.service.CvrValidationServiceTest" name="validateCvrRejectsNullEmptyAndMissingIssuerApplicationData" time="0.0" />
+  </testsuite>
+  <testsuite name="com.logicpoint.iso8583.service.DuplicateCheckServiceTest" tests="5" failures="0" errors="0" skipped="0" time="0.042">
+    <testcase classname="com.logicpoint.iso8583.service.DuplicateCheckServiceTest" name="missingRequiredFieldSkipsRepositoryLookup(Map)[1]" time="0.039" />
+    <testcase classname="com.logicpoint.iso8583.service.DuplicateCheckServiceTest" name="missingRequiredFieldSkipsRepositoryLookup(Map)[2]" time="0.001" />
+    <testcase classname="com.logicpoint.iso8583.service.DuplicateCheckServiceTest" name="missingRequiredFieldSkipsRepositoryLookup(Map)[3]" time="0.0" />
+    <testcase classname="com.logicpoint.iso8583.service.DuplicateCheckServiceTest" name="existingMatchBuildsDuplicateTransactionResponse" time="0.001" />
+    <testcase classname="com.logicpoint.iso8583.service.DuplicateCheckServiceTest" name="transactionWithoutExistingMatchIsNotDuplicate" time="0.0" />
+  </testsuite>
+  <testsuite name="com.logicpoint.iso8583.service.ExternalEndpointMetricsTest" tests="5" failures="0" errors="0" skipped="0" time="0.01">
+    <testcase classname="com.logicpoint.iso8583.service.ExternalEndpointMetricsTest" name="failedAccountingProbeIsContainedAndMarksEndpointDown" time="0.006" />
+    <testcase classname="com.logicpoint.iso8583.service.ExternalEndpointMetricsTest" name="disabledAccountingProbeRecordsCheckWithoutOpeningConnection" time="0.001" />
+    <testcase classname="com.logicpoint.iso8583.service.ExternalEndpointMetricsTest" name="buildsProbeUrisAndResolvesDefaultPorts" time="0.0" />
+    <testcase classname="com.logicpoint.iso8583.service.ExternalEndpointMetricsTest" name="bindsEndpointAndPoolGaugesWithConfiguredTags" time="0.001" />
+    <testcase classname="com.logicpoint.iso8583.service.ExternalEndpointMetricsTest" name="tracksHsmConnectedSinceAcrossTransitions" time="0.0" />
+  </testsuite>
+  <testsuite name="com.logicpoint.iso8583.service.FinancialRequestProcessorTest" tests="16" failures="0" errors="0" skipped="0" time="0.165">
+    <testcase classname="com.logicpoint.iso8583.service.FinancialRequestProcessorTest" name="mccRejectionStopsBeforeBusinessValidation" time="0.116" />
+    <testcase classname="com.logicpoint.iso8583.service.FinancialRequestProcessorTest" name="successfulOfflinePinAllowsMissingDe52" time="0.005" />
+    <testcase classname="com.logicpoint.iso8583.service.FinancialRequestProcessorTest" name="tvrFailureDoesNotAllowMissingDe52" time="0.004" />
+    <testcase classname="com.logicpoint.iso8583.service.FinancialRequestProcessorTest" name="identifyTransactionTypeReturnsUnknownWithoutRule" time="0.003" />
+    <testcase classname="com.logicpoint.iso8583.service.FinancialRequestProcessorTest" name="orchestratorFailurePreservesItsResponseAndOmitsPinChangeNewPin" time="0.004" />
+    <testcase classname="com.logicpoint.iso8583.service.FinancialRequestProcessorTest" name="successfulOfflinePinIsAllowedWhenCacheServiceIsUnavailable" time="0.003" />
+    <testcase classname="com.logicpoint.iso8583.service.FinancialRequestProcessorTest" name="failedOfflinePinDoesNotAllowMissingDe52" time="0.004" />
+    <testcase classname="com.logicpoint.iso8583.service.FinancialRequestProcessorTest" name="successfulOfflinePinWithCleanTvrAllowsMissingDe52" time="0.003" />
+    <testcase classname="com.logicpoint.iso8583.service.FinancialRequestProcessorTest" name="nonRupayRequestIsDeclinedBeforeIdentification" time="0.003" />
+    <testcase classname="com.logicpoint.iso8583.service.FinancialRequestProcessorTest" name="missingMandatoryFieldsReturnFormatErrorAndRemovePinChangeNewPin" time="0.003" />
+    <testcase classname="com.logicpoint.iso8583.service.FinancialRequestProcessorTest" name="validTransactionAppliesUpdatesAndFinancialApproval" time="0.002" />
+    <testcase classname="com.logicpoint.iso8583.service.FinancialRequestProcessorTest" name="malformedChipDataDoesNotAllowMissingDe52" time="0.003" />
+    <testcase classname="com.logicpoint.iso8583.service.FinancialRequestProcessorTest" name="unknownTransactionTypeReturnsComplianceViolation" time="0.003" />
+    <testcase classname="com.logicpoint.iso8583.service.FinancialRequestProcessorTest" name="missingBinConfigurationDefaultsToAllowOfflinePin" time="0.002" />
+    <testcase classname="com.logicpoint.iso8583.service.FinancialRequestProcessorTest" name="identifyTransactionTypeConvertsNumericFieldKeys" time="0.003" />
+    <testcase classname="com.logicpoint.iso8583.service.FinancialRequestProcessorTest" name="binConfigurationCanRejectOtherwiseSuccessfulOfflinePin" time="0.002" />
+  </testsuite>
+  <testsuite name="com.logicpoint.iso8583.service.HsmKeepAliveServiceTest" tests="9" failures="0" errors="0" skipped="0" time="0.085">
+    <testcase classname="com.logicpoint.iso8583.service.HsmKeepAliveServiceTest" name="testKeepAliveStats" time="0.033" />
+    <testcase classname="com.logicpoint.iso8583.service.HsmKeepAliveServiceTest" name="testActivityTracking" time="0.013" />
+    <testcase classname="com.logicpoint.iso8583.service.HsmKeepAliveServiceTest" name="testConnectionCounts" time="0.001" />
+    <testcase classname="com.logicpoint.iso8583.service.HsmKeepAliveServiceTest" name="repeatedEchoFailuresMarkConnectionUnhealthyAndSuccessRestoresIt" time="0.035" />
+    <testcase classname="com.logicpoint.iso8583.service.HsmKeepAliveServiceTest" name="testShutdown" time="0.001" />
+    <testcase classname="com.logicpoint.iso8583.service.HsmKeepAliveServiceTest" name="testKeepAliveServiceInitialization" time="0.0" />
+    <testcase classname="com.logicpoint.iso8583.service.HsmKeepAliveServiceTest" name="testDisabledKeepAlive" time="0.0" />
+    <testcase classname="com.logicpoint.iso8583.service.HsmKeepAliveServiceTest" name="testForceHealthCheck" time="0.0" />
+    <testcase classname="com.logicpoint.iso8583.service.HsmKeepAliveServiceTest" name="registeredConnectionTracksActivityAndCanBeUnregistered" time="0.001" />
+  </testsuite>
+  <testsuite name="com.logicpoint.iso8583.service.Iso8583ProcessorServiceTest" tests="7" failures="0" errors="0" skipped="0" time="0.002">
+    <testcase classname="com.logicpoint.iso8583.service.Iso8583ProcessorServiceTest" name="failedResponseRemovesDe120WhenTag004IsTheOnlyTag" time="0.001" />
+    <testcase classname="com.logicpoint.iso8583.service.Iso8583ProcessorServiceTest" name="buildResponseKeepsOnlyDe55Tag91ForRupayResponse" time="0.0" />
+    <testcase classname="com.logicpoint.iso8583.service.Iso8583ProcessorServiceTest" name="buildResponseRemovesDe55WhenArpcTagIsAbsent" time="0.001" />
+    <testcase classname="com.logicpoint.iso8583.service.Iso8583ProcessorServiceTest" name="buildResponseDoesNotEchoDe33" time="0.0" />
+    <testcase classname="com.logicpoint.iso8583.service.Iso8583ProcessorServiceTest" name="buildResponseDoesNotEchoDe48Tag78" time="0.0" />
+    <testcase classname="com.logicpoint.iso8583.service.Iso8583ProcessorServiceTest" name="buildResponseDoesNotEchoDe48Tag84" time="0.0" />
+    <testcase classname="com.logicpoint.iso8583.service.Iso8583ProcessorServiceTest" name="failedResponseDoesNotEchoDe55OrDe120Tag004" time="0.0" />
+  </testsuite>
+  <testsuite name="com.logicpoint.iso8583.service.IssuerMandateRevocationLifecycleServiceTest" tests="3" failures="0" errors="0" skipped="0" time="0.002">
+    <testcase classname="com.logicpoint.iso8583.service.IssuerMandateRevocationLifecycleServiceTest" name="declinedResponseRestoresPreviousPausedState" time="0.002" />
+    <testcase classname="com.logicpoint.iso8583.service.IssuerMandateRevocationLifecycleServiceTest" name="approvedResponseRevokesPendingMandate" time="0.0" />
+    <testcase classname="com.logicpoint.iso8583.service.IssuerMandateRevocationLifecycleServiceTest" name="pendingRevocationTimesOutUntilLaterResponseArrives" time="0.0" />
+  </testsuite>
+  <testsuite name="com.logicpoint.iso8583.service.IssuerMandateRevocationMessageFactoryTest" tests="1" failures="0" errors="0" skipped="0" time="0.001">
+    <testcase classname="com.logicpoint.iso8583.service.IssuerMandateRevocationMessageFactoryTest" name="buildsConfigured0302WithRequiredRevocationData" time="0.001" />
+  </testsuite>
+  <testsuite name="com.logicpoint.iso8583.service.IssuerMandateRevocationServiceTest" tests="3" failures="0" errors="0" skipped="0" time="0.097">
+    <testcase classname="com.logicpoint.iso8583.service.IssuerMandateRevocationServiceTest" name="dispatchFailurePropagatesWhileLeavingLifecyclePending" time="0.095" />
+    <testcase classname="com.logicpoint.iso8583.service.IssuerMandateRevocationServiceTest" name="reconcileReturnsResponseOutcomeFromLifecycle" time="0.0" />
+    <testcase classname="com.logicpoint.iso8583.service.IssuerMandateRevocationServiceTest" name="revokeMarksPendingDispatchesAndReturnsPendingReceipt" time="0.001" />
+  </testsuite>
+  <testsuite name="com.logicpoint.iso8583.service.KeyManagementServiceTest" tests="17" failures="0" errors="0" skipped="0" time="0.071">
+    <testcase classname="com.logicpoint.iso8583.service.KeyManagementServiceTest" name="institutionKeyQueriesResolveVersionsAndEncoding" time="0.059" />
+    <testcase classname="com.logicpoint.iso8583.service.KeyManagementServiceTest" name="cardLookupPrefersSessionScopedNetworkKey" time="0.0" />
+    <testcase classname="com.logicpoint.iso8583.service.KeyManagementServiceTest" name="saveInstitutionWrappedKeyRetiresExistingAndIncrementsHighestVersion" time="0.001" />
+    <testcase classname="com.logicpoint.iso8583.service.KeyManagementServiceTest" name="rotateKeyRetiresCurrentCreatesNextVersionAndRefreshesCache" time="0.001" />
+    <testcase classname="com.logicpoint.iso8583.service.KeyManagementServiceTest" name="cardLookupFallsBackToNetworkCacheForNetworkKeys" time="0.001" />
+    <testcase classname="com.logicpoint.iso8583.service.KeyManagementServiceTest" name="workingKeyLookupsReturnNullForMissingDataAndRepositoryFailures" time="0.001" />
+    <testcase classname="com.logicpoint.iso8583.service.KeyManagementServiceTest" name="currentSessionKeyRequiresContextAndScheme" time="0.0" />
+    <testcase classname="com.logicpoint.iso8583.service.KeyManagementServiceTest" name="historyDelegatesAndCacheRefreshWrapsFailures" time="0.001" />
+    <testcase classname="com.logicpoint.iso8583.service.KeyManagementServiceTest" name="networkKeySupportsTr31AndBinaryStorage" time="0.0" />
+    <testcase classname="com.logicpoint.iso8583.service.KeyManagementServiceTest" name="workingKeyForBinNumberResolvesBinAndReturnsUppercaseHex" time="0.001" />
+    <testcase classname="com.logicpoint.iso8583.service.KeyManagementServiceTest" name="resolvedBinKeyIsStoredInManualCache" time="0.0" />
+    <testcase classname="com.logicpoint.iso8583.service.KeyManagementServiceTest" name="loadAllActiveKeysReturnsPartialEmptyMapWhenRepositoryFails" time="0.001" />
+    <testcase classname="com.logicpoint.iso8583.service.KeyManagementServiceTest" name="institutionKeyValueReturnsHexOrNullAsAppropriate" time="0.0" />
+    <testcase classname="com.logicpoint.iso8583.service.KeyManagementServiceTest" name="rotateKeyReturnsFalseWithoutCurrentKeyAndSessionRotationDelegates" time="0.001" />
+    <testcase classname="com.logicpoint.iso8583.service.KeyManagementServiceTest" name="cardLookupUsesBinCacheBeforeRepository" time="0.0" />
+    <testcase classname="com.logicpoint.iso8583.service.KeyManagementServiceTest" name="loadAllActiveKeysBuildsBinNetworkAndInstitutionEntries" time="0.001" />
+    <testcase classname="com.logicpoint.iso8583.service.KeyManagementServiceTest" name="currentSessionKeyUsesConnectionThenListenerFallbackAndNormalizesScheme" time="0.001" />
+  </testsuite>
+  <testsuite name="com.logicpoint.iso8583.service.MessageProcessorServiceTest" tests="18" failures="0" errors="0" skipped="0" time="0.15">
+    <testcase classname="com.logicpoint.iso8583.service.MessageProcessorServiceTest" name="actionResponseReconcilesDefensiveMessageCopy" time="0.13" />
+    <testcase classname="com.logicpoint.iso8583.service.MessageProcessorServiceTest" name="macProtectedRequestRejectsMissingMacAndGeneratesResponseMac" time="0.002" />
+    <testcase classname="com.logicpoint.iso8583.service.MessageProcessorServiceTest" name="mappingEncryptionFailureIsWrappedAndPreventsPersistence" time="0.001" />
+    <testcase classname="com.logicpoint.iso8583.service.MessageProcessorServiceTest" name="ecommerceTypeOverridesPosFieldHeuristics" time="0.0" />
+    <testcase classname="com.logicpoint.iso8583.service.MessageProcessorServiceTest" name="macProtectedRequestVerifiesMacProcessesFinancialRequestAndReplacesTlv" time="0.002" />
+    <testcase classname="com.logicpoint.iso8583.service.MessageProcessorServiceTest" name="financialRequestDoesNotPersistApprovalWithoutSuccessfulResponseAndAuthCode" time="0.001" />
+    <testcase classname="com.logicpoint.iso8583.service.MessageProcessorServiceTest" name="unsupportedResponseReturnsSavedOriginalFields" time="0.001" />
+    <testcase classname="com.logicpoint.iso8583.service.MessageProcessorServiceTest" name="financialRequestPersistsMappedTransactionAndApproval" time="0.001" />
+    <testcase classname="com.logicpoint.iso8583.service.MessageProcessorServiceTest" name="duplicateRequestReturnsImmediatelyWithoutSaving" time="0.001" />
+    <testcase classname="com.logicpoint.iso8583.service.MessageProcessorServiceTest" name="nestedExceptionsPreserveMessageAndCause" time="0.001" />
+    <testcase classname="com.logicpoint.iso8583.service.MessageProcessorServiceTest" name="reversalFailureIsConvertedToSystemError" time="0.001" />
+    <testcase classname="com.logicpoint.iso8583.service.MessageProcessorServiceTest" name="buildCompositeKeyValidatesRequiredComponents" time="0.0" />
+    <testcase classname="com.logicpoint.iso8583.service.MessageProcessorServiceTest" name="failedInitialSaveReturnsOriginalFieldsWithoutRouting" time="0.0" />
+    <testcase classname="com.logicpoint.iso8583.service.MessageProcessorServiceTest" name="macOmitModeRemovesMacFromResponse" time="0.001" />
+    <testcase classname="com.logicpoint.iso8583.service.MessageProcessorServiceTest" name="networkManagementRequestIsApproved" time="0.001" />
+    <testcase classname="com.logicpoint.iso8583.service.MessageProcessorServiceTest" name="reversalRequestDelegatesAndSetsResponseMti" time="0.0" />
+    <testcase classname="com.logicpoint.iso8583.service.MessageProcessorServiceTest" name="invalidMtiIsWrappedWithOriginalCause" time="0.001" />
+    <testcase classname="com.logicpoint.iso8583.service.MessageProcessorServiceTest" name="transactionIdentificationFailurePersistsUnknownAndUsesFieldBasedAtmChannel" time="0.001" />
+  </testsuite>
+  <testsuite name="com.logicpoint.iso8583.service.NettyHsmServiceLoggingTest" tests="3" failures="0" errors="0" skipped="0" time="0.001">
+    <testcase classname="com.logicpoint.iso8583.service.NettyHsmServiceLoggingTest" name="rawPayloadsAreNotLoggedByDefault" time="0.001" />
+    <testcase classname="com.logicpoint.iso8583.service.NettyHsmServiceLoggingTest" name="productionProfileRejectsRawHsmPayloadLogging" time="0.0" />
+    <testcase classname="com.logicpoint.iso8583.service.NettyHsmServiceLoggingTest" name="rawPayloadsAreLoggedOnlyWhenExplicitlyEnabled" time="0.0" />
+  </testsuite>
+  <testsuite name="com.logicpoint.iso8583.service.NettyHsmServiceTest" tests="12" failures="0" errors="0" skipped="0" time="0.07">
+    <testcase classname="com.logicpoint.iso8583.service.NettyHsmServiceTest" name="generatesAndVerifiesCvvVariants" time="0.059" />
+    <testcase classname="com.logicpoint.iso8583.service.NettyHsmServiceTest" name="delegatesSynchronousAsynchronousConcurrentAndPoolOperations" time="0.002" />
+    <testcase classname="com.logicpoint.iso8583.service.NettyHsmServiceTest" name="cardEncryptionUsesCachedWorkingKeysAndHandlesMissingKeys" time="0.0" />
+    <testcase classname="com.logicpoint.iso8583.service.NettyHsmServiceTest" name="encryptsDecryptsAndWrapsKeys" time="0.0" />
+    <testcase classname="com.logicpoint.iso8583.service.NettyHsmServiceTest" name="translatesWorkingKeysAndNormalizesScheme" time="0.001" />
+    <testcase classname="com.logicpoint.iso8583.service.NettyHsmServiceTest" name="testsConnectionAcrossSuccessEmptyErrorAndException" time="0.001" />
+    <testcase classname="com.logicpoint.iso8583.service.NettyHsmServiceTest" name="generatesPvkFromPgkUsingTwoHsmCommands" time="0.001" />
+    <testcase classname="com.logicpoint.iso8583.service.NettyHsmServiceTest" name="generatesAndVerifiesMac" time="0.001" />
+    <testcase classname="com.logicpoint.iso8583.service.NettyHsmServiceTest" name="generatesEachWorkingKeyTypeAndHandlesFailures" time="0.001" />
+    <testcase classname="com.logicpoint.iso8583.service.NettyHsmServiceTest" name="translateWorkingKeyHandlesMissingKeyHsmErrorAndException" time="0.001" />
+    <testcase classname="com.logicpoint.iso8583.service.NettyHsmServiceTest" name="changesAndVerifiesPinsAcrossMethods" time="0.002" />
+    <testcase classname="com.logicpoint.iso8583.service.NettyHsmServiceTest" name="generatesPinOffsetsForSupportedMethods" time="0.0" />
+  </testsuite>
+  <testsuite name="com.logicpoint.iso8583.service.NetworkSessionContextHolderTest" tests="3" failures="0" errors="0" skipped="0" time="0.002">
+    <testcase classname="com.logicpoint.iso8583.service.NetworkSessionContextHolderTest" name="contextIsThreadLocal" time="0.001" />
+    <testcase classname="com.logicpoint.iso8583.service.NetworkSessionContextHolderTest" name="storesAndClearsSessionForCurrentThread" time="0.001" />
+    <testcase classname="com.logicpoint.iso8583.service.NetworkSessionContextHolderTest" name="incompleteIdentityRemovesExistingContext" time="0.0" />
+  </testsuite>
+  <testsuite name="com.logicpoint.iso8583.service.NetworkSessionKeyServiceTest" tests="7" failures="0" errors="0" skipped="0" time="0.096">
+    <testcase classname="com.logicpoint.iso8583.service.NetworkSessionKeyServiceTest" name="returnsNullWhenRepositoryHasNoUsableKeyMaterial" time="0.09" />
+    <testcase classname="com.logicpoint.iso8583.service.NetworkSessionKeyServiceTest" name="rejectsInvalidRotationAndSupportsExplicitEviction" time="0.002" />
+    <testcase classname="com.logicpoint.iso8583.service.NetworkSessionKeyServiceTest" name="resolvesTr31KeyTouchesUsageAndCachesIt" time="0.0" />
+    <testcase classname="com.logicpoint.iso8583.service.NetworkSessionKeyServiceTest" name="rotationDeactivatesCurrentKeyUsesNextVersionAndRefreshesCache" time="0.001" />
+    <testcase classname="com.logicpoint.iso8583.service.NetworkSessionKeyServiceTest" name="returnsConnectionScopedCacheHitWithoutRepositoryLookup" time="0.001" />
+    <testcase classname="com.logicpoint.iso8583.service.NetworkSessionKeyServiceTest" name="rejectsIncompleteLookupCoordinates" time="0.0" />
+    <testcase classname="com.logicpoint.iso8583.service.NetworkSessionKeyServiceTest" name="listenerLookupFallsBackToLegacyValueWithoutRetouchingRecentKey" time="0.0" />
+  </testsuite>
+  <testsuite name="com.logicpoint.iso8583.service.PinChangeServiceTest" tests="12" failures="0" errors="0" skipped="0" time="0.062">
+    <testcase classname="com.logicpoint.iso8583.service.PinChangeServiceTest" name="mapsHsmFailuresToBusinessErrors(String, String)[1]" time="0.054" />
+    <testcase classname="com.logicpoint.iso8583.service.PinChangeServiceTest" name="mapsHsmFailuresToBusinessErrors(String, String)[2]" time="0.001" />
+    <testcase classname="com.logicpoint.iso8583.service.PinChangeServiceTest" name="mapsHsmFailuresToBusinessErrors(String, String)[3]" time="0.001" />
+    <testcase classname="com.logicpoint.iso8583.service.PinChangeServiceTest" name="mapsHsmFailuresToBusinessErrors(String, String)[4]" time="0.001" />
+    <testcase classname="com.logicpoint.iso8583.service.PinChangeServiceTest" name="mapsHsmFailuresToBusinessErrors(String, String)[5]" time="0.0" />
+    <testcase classname="com.logicpoint.iso8583.service.PinChangeServiceTest" name="rejectsCardWithoutExistingPvvOffset" time="0.001" />
+    <testcase classname="com.logicpoint.iso8583.service.PinChangeServiceTest" name="successfulPinChangeUpdatesOffsetAuditAndRetryState" time="0.0" />
+    <testcase classname="com.logicpoint.iso8583.service.PinChangeServiceTest" name="rejectsCmsManagedCardBeforeCallingLegacyHsmFlow" time="0.0" />
+    <testcase classname="com.logicpoint.iso8583.service.PinChangeServiceTest" name="rejectsMalformedAndNegativeHsmResponses" time="0.001" />
+    <testcase classname="com.logicpoint.iso8583.service.PinChangeServiceTest" name="malformedTlvAndMissingCardContextAreContainedAsSystemMalfunction" time="0.001" />
+    <testcase classname="com.logicpoint.iso8583.service.PinChangeServiceTest" name="pinChangeResultExposesItsImmutableOutcome" time="0.0" />
+    <testcase classname="com.logicpoint.iso8583.service.PinChangeServiceTest" name="persistenceFailureReturnsDatabaseError" time="0.001" />
+  </testsuite>
+  <testsuite name="com.logicpoint.iso8583.service.PrepaidCardBalanceSnapshotServiceTest" tests="1" failures="0" errors="0" skipped="0" time="0.002">
+    <testcase classname="com.logicpoint.iso8583.service.PrepaidCardBalanceSnapshotServiceTest" name="keepsLedgerStableAndDebitsAvailableWhenSnapshotExists" time="0.002" />
+  </testsuite>
+  <testsuite name="com.logicpoint.iso8583.service.PrepaidLimitValidationServiceTest" tests="5" failures="0" errors="0" skipped="0" time="0.003">
+    <testcase classname="com.logicpoint.iso8583.service.PrepaidLimitValidationServiceTest" name="bypassesLimitsForOtherPrepaidTransactionTypes" time="0.002" />
+    <testcase classname="com.logicpoint.iso8583.service.PrepaidLimitValidationServiceTest" name="declinesWhenSuccessfulCashWithdrawalCountReachedInWindow" time="0.001" />
+    <testcase classname="com.logicpoint.iso8583.service.PrepaidLimitValidationServiceTest" name="bypassesPrepaidCashWithdrawalLimitsWhenDisabledForCertification" time="0.0" />
+    <testcase classname="com.logicpoint.iso8583.service.PrepaidLimitValidationServiceTest" name="returnsSystemErrorWhenPanHashIsMissingForEnabledLimitCheck" time="0.0" />
+    <testcase classname="com.logicpoint.iso8583.service.PrepaidLimitValidationServiceTest" name="allowsWhenSuccessfulCashWithdrawalCountIsBelowConfiguredLimit" time="0.0" />
+  </testsuite>
+  <testsuite name="com.logicpoint.iso8583.service.ResponseAssemblerTest" tests="4" failures="0" errors="0" skipped="0" time="0.0">
+    <testcase classname="com.logicpoint.iso8583.service.ResponseAssemblerTest" name="omitDe120TagRemovesDe120WhenNoTagsRemain" time="0.0" />
+    <testcase classname="com.logicpoint.iso8583.service.ResponseAssemblerTest" name="applyValidationUpdatesPopulatesDe102" time="0.0" />
+    <testcase classname="com.logicpoint.iso8583.service.ResponseAssemblerTest" name="applyValidationUpdatesKeepsExistingDe102WhenUpdateIsBlank" time="0.0" />
+    <testcase classname="com.logicpoint.iso8583.service.ResponseAssemblerTest" name="omitDe120TagRemovesOnlyRequestedTag" time="0.0" />
+  </testsuite>
+  <testsuite name="com.logicpoint.iso8583.service.ReversalInfrastructureTest" tests="3" failures="0" errors="0" skipped="0" time="0.033">
+    <testcase classname="com.logicpoint.iso8583.service.ReversalInfrastructureTest" name="reversalMetricsRecordCountersAndSuccessfulAndFailedTimings" time="0.006" />
+    <testcase classname="com.logicpoint.iso8583.service.ReversalInfrastructureTest" name="recoverySchedulerDelegatesBothScheduledOperations" time="0.026" />
+    <testcase classname="com.logicpoint.iso8583.service.ReversalInfrastructureTest" name="recoverySchedulerContainsDependencyFailures" time="0.001" />
+  </testsuite>
+  <testsuite name="com.logicpoint.iso8583.service.ReversalProcessorServiceTest" tests="26" failures="0" errors="0" skipped="0" time="0.091">
+    <testcase classname="com.logicpoint.iso8583.service.ReversalProcessorServiceTest" name="processReversalRejectsInvalidOriginalTimestamp" time="0.067" />
+    <testcase classname="com.logicpoint.iso8583.service.ReversalProcessorServiceTest" name="processRuPayReversalDeclinesWhenAccountingRejects" time="0.003" />
+    <testcase classname="com.logicpoint.iso8583.service.ReversalProcessorServiceTest" name="processRuPayReversalRejectsAmountMismatch" time="0.001" />
+    <testcase classname="com.logicpoint.iso8583.service.ReversalProcessorServiceTest" name="processRuPayReversalReturnsSystemErrorWhenAccountingFails" time="0.002" />
+    <testcase classname="com.logicpoint.iso8583.service.ReversalProcessorServiceTest" name="processMastercardReversalReturnsSystemErrorWhenSaveThrows" time="0.001" />
+    <testcase classname="com.logicpoint.iso8583.service.ReversalProcessorServiceTest" name="applyReversalAuthCodeFallsBackToOriginalWhenRequestDe38Missing" time="0.0" />
+    <testcase classname="com.logicpoint.iso8583.service.ReversalProcessorServiceTest" name="processVisaReversalReturnsSystemErrorWhenSaveReturnsNull" time="0.001" />
+    <testcase classname="com.logicpoint.iso8583.service.ReversalProcessorServiceTest" name="processReversalRejectsUnsupportedScheme" time="0.001" />
+    <testcase classname="com.logicpoint.iso8583.service.ReversalProcessorServiceTest" name="processReversalContinuesWhenDuplicateLookupFails" time="0.001" />
+    <testcase classname="com.logicpoint.iso8583.service.ReversalProcessorServiceTest" name="applyReversalAuthCodeEchoesRequestDe38" time="0.001" />
+    <testcase classname="com.logicpoint.iso8583.service.ReversalProcessorServiceTest" name="applyReversalAuthCodeOmitsDe38WhenNoValueIsAvailable" time="0.0" />
+    <testcase classname="com.logicpoint.iso8583.service.ReversalProcessorServiceTest" name="processMastercardReversalApprovesAndUsesOriginalAuthCode" time="0.001" />
+    <testcase classname="com.logicpoint.iso8583.service.ReversalProcessorServiceTest" name="processReversalUsesTerminalAndTimeFallbackWhenPrimaryLookupIsEmpty" time="0.0" />
+    <testcase classname="com.logicpoint.iso8583.service.ReversalProcessorServiceTest" name="processReversalReturnsInvalidTransactionWhenOriginalCannotBeFound" time="0.0" />
+    <testcase classname="com.logicpoint.iso8583.service.ReversalProcessorServiceTest" name="processRuPayReversalInApplicationModeCopiesSafeFieldsAndUpdatesOriginal" time="0.001" />
+    <testcase classname="com.logicpoint.iso8583.service.ReversalProcessorServiceTest" name="processVisaReversalRejectsAmountMismatch" time="0.001" />
+    <testcase classname="com.logicpoint.iso8583.service.ReversalProcessorServiceTest" name="processReversalSelectsMostRecentOriginalTransaction" time="0.0" />
+    <testcase classname="com.logicpoint.iso8583.service.ReversalProcessorServiceTest" name="processReversalRejectsMalformedOriginalDataElements(String)[1]" time="0.001" />
+    <testcase classname="com.logicpoint.iso8583.service.ReversalProcessorServiceTest" name="processReversalRejectsMalformedOriginalDataElements(String)[2]" time="0.001" />
+    <testcase classname="com.logicpoint.iso8583.service.ReversalProcessorServiceTest" name="processReversalRejectsMalformedOriginalDataElements(String)[3]" time="0.0" />
+    <testcase classname="com.logicpoint.iso8583.service.ReversalProcessorServiceTest" name="processReversalRejectsMalformedOriginalDataElements(String)[4]" time="0.0" />
+    <testcase classname="com.logicpoint.iso8583.service.ReversalProcessorServiceTest" name="processReversalRejectsBlankStanBeforeRepositoryLookup" time="0.001" />
+    <testcase classname="com.logicpoint.iso8583.service.ReversalProcessorServiceTest" name="processReversalRejectsRequestOutsideTwentyFourHourWindow" time="0.001" />
+    <testcase classname="com.logicpoint.iso8583.service.ReversalProcessorServiceTest" name="processReversalRejectsMissingRrnBeforeRepositoryLookup" time="0.0" />
+    <testcase classname="com.logicpoint.iso8583.service.ReversalProcessorServiceTest" name="processRuPayReversalApprovesWhenAccountingReturnsSuccess" time="0.0" />
+    <testcase classname="com.logicpoint.iso8583.service.ReversalProcessorServiceTest" name="processReversalRejectsDuplicateReversal" time="0.001" />
+  </testsuite>
+  <testsuite name="com.logicpoint.iso8583.service.ReversalStorageServiceTest" tests="6" failures="0" errors="0" skipped="0" time="0.074">
+    <testcase classname="com.logicpoint.iso8583.service.ReversalStorageServiceTest" name="recoveryReturnsImmediatelyWhenDisabledOrDirectoryDoesNotExist" time="0.04" />
+    <testcase classname="com.logicpoint.iso8583.service.ReversalStorageServiceTest" name="databaseFailureIsFlushedToFallbackFile" time="0.024" />
+    <testcase classname="com.logicpoint.iso8583.service.ReversalStorageServiceTest" name="databaseSuccessReturnsPersistedRequestWithoutFileFallback" time="0.001" />
+    <testcase classname="com.logicpoint.iso8583.service.ReversalStorageServiceTest" name="invalidFlushIntervalUsesFallbackSchedule" time="0.001" />
+    <testcase classname="com.logicpoint.iso8583.service.ReversalStorageServiceTest" name="pendingFileIsMigratedToDatabaseAndDeleted" time="0.007" />
+    <testcase classname="com.logicpoint.iso8583.service.ReversalStorageServiceTest" name="databaseFailureReturnsOriginalWhenFileFallbackIsDisabled" time="0.001" />
+  </testsuite>
+  <testsuite name="com.logicpoint.iso8583.service.RoutingHealthCheckServiceTest" tests="4" failures="0" errors="0" skipped="0" time="0.067">
+    <testcase classname="com.logicpoint.iso8583.service.RoutingHealthCheckServiceTest" name="reportsDownWhenDatabaseFailsOrRunningHsmHasNoHealthyConnections" time="0.029" />
+    <testcase classname="com.logicpoint.iso8583.service.RoutingHealthCheckServiceTest" name="reportsHealthyRunningHsmAsUp" time="0.036" />
+    <testcase classname="com.logicpoint.iso8583.service.RoutingHealthCheckServiceTest" name="runningHsmWithNoRegisteredConnectionsDoesNotBlockRouting" time="0.001" />
+    <testcase classname="com.logicpoint.iso8583.service.RoutingHealthCheckServiceTest" name="reportsRoutableWhenDatabaseIsUpAndKeepAliveIsStopped" time="0.0" />
+  </testsuite>
+  <testsuite name="com.logicpoint.iso8583.service.ServiceCodeValidationServiceTest" tests="1" failures="0" errors="0" skipped="0" time="0.003">
+    <testcase classname="com.logicpoint.iso8583.service.ServiceCodeValidationServiceTest" name="acceptsStandardRuPay226WhenDatabaseSeedIsMissing" time="0.003" />
+  </testsuite>
+  <testsuite name="com.logicpoint.iso8583.service.ServiceSupportClassesTest" tests="3" failures="0" errors="0" skipped="0" time="0.005">
+    <testcase classname="com.logicpoint.iso8583.service.ServiceSupportClassesTest" name="timeoutSchedulerDelegatesEveryScanIncludingNonzeroExpirationCounts" time="0.002" />
+    <testcase classname="com.logicpoint.iso8583.service.ServiceSupportClassesTest" name="databaseServicePropagatesSqlFailureForSpringRetryInterceptor" time="0.001" />
+    <testcase classname="com.logicpoint.iso8583.service.ServiceSupportClassesTest" name="noopStandingInstructionHubAcceptsEveryLifecycleNotification" time="0.001" />
+  </testsuite>
+  <testsuite name="com.logicpoint.iso8583.service.StandingInstructionAuthorizationValidationServiceTest" tests="10" failures="0" errors="0" skipped="0" time="0.043">
+    <testcase classname="com.logicpoint.iso8583.service.StandingInstructionAuthorizationValidationServiceTest" name="invalidNumericAndPreferredDayFieldsAccumulateErrors" time="0.039" />
+    <testcase classname="com.logicpoint.iso8583.service.StandingInstructionAuthorizationValidationServiceTest" name="malformedTlvReturnsFormatErrorWithoutCallingMandateService" time="0.0" />
+    <testcase classname="com.logicpoint.iso8583.service.StandingInstructionAuthorizationValidationServiceTest" name="validSiDataIsParsedAndMandateErrorsArePropagated" time="0.001" />
+    <testcase classname="com.logicpoint.iso8583.service.StandingInstructionAuthorizationValidationServiceTest" name="invalidAndReversedDatesAreRejectedWhileZeroDatesAreAllowed" time="0.001" />
+    <testcase classname="com.logicpoint.iso8583.service.StandingInstructionAuthorizationValidationServiceTest" name="unsupportedSchemeAndNonStandingInstructionTypeAreIgnored" time="0.0" />
+    <testcase classname="com.logicpoint.iso8583.service.StandingInstructionAuthorizationValidationServiceTest" name="absentSiDataStillDelegatesNormalizedMandateId" time="0.001" />
+    <testcase classname="com.logicpoint.iso8583.service.StandingInstructionAuthorizationValidationServiceTest" name="nonNumericPreferredDayIsRejectedWithoutParsingIt" time="0.0" />
+    <testcase classname="com.logicpoint.iso8583.service.StandingInstructionAuthorizationValidationServiceTest" name="invalidAmountFormatsAndRangesAreRejected" time="0.001" />
+    <testcase classname="com.logicpoint.iso8583.service.StandingInstructionAuthorizationValidationServiceTest" name="shortSiDataIsRejectedBeforePersistence" time="0.0" />
+    <testcase classname="com.logicpoint.iso8583.service.StandingInstructionAuthorizationValidationServiceTest" name="disabledOrIncompleteValidationContextIsIgnored" time="0.0" />
+  </testsuite>
+  <testsuite name="com.logicpoint.iso8583.service.StandingInstructionMandateServiceTest" tests="13" failures="0" errors="0" skipped="0" time="0.102">
+    <testcase classname="com.logicpoint.iso8583.service.StandingInstructionMandateServiceTest" name="editUpdatesOnlyAnActiveExistingMandate" time="0.063" />
+    <testcase classname="com.logicpoint.iso8583.service.StandingInstructionMandateServiceTest" name="revokeAllRevokesAndPublishesEveryEligibleMandate" time="0.0" />
+    <testcase classname="com.logicpoint.iso8583.service.StandingInstructionMandateServiceTest" name="unsupportedTransactionTypeReturnsAnErrorWithoutRepositoryAccess" time="0.0" />
+    <testcase classname="com.logicpoint.iso8583.service.StandingInstructionMandateServiceTest" name="transactionRejectsMandatesOutsideTheirEffectiveDates" time="0.001" />
+    <testcase classname="com.logicpoint.iso8583.service.StandingInstructionMandateServiceTest" name="revokeAllRequiresPanHashAndAtLeastOneMandate" time="0.0" />
+    <testcase classname="com.logicpoint.iso8583.service.StandingInstructionMandateServiceTest" name="transactionRecordsSuccessfulDebitAuditFields" time="0.0" />
+    <testcase classname="com.logicpoint.iso8583.service.StandingInstructionMandateServiceTest" name="startRejectsMandateThatIsNotPaused" time="0.001" />
+    <testcase classname="com.logicpoint.iso8583.service.StandingInstructionMandateServiceTest" name="pdnValidatesMandateWithoutRecordingDebit" time="0.0" />
+    <testcase classname="com.logicpoint.iso8583.service.StandingInstructionMandateServiceTest" name="pauseStartAndDeregisterApplyLifecycleTransitions" time="0.0" />
+    <testcase classname="com.logicpoint.iso8583.service.StandingInstructionMandateServiceTest" name="missingAndInactiveMandatesReturnSpecificDeclines" time="0.001" />
+    <testcase classname="com.logicpoint.iso8583.service.StandingInstructionMandateServiceTest" name="transactionRejectsAmountsOutsideMandateRange" time="0.0" />
+    <testcase classname="com.logicpoint.iso8583.service.StandingInstructionMandateServiceTest" name="registrationCreatesNormalizedActiveMandateAndPublishesIt" time="0.0" />
+    <testcase classname="com.logicpoint.iso8583.service.StandingInstructionMandateServiceTest" name="registrationRejectsMissingAndDuplicateMandateIds" time="0.034" />
+  </testsuite>
+  <testsuite name="com.logicpoint.iso8583.service.ThreeDsAuthorizationValidationServiceTest" tests="2" failures="0" errors="0" skipped="0" time="0.003">
+    <testcase classname="com.logicpoint.iso8583.service.ThreeDsAuthorizationValidationServiceTest" name="validateEnforcesMissingCavvWhenOnBehalfOfIsDisabled" time="0.001" />
+    <testcase classname="com.logicpoint.iso8583.service.ThreeDsAuthorizationValidationServiceTest" name="validateSkipsMissingCavvWhenOnBehalfOfIsEnabled" time="0.0" />
+  </testsuite>
+  <testsuite name="com.logicpoint.iso8583.service.TransactionChdEncryptionServiceTest" tests="6" failures="0" errors="0" skipped="0" time="0.029">
+    <testcase classname="com.logicpoint.iso8583.service.TransactionChdEncryptionServiceTest" name="missingTransactionKeyLeavesSensitiveFieldsUntouched" time="0.026" />
+    <testcase classname="com.logicpoint.iso8583.service.TransactionChdEncryptionServiceTest" name="encryptsPanMasksItHashesItAndRemovesPlaintextTracks" time="0.0" />
+    <testcase classname="com.logicpoint.iso8583.service.TransactionChdEncryptionServiceTest" name="disabledEncryptionStillRecordsResolvedInstitution" time="0.001" />
+    <testcase classname="com.logicpoint.iso8583.service.TransactionChdEncryptionServiceTest" name="blankPanClearsHashAndEncryptedPanCanBeCopied" time="0.0" />
+    <testcase classname="com.logicpoint.iso8583.service.TransactionChdEncryptionServiceTest" name="reusesExistingPanHashAndFailsClosedWhenEncryptionFails" time="0.0" />
+    <testcase classname="com.logicpoint.iso8583.service.TransactionChdEncryptionServiceTest" name="ignoresNullInputsAndInvalidInstitutionIdentifiers" time="0.0" />
+  </testsuite>
+  <testsuite name="com.logicpoint.iso8583.service.TransactionContextTest" tests="3" failures="0" errors="0" skipped="0" time="0.0">
+    <testcase classname="com.logicpoint.iso8583.service.TransactionContextTest" name="capturesOriginalTransactionFields" time="0.0" />
+    <testcase classname="com.logicpoint.iso8583.service.TransactionContextTest" name="copiesFieldsForReversalAndHandlesMissingTouchTimestamp" time="0.0" />
+    <testcase classname="com.logicpoint.iso8583.service.TransactionContextTest" name="tracksApprovalResponseAndReversalState" time="0.0" />
+  </testsuite>
+  <testsuite name="com.logicpoint.iso8583.service.TransactionIdGeneratorServiceTest" tests="3" failures="0" errors="0" skipped="0" time="0.003">
+    <testcase classname="com.logicpoint.iso8583.service.TransactionIdGeneratorServiceTest" name="generatesUniqueMonotonicallyIncreasingIdsWithSiteAndPaddedNode" time="0.001" />
+    <testcase classname="com.logicpoint.iso8583.service.TransactionIdGeneratorServiceTest" name="rejectsSiteAndNodeOutsideConfiguredRanges" time="0.001" />
+    <testcase classname="com.logicpoint.iso8583.service.TransactionIdGeneratorServiceTest" name="remainsUniqueAcrossRapidCalls" time="0.001" />
+  </testsuite>
+  <testsuite name="com.logicpoint.iso8583.service.TransactionOutcomeMetricsTest" tests="2" failures="0" errors="0" skipped="0" time="0.006">
+    <testcase classname="com.logicpoint.iso8583.service.TransactionOutcomeMetricsTest" name="recordsFinalOutcomeWithBoundedLabels" time="0.005" />
+    <testcase classname="com.logicpoint.iso8583.service.TransactionOutcomeMetricsTest" name="invalidResultAndResponseCodeAreCollapsedInsteadOfCreatingUnboundedLabels" time="0.001" />
+  </testsuite>
+  <testsuite name="com.logicpoint.iso8583.service.TvrValidationServiceTest" tests="21" failures="0" errors="0" skipped="0" time="0.008">
+    <testcase classname="com.logicpoint.iso8583.service.TvrValidationServiceTest" name="validateTvrRejectsEachUnconditionalFailure(String)[1]" time="0.001" />
+    <testcase classname="com.logicpoint.iso8583.service.TvrValidationServiceTest" name="validateTvrRejectsEachUnconditionalFailure(String)[2]" time="0.0" />
+    <testcase classname="com.logicpoint.iso8583.service.TvrValidationServiceTest" name="validateTvrRejectsEachUnconditionalFailure(String)[3]" time="0.0" />
+    <testcase classname="com.logicpoint.iso8583.service.TvrValidationServiceTest" name="validateTvrRejectsEachUnconditionalFailure(String)[4]" time="0.0" />
+    <testcase classname="com.logicpoint.iso8583.service.TvrValidationServiceTest" name="validateTvrRejectsEachUnconditionalFailure(String)[5]" time="0.0" />
+    <testcase classname="com.logicpoint.iso8583.service.TvrValidationServiceTest" name="validateTvrRejectsEachUnconditionalFailure(String)[6]" time="0.0" />
+    <testcase classname="com.logicpoint.iso8583.service.TvrValidationServiceTest" name="validateTvrRejectsEachUnconditionalFailure(String)[7]" time="0.001" />
+    <testcase classname="com.logicpoint.iso8583.service.TvrValidationServiceTest" name="validateTvrRejectsEachUnconditionalFailure(String)[8]" time="0.0" />
+    <testcase classname="com.logicpoint.iso8583.service.TvrValidationServiceTest" name="validateTvrHonorsAuthenticationFailurePolicy(String, boolean, boolean, boolean)[1]" time="0.001" />
+    <testcase classname="com.logicpoint.iso8583.service.TvrValidationServiceTest" name="validateTvrHonorsAuthenticationFailurePolicy(String, boolean, boolean, boolean)[2]" time="0.0" />
+    <testcase classname="com.logicpoint.iso8583.service.TvrValidationServiceTest" name="validateTvrHonorsAuthenticationFailurePolicy(String, boolean, boolean, boolean)[3]" time="0.0" />
+    <testcase classname="com.logicpoint.iso8583.service.TvrValidationServiceTest" name="requiresOnlineAuthorizationReturnsFalseForCleanTvr" time="0.001" />
+    <testcase classname="com.logicpoint.iso8583.service.TvrValidationServiceTest" name="requiresOnlineAuthorizationRecognizesEveryTrigger(String)[1]" time="0.0" />
+    <testcase classname="com.logicpoint.iso8583.service.TvrValidationServiceTest" name="requiresOnlineAuthorizationRecognizesEveryTrigger(String)[2]" time="0.0" />
+    <testcase classname="com.logicpoint.iso8583.service.TvrValidationServiceTest" name="requiresOnlineAuthorizationRecognizesEveryTrigger(String)[3]" time="0.0" />
+    <testcase classname="com.logicpoint.iso8583.service.TvrValidationServiceTest" name="requiresOnlineAuthorizationRecognizesEveryTrigger(String)[4]" time="0.0" />
+    <testcase classname="com.logicpoint.iso8583.service.TvrValidationServiceTest" name="requiresOnlineAuthorizationRecognizesEveryTrigger(String)[5]" time="0.0" />
+    <testcase classname="com.logicpoint.iso8583.service.TvrValidationServiceTest" name="requiresOnlineAuthorizationRecognizesEveryTrigger(String)[6]" time="0.0" />
+    <testcase classname="com.logicpoint.iso8583.service.TvrValidationServiceTest" name="requiresOnlineAuthorizationRecognizesEveryTrigger(String)[7]" time="0.001" />
+    <testcase classname="com.logicpoint.iso8583.service.TvrValidationServiceTest" name="validateTvrAllowsSdaFailureByDefaultButDeclinesDdaAndCda" time="0.0" />
+    <testcase classname="com.logicpoint.iso8583.service.TvrValidationServiceTest" name="validateTvrAllowsCleanAndWarningOnlyResults" time="0.0" />
+  </testsuite>
+  <testsuite name="com.logicpoint.iso8583.util.CardVerificationMethodTest" tests="14" failures="0" errors="0" skipped="0" time="0.007">
+    <testcase classname="com.logicpoint.iso8583.util.CardVerificationMethodTest" name="reportsOnlineOfflineAndNoCvmCategories" time="0.0" />
+    <testcase classname="com.logicpoint.iso8583.util.CardVerificationMethodTest" name="reportsPinSignatureAndBiometricRequirements" time="0.001" />
+    <testcase classname="com.logicpoint.iso8583.util.CardVerificationMethodTest" name="unknownAndNullCodesReturnUnknown" time="0.0" />
+    <testcase classname="com.logicpoint.iso8583.util.CardVerificationMethodTest" name="resolvesEveryCvmFromItsCode(CardVerificationMethod)[1]" time="0.0" />
+    <testcase classname="com.logicpoint.iso8583.util.CardVerificationMethodTest" name="resolvesEveryCvmFromItsCode(CardVerificationMethod)[2]" time="0.001" />
+    <testcase classname="com.logicpoint.iso8583.util.CardVerificationMethodTest" name="resolvesEveryCvmFromItsCode(CardVerificationMethod)[3]" time="0.0" />
+    <testcase classname="com.logicpoint.iso8583.util.CardVerificationMethodTest" name="resolvesEveryCvmFromItsCode(CardVerificationMethod)[4]" time="0.0" />
+    <testcase classname="com.logicpoint.iso8583.util.CardVerificationMethodTest" name="resolvesEveryCvmFromItsCode(CardVerificationMethod)[5]" time="0.0" />
+    <testcase classname="com.logicpoint.iso8583.util.CardVerificationMethodTest" name="resolvesEveryCvmFromItsCode(CardVerificationMethod)[6]" time="0.0" />
+    <testcase classname="com.logicpoint.iso8583.util.CardVerificationMethodTest" name="resolvesEveryCvmFromItsCode(CardVerificationMethod)[7]" time="0.001" />
+    <testcase classname="com.logicpoint.iso8583.util.CardVerificationMethodTest" name="resolvesEveryCvmFromItsCode(CardVerificationMethod)[8]" time="0.0" />
+    <testcase classname="com.logicpoint.iso8583.util.CardVerificationMethodTest" name="resolvesEveryCvmFromItsCode(CardVerificationMethod)[9]" time="0.001" />
+    <testcase classname="com.logicpoint.iso8583.util.CardVerificationMethodTest" name="resolvesEveryCvmFromItsCode(CardVerificationMethod)[10]" time="0.0" />
+    <testcase classname="com.logicpoint.iso8583.util.CardVerificationMethodTest" name="resolvesEveryCvmFromItsCode(CardVerificationMethod)[11]" time="0.0" />
+  </testsuite>
+  <testsuite name="com.logicpoint.iso8583.util.EmvDataUpdaterTest" tests="4" failures="0" errors="0" skipped="0" time="0.074">
+    <testcase classname="com.logicpoint.iso8583.util.EmvDataUpdaterTest" name="updatesArpcAndGenericTags" time="0.054" />
+    <testcase classname="com.logicpoint.iso8583.util.EmvDataUpdaterTest" name="parsesReadsAndRecognizesSingleEmvTag" time="0.005" />
+    <testcase classname="com.logicpoint.iso8583.util.EmvDataUpdaterTest" name="nullInputsAreHandledWithoutMutation" time="0.001" />
+    <testcase classname="com.logicpoint.iso8583.util.EmvDataUpdaterTest" name="reconstructsTagsAndSkipsEmptyValues" time="0.0" />
+  </testsuite>
+  <testsuite name="com.logicpoint.iso8583.util.EntryModeTest" tests="13" failures="0" errors="0" skipped="0" time="0.006">
+    <testcase classname="com.logicpoint.iso8583.util.EntryModeTest" name="categorizesPhysicalAndDigitalEntryModes" time="0.001" />
+    <testcase classname="com.logicpoint.iso8583.util.EntryModeTest" name="resolvesEveryEntryModeFromItsCode(EntryMode)[1]" time="0.001" />
+    <testcase classname="com.logicpoint.iso8583.util.EntryModeTest" name="resolvesEveryEntryModeFromItsCode(EntryMode)[2]" time="0.0" />
+    <testcase classname="com.logicpoint.iso8583.util.EntryModeTest" name="resolvesEveryEntryModeFromItsCode(EntryMode)[3]" time="0.001" />
+    <testcase classname="com.logicpoint.iso8583.util.EntryModeTest" name="resolvesEveryEntryModeFromItsCode(EntryMode)[4]" time="0.0" />
+    <testcase classname="com.logicpoint.iso8583.util.EntryModeTest" name="resolvesEveryEntryModeFromItsCode(EntryMode)[5]" time="0.0" />
+    <testcase classname="com.logicpoint.iso8583.util.EntryModeTest" name="resolvesEveryEntryModeFromItsCode(EntryMode)[6]" time="0.0" />
+    <testcase classname="com.logicpoint.iso8583.util.EntryModeTest" name="resolvesEveryEntryModeFromItsCode(EntryMode)[7]" time="0.0" />
+    <testcase classname="com.logicpoint.iso8583.util.EntryModeTest" name="resolvesEveryEntryModeFromItsCode(EntryMode)[8]" time="0.0" />
+    <testcase classname="com.logicpoint.iso8583.util.EntryModeTest" name="resolvesEveryEntryModeFromItsCode(EntryMode)[9]" time="0.0" />
+    <testcase classname="com.logicpoint.iso8583.util.EntryModeTest" name="resolvesEveryEntryModeFromItsCode(EntryMode)[10]" time="0.0" />
+    <testcase classname="com.logicpoint.iso8583.util.EntryModeTest" name="resolvesEveryEntryModeFromItsCode(EntryMode)[11]" time="0.001" />
+    <testcase classname="com.logicpoint.iso8583.util.EntryModeTest" name="unknownAndNullCodesReturnUnknown" time="0.0" />
+  </testsuite>
+  <testsuite name="com.logicpoint.iso8583.util.ISOUtilTest" tests="12" failures="0" errors="0" skipped="0" time="0.024">
+    <testcase classname="com.logicpoint.iso8583.util.ISOUtilTest" name="parsesAndFormatsValues" time="0.015" />
+    <testcase classname="com.logicpoint.iso8583.util.ISOUtilTest" name="convertsFixedLengthBinaryBitmapsAndSetsExtensionFlags" time="0.001" />
+    <testcase classname="com.logicpoint.iso8583.util.ISOUtilTest" name="convertsEbcdicAndBitmaps" time="0.002" />
+    <testcase classname="com.logicpoint.iso8583.util.ISOUtilTest" name="randomDigitsAreDeterministicWithSeedAndSleepValidatesInput" time="0.001" />
+    <testcase classname="com.logicpoint.iso8583.util.ISOUtilTest" name="masksAndNormalizesSensitiveText" time="0.0" />
+    <testcase classname="com.logicpoint.iso8583.util.ISOUtilTest" name="convertsPrimarySecondaryAndTertiaryBinaryBitmaps" time="0.001" />
+    <testcase classname="com.logicpoint.iso8583.util.ISOUtilTest" name="bcdConversionSupportsOffsetsAndCustomFillNibbles" time="0.0" />
+    <testcase classname="com.logicpoint.iso8583.util.ISOUtilTest" name="convertsBcdHexAndIntegers" time="0.001" />
+    <testcase classname="com.logicpoint.iso8583.util.ISOUtilTest" name="rendersNamedAndUnknownControlCharactersForDiagnostics" time="0.0" />
+    <testcase classname="com.logicpoint.iso8583.util.ISOUtilTest" name="handlesArraysNumbersAndValidation" time="0.001" />
+    <testcase classname="com.logicpoint.iso8583.util.ISOUtilTest" name="padsTrimsAndSelectsText" time="0.001" />
+    <testcase classname="com.logicpoint.iso8583.util.ISOUtilTest" name="encodesDelimitedStringsAndDumpsBytes" time="0.001" />
+  </testsuite>
+  <testsuite name="com.logicpoint.iso8583.util.Iso8583MessageHandlerTest" tests="5" failures="0" errors="0" skipped="0" time="0.008">
+    <testcase classname="com.logicpoint.iso8583.util.Iso8583MessageHandlerTest" name="wrapsMalformedInputAsParsingFailure" time="0.005" />
+    <testcase classname="com.logicpoint.iso8583.util.Iso8583MessageHandlerTest" name="parsesHexBitmapCaseInsensitively" time="0.001" />
+    <testcase classname="com.logicpoint.iso8583.util.Iso8583MessageHandlerTest" name="defaultsMtiAndParsesPrimaryBitmap" time="0.0" />
+    <testcase classname="com.logicpoint.iso8583.util.Iso8583MessageHandlerTest" name="wrapsNullFieldMapAsFormattingFailure" time="0.0" />
+    <testcase classname="com.logicpoint.iso8583.util.Iso8583MessageHandlerTest" name="formatsBitmapAndFieldsInNumericOrder" time="0.0" />
+  </testsuite>
+  <testsuite name="com.logicpoint.iso8583.util.MacGenerationTest" tests="3" failures="0" errors="0" skipped="0" time="0.023">
+    <testcase classname="com.logicpoint.iso8583.util.MacGenerationTest" name="invalidKeyReturnsNullInsteadOfLeakingCryptoException" time="0.002" />
+    <testcase classname="com.logicpoint.iso8583.util.MacGenerationTest" name="padsNonBlockAlignedPayloadBeforeMacGeneration" time="0.019" />
+    <testcase classname="com.logicpoint.iso8583.util.MacGenerationTest" name="generatesStableUppercaseRetailMacForSamePayload" time="0.001" />
+  </testsuite>
+  <testsuite name="com.logicpoint.iso8583.util.RandomCodeGeneratorsTest" tests="4" failures="0" errors="0" skipped="0" time="0.055">
+    <testcase classname="com.logicpoint.iso8583.util.RandomCodeGeneratorsTest" name="numericGeneratorReturnsEmptyForNonPositiveLength" time="0.007" />
+    <testcase classname="com.logicpoint.iso8583.util.RandomCodeGeneratorsTest" name="consecutiveLongValuesAreIndependentlyGenerated" time="0.003" />
+    <testcase classname="com.logicpoint.iso8583.util.RandomCodeGeneratorsTest" name="authCodeHasRequiredLengthAndCharacterSet" time="0.044" />
+    <testcase classname="com.logicpoint.iso8583.util.RandomCodeGeneratorsTest" name="numericGeneratorHonorsRequestedLengthAndDigits" time="0.0" />
+  </testsuite>
+  <testsuite name="com.logicpoint.iso8583.util.ServiceCodeParserTest" tests="41" failures="0" errors="0" skipped="0" time="0.073">
+    <testcase classname="com.logicpoint.iso8583.util.ServiceCodeParserTest" name="interpretsAuthorizationProcessing(char, String)[1]" time="0.01" />
+    <testcase classname="com.logicpoint.iso8583.util.ServiceCodeParserTest" name="interpretsAuthorizationProcessing(char, String)[2]" time="0.001" />
+    <testcase classname="com.logicpoint.iso8583.util.ServiceCodeParserTest" name="interpretsAuthorizationProcessing(char, String)[3]" time="0.0" />
+    <testcase classname="com.logicpoint.iso8583.util.ServiceCodeParserTest" name="interpretsAuthorizationProcessing(char, String)[4]" time="0.0" />
+    <testcase classname="com.logicpoint.iso8583.util.ServiceCodeParserTest" name="interpretsAuthorizationProcessing(char, String)[5]" time="0.001" />
+    <testcase classname="com.logicpoint.iso8583.util.ServiceCodeParserTest" name="interpretsServiceRangeForEverySupportedScheme(Scheme, char, String)[1]" time="0.001" />
+    <testcase classname="com.logicpoint.iso8583.util.ServiceCodeParserTest" name="interpretsServiceRangeForEverySupportedScheme(Scheme, char, String)[2]" time="0.001" />
+    <testcase classname="com.logicpoint.iso8583.util.ServiceCodeParserTest" name="interpretsServiceRangeForEverySupportedScheme(Scheme, char, String)[3]" time="0.0" />
+    <testcase classname="com.logicpoint.iso8583.util.ServiceCodeParserTest" name="interpretsServiceRangeForEverySupportedScheme(Scheme, char, String)[4]" time="0.0" />
+    <testcase classname="com.logicpoint.iso8583.util.ServiceCodeParserTest" name="interpretsServiceRangeForEverySupportedScheme(Scheme, char, String)[5]" time="0.001" />
+    <testcase classname="com.logicpoint.iso8583.util.ServiceCodeParserTest" name="interpretsServiceRangeForEverySupportedScheme(Scheme, char, String)[6]" time="0.0" />
+    <testcase classname="com.logicpoint.iso8583.util.ServiceCodeParserTest" name="interpretsServiceRangeForEverySupportedScheme(Scheme, char, String)[7]" time="0.0" />
+    <testcase classname="com.logicpoint.iso8583.util.ServiceCodeParserTest" name="interpretsServiceRangeForEverySupportedScheme(Scheme, char, String)[8]" time="0.0" />
+    <testcase classname="com.logicpoint.iso8583.util.ServiceCodeParserTest" name="interpretsServiceRangeForEverySupportedScheme(Scheme, char, String)[9]" time="0.0" />
+    <testcase classname="com.logicpoint.iso8583.util.ServiceCodeParserTest" name="interpretsServiceRangeForEverySupportedScheme(Scheme, char, String)[10]" time="0.0" />
+    <testcase classname="com.logicpoint.iso8583.util.ServiceCodeParserTest" name="interpretsServiceRangeForEverySupportedScheme(Scheme, char, String)[11]" time="0.0" />
+    <testcase classname="com.logicpoint.iso8583.util.ServiceCodeParserTest" name="interpretsServiceRangeForEverySupportedScheme(Scheme, char, String)[12]" time="0.0" />
+    <testcase classname="com.logicpoint.iso8583.util.ServiceCodeParserTest" name="interpretsServiceRangeForEverySupportedScheme(Scheme, char, String)[13]" time="0.0" />
+    <testcase classname="com.logicpoint.iso8583.util.ServiceCodeParserTest" name="interpretsServiceRangeForEverySupportedScheme(Scheme, char, String)[14]" time="0.001" />
+    <testcase classname="com.logicpoint.iso8583.util.ServiceCodeParserTest" name="interpretsServiceRangeForEverySupportedScheme(Scheme, char, String)[15]" time="0.0" />
+    <testcase classname="com.logicpoint.iso8583.util.ServiceCodeParserTest" name="interpretsServiceRangeForEverySupportedScheme(Scheme, char, String)[16]" time="0.001" />
+    <testcase classname="com.logicpoint.iso8583.util.ServiceCodeParserTest" name="interpretsServiceRangeForEverySupportedScheme(Scheme, char, String)[17]" time="0.0" />
+    <testcase classname="com.logicpoint.iso8583.util.ServiceCodeParserTest" name="interpretsServiceRangeForEverySupportedScheme(Scheme, char, String)[18]" time="0.0" />
+    <testcase classname="com.logicpoint.iso8583.util.ServiceCodeParserTest" name="interpretsServiceRangeForEverySupportedScheme(Scheme, char, String)[19]" time="0.001" />
+    <testcase classname="com.logicpoint.iso8583.util.ServiceCodeParserTest" name="interpretsServiceRangeForEverySupportedScheme(Scheme, char, String)[20]" time="0.0" />
+    <testcase classname="com.logicpoint.iso8583.util.ServiceCodeParserTest" name="interpretsServiceRangeForEverySupportedScheme(Scheme, char, String)[21]" time="0.0" />
+    <testcase classname="com.logicpoint.iso8583.util.ServiceCodeParserTest" name="interpretsServiceRangeForEverySupportedScheme(Scheme, char, String)[22]" time="0.001" />
+    <testcase classname="com.logicpoint.iso8583.util.ServiceCodeParserTest" name="interpretsServiceRangeForEverySupportedScheme(Scheme, char, String)[23]" time="0.0" />
+    <testcase classname="com.logicpoint.iso8583.util.ServiceCodeParserTest" name="interpretsServiceRangeForEverySupportedScheme(Scheme, char, String)[24]" time="0.001" />
+    <testcase classname="com.logicpoint.iso8583.util.ServiceCodeParserTest" name="interpretsServiceRangeForEverySupportedScheme(Scheme, char, String)[25]" time="0.0" />
+    <testcase classname="com.logicpoint.iso8583.util.ServiceCodeParserTest" name="interpretsServiceRangeForEverySupportedScheme(Scheme, char, String)[26]" time="0.001" />
+    <testcase classname="com.logicpoint.iso8583.util.ServiceCodeParserTest" name="interpretsServiceRangeForEverySupportedScheme(Scheme, char, String)[27]" time="0.0" />
+    <testcase classname="com.logicpoint.iso8583.util.ServiceCodeParserTest" name="parsesServiceCodeIntoBusinessAttributes" time="0.001" />
+    <testcase classname="com.logicpoint.iso8583.util.ServiceCodeParserTest" name="interpretsInterchangeQualifier(char, String)[1]" time="0.001" />
+    <testcase classname="com.logicpoint.iso8583.util.ServiceCodeParserTest" name="interpretsInterchangeQualifier(char, String)[2]" time="0.001" />
+    <testcase classname="com.logicpoint.iso8583.util.ServiceCodeParserTest" name="interpretsInterchangeQualifier(char, String)[3]" time="0.0" />
+    <testcase classname="com.logicpoint.iso8583.util.ServiceCodeParserTest" name="interpretsInterchangeQualifier(char, String)[4]" time="0.001" />
+    <testcase classname="com.logicpoint.iso8583.util.ServiceCodeParserTest" name="interpretsInterchangeQualifier(char, String)[5]" time="0.0" />
+    <testcase classname="com.logicpoint.iso8583.util.ServiceCodeParserTest" name="interpretsInterchangeQualifier(char, String)[6]" time="0.0" />
+    <testcase classname="com.logicpoint.iso8583.util.ServiceCodeParserTest" name="interpretsInterchangeQualifier(char, String)[7]" time="0.0" />
+    <testcase classname="com.logicpoint.iso8583.util.ServiceCodeParserTest" name="rejectsMissingOrIncorrectLengthServiceCodes" time="0.0" />
+  </testsuite>
+  <testsuite name="com.logicpoint.iso8583.util.rupay.De54dataTest" tests="3" failures="0" errors="0" skipped="0" time="0.008">
+    <testcase classname="com.logicpoint.iso8583.util.rupay.De54dataTest" name="packsBalanceEnquiryWithLedgerAndAvailableBalance" time="0.007" />
+    <testcase classname="com.logicpoint.iso8583.util.rupay.De54dataTest" name="packsDebitBalancesWithPositiveMinorUnitAmount" time="0.0" />
+    <testcase classname="com.logicpoint.iso8583.util.rupay.De54dataTest" name="packsPrepaidAtmBalanceWithZeroAccountTypeAndLedgerAvailableAmountTypes" time="0.0" />
+  </testsuite>
+  <testsuite name="com.logicpoint.iso8583.validation.SchemeValidatorServiceTest" tests="5" failures="0" errors="0" skipped="0" time="0.007">
+    <testcase classname="com.logicpoint.iso8583.validation.SchemeValidatorServiceTest" name="validate_PurchaseTransaction" time="0.002" />
+    <testcase classname="com.logicpoint.iso8583.validation.SchemeValidatorServiceTest" name="identify_NoMatchingRule" time="0.002" />
+    <testcase classname="com.logicpoint.iso8583.validation.SchemeValidatorServiceTest" name="validate_TransactionTypeNotIdentified" time="0.001" />
+    <testcase classname="com.logicpoint.iso8583.validation.SchemeValidatorServiceTest" name="identify_PurchaseTransaction" time="0.001" />
+    <testcase classname="com.logicpoint.iso8583.validation.SchemeValidatorServiceTest" name="identify_WithdrawalTransaction" time="0.001" />
+  </testsuite>
+  <testsuite name="com.logicpoint.iso8583.validation.StandingInstructionIdentificationTest" tests="8" failures="0" errors="0" skipped="0" time="0.009">
+    <testcase classname="com.logicpoint.iso8583.validation.StandingInstructionIdentificationTest" name="identifiesSiTransactionFromTag085(String, TransactionType, String, String, String)[1]" time="0.001" />
+    <testcase classname="com.logicpoint.iso8583.validation.StandingInstructionIdentificationTest" name="identifiesSiTransactionFromTag085(String, TransactionType, String, String, String)[2]" time="0.0" />
+    <testcase classname="com.logicpoint.iso8583.validation.StandingInstructionIdentificationTest" name="identifiesSiTransactionFromTag085(String, TransactionType, String, String, String)[3]" time="0.0" />
+    <testcase classname="com.logicpoint.iso8583.validation.StandingInstructionIdentificationTest" name="identifiesSiTransactionFromTag085(String, TransactionType, String, String, String)[4]" time="0.0" />
+    <testcase classname="com.logicpoint.iso8583.validation.StandingInstructionIdentificationTest" name="identifiesSiTransactionFromTag085(String, TransactionType, String, String, String)[5]" time="0.0" />
+    <testcase classname="com.logicpoint.iso8583.validation.StandingInstructionIdentificationTest" name="identifiesSiTransactionFromTag085(String, TransactionType, String, String, String)[6]" time="0.0" />
+    <testcase classname="com.logicpoint.iso8583.validation.StandingInstructionIdentificationTest" name="identifiesSiTransactionFromTag085(String, TransactionType, String, String, String)[7]" time="0.001" />
+    <testcase classname="com.logicpoint.iso8583.validation.StandingInstructionIdentificationTest" name="reportsMissingMandateIdAfterIdentifyingSiType" time="0.0" />
+  </testsuite>
+  <testsuite name="com.logicpoint.iso8583.validation.TlvConditionTest" tests="8" failures="0" errors="0" skipped="0" time="0.001">
+    <testcase classname="com.logicpoint.iso8583.validation.TlvConditionTest" name="matches_EmptyTlvData" time="0.0" />
+    <testcase classname="com.logicpoint.iso8583.validation.TlvConditionTest" name="matches_MissingField" time="0.0" />
+    <testcase classname="com.logicpoint.iso8583.validation.TlvConditionTest" name="matches_TagNotFound" time="0.0" />
+    <testcase classname="com.logicpoint.iso8583.validation.TlvConditionTest" name="matches_ConfiguredValueSegmentMismatch" time="0.0" />
+    <testcase classname="com.logicpoint.iso8583.validation.TlvConditionTest" name="matches_InvalidValue" time="0.0" />
+    <testcase classname="com.logicpoint.iso8583.validation.TlvConditionTest" name="matches_ConfiguredValueSegment" time="0.0" />
+    <testcase classname="com.logicpoint.iso8583.validation.TlvConditionTest" name="matches_ValidValue" time="0.0" />
+    <testcase classname="com.logicpoint.iso8583.validation.TlvConditionTest" name="matches_ConfiguredValueSegmentOutOfBounds" time="0.0" />
+  </testsuite>
+  <testsuite name="com.logicpoint.iso8583.validation.TlvUtilsTest" tests="10" failures="0" errors="0" skipped="0" time="0.002">
+    <testcase classname="com.logicpoint.iso8583.validation.TlvUtilsTest" name="isValidTlvFormat_ValidData(String)[1]" time="0.0" />
+    <testcase classname="com.logicpoint.iso8583.validation.TlvUtilsTest" name="isValidTlvFormat_ValidData(String)[2]" time="0.0" />
+    <testcase classname="com.logicpoint.iso8583.validation.TlvUtilsTest" name="isValidTlvFormat_ValidData(String)[3]" time="0.0" />
+    <testcase classname="com.logicpoint.iso8583.validation.TlvUtilsTest" name="parseTlv_MalformedData" time="0.0" />
+    <testcase classname="com.logicpoint.iso8583.validation.TlvUtilsTest" name="isValidTlvFormat_InvalidData(String)[1]" time="0.0" />
+    <testcase classname="com.logicpoint.iso8583.validation.TlvUtilsTest" name="isValidTlvFormat_InvalidData(String)[2]" time="0.001" />
+    <testcase classname="com.logicpoint.iso8583.validation.TlvUtilsTest" name="isValidTlvFormat_InvalidData(String)[3]" time="0.0" />
+    <testcase classname="com.logicpoint.iso8583.validation.TlvUtilsTest" name="isValidTlvFormat_InvalidData(String)[4]" time="0.0" />
+    <testcase classname="com.logicpoint.iso8583.validation.TlvUtilsTest" name="parseTlv_InvalidLength" time="0.0" />
+    <testcase classname="com.logicpoint.iso8583.validation.TlvUtilsTest" name="parseTlv_ValidData" time="0.0" />
+  </testsuite>
+  <testsuite name="com.logicpoint.iso8583.validation.TransactionIdentificationRuleTest" tests="5" failures="0" errors="0" skipped="0" time="0.0">
+    <testcase classname="com.logicpoint.iso8583.validation.TransactionIdentificationRuleTest" name="matches_AllConditionsMet" time="0.0" />
+    <testcase classname="com.logicpoint.iso8583.validation.TransactionIdentificationRuleTest" name="matches_InvalidProcessingCode" time="0.0" />
+    <testcase classname="com.logicpoint.iso8583.validation.TransactionIdentificationRuleTest" name="validateFields_AllFieldsPresent" time="0.0" />
+    <testcase classname="com.logicpoint.iso8583.validation.TransactionIdentificationRuleTest" name="matches_InvalidPosEntryMode" time="0.0" />
+    <testcase classname="com.logicpoint.iso8583.validation.TransactionIdentificationRuleTest" name="validateFields_RequiredFields" time="0.0" />
+  </testsuite>
+  <testsuite name="com.logicpoint.iso8583.validation.card.impl.CardValidatorImplTest" tests="22" failures="0" errors="0" skipped="0" time="0.008">
+    <testcase classname="com.logicpoint.iso8583.validation.card.impl.CardValidatorImplTest" name="cvvValidationAcceptsOnlyThreeOrFourDigits(String, boolean)[1]" time="0.0" />
+    <testcase classname="com.logicpoint.iso8583.validation.card.impl.CardValidatorImplTest" name="cvvValidationAcceptsOnlyThreeOrFourDigits(String, boolean)[2]" time="0.001" />
+    <testcase classname="com.logicpoint.iso8583.validation.card.impl.CardValidatorImplTest" name="cvvValidationAcceptsOnlyThreeOrFourDigits(String, boolean)[3]" time="0.0" />
+    <testcase classname="com.logicpoint.iso8583.validation.card.impl.CardValidatorImplTest" name="cvvValidationAcceptsOnlyThreeOrFourDigits(String, boolean)[4]" time="0.0" />
+    <testcase classname="com.logicpoint.iso8583.validation.card.impl.CardValidatorImplTest" name="cvvValidationAcceptsOnlyThreeOrFourDigits(String, boolean)[5]" time="0.0" />
+    <testcase classname="com.logicpoint.iso8583.validation.card.impl.CardValidatorImplTest" name="cvvValidationAcceptsOnlyThreeOrFourDigits(String, boolean)[6]" time="0.0" />
+    <testcase classname="com.logicpoint.iso8583.validation.card.impl.CardValidatorImplTest" name="cvvValidationAcceptsOnlyThreeOrFourDigits(String, boolean)[7]" time="0.0" />
+    <testcase classname="com.logicpoint.iso8583.validation.card.impl.CardValidatorImplTest" name="expiryValidationRejectsMissingMalformedAndExpiredValues(String, String)[1]" time="0.0" />
+    <testcase classname="com.logicpoint.iso8583.validation.card.impl.CardValidatorImplTest" name="expiryValidationRejectsMissingMalformedAndExpiredValues(String, String)[2]" time="0.0" />
+    <testcase classname="com.logicpoint.iso8583.validation.card.impl.CardValidatorImplTest" name="expiryValidationRejectsMissingMalformedAndExpiredValues(String, String)[3]" time="0.0" />
+    <testcase classname="com.logicpoint.iso8583.validation.card.impl.CardValidatorImplTest" name="expiryValidationRejectsMissingMalformedAndExpiredValues(String, String)[4]" time="0.0" />
+    <testcase classname="com.logicpoint.iso8583.validation.card.impl.CardValidatorImplTest" name="expiryValidationRejectsMissingMalformedAndExpiredValues(String, String)[5]" time="0.001" />
+    <testcase classname="com.logicpoint.iso8583.validation.card.impl.CardValidatorImplTest" name="expiryValidationRejectsMissingMalformedAndExpiredValues(String, String)[6]" time="0.0" />
+    <testcase classname="com.logicpoint.iso8583.validation.card.impl.CardValidatorImplTest" name="cardNumberValidationNormalizesSeparatorsAndDelegatingValidateUsesSameRules" time="0.0" />
+    <testcase classname="com.logicpoint.iso8583.validation.card.impl.CardValidatorImplTest" name="expiryValidationAcceptsActiveCardWithMatchingExpiry" time="0.0" />
+    <testcase classname="com.logicpoint.iso8583.validation.card.impl.CardValidatorImplTest" name="expiryValidationRejectsMissingInactiveAndMismatchedDatabaseCards" time="0.001" />
+    <testcase classname="com.logicpoint.iso8583.validation.card.impl.CardValidatorImplTest" name="cardNumberValidationRejectsInvalidInputs(String, String)[1]" time="0.0" />
+    <testcase classname="com.logicpoint.iso8583.validation.card.impl.CardValidatorImplTest" name="cardNumberValidationRejectsInvalidInputs(String, String)[2]" time="0.0" />
+    <testcase classname="com.logicpoint.iso8583.validation.card.impl.CardValidatorImplTest" name="cardNumberValidationRejectsInvalidInputs(String, String)[3]" time="0.0" />
+    <testcase classname="com.logicpoint.iso8583.validation.card.impl.CardValidatorImplTest" name="cardNumberValidationRejectsInvalidInputs(String, String)[4]" time="0.0" />
+    <testcase classname="com.logicpoint.iso8583.validation.card.impl.CardValidatorImplTest" name="cardNumberValidationRejectsInvalidInputs(String, String)[5]" time="0.0" />
+    <testcase classname="com.logicpoint.iso8583.validation.card.impl.CardValidatorImplTest" name="cardNumberValidationRejectsInvalidInputs(String, String)[6]" time="0.0" />
+  </testsuite>
+  <testsuite name="com.logicpoint.iso8583.validation.context.De48ContextTest" tests="9" failures="0" errors="0" skipped="0" time="0.003">
+    <testcase classname="com.logicpoint.iso8583.validation.context.De48ContextTest" name="malformedDe48CapturesParseFailureWithoutThrowing(String)[1]" time="0.001" />
+    <testcase classname="com.logicpoint.iso8583.validation.context.De48ContextTest" name="malformedDe48CapturesParseFailureWithoutThrowing(String)[2]" time="0.0" />
+    <testcase classname="com.logicpoint.iso8583.validation.context.De48ContextTest" name="malformedDe48CapturesParseFailureWithoutThrowing(String)[3]" time="0.0" />
+    <testcase classname="com.logicpoint.iso8583.validation.context.De48ContextTest" name="validDe48ExposesParsedTagsAndReturnsOriginalUntilModified" time="0.001" />
+    <testcase classname="com.logicpoint.iso8583.validation.context.De48ContextTest" name="removeExistingTagMarksModifiedButRemovingMissingTagDoesNot" time="0.0" />
+    <testcase classname="com.logicpoint.iso8583.validation.context.De48ContextTest" name="setTagMarksContextModifiedAndRebuildsParseableDe48" time="0.0" />
+    <testcase classname="com.logicpoint.iso8583.validation.context.De48ContextTest" name="nullBlankOrEmptyDe48CreatesImmutableInvalidContext(String)[1]" time="0.0" />
+    <testcase classname="com.logicpoint.iso8583.validation.context.De48ContextTest" name="nullBlankOrEmptyDe48CreatesImmutableInvalidContext(String)[2]" time="0.0" />
+    <testcase classname="com.logicpoint.iso8583.validation.context.De48ContextTest" name="nullBlankOrEmptyDe48CreatesImmutableInvalidContext(String)[3]" time="0.0" />
+  </testsuite>
+  <testsuite name="com.logicpoint.iso8583.validation.factory.TransactionValidatorFactoryTest" tests="2" failures="0" errors="0" skipped="0" time="0.153">
+    <testcase classname="com.logicpoint.iso8583.validation.factory.TransactionValidatorFactoryTest" name="returnsNoValidatorForUnsupportedOrNullTransactionType" time="0.152" />
+    <testcase classname="com.logicpoint.iso8583.validation.factory.TransactionValidatorFactoryTest" name="mapsEverySupportedTransactionTypeToItsValidatorFamily" time="0.001" />
+  </testsuite>
+  <testsuite name="com.logicpoint.iso8583.validation.orchestrator.CardDataContextTest" tests="4" failures="0" errors="0" skipped="0" time="0.0">
+    <testcase classname="com.logicpoint.iso8583.validation.orchestrator.CardDataContextTest" name="successfulContextExposesAllCardSecurityAttributes" time="0.0" />
+    <testcase classname="com.logicpoint.iso8583.validation.orchestrator.CardDataContextTest" name="testCardDataContextStaticMethods" time="0.0" />
+    <testcase classname="com.logicpoint.iso8583.validation.orchestrator.CardDataContextTest" name="testCardDataContextLombokGeneration" time="0.0" />
+    <testcase classname="com.logicpoint.iso8583.validation.orchestrator.CardDataContextTest" name="failedContextSafelyReturnsNullForEveryCardAttribute" time="0.0" />
+  </testsuite>
+  <testsuite name="com.logicpoint.iso8583.validation.orchestrator.TransactionValidationOrchestratorAccountIdTest" tests="8" failures="0" errors="0" skipped="0" time="0.002">
+    <testcase classname="com.logicpoint.iso8583.validation.orchestrator.TransactionValidationOrchestratorAccountIdTest" name="rupayDebitCardDoesNotAddAccountIdForDe102" time="0.0" />
+    <testcase classname="com.logicpoint.iso8583.validation.orchestrator.TransactionValidationOrchestratorAccountIdTest" name="rupayCreditCardAddsAccountIdForDe102" time="0.001" />
+    <testcase classname="com.logicpoint.iso8583.validation.orchestrator.TransactionValidationOrchestratorAccountIdTest" name="prepaidAtmBalanceUsesAtmDe54AccountAndAmountTypesFromDe48Source" time="0.0" />
+    <testcase classname="com.logicpoint.iso8583.validation.orchestrator.TransactionValidationOrchestratorAccountIdTest" name="prepaidCashWithdrawalUsesAtmDe54TypesFromAtmMcc" time="0.0" />
+    <testcase classname="com.logicpoint.iso8583.validation.orchestrator.TransactionValidationOrchestratorAccountIdTest" name="prepaidPosBalanceDoesNotUseAtmDe54AccountAndAmountTypes" time="0.0" />
+    <testcase classname="com.logicpoint.iso8583.validation.orchestrator.TransactionValidationOrchestratorAccountIdTest" name="nonRupayCreditCardDoesNotAddAccountIdForDe102" time="0.0" />
+    <testcase classname="com.logicpoint.iso8583.validation.orchestrator.TransactionValidationOrchestratorAccountIdTest" name="excludedNcmcTransactionsDoNotAddAccountIdForDe102" time="0.0" />
+    <testcase classname="com.logicpoint.iso8583.validation.orchestrator.TransactionValidationOrchestratorAccountIdTest" name="accountingLimitDeclineReturnsNonNullInvalidResult" time="0.0" />
+  </testsuite>
+  <testsuite name="com.logicpoint.iso8583.validation.orchestrator.TransactionValidationOrchestratorCashAtPosTest" tests="5" failures="0" errors="0" skipped="0" time="0.0">
+    <testcase classname="com.logicpoint.iso8583.validation.orchestrator.TransactionValidationOrchestratorCashAtPosTest" name="allowsNonCashAtPosTransactionForCreditCard" time="0.0" />
+    <testcase classname="com.logicpoint.iso8583.validation.orchestrator.TransactionValidationOrchestratorCashAtPosTest" name="declinesContactlessCashAtPosForCreditCard" time="0.0" />
+    <testcase classname="com.logicpoint.iso8583.validation.orchestrator.TransactionValidationOrchestratorCashAtPosTest" name="leavesPrepaidCashAtPosUnchangedForLaterImplementation" time="0.0" />
+    <testcase classname="com.logicpoint.iso8583.validation.orchestrator.TransactionValidationOrchestratorCashAtPosTest" name="declinesCashAtPosForCreditCard" time="0.0" />
+    <testcase classname="com.logicpoint.iso8583.validation.orchestrator.TransactionValidationOrchestratorCashAtPosTest" name="allowsCashAtPosForDebitCard" time="0.0" />
+  </testsuite>
+  <testsuite name="com.logicpoint.iso8583.validation.orchestrator.TransactionValidationOrchestratorDe48Test" tests="5" failures="0" errors="0" skipped="0" time="0.001">
+    <testcase classname="com.logicpoint.iso8583.validation.orchestrator.TransactionValidationOrchestratorDe48Test" name="icvvValidationResultAddsRuPayTag054AndRemovesTemporaryTag058" time="0.0" />
+    <testcase classname="com.logicpoint.iso8583.validation.orchestrator.TransactionValidationOrchestratorDe48Test" name="de55ResponseIsRemovedForMandatoryTagFailure" time="0.0" />
+    <testcase classname="com.logicpoint.iso8583.validation.orchestrator.TransactionValidationOrchestratorDe48Test" name="icvvValidationResultIsPresentWhenRequestDe48IsBlank" time="0.0" />
+    <testcase classname="com.logicpoint.iso8583.validation.orchestrator.TransactionValidationOrchestratorDe48Test" name="de55ResponseIsRemovedWhenArpcIsBlank" time="0.0" />
+    <testcase classname="com.logicpoint.iso8583.validation.orchestrator.TransactionValidationOrchestratorDe48Test" name="de55ResponseContainsOnlyTag91WhenArpcIsPresent" time="0.0" />
+  </testsuite>
+  <testsuite name="com.logicpoint.iso8583.validation.orchestrator.TransactionValidationOrchestratorFlowTest" tests="65" failures="0" errors="0" skipped="0" time="0.292">
+    <testcase classname="com.logicpoint.iso8583.validation.orchestrator.TransactionValidationOrchestratorFlowTest" name="rejectsCardNotPresentTransactionWhenCvv2IsMissing" time="0.211" />
+    <testcase classname="com.logicpoint.iso8583.validation.orchestrator.TransactionValidationOrchestratorFlowTest" name="emvCvrFailurePropagatesDetailedErrorsAfterSuccessfulIcvv" time="0.001" />
+    <testcase classname="com.logicpoint.iso8583.validation.orchestrator.TransactionValidationOrchestratorFlowTest" name="propagatesServiceCodeValidationFailure" time="0.001" />
+    <testcase classname="com.logicpoint.iso8583.validation.orchestrator.TransactionValidationOrchestratorFlowTest" name="mapsCvv2MismatchToCvvFailure" time="0.001" />
+    <testcase classname="com.logicpoint.iso8583.validation.orchestrator.TransactionValidationOrchestratorFlowTest" name="mapsExternalAccountingDeclineCodes(String, InternalResCode)[1]" time="0.0" />
+    <testcase classname="com.logicpoint.iso8583.validation.orchestrator.TransactionValidationOrchestratorFlowTest" name="mapsExternalAccountingDeclineCodes(String, InternalResCode)[2]" time="0.001" />
+    <testcase classname="com.logicpoint.iso8583.validation.orchestrator.TransactionValidationOrchestratorFlowTest" name="mapsExternalAccountingDeclineCodes(String, InternalResCode)[3]" time="0.0" />
+    <testcase classname="com.logicpoint.iso8583.validation.orchestrator.TransactionValidationOrchestratorFlowTest" name="mapsExternalAccountingDeclineCodes(String, InternalResCode)[4]" time="0.0" />
+    <testcase classname="com.logicpoint.iso8583.validation.orchestrator.TransactionValidationOrchestratorFlowTest" name="mapsExternalAccountingDeclineCodes(String, InternalResCode)[5]" time="0.0" />
+    <testcase classname="com.logicpoint.iso8583.validation.orchestrator.TransactionValidationOrchestratorFlowTest" name="mapsExternalAccountingDeclineCodes(String, InternalResCode)[6]" time="0.0" />
+    <testcase classname="com.logicpoint.iso8583.validation.orchestrator.TransactionValidationOrchestratorFlowTest" name="mapsExternalAccountingDeclineCodes(String, InternalResCode)[7]" time="0.001" />
+    <testcase classname="com.logicpoint.iso8583.validation.orchestrator.TransactionValidationOrchestratorFlowTest" name="mapsExternalAccountingDeclineCodes(String, InternalResCode)[8]" time="0.0" />
+    <testcase classname="com.logicpoint.iso8583.validation.orchestrator.TransactionValidationOrchestratorFlowTest" name="mapsExternalAccountingDeclineCodes(String, InternalResCode)[9]" time="0.0" />
+    <testcase classname="com.logicpoint.iso8583.validation.orchestrator.TransactionValidationOrchestratorFlowTest" name="mapsExternalAccountingDeclineCodes(String, InternalResCode)[10]" time="0.001" />
+    <testcase classname="com.logicpoint.iso8583.validation.orchestrator.TransactionValidationOrchestratorFlowTest" name="mapsExternalAccountingDeclineCodes(String, InternalResCode)[11]" time="0.0" />
+    <testcase classname="com.logicpoint.iso8583.validation.orchestrator.TransactionValidationOrchestratorFlowTest" name="mapsExternalAccountingDeclineCodes(String, InternalResCode)[12]" time="0.001" />
+    <testcase classname="com.logicpoint.iso8583.validation.orchestrator.TransactionValidationOrchestratorFlowTest" name="mapsExternalAccountingDeclineCodes(String, InternalResCode)[13]" time="0.0" />
+    <testcase classname="com.logicpoint.iso8583.validation.orchestrator.TransactionValidationOrchestratorFlowTest" name="mapsExternalAccountingDeclineCodes(String, InternalResCode)[14]" time="0.001" />
+    <testcase classname="com.logicpoint.iso8583.validation.orchestrator.TransactionValidationOrchestratorFlowTest" name="propagatesTransactionTypeValidationFailure" time="0.001" />
+    <testcase classname="com.logicpoint.iso8583.validation.orchestrator.TransactionValidationOrchestratorFlowTest" name="emvCvmFailureStopsBeforeCvvAndMapsCvmResponseCode" time="0.002" />
+    <testcase classname="com.logicpoint.iso8583.validation.orchestrator.TransactionValidationOrchestratorFlowTest" name="stopsWhenCardNumberFormatIsInvalid" time="0.0" />
+    <testcase classname="com.logicpoint.iso8583.validation.orchestrator.TransactionValidationOrchestratorFlowTest" name="cmsManagedPinChangeCompletesWithoutLegacyPinService" time="0.032" />
+    <testcase classname="com.logicpoint.iso8583.validation.orchestrator.TransactionValidationOrchestratorFlowTest" name="rejectsCardThatIsNotEligibleForTransactions" time="0.001" />
+    <testcase classname="com.logicpoint.iso8583.validation.orchestrator.TransactionValidationOrchestratorFlowTest" name="successfulPinVerificationResetsRetryCountAndMarksContext" time="0.001" />
+    <testcase classname="com.logicpoint.iso8583.validation.orchestrator.TransactionValidationOrchestratorFlowTest" name="mapsCvvServiceExceptionToSystemError" time="0.0" />
+    <testcase classname="com.logicpoint.iso8583.validation.orchestrator.TransactionValidationOrchestratorFlowTest" name="rejectsMalformedExpiry" time="0.001" />
+    <testcase classname="com.logicpoint.iso8583.validation.orchestrator.TransactionValidationOrchestratorFlowTest" name="prepaidAtmMiniStatementUsesLocalStatementAndBalanceResponse" time="0.0" />
+    <testcase classname="com.logicpoint.iso8583.validation.orchestrator.TransactionValidationOrchestratorFlowTest" name="approvesNonEmvPurchaseWhenAllValidationsPass" time="0.0" />
+    <testcase classname="com.logicpoint.iso8583.validation.orchestrator.TransactionValidationOrchestratorFlowTest" name="prepaidAtmBalanceUsesPersistedSnapshotBalances" time="0.001" />
+    <testcase classname="com.logicpoint.iso8583.validation.orchestrator.TransactionValidationOrchestratorFlowTest" name="acceptsDirectCvv2ForEveryCardNotPresentTransactionType(TransactionType)[1]" time="0.001" />
+    <testcase classname="com.logicpoint.iso8583.validation.orchestrator.TransactionValidationOrchestratorFlowTest" name="acceptsDirectCvv2ForEveryCardNotPresentTransactionType(TransactionType)[2]" time="0.0" />
+    <testcase classname="com.logicpoint.iso8583.validation.orchestrator.TransactionValidationOrchestratorFlowTest" name="acceptsDirectCvv2ForEveryCardNotPresentTransactionType(TransactionType)[3]" time="0.001" />
+    <testcase classname="com.logicpoint.iso8583.validation.orchestrator.TransactionValidationOrchestratorFlowTest" name="acceptsDirectCvv2ForEveryCardNotPresentTransactionType(TransactionType)[4]" time="0.001" />
+    <testcase classname="com.logicpoint.iso8583.validation.orchestrator.TransactionValidationOrchestratorFlowTest" name="acceptsDirectCvv2ForEveryCardNotPresentTransactionType(TransactionType)[5]" time="0.001" />
+    <testcase classname="com.logicpoint.iso8583.validation.orchestrator.TransactionValidationOrchestratorFlowTest" name="acceptsDirectCvv2ForEveryCardNotPresentTransactionType(TransactionType)[6]" time="0.0" />
+    <testcase classname="com.logicpoint.iso8583.validation.orchestrator.TransactionValidationOrchestratorFlowTest" name="acceptsDirectCvv2ForEveryCardNotPresentTransactionType(TransactionType)[7]" time="0.001" />
+    <testcase classname="com.logicpoint.iso8583.validation.orchestrator.TransactionValidationOrchestratorFlowTest" name="acceptsDirectCvv2ForEveryCardNotPresentTransactionType(TransactionType)[8]" time="0.001" />
+    <testcase classname="com.logicpoint.iso8583.validation.orchestrator.TransactionValidationOrchestratorFlowTest" name="mapsIsoCurrencyBeforeCallingAccounting(String, String)[1]" time="0.001" />
+    <testcase classname="com.logicpoint.iso8583.validation.orchestrator.TransactionValidationOrchestratorFlowTest" name="mapsIsoCurrencyBeforeCallingAccounting(String, String)[2]" time="0.001" />
+    <testcase classname="com.logicpoint.iso8583.validation.orchestrator.TransactionValidationOrchestratorFlowTest" name="mapsIsoCurrencyBeforeCallingAccounting(String, String)[3]" time="0.001" />
+    <testcase classname="com.logicpoint.iso8583.validation.orchestrator.TransactionValidationOrchestratorFlowTest" name="mapsIsoCurrencyBeforeCallingAccounting(String, String)[4]" time="0.0" />
+    <testcase classname="com.logicpoint.iso8583.validation.orchestrator.TransactionValidationOrchestratorFlowTest" name="failedPinVerificationIncrementsRetryCountAndDeclines" time="0.0" />
+    <testcase classname="com.logicpoint.iso8583.validation.orchestrator.TransactionValidationOrchestratorFlowTest" name="delegatesPinChangeAndReturnsItsWarnings" time="0.001" />
+    <testcase classname="com.logicpoint.iso8583.validation.orchestrator.TransactionValidationOrchestratorFlowTest" name="requiresExpiryWhenNeitherDe14NorTrack2IsPresent" time="0.001" />
+    <testcase classname="com.logicpoint.iso8583.validation.orchestrator.TransactionValidationOrchestratorFlowTest" name="cmsManagedPinChangeMapsNonCompletedReceiptToInvalidPin" time="0.001" />
+    <testcase classname="com.logicpoint.iso8583.validation.orchestrator.TransactionValidationOrchestratorFlowTest" name="accountingExceptionIsReturnedAsSystemError" time="0.001" />
+    <testcase classname="com.logicpoint.iso8583.validation.orchestrator.TransactionValidationOrchestratorFlowTest" name="emvArqcApprovalReplacesRequestDe55WithGeneratedArpc" time="0.001" />
+    <testcase classname="com.logicpoint.iso8583.validation.orchestrator.TransactionValidationOrchestratorFlowTest" name="emvMissingTvrIsFormatErrorAfterCvmCvrAndIcvvPass" time="0.001" />
+    <testcase classname="com.logicpoint.iso8583.validation.orchestrator.TransactionValidationOrchestratorFlowTest" name="balanceEnquiryApprovalPacksLedgerAndAvailableBalanceIntoDe54" time="0.001" />
+    <testcase classname="com.logicpoint.iso8583.validation.orchestrator.TransactionValidationOrchestratorFlowTest" name="propagatesPrepaidLimitDeclineAfterAuthentication" time="0.001" />
+    <testcase classname="com.logicpoint.iso8583.validation.orchestrator.TransactionValidationOrchestratorFlowTest" name="rejectsTransactionImmediatelyWhenBinIsInvalid" time="0.0" />
+    <testcase classname="com.logicpoint.iso8583.validation.orchestrator.TransactionValidationOrchestratorFlowTest" name="rejectsCardAtPinRetryBoundary" time="0.001" />
+    <testcase classname="com.logicpoint.iso8583.validation.orchestrator.TransactionValidationOrchestratorFlowTest" name="validatesMagstripeCvvFromTrack2DiscretionaryData" time="0.001" />
+    <testcase classname="com.logicpoint.iso8583.validation.orchestrator.TransactionValidationOrchestratorFlowTest" name="rejectsUnsupportedTransactionTypeBeforeFetchingCardData" time="0.0" />
+    <testcase classname="com.logicpoint.iso8583.validation.orchestrator.TransactionValidationOrchestratorFlowTest" name="nullAccountingResponseMapsToDoNotHonor" time="0.0" />
+    <testcase classname="com.logicpoint.iso8583.validation.orchestrator.TransactionValidationOrchestratorFlowTest" name="reportsCardDataFetchFailureWithOriginalReason" time="0.001" />
+    <testcase classname="com.logicpoint.iso8583.validation.orchestrator.TransactionValidationOrchestratorFlowTest" name="accountingDeclineSetsMappedResponseCode" time="0.001" />
+    <testcase classname="com.logicpoint.iso8583.validation.orchestrator.TransactionValidationOrchestratorFlowTest" name="cmsManagedPinChangeFailureReturnsSystemError" time="0.001" />
+    <testcase classname="com.logicpoint.iso8583.validation.orchestrator.TransactionValidationOrchestratorFlowTest" name="blockedPinIsRejectedWithoutCallingHsm" time="0.001" />
+    <testcase classname="com.logicpoint.iso8583.validation.orchestrator.TransactionValidationOrchestratorFlowTest" name="expiryMismatchSetsCaptureResponseCode" time="0.001" />
+    <testcase classname="com.logicpoint.iso8583.validation.orchestrator.TransactionValidationOrchestratorFlowTest" name="rejectsPreauthorizationForPrepaidCard" time="0.0" />
+    <testcase classname="com.logicpoint.iso8583.validation.orchestrator.TransactionValidationOrchestratorFlowTest" name="emvArqcRejectionReturnsArqcFailureWithoutReplacingDe55" time="0.001" />
+    <testcase classname="com.logicpoint.iso8583.validation.orchestrator.TransactionValidationOrchestratorFlowTest" name="approvesCardNotPresentTransactionWhenCvv2Matches" time="0.001" />
+    <testcase classname="com.logicpoint.iso8583.validation.orchestrator.TransactionValidationOrchestratorFlowTest" name="accountingApprovalStoresTransactionReferenceAndReturnsSuccess" time="0.001" />
+    <testcase classname="com.logicpoint.iso8583.validation.orchestrator.TransactionValidationOrchestratorFlowTest" name="emvTvrDeclineMapsToGenericTvrFailure" time="0.001" />
+  </testsuite>
+  <testsuite name="com.logicpoint.iso8583.validation.orchestrator.TransactionValidationOrchestratorMiniStatementTest" tests="1" failures="0" errors="0" skipped="0" time="0.001">
+    <testcase classname="com.logicpoint.iso8583.validation.orchestrator.TransactionValidationOrchestratorMiniStatementTest" name="miniStatementDe120ContainsLineCountAndTenFixedWidthRows" time="0.001" />
+  </testsuite>
+  <testsuite name="com.logicpoint.iso8583.validation.orchestrator.TransactionValidationOrchestratorNepalBhutanTest" tests="6" failures="0" errors="0" skipped="0" time="0.001">
+    <testcase classname="com.logicpoint.iso8583.validation.orchestrator.TransactionValidationOrchestratorNepalBhutanTest" name="allowsMissingCurrencyForMandatoryFieldValidationToHandle" time="0.0" />
+    <testcase classname="com.logicpoint.iso8583.validation.orchestrator.TransactionValidationOrchestratorNepalBhutanTest" name="allowsInrTransactionInNepal" time="0.0" />
+    <testcase classname="com.logicpoint.iso8583.validation.orchestrator.TransactionValidationOrchestratorNepalBhutanTest" name="declinesForeignCurrencyWhenDe19IdentifiesNepal" time="0.0" />
+    <testcase classname="com.logicpoint.iso8583.validation.orchestrator.TransactionValidationOrchestratorNepalBhutanTest" name="allowsForeignCurrencyOutsideNepalAndBhutan" time="0.0" />
+    <testcase classname="com.logicpoint.iso8583.validation.orchestrator.TransactionValidationOrchestratorNepalBhutanTest" name="allowsRefundInBhutanBecauseItIsNotForeignExchangeDrawal" time="0.0" />
+    <testcase classname="com.logicpoint.iso8583.validation.orchestrator.TransactionValidationOrchestratorNepalBhutanTest" name="declinesForeignCurrencyWhenDe43IdentifiesBhutan" time="0.001" />
+  </testsuite>
+  <testsuite name="com.logicpoint.iso8583.validation.orchestrator.TransactionValidationOrchestratorQuickTest" tests="4" failures="0" errors="0" skipped="0" time="0.093">
+    <testcase classname="com.logicpoint.iso8583.validation.orchestrator.TransactionValidationOrchestratorQuickTest" name="preservesOriginalDe48WhenInputTlvIsMalformed" time="0.091" />
+    <testcase classname="com.logicpoint.iso8583.validation.orchestrator.TransactionValidationOrchestratorQuickTest" name="quickValidationSucceedsWhenBothValidatorsApprove" time="0.001" />
+    <testcase classname="com.logicpoint.iso8583.validation.orchestrator.TransactionValidationOrchestratorQuickTest" name="exposesFactorySupportedTransactionTypes" time="0.0" />
+    <testcase classname="com.logicpoint.iso8583.validation.orchestrator.TransactionValidationOrchestratorQuickTest" name="quickValidationCombinesCardAndBinErrorsAndWarnings" time="0.0" />
+  </testsuite>
+  <testsuite name="com.logicpoint.iso8583.validation.transaction.impl.AbstractTransactionTypeValidatorTest" tests="3" failures="0" errors="0" skipped="0" time="0.0">
+    <testcase classname="com.logicpoint.iso8583.validation.transaction.impl.AbstractTransactionTypeValidatorTest" name="velocityValidationReportsExceededAndAllowedOutcomes" time="0.0" />
+    <testcase classname="com.logicpoint.iso8583.validation.transaction.impl.AbstractTransactionTypeValidatorTest" name="requiredFieldDefinitionsCoverKnownAndUnknownTransactionTypes" time="0.0" />
+    <testcase classname="com.logicpoint.iso8583.validation.transaction.impl.AbstractTransactionTypeValidatorTest" name="amountValidationRejectsNullAndNonPositiveValues" time="0.0" />
+  </testsuite>
+  <testsuite name="com.logicpoint.iso8583.validation.transaction.impl.AtmFinancialTransactionValidatorTest" tests="19" failures="0" errors="0" skipped="0" time="0.012">
+    <testcase classname="com.logicpoint.iso8583.validation.transaction.impl.AtmFinancialTransactionValidatorTest" name="missingAndInvalidMerchantCategoryCodesAreReported" time="0.004" />
+    <testcase classname="com.logicpoint.iso8583.validation.transaction.impl.AtmFinancialTransactionValidatorTest" name="contactlessCashAtPosAboveLimitRequiresPinBlock" time="0.001" />
+    <testcase classname="com.logicpoint.iso8583.validation.transaction.impl.AtmFinancialTransactionValidatorTest" name="malformedLocationFailsInternationalTransactionValidation" time="0.0" />
+    <testcase classname="com.logicpoint.iso8583.validation.transaction.impl.AtmFinancialTransactionValidatorTest" name="missingAndMalformedDe61AreRejected" time="0.0" />
+    <testcase classname="com.logicpoint.iso8583.validation.transaction.impl.AtmFinancialTransactionValidatorTest" name="nonRupaySchemeFallsBackToRupayDe61Rules" time="0.0" />
+    <testcase classname="com.logicpoint.iso8583.validation.transaction.impl.AtmFinancialTransactionValidatorTest" name="validFallbackWithdrawalUsesFallbackDe61Rules" time="0.0" />
+    <testcase classname="com.logicpoint.iso8583.validation.transaction.impl.AtmFinancialTransactionValidatorTest" name="exposesValidatorMetadataAndSupportedTypes" time="0.0" />
+    <testcase classname="com.logicpoint.iso8583.validation.transaction.impl.AtmFinancialTransactionValidatorTest" name="rejectsEachInvalidRequiredDe61Subfield(String, String)[1]" time="0.001" />
+    <testcase classname="com.logicpoint.iso8583.validation.transaction.impl.AtmFinancialTransactionValidatorTest" name="rejectsEachInvalidRequiredDe61Subfield(String, String)[2]" time="0.0" />
+    <testcase classname="com.logicpoint.iso8583.validation.transaction.impl.AtmFinancialTransactionValidatorTest" name="rejectsEachInvalidRequiredDe61Subfield(String, String)[3]" time="0.0" />
+    <testcase classname="com.logicpoint.iso8583.validation.transaction.impl.AtmFinancialTransactionValidatorTest" name="rejectsEachInvalidRequiredDe61Subfield(String, String)[4]" time="0.0" />
+    <testcase classname="com.logicpoint.iso8583.validation.transaction.impl.AtmFinancialTransactionValidatorTest" name="rejectsEachInvalidRequiredDe61Subfield(String, String)[5]" time="0.0" />
+    <testcase classname="com.logicpoint.iso8583.validation.transaction.impl.AtmFinancialTransactionValidatorTest" name="mapOverloadDefaultsInvalidOrMissingSchemeToRupay" time="0.001" />
+    <testcase classname="com.logicpoint.iso8583.validation.transaction.impl.AtmFinancialTransactionValidatorTest" name="rejectsMissingZeroAndNonNumericAmounts(String, String)[1]" time="0.0" />
+    <testcase classname="com.logicpoint.iso8583.validation.transaction.impl.AtmFinancialTransactionValidatorTest" name="rejectsMissingZeroAndNonNumericAmounts(String, String)[2]" time="0.001" />
+    <testcase classname="com.logicpoint.iso8583.validation.transaction.impl.AtmFinancialTransactionValidatorTest" name="rejectsMissingZeroAndNonNumericAmounts(String, String)[3]" time="0.0" />
+    <testcase classname="com.logicpoint.iso8583.validation.transaction.impl.AtmFinancialTransactionValidatorTest" name="rejectsMissingZeroAndNonNumericAmounts(String, String)[4]" time="0.0" />
+    <testcase classname="com.logicpoint.iso8583.validation.transaction.impl.AtmFinancialTransactionValidatorTest" name="rejectsUnsupportedTransactionTypeBeforeReadingFields" time="0.0" />
+    <testcase classname="com.logicpoint.iso8583.validation.transaction.impl.AtmFinancialTransactionValidatorTest" name="validRupayCashWithdrawalPassesAllRules" time="0.001" />
+  </testsuite>
+  <testsuite name="com.logicpoint.iso8583.validation.transaction.impl.AtmServiceTransactionValidatorTest" tests="4" failures="0" errors="0" skipped="0" time="0.001">
+    <testcase classname="com.logicpoint.iso8583.validation.transaction.impl.AtmServiceTransactionValidatorTest" name="rejectsUnsupportedTypeAndNonZeroAmount" time="0.001" />
+    <testcase classname="com.logicpoint.iso8583.validation.transaction.impl.AtmServiceTransactionValidatorTest" name="accountingEnabledAndNonBalanceTransactionsDoNotAddBalanceData" time="0.0" />
+    <testcase classname="com.logicpoint.iso8583.validation.transaction.impl.AtmServiceTransactionValidatorTest" name="balanceEnquiryAddsTemporaryBalanceWhenAccountingIsDisabled" time="0.0" />
+    <testcase classname="com.logicpoint.iso8583.validation.transaction.impl.AtmServiceTransactionValidatorTest" name="exposesCurrentStubContractsAndMetadata" time="0.0" />
+  </testsuite>
+  <testsuite name="com.logicpoint.iso8583.validation.transaction.impl.EcommerceTransactionValidatorTest" tests="11" failures="0" errors="0" skipped="0" time="0.201">
+    <testcase classname="com.logicpoint.iso8583.validation.transaction.impl.EcommerceTransactionValidatorTest" name="ecommerceRejectsMissingOrMalformedMerchantCategoryCode(String)[1]" time="0.193" />
+    <testcase classname="com.logicpoint.iso8583.validation.transaction.impl.EcommerceTransactionValidatorTest" name="ecommerceRejectsMissingOrMalformedMerchantCategoryCode(String)[2]" time="0.0" />
+    <testcase classname="com.logicpoint.iso8583.validation.transaction.impl.EcommerceTransactionValidatorTest" name="internationalRupayEmiAndCardEmiAreRejectedEarly" time="0.0" />
+    <testcase classname="com.logicpoint.iso8583.validation.transaction.impl.EcommerceTransactionValidatorTest" name="siPauseRunsStandingInstructionValidationWithoutTokenValidation" time="0.001" />
+    <testcase classname="com.logicpoint.iso8583.validation.transaction.impl.EcommerceTransactionValidatorTest" name="domesticEmiRunsTokenInstallmentAndThreeDsValidators" time="0.0" />
+    <testcase classname="com.logicpoint.iso8583.validation.transaction.impl.EcommerceTransactionValidatorTest" name="ecommerceRunsPosTokenAndThreeDsValidation" time="0.001" />
+    <testcase classname="com.logicpoint.iso8583.validation.transaction.impl.EcommerceTransactionValidatorTest" name="mapOverloadBuildsRupayContextAndPreservesFields" time="0.001" />
+    <testcase classname="com.logicpoint.iso8583.validation.transaction.impl.EcommerceTransactionValidatorTest" name="motoRunsOnlySharedCardNotPresentValidators" time="0.001" />
+    <testcase classname="com.logicpoint.iso8583.validation.transaction.impl.EcommerceTransactionValidatorTest" name="ivrAggregatesPrivateTokenAndThreeDsErrors" time="0.001" />
+    <testcase classname="com.logicpoint.iso8583.validation.transaction.impl.EcommerceTransactionValidatorTest" name="siRegistrationRunsTokenAndStandingInstructionValidation" time="0.0" />
+    <testcase classname="com.logicpoint.iso8583.validation.transaction.impl.EcommerceTransactionValidatorTest" name="unsupportedTransactionReturnsBeforeAuthorizationValidation" time="0.0" />
+  </testsuite>
+  <testsuite name="com.logicpoint.iso8583.validation.transaction.impl.NcmcTxnValidationAdditionalTest" tests="6" failures="0" errors="0" skipped="0" time="0.043">
+    <testcase classname="com.logicpoint.iso8583.validation.transaction.impl.NcmcTxnValidationAdditionalTest" name="serviceCreationChecksConfiguredServiceId" time="0.041" />
+    <testcase classname="com.logicpoint.iso8583.validation.transaction.impl.NcmcTxnValidationAdditionalTest" name="exposesCurrentMoneyLoadAndMetadataStubContracts" time="0.0" />
+    <testcase classname="com.logicpoint.iso8583.validation.transaction.impl.NcmcTxnValidationAdditionalTest" name="reportsMissingAndMalformedDe61BeforeMissingChipData" time="0.001" />
+    <testcase classname="com.logicpoint.iso8583.validation.transaction.impl.NcmcTxnValidationAdditionalTest" name="nonRupaySchemeSkipsNcmcSpecificValidation" time="0.0" />
+    <testcase classname="com.logicpoint.iso8583.validation.transaction.impl.NcmcTxnValidationAdditionalTest" name="afaIgnoresMissingMalformedBelowLimitAndPinProtectedAmounts" time="0.0" />
+    <testcase classname="com.logicpoint.iso8583.validation.transaction.impl.NcmcTxnValidationAdditionalTest" name="validDe61StillRequiresChipDataAndIssuerApplicationData" time="0.001" />
+  </testsuite>
+  <testsuite name="com.logicpoint.iso8583.validation.transaction.impl.NcmcTxnValidationAfaTest" tests="2" failures="0" errors="0" skipped="0" time="0.001">
+    <testcase classname="com.logicpoint.iso8583.validation.transaction.impl.NcmcTxnValidationAfaTest" name="moneyLoadAboveAfaLimitWithoutPinDeclinesWithInvalidPin" time="0.001" />
+    <testcase classname="com.logicpoint.iso8583.validation.transaction.impl.NcmcTxnValidationAfaTest" name="moneyLoadAboveAfaLimitWithPinContinuesToNcmcValidation" time="0.0" />
+  </testsuite>
+  <testsuite name="com.logicpoint.iso8583.validation.transaction.impl.PurchaseTransactionValidatorAdditionalTest" tests="15" failures="0" errors="0" skipped="0" time="0.007">
+    <testcase classname="com.logicpoint.iso8583.validation.transaction.impl.PurchaseTransactionValidatorAdditionalTest" name="malformedDe61AndInternationalDataAreRejected" time="0.0" />
+    <testcase classname="com.logicpoint.iso8583.validation.transaction.impl.PurchaseTransactionValidatorAdditionalTest" name="contactlessValidatesAmountAndPinThreshold" time="0.001" />
+    <testcase classname="com.logicpoint.iso8583.validation.transaction.impl.PurchaseTransactionValidatorAdditionalTest" name="contactlessRejectsEveryInvalidRequiredDe61Subfield(String, String)[1]" time="0.001" />
+    <testcase classname="com.logicpoint.iso8583.validation.transaction.impl.PurchaseTransactionValidatorAdditionalTest" name="contactlessRejectsEveryInvalidRequiredDe61Subfield(String, String)[2]" time="0.0" />
+    <testcase classname="com.logicpoint.iso8583.validation.transaction.impl.PurchaseTransactionValidatorAdditionalTest" name="contactlessRejectsEveryInvalidRequiredDe61Subfield(String, String)[3]" time="0.0" />
+    <testcase classname="com.logicpoint.iso8583.validation.transaction.impl.PurchaseTransactionValidatorAdditionalTest" name="contactlessRejectsEveryInvalidRequiredDe61Subfield(String, String)[4]" time="0.0" />
+    <testcase classname="com.logicpoint.iso8583.validation.transaction.impl.PurchaseTransactionValidatorAdditionalTest" name="contactlessRejectsEveryInvalidRequiredDe61Subfield(String, String)[5]" time="0.0" />
+    <testcase classname="com.logicpoint.iso8583.validation.transaction.impl.PurchaseTransactionValidatorAdditionalTest" name="inheritedAmountAndVelocityContractsHandleBoundaries" time="0.0" />
+    <testcase classname="com.logicpoint.iso8583.validation.transaction.impl.PurchaseTransactionValidatorAdditionalTest" name="cashbackValidatesDe54ComponentsAndAmountRelationship" time="0.001" />
+    <testcase classname="com.logicpoint.iso8583.validation.transaction.impl.PurchaseTransactionValidatorAdditionalTest" name="validatesPurchaseFallbackAndSupportedPreauthMccs" time="0.0" />
+    <testcase classname="com.logicpoint.iso8583.validation.transaction.impl.PurchaseTransactionValidatorAdditionalTest" name="purchaseRejectsEveryInvalidRequiredDe61Subfield(String, String)[1]" time="0.0" />
+    <testcase classname="com.logicpoint.iso8583.validation.transaction.impl.PurchaseTransactionValidatorAdditionalTest" name="purchaseRejectsEveryInvalidRequiredDe61Subfield(String, String)[2]" time="0.0" />
+    <testcase classname="com.logicpoint.iso8583.validation.transaction.impl.PurchaseTransactionValidatorAdditionalTest" name="purchaseRejectsEveryInvalidRequiredDe61Subfield(String, String)[3]" time="0.0" />
+    <testcase classname="com.logicpoint.iso8583.validation.transaction.impl.PurchaseTransactionValidatorAdditionalTest" name="purchaseRejectsEveryInvalidRequiredDe61Subfield(String, String)[4]" time="0.0" />
+    <testcase classname="com.logicpoint.iso8583.validation.transaction.impl.PurchaseTransactionValidatorAdditionalTest" name="purchaseRejectsEveryInvalidRequiredDe61Subfield(String, String)[5]" time="0.0" />
+  </testsuite>
+  <testsuite name="com.logicpoint.iso8583.validation.transaction.impl.PurchaseTransactionValidatorTest" tests="4" failures="0" errors="0" skipped="0" time="0.0">
+    <testcase classname="com.logicpoint.iso8583.validation.transaction.impl.PurchaseTransactionValidatorTest" name="exposesValidatorMetadataAndAmountLimits" time="0.0" />
+    <testcase classname="com.logicpoint.iso8583.validation.transaction.impl.PurchaseTransactionValidatorTest" name="rejectsUnsupportedTransactionTypeImmediately" time="0.0" />
+    <testcase classname="com.logicpoint.iso8583.validation.transaction.impl.PurchaseTransactionValidatorTest" name="purchaseWithCashbackRequiresAdditionalAmount" time="0.0" />
+    <testcase classname="com.logicpoint.iso8583.validation.transaction.impl.PurchaseTransactionValidatorTest" name="validatesPreauthorizationMerchantCategories" time="0.0" />
+  </testsuite>
+</testsuites>

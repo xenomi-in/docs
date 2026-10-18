@@ -1,0 +1,135 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>MccRuleEngine.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">iso8583-processor</a> &gt; <a href="index.source.html" class="el_package">com.logicpoint.iso8583.mcc</a> &gt; <span class="el_source">MccRuleEngine.java</span></div><h1>MccRuleEngine.java</h1><pre class="source lang-java linenums">package com.logicpoint.iso8583.mcc;
+
+import com.logicpoint.iso8583.context.RequestContext;
+import com.logicpoint.iso8583.responsecode.InternalResCode;
+import com.logicpoint.iso8583.service.ResponseAssembler;
+import org.springframework.stereotype.Service;
+
+@Service
+public class MccRuleEngine {
+    private static final String ATTR_MCC = &quot;mcc&quot;;
+    private static final String ATTR_MCC_GROUP_MASK = &quot;mccGroupMask&quot;;
+    private static final String ATTR_MCC_RULE_ID = &quot;mccRuleId&quot;;
+
+    private final MccConfigService configService;
+    private final ResponseAssembler responseAssembler;
+<span class="fc" id="L16">    private final ThreadLocal&lt;MccEvaluationContext&gt; evalContext =</span>
+<span class="fc" id="L17">            ThreadLocal.withInitial(MccEvaluationContext::new);</span>
+
+<span class="fc" id="L19">    public MccRuleEngine(MccConfigService configService, ResponseAssembler responseAssembler) {</span>
+<span class="fc" id="L20">        this.configService = configService;</span>
+<span class="fc" id="L21">        this.responseAssembler = responseAssembler;</span>
+<span class="fc" id="L22">    }</span>
+
+    public boolean validate(RequestContext requestContext) {
+<span class="fc" id="L25">        MccEvaluationContext ctx = evalContext.get();</span>
+<span class="fc" id="L26">        ctx.reset();</span>
+
+<span class="fc" id="L28">        String rawMcc = requestContext.getFields().get(18);</span>
+<span class="fc bfc" id="L29" title="All 4 branches covered.">        if (rawMcc == null || rawMcc.isBlank()) {</span>
+<span class="fc" id="L30">            decline(requestContext, InternalResCode.MISSING_MCC);</span>
+<span class="fc" id="L31">            return false;</span>
+        }
+
+<span class="fc" id="L34">        int mcc = parseMcc(rawMcc);</span>
+<span class="fc bfc" id="L35" title="All 2 branches covered.">        if (mcc &lt; 0) {</span>
+<span class="fc" id="L36">            decline(requestContext, InternalResCode.INVALID_MCC);</span>
+<span class="fc" id="L37">            return false;</span>
+        }
+
+<span class="fc" id="L40">        int institutionId = parseInstitutionId(requestContext.getInstitutionId());</span>
+<span class="fc bfc" id="L41" title="All 2 branches covered.">        if (institutionId &lt;= 0) {</span>
+<span class="fc" id="L42">            decline(requestContext, InternalResCode.NO_SUCH_ISSUER);</span>
+<span class="fc" id="L43">            return false;</span>
+        }
+
+<span class="fc" id="L46">        int schemeSlot = MccSchemeSlots.slot(requestContext.getScheme());</span>
+<span class="fc" id="L47">        MccRuntimeConfig config = configService.current();</span>
+<span class="fc bfc" id="L48" title="All 2 branches covered.">        if (!config.loaded()) {</span>
+<span class="fc" id="L49">            decline(requestContext, InternalResCode.SYSTEM_ERROR);</span>
+<span class="fc" id="L50">            return false;</span>
+        }
+<span class="fc" id="L52">        MccTable table = config.table();</span>
+<span class="fc bfc" id="L53" title="All 2 branches covered.">        if (!table.isValid(schemeSlot, mcc)) {</span>
+<span class="fc" id="L54">            decline(requestContext, InternalResCode.INVALID_MCC);</span>
+<span class="fc" id="L55">            return false;</span>
+        }
+
+<span class="fc" id="L58">        ctx.institutionId(institutionId);</span>
+<span class="fc" id="L59">        ctx.schemeSlot(schemeSlot);</span>
+<span class="fc" id="L60">        ctx.mcc(mcc);</span>
+<span class="fc" id="L61">        ctx.amountMinor(parseAmountMinor(requestContext.getFields().get(4)));</span>
+<span class="fc" id="L62">        ctx.groupMask(table.groupMask(schemeSlot, mcc));</span>
+
+<span class="fc" id="L64">        requestContext.setAttribute(ATTR_MCC, mcc);</span>
+<span class="fc" id="L65">        requestContext.setAttribute(ATTR_MCC_GROUP_MASK, ctx.groupMask());</span>
+
+<span class="fc" id="L67">        MccDecision decision = config.rules(institutionId, schemeSlot).evaluate(ctx);</span>
+<span class="pc bpc" id="L68" title="1 of 4 branches missed.">        if (decision == MccDecision.CONTINUE || decision == MccDecision.ALLOW) {</span>
+<span class="fc" id="L69">            return true;</span>
+        }
+
+<span class="fc" id="L72">        requestContext.setAttribute(ATTR_MCC_RULE_ID, ctx.matchedRuleId());</span>
+<span class="fc" id="L73">        InternalResCode responseCode = internalCode(ctx.matchedReasonCode());</span>
+<span class="fc" id="L74">        decline(requestContext, responseCode);</span>
+<span class="fc" id="L75">        return false;</span>
+    }
+
+    private void decline(RequestContext requestContext, InternalResCode responseCode) {
+<span class="fc" id="L79">        responseAssembler.applyResponseCode(requestContext, responseCode);</span>
+<span class="fc" id="L80">    }</span>
+
+    private int parseMcc(String rawMcc) {
+<span class="fc bfc" id="L83" title="All 2 branches covered.">        if (rawMcc.length() != 4) {</span>
+<span class="fc" id="L84">            return -1;</span>
+        }
+<span class="fc" id="L86">        int d0 = rawMcc.charAt(0) - '0';</span>
+<span class="fc" id="L87">        int d1 = rawMcc.charAt(1) - '0';</span>
+<span class="fc" id="L88">        int d2 = rawMcc.charAt(2) - '0';</span>
+<span class="fc" id="L89">        int d3 = rawMcc.charAt(3) - '0';</span>
+<span class="pc bpc" id="L90" title="2 of 10 branches missed.">        if ((d0 | d1 | d2 | d3) &lt; 0 || d0 &gt; 9 || d1 &gt; 9 || d2 &gt; 9 || d3 &gt; 9) {</span>
+<span class="fc" id="L91">            return -1;</span>
+        }
+<span class="fc" id="L93">        return d0 * 1000 + d1 * 100 + d2 * 10 + d3;</span>
+    }
+
+    private long parseAmountMinor(String rawAmount) {
+<span class="fc bfc" id="L97" title="All 4 branches covered.">        if (rawAmount == null || rawAmount.isBlank()) {</span>
+<span class="fc" id="L98">            return 0L;</span>
+        }
+<span class="fc" id="L100">        long value = 0L;</span>
+<span class="fc" id="L101">        int len = rawAmount.length();</span>
+<span class="fc bfc" id="L102" title="All 2 branches covered.">        for (int i = 0; i &lt; len; i++) {</span>
+<span class="fc" id="L103">            int digit = rawAmount.charAt(i) - '0';</span>
+<span class="pc bpc" id="L104" title="1 of 4 branches missed.">            if (digit &lt; 0 || digit &gt; 9) {</span>
+<span class="fc" id="L105">                return 0L;</span>
+            }
+<span class="fc" id="L107">            value = value * 10L + digit;</span>
+        }
+<span class="fc" id="L109">        return value;</span>
+    }
+
+    private int parseInstitutionId(String institutionId) {
+<span class="fc bfc" id="L113" title="All 4 branches covered.">        if (institutionId == null || institutionId.isBlank()) {</span>
+<span class="fc" id="L114">            return 0;</span>
+        }
+<span class="fc" id="L116">        int value = 0;</span>
+<span class="fc bfc" id="L117" title="All 2 branches covered.">        for (int i = 0; i &lt; institutionId.length(); i++) {</span>
+<span class="fc" id="L118">            int digit = institutionId.charAt(i) - '0';</span>
+<span class="pc bpc" id="L119" title="1 of 4 branches missed.">            if (digit &lt; 0 || digit &gt; 9) {</span>
+<span class="fc" id="L120">                return 0;</span>
+            }
+<span class="fc" id="L122">            value = value * 10 + digit;</span>
+        }
+<span class="fc" id="L124">        return value;</span>
+    }
+
+    private InternalResCode internalCode(int ordinal) {
+<span class="fc" id="L128">        InternalResCode[] values = InternalResCode.values();</span>
+<span class="pc bpc" id="L129" title="1 of 4 branches missed.">        if (ordinal &lt; 0 || ordinal &gt;= values.length) {</span>
+<span class="fc" id="L130">            return InternalResCode.MCC_NOT_ALLOWED;</span>
+        }
+<span class="fc" id="L132">        return values[ordinal];</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.14.202510111229</span></div></body></html>

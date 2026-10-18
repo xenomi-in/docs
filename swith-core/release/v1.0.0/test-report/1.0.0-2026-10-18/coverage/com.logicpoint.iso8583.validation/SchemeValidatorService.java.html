@@ -1,0 +1,99 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>SchemeValidatorService.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">iso8583-processor</a> &gt; <a href="index.source.html" class="el_package">com.logicpoint.iso8583.validation</a> &gt; <span class="el_source">SchemeValidatorService.java</span></div><h1>SchemeValidatorService.java</h1><pre class="source lang-java linenums">package com.logicpoint.iso8583.validation;
+
+import tools.jackson.databind.json.JsonMapper;
+import java.util.List;
+import java.util.Map;
+import java.util.HashMap;
+import java.util.Optional;
+import java.util.Arrays;
+import java.io.InputStream;
+import java.io.IOException;
+import com.logicpoint.iso8583.util.Scheme;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
+/**
+ * Service for validating ISO 8583 messages based on scheme-specific rules.
+ * This service loads validation rules from JSON files and applies them to
+ * incoming messages to identify transaction types and validate required fields.
+ *
+ * The validation rules are stored in JSON files under the specified directory,
+ * with one file per payment scheme (e.g., rupay_rules.json, visa_rules.json).
+ *
+ * @author LogicPoint Systems
+ * @version 1.0
+ */
+public class SchemeValidatorService {
+
+<span class="fc" id="L28">    Logger log = LoggerFactory.getLogger(SchemeValidatorService.class);</span>
+
+    private final Map&lt;Scheme, List&lt;TransactionIdentificationRule&gt;&gt; schemeRules;
+
+    /**
+     * Constructs a new SchemeValidatorService.
+     *
+     * @param rulesDir Directory containing the validation rule JSON files
+     * @throws IOException if there's an error loading the rule files
+     */
+<span class="fc" id="L38">    public SchemeValidatorService(String rulesDir) throws IOException {</span>
+<span class="fc" id="L39">        this.schemeRules = loadAllSchemeRules(rulesDir);</span>
+<span class="fc" id="L40">    }</span>
+
+    /**
+     * Loads validation rules for all supported schemes from JSON files.
+     *
+     * @param baseDir Base directory containing the rule files
+     * @return Map of schemes to their validation rules
+     * @throws IOException if there's an error reading the rule files
+     */
+    private Map&lt;Scheme, List&lt;TransactionIdentificationRule&gt;&gt; loadAllSchemeRules(String baseDir) throws IOException {
+<span class="fc" id="L50">        Map&lt;Scheme, List&lt;TransactionIdentificationRule&gt;&gt; map = new HashMap&lt;&gt;();</span>
+<span class="fc" id="L51">        JsonMapper mapper = JsonMapper.builderWithJackson2Defaults().build();</span>
+        try {
+<span class="fc bfc" id="L53" title="All 2 branches covered.">            for (Scheme scheme : Scheme.values()) {</span>
+<span class="fc" id="L54">                String file = baseDir + &quot;/&quot; + scheme.name().toLowerCase() + &quot;_rules.json&quot;; </span>
+<span class="fc" id="L55">                InputStream in = getClass().getClassLoader().getResourceAsStream(file);</span>
+<span class="fc bfc" id="L56" title="All 2 branches covered.">                if (in == null) continue;</span>
+<span class="fc" id="L57">                List&lt;TransactionIdentificationRule&gt; rules = Arrays.asList(</span>
+<span class="fc" id="L58">                    mapper.readValue(in, TransactionIdentificationRule[].class)</span>
+                );
+<span class="fc" id="L60">                map.put(scheme, rules);</span>
+<span class="fc" id="L61">                log.info(&quot;scheme: &quot;+scheme + &quot; No of rules: &quot;+rules.size());</span>
+            }
+<span class="fc" id="L63">            return map;</span>
+<span class="nc" id="L64">        } catch (Exception e) {</span>
+<span class="nc" id="L65">            e.printStackTrace();</span>
+<span class="nc" id="L66">            throw new IOException(&quot;Failed to load scheme rules&quot;, e);</span>
+        }
+    }
+
+    
+    /**
+     * Identifies the transaction type based on the message fields.
+     *
+     * @param scheme The payment scheme
+     * @param fields Map of field numbers to their values
+     * @return Optional containing the matching transaction rule, if found
+     */
+    public Optional&lt;TransactionIdentificationRule&gt; identify(Scheme scheme, Map&lt;String, String&gt; fields) {
+        
+<span class="fc" id="L80">        List&lt;TransactionIdentificationRule&gt; rules = schemeRules.get(scheme);</span>
+<span class="pc bpc" id="L81" title="1 of 2 branches missed.">        if (rules == null) return Optional.empty();</span>
+<span class="fc" id="L82">        log.info(&quot;Loaded {} identification rules for scheme {}&quot;, rules.size(), scheme);</span>
+<span class="fc" id="L83">        return rules.stream().filter(rule -&gt; rule.matches(fields)).findFirst();</span>
+    }
+
+    /**
+     * Validates the required fields for a transaction.
+     *
+     * @param scheme The payment scheme
+     * @param fields Map of field numbers to their values
+     * @return List of missing required fields, or empty list if all required fields are present
+     */
+    public List&lt;String&gt; validate(Scheme scheme, Map&lt;String, String&gt; fields) {
+<span class="fc" id="L94">        return identify(scheme, fields)</span>
+<span class="fc" id="L95">            .map(rule -&gt; rule.validateFields(fields))</span>
+<span class="fc" id="L96">            .orElse(List.of(&quot;Transaction type not identified.&quot;));</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.14.202510111229</span></div></body></html>

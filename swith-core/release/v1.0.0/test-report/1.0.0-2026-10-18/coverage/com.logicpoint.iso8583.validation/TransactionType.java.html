@@ -1,0 +1,263 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>TransactionType.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">iso8583-processor</a> &gt; <a href="index.source.html" class="el_package">com.logicpoint.iso8583.validation</a> &gt; <span class="el_source">TransactionType.java</span></div><h1>TransactionType.java</h1><pre class="source lang-java linenums">package com.logicpoint.iso8583.validation;
+
+/**
+ * Enumeration of possible transaction types in ISO 8583 messages.
+ * Each transaction type represents a specific kind of financial transaction
+ * that can be processed by the system.
+ *
+ * @author LogicPoint Systems
+ * @version 1.0
+ */
+<span class="fc" id="L11">public enum TransactionType {</span>
+
+    /**
+     * Purchase transaction - used for regular purchases
+     */
+<span class="fc" id="L16">    PURCHASE,</span>
+    
+    /**
+     * Purchase transaction - used for contactless purchases
+     */
+<span class="fc" id="L21">    PURCHASE_CONTACTLESS,</span>
+
+    /**
+     * Purchase transaction - used for contact purchases
+     */
+<span class="fc" id="L26">    PURCHASE_CONTACT,</span>
+    
+    /**
+     * Purchase transaction - used for transit purchases
+     */
+<span class="fc" id="L31">    PURCHASE_TRANSIT,</span>
+
+    /* 
+     * MOTO transaction - used for MOTO purchases
+     */
+<span class="fc" id="L36">    MOTO,</span>
+
+    /**
+     * Purchase transaction - used for contactless purchases
+     */
+<span class="fc" id="L41">    PURCHASE_FALLBACK,</span>
+    /**
+     * IVR purchase transaction - used for IVR purchases
+     */
+<span class="fc" id="L45">    IVR_PURCHASE,</span>
+
+    /* * Cash withdrawal transaction - used for ATM withdrawals
+     */
+<span class="fc" id="L49">    CASH_WITHDRAWAL,</span>
+
+    // ATM CASH WITHDRAWAL in FaLLback
+<span class="fc" id="L52">    CASH_WITHDRAWAL_FALLBACK,</span>
+    /* * Cash withdrawal contactless transaction - used for ATM withdrawals
+     */
+<span class="fc" id="L55">    CASH_WITHDRAWAL_CONTACTLESS,</span>
+
+    /* * Cash at POS transaction - used for POS withdrawals
+     */
+<span class="fc" id="L59">    CASH_AT_POS,</span>
+
+    /* * Cash at POS contactless transaction - used for POS withdrawals
+     */
+<span class="fc" id="L63">    CASH_AT_POS_CL,</span>
+
+    /* * E-COMMERCE transaction - used for online purchase( CNP)
+     */
+<span class="fc" id="L67">    ECOMMERCE,</span>
+
+     /* * Pre -Authorization transaction 
+     */
+<span class="fc" id="L71">    PREAUTH,</span>
+
+    /* * Loyalty transaction 
+     */
+<span class="fc" id="L75">    LOYALTY,</span>
+
+    /**
+     * Balance inquiry transaction - used to check account balance
+     */
+<span class="fc" id="L80">    BALANCE_ENQUIRY,</span>
+    /**
+     * Balance inquiry transaction - used to check account balance
+     * Contactless balance inquiry transaction - used to check account balance
+     */
+<span class="fc" id="L85">    BALANCE_ENQUIRY_CL,</span>
+    /**
+     * Mini statement transaction - used to get recent transaction history
+     */
+<span class="fc" id="L89">    MINI_STATEMENT,</span>
+
+    /**
+     * Fund transfer transaction - used to transfer funds between accounts
+     */
+<span class="fc" id="L94">    FUND_TRANSFER,</span>
+
+    /**
+     * Bill payment transaction - used to pay bills
+     */
+<span class="fc" id="L99">    BILL_PAYMENT,</span>
+
+    /**
+     * Reversal transaction - used to reverse a previous transaction
+     */
+<span class="fc" id="L104">    REVERSAL,</span>
+
+    /**
+     * PIN change transaction - used to change card PIN
+     */
+<span class="fc" id="L109">    PIN_CHANGE,</span>
+
+    /**
+     * Card to card transfer transaction
+     */
+<span class="fc" id="L114">    CARD_TO_CARD_TRANSFER,</span>
+
+    /**
+     * Service creation transaction
+     */
+<span class="fc" id="L119">    SERVICE_CREATION,   </span>
+
+    /**
+     * Service creation transaction - used for contactless service creation
+     */
+<span class="fc" id="L124">    SERVICE_CREATION_CONTACTLESS,</span>
+    /**
+     * Purchase with cashback transaction
+     */
+<span class="fc" id="L128">    PURCHASE_WITHCASHBACK,</span>
+
+    /**
+     * Refund transaction
+     */
+<span class="fc" id="L133">    REFUND,</span>
+
+    /**
+     * OCT transaction
+     */
+<span class="fc" id="L138">    OCT,</span>
+
+    /**
+     * Aadhar inquiry transaction
+     */
+<span class="fc" id="L143">    AADHAR_INQUIRY,</span>
+
+    /**
+     * EMI purchase transaction (e-commerce)
+     */
+<span class="fc" id="L148">    EMI_PURCHASE,</span>
+    /**
+     * POS EMI purchase transaction 
+     */
+<span class="fc" id="L152">    CARD_EMI_PURCHASE,</span>
+
+    /**
+     * Account verification transaction
+     */
+<span class="fc" id="L157">    ACCOUNT_VERIFICATION,</span>
+
+    /**
+     * Mobile number update transaction
+     */
+<span class="fc" id="L162">    MOBILE_NUMBER_UPDATE,</span>
+
+    /**
+     * Chequebook request transaction
+     */
+<span class="fc" id="L167">    CHEQUEBOOK_REQUEST,</span>
+
+    /**
+     * Money load transaction
+     */
+<span class="fc" id="L172">    MONEY_LOAD,</span>
+
+    /**
+     * ML balance update transaction
+     */
+<span class="fc" id="L177">    ML_BALANCEUPDATE,</span>
+
+    /**
+     * Beneficiary account validation transaction
+     */
+<span class="fc" id="L182">    BENIFICIARY_ACCOUNT_VALIDATION,</span>
+
+    /**
+     * Cash deposit transaction
+     */
+<span class="fc" id="L187">    CASH_DEPOSIT,</span>
+
+    /**
+     * Statement request transaction
+     */
+<span class="fc" id="L192">    STATEMENT_REQUEST,</span>
+
+    /**
+     * Standing instruction registration transaction
+     */
+<span class="fc" id="L197">    SI_REGISTRATION,</span>
+<span class="fc" id="L198">    SI_EDIT,</span>
+<span class="fc" id="L199">    SI_TRANSACTION,</span>
+<span class="fc" id="L200">    SI_DEREGISTRATION,</span>
+<span class="fc" id="L201">    SI_REVOKEALL,</span>
+<span class="fc" id="L202">    SI_PAUSE,</span>
+<span class="fc" id="L203">    SI_START,</span>
+<span class="fc" id="L204">    SI_PDN,</span>
+
+    
+<span class="fc" id="L207">    BIOMETIC_VERIFICATION,</span>
+    
+
+    /**
+     * Unknown transaction type
+     */
+<span class="fc" id="L213">    UNKNOWN;</span>
+
+    private String code;
+
+    /**
+     * Constructs a new transaction type with the specified code.
+     *
+     * @param code The transaction type code
+     */
+  
+
+    /**
+     * Gets the transaction type code.
+     *
+     * @return The transaction type code
+     */
+    public String getCode() {
+<span class="nc" id="L230">        return code;</span>
+    }
+
+    /**
+     * Gets the transaction type for a given code.
+     *
+     * @param code The transaction type code to look up
+     * @return The corresponding TransactionType, or null if not found
+     */
+    public static TransactionType fromCode(String code) {
+<span class="nc bnc" id="L240" title="All 2 branches missed.">        for (TransactionType type : values()) {</span>
+<span class="nc bnc" id="L241" title="All 2 branches missed.">            if (type.code.equals(code)) {</span>
+<span class="nc" id="L242">                return type;</span>
+            }
+        }
+<span class="nc" id="L245">        return null;</span>
+    }
+
+    /**
+     * Safely converts a string to a TransactionType.
+     * Returns UNKNOWN if the string doesn't match any transaction type.
+     *
+     * @param name The name to convert
+     * @return The corresponding TransactionType, or UNKNOWN if not found
+     */
+    public static TransactionType fromStringSafe(String name) {
+        try {
+<span class="nc" id="L257">            return valueOf(name);</span>
+<span class="nc" id="L258">        } catch (IllegalArgumentException e) {</span>
+<span class="nc" id="L259">            return UNKNOWN;</span>
+        }
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.14.202510111229</span></div></body></html>

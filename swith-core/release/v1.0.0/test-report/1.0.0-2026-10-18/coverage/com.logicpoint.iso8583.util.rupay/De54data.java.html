@@ -1,0 +1,162 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>De54data.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">iso8583-processor</a> &gt; <a href="index.source.html" class="el_package">com.logicpoint.iso8583.util.rupay</a> &gt; <span class="el_source">De54data.java</span></div><h1>De54data.java</h1><pre class="source lang-java linenums">package com.logicpoint.iso8583.util.rupay;
+
+import java.math.BigDecimal;
+import java.math.RoundingMode;
+
+<span class="nc" id="L6">public class De54data {</span>
+    /**
+     * Represents the parsed DE54 data for RuPay as per the specified format.
+     */
+    public static class RuPayDe54Data {
+        private String accountType;      // 2 digits
+        private String amountType;       // 2 digits
+        private String currencyCode;     // 3 digits
+        private char amountSign;         // 1 char: 'C' or 'D'
+        private long amount;             // 12 digits, in minor units (e.g., paise)
+        private String raw;              // Original DE54 string
+
+<span class="fc" id="L18">        public RuPayDe54Data(String accountType, String amountType, String currencyCode, char amountSign, long amount, String raw) {</span>
+<span class="fc" id="L19">            this.accountType = accountType;</span>
+<span class="fc" id="L20">            this.amountType = amountType;</span>
+<span class="fc" id="L21">            this.currencyCode = currencyCode;</span>
+<span class="fc" id="L22">            this.amountSign = amountSign;</span>
+<span class="fc" id="L23">            this.amount = amount;</span>
+<span class="fc" id="L24">            this.raw = raw;</span>
+<span class="fc" id="L25">        }</span>
+
+        public String getAccountType() {
+<span class="fc" id="L28">            return accountType;</span>
+        }
+
+        public String getAmountType() {
+<span class="fc" id="L32">            return amountType;</span>
+        }
+
+        public String getCurrencyCode() {
+<span class="fc" id="L36">            return currencyCode;</span>
+        }
+
+        public char getAmountSign() {
+<span class="fc" id="L40">            return amountSign;</span>
+        }
+
+        public long getAmount() {
+<span class="fc" id="L44">            return amount;</span>
+        }
+
+        public String getRaw() {
+<span class="nc" id="L48">            return raw;</span>
+        }
+
+        @Override
+        public String toString() {
+<span class="fc" id="L53">            return &quot;RuPayDe54Data{&quot; +</span>
+                    &quot;accountType='&quot; + accountType + '\'' +
+                    &quot;, amountType='&quot; + amountType + '\'' +
+                    &quot;, currencyCode='&quot; + currencyCode + '\'' +
+                    &quot;, amountSign=&quot; + amountSign +
+                    &quot;, amount=&quot; + amount +
+                    &quot;, raw='&quot; + raw + '\'' +
+                    '}';
+        }
+    }
+
+    /**
+     * Parses a DE54 string as per RuPay format.
+     * @param de54 the DE54 string (should be 20 characters)
+     * @return RuPayDe54Data object if valid, null otherwise
+     */
+    public static RuPayDe54Data parseDe54(String de54) {
+<span class="pc bpc" id="L70" title="2 of 4 branches missed.">        if (de54 == null || de54.length() != 20) {</span>
+<span class="nc" id="L71">            return null;</span>
+        }
+        try {
+<span class="fc" id="L74">            String accountType = de54.substring(0, 2);</span>
+<span class="fc" id="L75">            String amountType = de54.substring(2, 4);</span>
+<span class="fc" id="L76">            String currencyCode = de54.substring(4, 7);</span>
+<span class="fc" id="L77">            char amountSign = de54.charAt(7);</span>
+<span class="fc" id="L78">            String amountStr = de54.substring(8, 20);</span>
+
+            // Validate sign
+<span class="pc bpc" id="L81" title="2 of 4 branches missed.">            if (amountSign != 'C' &amp;&amp; amountSign != 'D') {</span>
+<span class="nc" id="L82">                return null;</span>
+            }
+
+            // Amount is 12 digits, left-padded with zeros
+<span class="fc" id="L86">            long amount = Long.parseLong(amountStr);</span>
+
+<span class="fc" id="L88">            return new RuPayDe54Data(accountType, amountType, currencyCode, amountSign, amount, de54);</span>
+<span class="nc" id="L89">        } catch (Exception e) {</span>
+<span class="nc" id="L90">            System.out.println(&quot;Error parsing DE54: &quot; + e.getMessage());</span>
+<span class="nc" id="L91">            return null;</span>
+        }
+    }
+
+    /**
+     * Packs the given RuPayDe54Data into a DE54 string as per RuPay format.
+     * @param data RuPayDe54Data object
+     * @return DE54 string (20 characters) or null if invalid
+     */
+    public static String packDe54(RuPayDe54Data data) {
+<span class="pc bpc" id="L101" title="1 of 2 branches missed.">        if (data == null) {</span>
+<span class="nc" id="L102">            return null;</span>
+        }
+<span class="fc" id="L104">        StringBuilder sb = new StringBuilder(20);</span>
+<span class="fc" id="L105">        sb.append(padLeft(data.getAccountType(), 2, '0'));</span>
+<span class="fc" id="L106">        sb.append(padLeft(data.getAmountType(), 2, '0'));</span>
+<span class="fc" id="L107">        sb.append(padLeft(data.getCurrencyCode(), 3, '0'));</span>
+<span class="fc" id="L108">        sb.append(data.getAmountSign());</span>
+<span class="fc" id="L109">        sb.append(padLeft(Long.toString(data.getAmount()), 12, '0'));</span>
+<span class="fc" id="L110">        return sb.toString();</span>
+    }
+
+    public static String packBalanceEnquiryDe54(BigDecimal ledgerBalance, BigDecimal availableBalance) {
+<span class="fc" id="L114">        return packBalanceResponseDe54(&quot;30&quot;, &quot;01&quot;, &quot;02&quot;, ledgerBalance, availableBalance);</span>
+    }
+
+    public static String packBalanceResponseDe54(
+            String accountType,
+            String ledgerAmountType,
+            String availableAmountType,
+            BigDecimal ledgerBalance,
+            BigDecimal availableBalance) {
+<span class="fc" id="L123">        RuPayDe54Data ledger = toBalanceAmount(accountType, ledgerAmountType, ledgerBalance);</span>
+<span class="fc" id="L124">        RuPayDe54Data available = toBalanceAmount(accountType, availableAmountType, availableBalance);</span>
+<span class="fc" id="L125">        return packDe54(ledger) + packDe54(available);</span>
+    }
+
+    private static RuPayDe54Data toBalanceAmount(String accountType, String amountType, BigDecimal balance) {
+<span class="pc bpc" id="L129" title="1 of 2 branches missed.">        BigDecimal safeBalance = balance == null ? BigDecimal.ZERO : balance;</span>
+<span class="fc bfc" id="L130" title="All 2 branches covered.">        char amountSign = safeBalance.compareTo(BigDecimal.ZERO) &lt; 0 ? 'D' : 'C';</span>
+<span class="fc" id="L131">        long minorUnits = safeBalance.abs()</span>
+<span class="fc" id="L132">                .multiply(BigDecimal.valueOf(100))</span>
+<span class="fc" id="L133">                .setScale(0, RoundingMode.DOWN)</span>
+<span class="fc" id="L134">                .longValue();</span>
+<span class="fc" id="L135">        return new RuPayDe54Data(accountType, amountType, &quot;356&quot;, amountSign, minorUnits, &quot;&quot;);</span>
+    }
+
+    /**
+     * Utility method to left-pad a string with a given character.
+     * @param value the string to pad
+     * @param length the desired length
+     * @param padChar the character to pad with
+     * @return padded string
+     */
+    private static String padLeft(String value, int length, char padChar) {
+<span class="pc bpc" id="L146" title="1 of 2 branches missed.">        if (value == null) value = &quot;&quot;;</span>
+<span class="fc bfc" id="L147" title="All 2 branches covered.">        if (value.length() &gt;= length) return value.substring(0, length);</span>
+<span class="fc" id="L148">        StringBuilder sb = new StringBuilder(length);</span>
+<span class="fc bfc" id="L149" title="All 2 branches covered.">        for (int i = value.length(); i &lt; length; i++) {</span>
+<span class="fc" id="L150">            sb.append(padChar);</span>
+        }
+<span class="fc" id="L152">        sb.append(value);</span>
+<span class="fc" id="L153">        return sb.toString();</span>
+    }
+    public static void main(String[] args) {
+<span class="nc" id="L156">        String de54 = &quot;9090356D000000000100&quot;;</span>
+       // 9090356D000000000100
+<span class="nc" id="L158">        RuPayDe54Data de54data = parseDe54(de54);</span>
+<span class="nc" id="L159">        System.out.println(de54data);</span>
+<span class="nc" id="L160">    }</span>
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.14.202510111229</span></div></body></html>

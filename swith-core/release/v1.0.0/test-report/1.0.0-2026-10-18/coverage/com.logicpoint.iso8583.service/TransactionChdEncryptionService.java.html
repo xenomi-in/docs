@@ -1,0 +1,137 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>TransactionChdEncryptionService.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">iso8583-processor</a> &gt; <a href="index.source.html" class="el_package">com.logicpoint.iso8583.service</a> &gt; <span class="el_source">TransactionChdEncryptionService.java</span></div><h1>TransactionChdEncryptionService.java</h1><pre class="source lang-java linenums">package com.logicpoint.iso8583.service;
+
+import com.logicpoint.iso8583.context.RequestContext;
+import java.util.Map;
+
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+import org.springframework.beans.factory.annotation.Value;
+import org.springframework.stereotype.Service;
+
+import com.logicpoint.iso8583.entity.Transaction;
+
+@Service
+public class TransactionChdEncryptionService {
+
+<span class="fc" id="L16">    private static final Logger logger = LoggerFactory.getLogger(TransactionChdEncryptionService.class);</span>
+
+    private final AesGcmCryptoService aesGcmCryptoService;
+    private final ChdKeyCacheService chdKeyCacheService;
+
+    @Value(&quot;${chd.encryption.enabled:false}&quot;)
+    private boolean encryptionEnabled;
+
+    @Value(&quot;${chd.encryption.dual-write-plaintext:true}&quot;)
+    private boolean dualWritePlaintext;
+
+    public TransactionChdEncryptionService(AesGcmCryptoService aesGcmCryptoService,
+<span class="fc" id="L28">                                           ChdKeyCacheService chdKeyCacheService) {</span>
+<span class="fc" id="L29">        this.aesGcmCryptoService = aesGcmCryptoService;</span>
+<span class="fc" id="L30">        this.chdKeyCacheService = chdKeyCacheService;</span>
+<span class="fc" id="L31">    }</span>
+
+    public void applyOnWrite(Transaction transaction, RequestContext requestContext) {
+<span class="pc bpc" id="L34" title="1 of 6 branches missed.">        if (transaction == null || requestContext == null || requestContext.getFields() == null) {</span>
+<span class="fc" id="L35">            return;</span>
+        }
+
+<span class="fc" id="L38">        Integer institutionId = parseInstitutionId(requestContext.getInstitutionId());</span>
+<span class="fc bfc" id="L39" title="All 2 branches covered.">        if (institutionId == null) {</span>
+<span class="fc" id="L40">            logger.warn(&quot;Institution id could not be resolved from PAN BIN; encrypted PAN will not be stored&quot;);</span>
+<span class="fc" id="L41">            return;</span>
+        }
+<span class="fc" id="L43">        transaction.setInstitutionId(institutionId);</span>
+
+<span class="fc" id="L45">        Map&lt;Integer, String&gt; fields = requestContext.getFields();</span>
+<span class="fc bfc" id="L46" title="All 2 branches covered.">        if (!encryptionEnabled) {</span>
+<span class="fc" id="L47">            logger.debug(&quot;Transaction CHD encryption is disabled; skipping encrypted PAN persistence&quot;);</span>
+<span class="fc" id="L48">            return;</span>
+        }
+
+<span class="fc" id="L51">        Integer transactionChdKeyVersion = chdKeyCacheService.getActiveKeyVersion(institutionId, ChdKeyCacheService.TXN_KEY_TYPE);</span>
+<span class="fc" id="L52">        byte[] transactionKey = chdKeyCacheService.getActiveKey(institutionId, ChdKeyCacheService.TXN_KEY_TYPE);</span>
+<span class="pc bpc" id="L53" title="1 of 4 branches missed.">        if (transactionChdKeyVersion == null || transactionKey == null) {</span>
+<span class="fc" id="L54">            logger.warn(&quot;Transaction CHD encryption key is not available for institution {}; encrypted PAN will not be stored&quot;, institutionId);</span>
+<span class="fc" id="L55">            return;</span>
+        }
+
+<span class="fc" id="L58">        transaction.setTxnChdKeyVersion(transactionChdKeyVersion);</span>
+
+<span class="fc" id="L60">        String pan = fields.get(2);</span>
+<span class="pc bpc" id="L61" title="1 of 4 branches missed.">        if (pan != null &amp;&amp; !pan.isBlank()) {</span>
+<span class="fc" id="L62">            transaction.setDe2PanMasked(maskPan(pan));</span>
+<span class="fc" id="L63">            EncryptedFieldValue encryptedPan = encryptTransactionValue(</span>
+                pan,
+                transactionKey,
+                transactionChdKeyVersion,
+<span class="fc" id="L67">                buildAad(transaction, &quot;de2&quot;));</span>
+<span class="fc bfc" id="L68" title="All 2 branches covered.">            if (encryptedPan == null) {</span>
+<span class="fc" id="L69">                throw new IllegalStateException(&quot;Transaction PAN encryption could not be completed&quot;);</span>
+            }
+<span class="fc" id="L71">            transaction.setDe2PanCt(encryptedPan.getCiphertext());</span>
+<span class="fc" id="L72">            transaction.setDe2PanIv(encryptedPan.getIv());</span>
+<span class="fc" id="L73">            transaction.setDe2PanTag(encryptedPan.getTag());</span>
+<span class="fc" id="L74">            transaction.setPanLookupHmac(resolvePanHash(requestContext, pan, institutionId));</span>
+<span class="pc bpc" id="L75" title="1 of 2 branches missed.">            if (!dualWritePlaintext) {</span>
+<span class="fc" id="L76">                transaction.setDe2Pan(null);</span>
+            }
+<span class="fc" id="L78">        } else {</span>
+<span class="fc" id="L79">            transaction.setPanLookupHmac(null);</span>
+        }
+<span class="fc" id="L81">        transaction.setDe35Track2(null);</span>
+<span class="fc" id="L82">        transaction.setDe45Track1(null);</span>
+<span class="fc" id="L83">    }</span>
+
+    public void copyEncryptedPan(Transaction source, Transaction target) {
+<span class="fc bfc" id="L86" title="All 4 branches covered.">        if (source == null || target == null) {</span>
+<span class="fc" id="L87">            return;</span>
+        }
+<span class="fc" id="L89">        target.setInstitutionId(source.getInstitutionId());</span>
+<span class="fc" id="L90">        target.setTxnChdKeyVersion(source.getTxnChdKeyVersion());</span>
+<span class="fc" id="L91">        target.setPanLookupHmac(source.getPanLookupHmac());</span>
+<span class="fc" id="L92">        target.setDe2PanCt(source.getDe2PanCt());</span>
+<span class="fc" id="L93">        target.setDe2PanIv(source.getDe2PanIv());</span>
+<span class="fc" id="L94">        target.setDe2PanTag(source.getDe2PanTag());</span>
+<span class="fc" id="L95">    }</span>
+
+    private String buildAad(Transaction transaction, String fieldName) {
+<span class="fc bfc" id="L98" title="All 2 branches covered.">        return &quot;transaction|&quot; + (transaction.getTransactionId() == null ? &quot;new&quot; : transaction.getTransactionId()) + &quot;|&quot; + fieldName;</span>
+    }
+
+    private String maskPan(String pan) {
+<span class="pc bpc" id="L102" title="2 of 4 branches missed.">        if (pan == null || pan.length() &lt; 10) {</span>
+<span class="nc" id="L103">            return pan;</span>
+        }
+<span class="fc" id="L105">        return pan.substring(0, 6) + &quot;******&quot; + pan.substring(pan.length() - 4);</span>
+    }
+
+    private String resolvePanHash(RequestContext requestContext, String pan, Integer institutionId) {
+<span class="pc bpc" id="L109" title="3 of 4 branches missed.">        if (requestContext.getPanHash() != null &amp;&amp; !requestContext.getPanHash().isBlank()) {</span>
+<span class="nc" id="L110">            return requestContext.getPanHash();</span>
+        }
+<span class="fc" id="L112">        byte[] panLookupKey = chdKeyCacheService.getActiveKey(institutionId, ChdKeyCacheService.PAN_HMAC_KEY_TYPE);</span>
+<span class="pc bpc" id="L113" title="1 of 2 branches missed.">        if (panLookupKey != null) {</span>
+<span class="fc" id="L114">            String panHash = aesGcmCryptoService.hmacHex(pan, panLookupKey);</span>
+<span class="fc" id="L115">            requestContext.setPanHash(panHash);</span>
+<span class="fc" id="L116">            return panHash;</span>
+        }
+<span class="nc" id="L118">        logger.warn(&quot;PAN lookup HMAC key is not available for institution {}; pan_lookup_hmac will remain null&quot;, institutionId);</span>
+<span class="nc" id="L119">        return null;</span>
+    }
+
+    private EncryptedFieldValue encryptTransactionValue(String value, byte[] transactionKey, Integer keyVersion, String aad) {
+<span class="fc" id="L123">        return aesGcmCryptoService.encrypt(value, transactionKey, keyVersion, aad);</span>
+    }
+
+    private Integer parseInstitutionId(String institutionId) {
+<span class="pc bpc" id="L127" title="1 of 4 branches missed.">        if (institutionId == null || institutionId.isBlank()) {</span>
+<span class="fc" id="L128">            return null;</span>
+        }
+        try {
+<span class="fc" id="L131">            return Integer.valueOf(institutionId);</span>
+<span class="fc" id="L132">        } catch (NumberFormatException ex) {</span>
+<span class="fc" id="L133">            return null;</span>
+        }
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.14.202510111229</span></div></body></html>

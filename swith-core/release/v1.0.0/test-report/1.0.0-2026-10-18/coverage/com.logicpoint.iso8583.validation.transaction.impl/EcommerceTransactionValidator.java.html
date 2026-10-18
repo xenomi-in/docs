@@ -1,0 +1,382 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>EcommerceTransactionValidator.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">iso8583-processor</a> &gt; <a href="index.source.html" class="el_package">com.logicpoint.iso8583.validation.transaction.impl</a> &gt; <span class="el_source">EcommerceTransactionValidator.java</span></div><h1>EcommerceTransactionValidator.java</h1><pre class="source lang-java linenums">package com.logicpoint.iso8583.validation.transaction.impl;
+
+import com.logicpoint.iso8583.context.RequestContext;
+import com.logicpoint.iso8583.service.InstallmentAuthorizationValidationService;
+import com.logicpoint.iso8583.service.PosDataAuthorizationValidationService;
+import com.logicpoint.iso8583.service.PrivateDataAuthorizationValidationService;
+import com.logicpoint.iso8583.service.StandingInstructionAuthorizationValidationService;
+import com.logicpoint.iso8583.service.ThreeDsAuthorizationValidationService;
+import com.logicpoint.iso8583.service.TokenAuthorizationValidationService;
+import com.logicpoint.iso8583.validation.ValidationResult;
+import com.logicpoint.iso8583.validation.TransactionType;
+import com.logicpoint.iso8583.util.Scheme;
+import org.springframework.stereotype.Service;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
+import java.util.*;
+
+/**
+ * @author : Logicpoint Systems
+ * @version : 1.0
+ * @since : 2025-06-06
+ * 
+ * @description Generic validator for Card Not Present (CNP) transactions including E-COMMERCE, IVR, and MOTO.
+ * This validator handles scheme-specific validation rules for different payment networks.
+ * 
+ * Supported transaction types:
+ * - ECOMMERCE: Online transactions
+ * - IVR_PURCHASE: Interactive Voice Response transactions  
+ * - MOTO: Mail Order/Telephone Order transactions
+ * - EMI_PURCHASE: EMI purchase transactions
+ * - CARD_EMI_PURCHASE: POS EMI purchase transactions
+ * 
+ * Scheme identification is resolved from RequestContext
+ */
+@Service
+public class EcommerceTransactionValidator extends AbstractTransactionTypeValidator {
+    
+<span class="fc" id="L39">    private static final Logger log = LoggerFactory.getLogger(EcommerceTransactionValidator.class);</span>
+    private final InstallmentAuthorizationValidationService installmentAuthorizationValidationService;
+    private final PosDataAuthorizationValidationService posDataAuthorizationValidationService;
+    private final PrivateDataAuthorizationValidationService privateDataAuthorizationValidationService;
+    private final StandingInstructionAuthorizationValidationService standingInstructionAuthorizationValidationService;
+    private final ThreeDsAuthorizationValidationService threeDsAuthorizationValidationService;
+    private final TokenAuthorizationValidationService tokenAuthorizationValidationService;
+
+    public EcommerceTransactionValidator(InstallmentAuthorizationValidationService installmentAuthorizationValidationService,
+                                         PosDataAuthorizationValidationService posDataAuthorizationValidationService,
+                                         PrivateDataAuthorizationValidationService privateDataAuthorizationValidationService,
+                                         StandingInstructionAuthorizationValidationService standingInstructionAuthorizationValidationService,
+                                         ThreeDsAuthorizationValidationService threeDsAuthorizationValidationService,
+<span class="fc" id="L52">                                         TokenAuthorizationValidationService tokenAuthorizationValidationService) {</span>
+<span class="fc" id="L53">        this.installmentAuthorizationValidationService = installmentAuthorizationValidationService;</span>
+<span class="fc" id="L54">        this.posDataAuthorizationValidationService = posDataAuthorizationValidationService;</span>
+<span class="fc" id="L55">        this.privateDataAuthorizationValidationService = privateDataAuthorizationValidationService;</span>
+<span class="fc" id="L56">        this.standingInstructionAuthorizationValidationService = standingInstructionAuthorizationValidationService;</span>
+<span class="fc" id="L57">        this.threeDsAuthorizationValidationService = threeDsAuthorizationValidationService;</span>
+<span class="fc" id="L58">        this.tokenAuthorizationValidationService = tokenAuthorizationValidationService;</span>
+<span class="fc" id="L59">    }</span>
+    
+    // Transaction-specific amount limits
+<span class="fc" id="L62">    private static final Map&lt;TransactionType, Double&gt; MAX_AMOUNTS = Map.of(</span>
+<span class="fc" id="L63">        TransactionType.ECOMMERCE, 5000.0,</span>
+<span class="fc" id="L64">        TransactionType.MOTO, 2500.0,</span>
+<span class="fc" id="L65">        TransactionType.IVR_PURCHASE, 1000.0</span>
+    );
+    
+    // Supported transaction types
+<span class="fc" id="L69">    private static final Set&lt;TransactionType&gt; SUPPORTED_TYPES = EnumSet.of(</span>
+        TransactionType.ECOMMERCE, 
+        TransactionType.MOTO, 
+        TransactionType.IVR_PURCHASE,
+        TransactionType.EMI_PURCHASE,
+        TransactionType.CARD_EMI_PURCHASE,
+        TransactionType.SI_REGISTRATION,
+        TransactionType.SI_EDIT,
+        TransactionType.SI_TRANSACTION,
+        TransactionType.SI_DEREGISTRATION,
+        TransactionType.SI_PAUSE,
+        TransactionType.SI_START,
+        TransactionType.SI_REVOKEALL,
+        TransactionType.SI_PDN
+
+    );
+    
+    @Override
+    public ValidationResult validateTransactionType(TransactionType transactionType, Map&lt;Integer, String&gt; transactionData) {
+<span class="fc" id="L88">        return validateTransactionType(transactionType, buildFallbackRequestContext(transactionData));</span>
+    }
+
+    @Override
+    public ValidationResult validateTransactionType(TransactionType transactionType, RequestContext requestContext) {
+<span class="pc bpc" id="L93" title="1 of 2 branches missed.">        Map&lt;Integer, String&gt; transactionData = requestContext != null ? requestContext.getFields() : null;</span>
+<span class="fc" id="L94">        List&lt;String&gt; errors = new ArrayList&lt;&gt;();</span>
+        
+        // Validate transaction type is supported
+<span class="fc bfc" id="L97" title="All 2 branches covered.">        if (!SUPPORTED_TYPES.contains(transactionType)) {</span>
+<span class="fc" id="L98">            errors.add(String.format(&quot;INVALID_TRANSACTION_TYPE: Expected one of %s, got %s&quot;, </span>
+                SUPPORTED_TYPES, transactionType));
+<span class="fc" id="L100">            return new ValidationResult(errors, new ArrayList&lt;&gt;());</span>
+        }
+        
+<span class="fc" id="L103">        Scheme scheme = requestContext.getScheme() ;</span>
+        /*requestContext != null &amp;&amp; requestContext.getScheme() != null
+                ? requestContext.getScheme()
+                : getSchemeFromTransactionData(transactionData);*/
+<span class="fc" id="L107">        log.info(&quot;Validating {} transaction for scheme: {}&quot;, transactionType, scheme);</span>
+        
+        // Checking for international transaction validation
+<span class="fc" id="L110">        boolean isInternationalTransaction = isValidInternationalTransaction(requestContext);</span>
+<span class="pc bpc" id="L111" title="1 of 6 branches missed.">        if (isInternationalTransaction &amp;&amp; transactionType == TransactionType.EMI_PURCHASE &amp;&amp; scheme == Scheme.RUPAY) {</span>
+<span class="fc" id="L112">            errors.add(&quot;INVALID_TRANSACTION: EMI not allowd for international transaction&quot;);</span>
+<span class="fc" id="L113">            return new ValidationResult(errors, new ArrayList&lt;&gt;());</span>
+<span class="pc bpc" id="L114" title="2 of 6 branches missed.">        }else if (isInternationalTransaction &amp;&amp; transactionType == TransactionType.CARD_EMI_PURCHASE &amp;&amp; scheme == Scheme.RUPAY) {</span>
+<span class="fc" id="L115">            errors.add(&quot;INVALID_TRANSACTION: POS EMI not allowd for international transaction&quot;);</span>
+<span class="fc" id="L116">            return new ValidationResult(errors, new ArrayList&lt;&gt;());</span>
+<span class="pc bpc" id="L117" title="1 of 2 branches missed.">        } else if(isInternationalTransaction ){</span>
+<span class="nc" id="L118">            log.info(&quot;International transaction: {}&quot;, transactionType);</span>
+        } else{
+<span class="fc" id="L120">            log.info(&quot;Domestic transaction: {}&quot;, transactionType);</span>
+        }
+        
+        // Validate scheme-specific DE61 field
+<span class="fc" id="L124">        validateSchemeBasedDe61(requestContext, scheme, transactionType, transactionData, errors);</span>
+
+        // Execute only the authorization-data validators applicable to this transaction type.
+<span class="fc" id="L127">        validateAuthorizationData(requestContext, scheme, transactionType, errors);</span>
+        
+        // Validate transaction-specific requirements
+<span class="fc" id="L130">        validateTransactionSpecificRequirements(transactionType, requestContext, errors);</span>
+        
+<span class="fc" id="L132">        log.debug(&quot;Validation completed for {} {} transaction with {} errors&quot;, scheme, transactionType, errors.size());</span>
+        
+<span class="fc" id="L134">        return new ValidationResult(errors, new ArrayList&lt;&gt;());</span>
+    }
+
+    private void validateAuthorizationData(RequestContext requestContext,
+                                           Scheme scheme,
+                                           TransactionType transactionType,
+                                           List&lt;String&gt; errors) {
+<span class="pc bpc" id="L141" title="1 of 6 branches missed.">        switch (transactionType) {</span>
+            case ECOMMERCE, MOTO -&gt; {
+<span class="fc" id="L143">                validateTokenAuthorization(requestContext, scheme, transactionType, errors);</span>
+<span class="fc" id="L144">                validateThreeDsAuthorization(requestContext, scheme, transactionType, errors);</span>
+<span class="fc" id="L145">            }</span>
+            case IVR_PURCHASE -&gt; {
+<span class="fc" id="L147">                errors.addAll(privateDataAuthorizationValidationService.validate(</span>
+                        requestContext, scheme, transactionType));
+<span class="fc" id="L149">                validateTokenAuthorization(requestContext, scheme, transactionType, errors);</span>
+<span class="fc" id="L150">                validateThreeDsAuthorization(requestContext, scheme, transactionType, errors);</span>
+<span class="fc" id="L151">            }</span>
+            case EMI_PURCHASE, CARD_EMI_PURCHASE -&gt; {
+<span class="fc" id="L153">                validateTokenAuthorization(requestContext, scheme, transactionType, errors);</span>
+<span class="fc" id="L154">                errors.addAll(installmentAuthorizationValidationService.validate(</span>
+                        requestContext, scheme, transactionType));
+<span class="fc" id="L156">                validateThreeDsAuthorization(requestContext, scheme, transactionType, errors);</span>
+<span class="fc" id="L157">            }</span>
+            case SI_REGISTRATION, SI_EDIT, SI_TRANSACTION, SI_DEREGISTRATION -&gt; {
+<span class="fc" id="L159">                validateTokenAuthorization(requestContext, scheme, transactionType, errors);</span>
+<span class="fc" id="L160">                validateStandingInstruction(requestContext, scheme, transactionType, errors);</span>
+<span class="fc" id="L161">            }</span>
+            case SI_REVOKEALL, SI_PAUSE, SI_START, SI_PDN -&gt;
+<span class="fc" id="L163">                    validateStandingInstruction(requestContext, scheme, transactionType, errors);</span>
+<span class="nc" id="L164">            default -&gt; log.debug(&quot;No authorization-data validators configured for {}&quot;, transactionType);</span>
+        }
+<span class="fc" id="L166">    }</span>
+
+    private void validateTokenAuthorization(RequestContext requestContext,
+                                            Scheme scheme,
+                                            TransactionType transactionType,
+                                            List&lt;String&gt; errors) {
+<span class="fc" id="L172">        errors.addAll(tokenAuthorizationValidationService.validate(requestContext, scheme, transactionType));</span>
+<span class="fc" id="L173">    }</span>
+
+    private void validateThreeDsAuthorization(RequestContext requestContext,
+                                              Scheme scheme,
+                                              TransactionType transactionType,
+                                              List&lt;String&gt; errors) {
+<span class="fc" id="L179">        errors.addAll(threeDsAuthorizationValidationService.validate(requestContext, scheme, transactionType));</span>
+<span class="fc" id="L180">    }</span>
+
+    private void validateStandingInstruction(RequestContext requestContext,
+                                             Scheme scheme,
+                                             TransactionType transactionType,
+                                             List&lt;String&gt; errors) {
+<span class="fc" id="L186">        errors.addAll(standingInstructionAuthorizationValidationService.validate(</span>
+                requestContext, scheme, transactionType));
+<span class="fc" id="L188">    }</span>
+
+    /**
+     * Gets the scheme from transaction data field 999
+     */
+    private Scheme getSchemeFromTransactionData(Map&lt;Integer, String&gt; transactionData) {
+<span class="pc bpc" id="L194" title="1 of 2 branches missed.">        if (transactionData == null) {</span>
+<span class="nc" id="L195">            return Scheme.RUPAY;</span>
+        }
+<span class="fc" id="L197">        return Scheme.RUPAY;</span>
+    }
+
+    private RequestContext buildFallbackRequestContext(Map&lt;Integer, String&gt; transactionData) {
+<span class="pc bpc" id="L201" title="2 of 4 branches missed.">        return new RequestContext(&quot;&quot;, &quot;&quot;, transactionData != null ? transactionData.get(32) : null, &quot;&quot;, getSchemeFromTransactionData(transactionData), transactionData != null ? transactionData : new HashMap&lt;&gt;());</span>
+    }
+    
+    /**
+     * Validates international transaction
+     */
+    private boolean isValidInternationalTransaction(RequestContext requestContext) {
+<span class="fc" id="L208">        int isInternationalTransaction = InternationalTxnValidation.isInternationalTransaction(requestContext);</span>
+<span class="fc bfc" id="L209" title="All 2 branches covered.">        return isInternationalTransaction &gt; 1;</span>
+    }
+    
+    /**
+     * Validates DE61 field based on scheme and transaction type
+     */
+    private void validateSchemeBasedDe61(RequestContext requestContext, Scheme scheme, TransactionType transactionType,
+                                        Map&lt;Integer, String&gt; transactionData, List&lt;String&gt; errors) {
+<span class="fc" id="L217">        errors.addAll(posDataAuthorizationValidationService.validate(requestContext, scheme, transactionType));</span>
+<span class="fc" id="L218">    }</span>
+    
+    /**
+     * Validates transaction-specific requirements
+     */
+    private void validateTransactionSpecificRequirements(TransactionType transactionType,
+                                                         RequestContext requestContext,
+                                                         List&lt;String&gt; errors) {
+<span class="fc bfc" id="L226" title="All 4 branches covered.">        switch (transactionType) {</span>
+            case ECOMMERCE:
+<span class="fc" id="L228">                validateEcommerceSpecificRequirements(requestContext.getFields(), errors);</span>
+<span class="fc" id="L229">                break;</span>
+            case MOTO:
+<span class="fc" id="L231">                validateMotoSpecificRequirements(requestContext.getFields(), errors);</span>
+<span class="fc" id="L232">                break;</span>
+            case IVR_PURCHASE:
+<span class="fc" id="L234">                validateIvrSpecificRequirements(requestContext, errors);</span>
+<span class="fc" id="L235">                break;</span>
+            default:
+<span class="fc" id="L237">                log.warn(&quot;No specific requirements defined for transaction type: {}&quot;, transactionType);</span>
+        }
+<span class="fc" id="L239">    }</span>
+    
+    /**
+     * Validates e-commerce specific requirements
+     */
+    private void validateEcommerceSpecificRequirements(Map&lt;Integer, String&gt; transactionData, List&lt;String&gt; errors) {
+<span class="fc" id="L245">        validateMerchantCategoryCode(transactionData, errors);</span>
+<span class="fc" id="L246">    }</span>
+    
+    /**
+     * Validates MOTO specific requirements
+     */
+    private void validateMotoSpecificRequirements(Map&lt;Integer, String&gt; transactionData, List&lt;String&gt; errors) {
+        // MOTO transactions may require additional validation for mail/telephone orders
+<span class="fc" id="L253">        log.debug(&quot;MOTO specific requirements validated&quot;);</span>
+<span class="fc" id="L254">    }</span>
+    
+    /**
+     * Validates IVR specific requirements
+     */
+    private void validateIvrSpecificRequirements(RequestContext requestContext, List&lt;String&gt; errors) {
+<span class="fc" id="L260">        log.debug(&quot;IVR specific requirements validated&quot;);</span>
+<span class="fc" id="L261">    }</span>
+    
+    /**
+     * Validates CAVV (Cardholder Authentication Verification Value) for e-commerce transactions
+     */
+    private void validateCavvForEcommerce(RequestContext requestContext, List&lt;String&gt; errors) {
+<span class="nc" id="L267">        Map&lt;Integer, String&gt; transactionData = requestContext.getFields();</span>
+<span class="nc" id="L268">        String de48 = transactionData.get(48);</span>
+<span class="nc bnc" id="L269" title="All 4 branches missed.">        if (de48 == null || de48.isEmpty()) {</span>
+<span class="nc" id="L270">            errors.add(&quot;MISSING_DE48: DE48 is required for CAVV extraction in e-commerce transactions&quot;);</span>
+<span class="nc" id="L271">            return;</span>
+        }
+        
+        try {
+<span class="nc" id="L275">            Map&lt;String, String&gt; tlvMap = requestContext.getParsedTlv(48);</span>
+<span class="nc" id="L276">            String cavv = tlvMap.get(&quot;100&quot;);</span>
+<span class="nc bnc" id="L277" title="All 4 branches missed.">            if (cavv != null &amp;&amp; !cavv.isEmpty()) {</span>
+                try {
+                    // Decode Base64 CAVV value
+<span class="nc" id="L280">                    byte[] decodedBytes = Base64.getDecoder().decode(cavv);</span>
+<span class="nc" id="L281">                    String cavvDecoded = new String(decodedBytes);</span>
+
+                    // Defensive: If decoded string is shorter than expected, pad with spaces
+<span class="nc" id="L284">                    String paddedCavv = String.format(&quot;%-40s&quot;, cavvDecoded);</span>
+
+                    // Parse fields as per specification
+<span class="nc" id="L287">                    String authStatus = paddedCavv.substring(0, 2); // Position 1-2</span>
+<span class="nc" id="L288">                    String otpStatus = paddedCavv.substring(2, 4);  // Position 3-4</span>
+<span class="nc" id="L289">                    String keyIndicator = paddedCavv.substring(4, 6); // Position 5-6</span>
+<span class="nc" id="L290">                    String cvv2 = paddedCavv.substring(6, 10); // Position 7-10</span>
+<span class="nc" id="L291">                    String authTranIdLast4 = paddedCavv.substring(10, 14); // Position 11-14</span>
+<span class="nc" id="L292">                    String authTranId = paddedCavv.substring(14, 30); // Position 15-30</span>
+<span class="nc" id="L293">                    String reservedZeros = paddedCavv.substring(30, 34); // Position 31-34</span>
+<span class="nc" id="L294">                    String dateYyddd = paddedCavv.substring(34, 40); // Position 35-40</span>
+
+                    // Validate authentication status
+<span class="nc" id="L297">                    Set&lt;String&gt; validAuthStatus = Set.of(&quot;00&quot;, &quot;05&quot;, &quot;06&quot;, &quot;07&quot;);</span>
+<span class="nc bnc" id="L298" title="All 2 branches missed.">                    if (!validAuthStatus.contains(authStatus)) {</span>
+<span class="nc" id="L299">                        errors.add(&quot;INVALID_CAVV_AUTH_STATUS: Unexpected authentication status in CAVV: &quot; + authStatus);</span>
+                    }
+
+                    // Validate OTP status (optional, as per business rules)
+<span class="nc bnc" id="L303" title="All 2 branches missed.">                    if (!&quot;00&quot;.equals(otpStatus)) {</span>
+<span class="nc" id="L304">                        log.info(&quot;CAVV OTP status is not '00' (OTP Authentication done): {}&quot;, otpStatus);</span>
+                    }
+
+                    // Validate reserved zeros
+<span class="nc bnc" id="L308" title="All 2 branches missed.">                    if (!reservedZeros.trim().equals(&quot;0000&quot;)) {</span>
+<span class="nc" id="L309">                        errors.add(&quot;INVALID_CAVV_RESERVED: Reserved field in CAVV (positions 31-34) must be '0000'&quot;);</span>
+                    }
+
+                    // Validate date format (YYDDD)
+<span class="nc bnc" id="L313" title="All 2 branches missed.">                    if (!dateYyddd.trim().matches(&quot;\\d{5,6}&quot;)) {</span>
+<span class="nc" id="L314">                        errors.add(&quot;INVALID_CAVV_DATE: Date in CAVV (positions 35-40) must be in YYDDD format, found: &quot; + dateYyddd.trim());</span>
+                    }
+
+<span class="nc" id="L317">                    log.debug(&quot;Parsed CAVV metadata - AuthStatus: {}, OTPStatus: {}, KeyIndicator: {}, Date: {}&quot;,</span>
+                            authStatus, otpStatus, keyIndicator, dateYyddd);
+
+<span class="nc" id="L320">                } catch (IllegalArgumentException e) {</span>
+<span class="nc" id="L321">                    log.error(&quot;CAVV Base64 decoding failed: {}&quot;, e.getMessage(), e);</span>
+<span class="nc" id="L322">                    errors.add(&quot;INVALID_CAVV_FORMAT: Unable to decode Base64 CAVV value&quot;);</span>
+<span class="nc" id="L323">                } catch (Exception ex) {</span>
+<span class="nc" id="L324">                    log.error(&quot;CAVV parsing error: {}&quot;, ex.getMessage(), ex);</span>
+<span class="nc" id="L325">                    errors.add(&quot;INVALID_CAVV_FORMAT: Error parsing CAVV value&quot;);</span>
+<span class="nc" id="L326">                }</span>
+            }
+<span class="nc bnc" id="L328" title="All 4 branches missed.">            if (cavv == null || cavv.isEmpty()) {</span>
+<span class="nc" id="L329">                errors.add(&quot;MISSING_CAVV: CAVV (Tag 100) is required in DE48 for e-commerce transactions&quot;);</span>
+            } else {
+<span class="nc" id="L331">                log.debug(&quot;CAVV validation successful for e-commerce transaction&quot;);</span>
+            }
+<span class="nc" id="L333">        } catch (Exception e) {</span>
+<span class="nc" id="L334">            log.error(&quot;Failed to parse DE48 for CAVV extraction: {}&quot;, e.getMessage(), e);</span>
+<span class="nc" id="L335">            errors.add(&quot;INVALID_DE48_FORMAT: Unable to parse DE48 for CAVV extraction&quot;);</span>
+<span class="nc" id="L336">        }</span>
+<span class="nc" id="L337">    }</span>
+    
+    /**
+     * Validates merchant category code
+     */
+    private void validateMerchantCategoryCode(Map&lt;Integer, String&gt; transactionData, List&lt;String&gt; errors) {
+<span class="fc" id="L343">        String mcc = transactionData.get(18);</span>
+<span class="pc bpc" id="L344" title="1 of 4 branches missed.">        if (mcc == null || mcc.isEmpty()) {</span>
+<span class="fc" id="L345">            errors.add(&quot;MISSING_MCC: Merchant Category Code (DE18) is required for e-commerce transactions&quot;);</span>
+<span class="fc" id="L346">            return;</span>
+        }
+        
+        // Validate MCC format (4 digits)
+<span class="fc bfc" id="L350" title="All 2 branches covered.">        if (!mcc.matches(&quot;\\d{4}&quot;)) {</span>
+<span class="fc" id="L351">            errors.add(&quot;INVALID_MCC: Merchant Category Code must be 4 digits&quot;);</span>
+        }
+        
+<span class="fc" id="L354">        log.debug(&quot;Merchant Category Code validation: {}&quot;, mcc);</span>
+<span class="fc" id="L355">    }</span>
+    
+    @Override
+    protected double getMaxAmountForTransactionType(TransactionType transactionType) {
+<span class="nc" id="L359">        return MAX_AMOUNTS.getOrDefault(transactionType, Double.MAX_VALUE);</span>
+    }
+    
+    @Override
+    protected boolean isVelocityLimitExceeded(TransactionType transactionType, String cardNumber) {
+        // CNP transactions typically have stricter velocity limits
+        // In a real implementation, this would check against a database
+        // for velocity limits specific to CNP transaction types
+<span class="nc" id="L367">        return false; // Placeholder implementation</span>
+    }
+    
+    @Override
+    public String getValidatorType() {
+<span class="nc" id="L372">        return &quot;GENERIC_CNP_TRANSACTION_VALIDATOR&quot;;</span>
+    }
+    
+    /**
+     * Returns the supported transaction types
+     */
+    public Set&lt;TransactionType&gt; getSupportedTransactionTypes() {
+<span class="nc" id="L379">        return SUPPORTED_TYPES;</span>
+    }
+} 
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.14.202510111229</span></div></body></html>

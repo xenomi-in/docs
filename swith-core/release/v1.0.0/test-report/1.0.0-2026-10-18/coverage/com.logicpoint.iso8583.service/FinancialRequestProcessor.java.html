@@ -1,0 +1,210 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>FinancialRequestProcessor.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">iso8583-processor</a> &gt; <a href="index.source.html" class="el_package">com.logicpoint.iso8583.service</a> &gt; <span class="el_source">FinancialRequestProcessor.java</span></div><h1>FinancialRequestProcessor.java</h1><pre class="source lang-java linenums">package com.logicpoint.iso8583.service;
+
+import com.logicpoint.iso8583.context.RequestContext;
+import com.logicpoint.iso8583.emv.CardholderVerificationMethodResults;
+import com.logicpoint.iso8583.emv.ChipData;
+import com.logicpoint.iso8583.emv.ChipDataParser;
+import com.logicpoint.iso8583.emv.TerminalVerificationResults;
+import com.logicpoint.iso8583.entity.BinDetails;
+import com.logicpoint.iso8583.mcc.MccRuleEngine;
+import com.logicpoint.iso8583.responsecode.InternalResCode;
+import com.logicpoint.iso8583.util.Scheme;
+import com.logicpoint.iso8583.validation.SchemeValidatorService;
+import com.logicpoint.iso8583.validation.TransactionIdentificationRule;
+import com.logicpoint.iso8583.validation.TransactionType;
+import com.logicpoint.iso8583.validation.ValidationResult;
+import com.logicpoint.iso8583.validation.orchestrator.TransactionValidationOrchestrator;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+import org.springframework.beans.factory.annotation.Value;
+import org.springframework.stereotype.Service;
+
+import java.io.IOException;
+import java.util.List;
+import java.util.Map;
+import java.util.Optional;
+import java.util.stream.Collectors;
+import java.util.ArrayList;
+
+@Service
+public class FinancialRequestProcessor {
+
+<span class="fc" id="L32">    private static final Logger log = LoggerFactory.getLogger(FinancialRequestProcessor.class);</span>
+
+    private final SchemeValidatorService validator;
+    private final TransactionValidationOrchestrator validationOrchestrator;
+    private final ResponseAssembler responseAssembler;
+    private final MccRuleEngine mccRuleEngine;
+    private final CacheInitializationService cacheInitializationService;
+
+    public FinancialRequestProcessor(
+            TransactionValidationOrchestrator validationOrchestrator,
+            ResponseAssembler responseAssembler,
+            MccRuleEngine mccRuleEngine,
+            CacheInitializationService cacheInitializationService,
+            @Value(&quot;${scheme.validation.rules-dir:validation_rules}&quot;) String validationRulesDir
+<span class="fc" id="L46">    ) throws IOException {</span>
+<span class="fc" id="L47">        this.validator = new SchemeValidatorService(validationRulesDir);</span>
+<span class="fc" id="L48">        this.validationOrchestrator = validationOrchestrator;</span>
+<span class="fc" id="L49">        this.responseAssembler = responseAssembler;</span>
+<span class="fc" id="L50">        this.mccRuleEngine = mccRuleEngine;</span>
+<span class="fc" id="L51">        this.cacheInitializationService = cacheInitializationService;</span>
+<span class="fc" id="L52">    }</span>
+
+    public Map&lt;Integer, String&gt; process(RequestContext requestContext) {
+<span class="fc" id="L55">        Map&lt;Integer, String&gt; fields = requestContext.getFields();</span>
+<span class="fc" id="L56">        responseAssembler.setResponseMti(requestContext);</span>
+
+<span class="fc bfc" id="L58" title="All 2 branches covered.">        if (requestContext.getScheme() != Scheme.RUPAY) {</span>
+<span class="fc" id="L59">            responseAssembler.applyResponseCode(requestContext, InternalResCode.DO_NOT_HONOR);</span>
+<span class="fc" id="L60">            return fields;</span>
+        }
+
+<span class="fc" id="L63">        ValidationOutcome validationOutcome = validateTransactionType(requestContext);</span>
+<span class="fc" id="L64">        log.info(&quot;Processing financial request for transaction type: {}&quot;, validationOutcome.transactionType());</span>
+
+<span class="fc bfc" id="L66" title="All 2 branches covered.">        if (validationOutcome.transactionType() == TransactionType.UNKNOWN) {</span>
+<span class="fc" id="L67">            responseAssembler.applyResponseCode(requestContext, InternalResCode.COMPLIANCE_VIOLATION);</span>
+<span class="fc" id="L68">            return fields;</span>
+        }
+
+<span class="fc" id="L71">        requestContext.setTransactionType(validationOutcome.transactionType());</span>
+<span class="fc" id="L72">        requestContext.setAttribute(&quot;matchedTransactionType&quot;, validationOutcome.transactionType().name());</span>
+
+<span class="fc bfc" id="L74" title="All 2 branches covered.">        if (!validationOutcome.valid()) {</span>
+<span class="fc" id="L75">            log.warn(&quot;Transaction validation failed. Missing fields: {}&quot;, validationOutcome.missingFields());</span>
+<span class="fc" id="L76">            responseAssembler.applyResponseCode(requestContext, InternalResCode.FORMAT_ERROR);</span>
+<span class="fc" id="L77">            omitPinChangeNewPinBlock(requestContext);</span>
+<span class="fc" id="L78">            return fields;</span>
+        }
+
+<span class="fc bfc" id="L81" title="All 2 branches covered.">        if (!mccRuleEngine.validate(requestContext)) {</span>
+<span class="fc" id="L82">            omitPinChangeNewPinBlock(requestContext);</span>
+<span class="fc" id="L83">            return fields;</span>
+        }
+
+<span class="fc" id="L86">        ValidationResult validationResult = validationOrchestrator.validateTransaction(requestContext);</span>
+<span class="fc" id="L87">        log.info(&quot;Validation Result: {}&quot;, validationResult.getErrors());</span>
+
+<span class="fc bfc" id="L89" title="All 2 branches covered.">        if (!validationResult.isValid()) {</span>
+<span class="fc" id="L90">            responseAssembler.ensureResponseCode(requestContext);</span>
+<span class="fc" id="L91">            omitPinChangeNewPinBlock(requestContext);</span>
+<span class="fc" id="L92">            return fields;</span>
+        }
+
+<span class="fc" id="L95">        responseAssembler.applyValidationUpdates(requestContext, validationResult);</span>
+<span class="fc" id="L96">        responseAssembler.applyFinancialApproval(requestContext);</span>
+<span class="fc" id="L97">        omitPinChangeNewPinBlock(requestContext);</span>
+<span class="fc" id="L98">        log.info(&quot;Transaction validation successful&quot;);</span>
+<span class="fc" id="L99">        return fields;</span>
+    }
+
+    public TransactionType identifyTransactionType(RequestContext requestContext) {
+<span class="fc" id="L103">        Map&lt;String, String&gt; convertedFields = requestContext.getFields().entrySet().stream()</span>
+<span class="fc" id="L104">                .collect(Collectors.toMap(entry -&gt; String.valueOf(entry.getKey()), Map.Entry::getValue));</span>
+<span class="fc" id="L105">        return validator.identify(requestContext.getScheme(), convertedFields)</span>
+<span class="fc" id="L106">                .map(rule -&gt; rule.transactionType)</span>
+<span class="fc" id="L107">                .orElse(TransactionType.UNKNOWN);</span>
+    }
+
+    private void omitPinChangeNewPinBlock(RequestContext requestContext) {
+<span class="fc bfc" id="L111" title="All 2 branches covered.">        if (requestContext.getTransactionType() == TransactionType.PIN_CHANGE) {</span>
+<span class="fc" id="L112">            responseAssembler.omitDe120Tag(requestContext, &quot;004&quot;);</span>
+        }
+<span class="fc" id="L114">    }</span>
+
+    private ValidationOutcome validateTransactionType(RequestContext requestContext) {
+<span class="fc" id="L117">        Map&lt;Integer, String&gt; fields = requestContext.getFields();</span>
+<span class="fc" id="L118">        Map&lt;String, String&gt; convertedFields = fields.entrySet().stream()</span>
+<span class="fc" id="L119">                .collect(Collectors.toMap(entry -&gt; String.valueOf(entry.getKey()), Map.Entry::getValue));</span>
+<span class="fc" id="L120">        Optional&lt;TransactionIdentificationRule&gt; rule = validator.identify(requestContext.getScheme(), convertedFields);</span>
+
+<span class="fc bfc" id="L122" title="All 2 branches covered.">        if (rule.isPresent()) {</span>
+<span class="fc" id="L123">            List&lt;String&gt; missing = new ArrayList&lt;&gt;(rule.get().validateFields(convertedFields));</span>
+<span class="fc" id="L124">            removeOfflinePinMissingDe52IfAllowed(requestContext, missing);</span>
+<span class="fc" id="L125">            log.info(&quot;Mandatory Fields are Missign&quot;);</span>
+<span class="fc" id="L126">            return new ValidationOutcome(rule.get().transactionType, missing);</span>
+        }
+
+<span class="fc" id="L129">        return new ValidationOutcome(TransactionType.UNKNOWN, List.of(&quot;UNKNOWN_TRANSACTION_TYPE&quot;));</span>
+    }
+
+    private void removeOfflinePinMissingDe52IfAllowed(RequestContext requestContext, List&lt;String&gt; missingFields) {
+<span class="pc bpc" id="L133" title="1 of 4 branches missed.">        if (missingFields == null || !missingFields.contains(&quot;52&quot;)) {</span>
+<span class="fc" id="L134">            return;</span>
+        }
+<span class="fc bfc" id="L136" title="All 2 branches covered.">        if (!isSuccessfulOfflinePin(requestContext)) {</span>
+<span class="fc" id="L137">            return;</span>
+        }
+<span class="fc bfc" id="L139" title="All 2 branches covered.">        if (!isOfflinePinAllowedForBin(requestContext.getBin())) {</span>
+<span class="fc" id="L140">            log.warn(&quot;Offline PIN selected but BIN configuration does not allow offline PIN. bin={}&quot;, requestContext.getBin());</span>
+<span class="fc" id="L141">            return;</span>
+        }
+
+<span class="fc" id="L144">        missingFields.remove(&quot;52&quot;);</span>
+<span class="fc" id="L145">        log.debug(&quot;Allowing missing DE52 because DE55 tag 9F34 indicates offline PIN for BIN {}&quot;, requestContext.getBin());</span>
+<span class="fc" id="L146">    }</span>
+
+    private boolean isSuccessfulOfflinePin(RequestContext requestContext) {
+<span class="fc" id="L149">        String de55 = requestContext.getFields().get(55);</span>
+<span class="pc bpc" id="L150" title="1 of 4 branches missed.">        if (de55 == null || de55.isBlank()) {</span>
+<span class="fc" id="L151">            return false;</span>
+        }
+
+        try {
+<span class="fc" id="L155">            ChipData chipData = requestContext.getParsedChipData(55);</span>
+<span class="pc bpc" id="L156" title="1 of 2 branches missed.">            String cvmHex = chipData != null ? chipData.getTagValue(&quot;9F34&quot;) : null;</span>
+<span class="pc bpc" id="L157" title="1 of 4 branches missed.">            if (cvmHex == null || cvmHex.isBlank()) {</span>
+<span class="fc" id="L158">                chipData = new ChipDataParser().parseChipData(de55);</span>
+<span class="pc bpc" id="L159" title="1 of 2 branches missed.">                cvmHex = chipData != null ? chipData.getTagValue(&quot;9F34&quot;) : null;</span>
+            }
+<span class="pc bpc" id="L161" title="1 of 4 branches missed.">            if (cvmHex == null || cvmHex.isBlank()) {</span>
+<span class="fc" id="L162">                return false;</span>
+            }
+
+<span class="fc" id="L165">            CardholderVerificationMethodResults cvm = new CardholderVerificationMethodResults(cvmHex);</span>
+<span class="pc bpc" id="L166" title="1 of 4 branches missed.">            if (!cvm.isOfflinePinVerificationPerformed() || !cvm.isCvmSuccessful()) {</span>
+<span class="fc" id="L167">                return false;</span>
+            }
+
+<span class="pc bpc" id="L170" title="1 of 2 branches missed.">            String tvrHex = chipData != null ? chipData.getTagValue(&quot;95&quot;) : null;</span>
+<span class="pc bpc" id="L171" title="1 of 4 branches missed.">            if (tvrHex != null &amp;&amp; !tvrHex.isBlank()) {</span>
+<span class="fc" id="L172">                TerminalVerificationResults tvr = new TerminalVerificationResults(tvrHex);</span>
+<span class="fc bfc" id="L173" title="All 2 branches covered.">                if (tvr.cardholderVerificationNotSuccessful()</span>
+<span class="pc bpc" id="L174" title="1 of 2 branches missed.">                        || tvr.pinTryLimitExceeded()</span>
+<span class="pc bpc" id="L175" title="1 of 2 branches missed.">                        || tvr.pinRequiredButNotEntered()) {</span>
+<span class="fc" id="L176">                    return false;</span>
+                }
+            }
+
+<span class="fc" id="L180">            return true;</span>
+<span class="nc" id="L181">        } catch (Exception ex) {</span>
+<span class="nc" id="L182">            log.warn(&quot;Unable to determine offline PIN from DE55 for mandatory DE52 validation: {}&quot;, ex.getMessage());</span>
+<span class="nc" id="L183">            return false;</span>
+        }
+    }
+
+    private boolean isOfflinePinAllowedForBin(String bin) {
+<span class="pc bpc" id="L188" title="1 of 4 branches missed.">        if (bin == null || bin.isBlank()) {</span>
+<span class="fc" id="L189">            return true;</span>
+        }
+<span class="fc bfc" id="L191" title="All 2 branches covered.">        if (cacheInitializationService == null) {</span>
+<span class="fc" id="L192">            return true;</span>
+        }
+
+<span class="fc" id="L195">        CacheInitializationService.BinInstitutionData binData = cacheInitializationService</span>
+<span class="fc" id="L196">                .loadBinInstitutionCache()</span>
+<span class="fc" id="L197">                .get(bin);</span>
+<span class="fc bfc" id="L198" title="All 2 branches covered.">        BinDetails binDetails = binData == null ? null : binData.getBinDetails();</span>
+<span class="fc bfc" id="L199" title="All 2 branches covered.">        return binDetails == null</span>
+<span class="pc bpc" id="L200" title="1 of 2 branches missed.">                || binDetails.getAllow_offline_pin() == null</span>
+<span class="pc bpc" id="L201" title="1 of 2 branches missed.">                || binDetails.getAllow_offline_pin();</span>
+    }
+
+<span class="fc" id="L204">    private record ValidationOutcome(TransactionType transactionType, List&lt;String&gt; missingFields) {</span>
+        boolean valid() {
+<span class="pc bpc" id="L206" title="1 of 4 branches missed.">            return missingFields == null || missingFields.isEmpty();</span>
+        }
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.14.202510111229</span></div></body></html>

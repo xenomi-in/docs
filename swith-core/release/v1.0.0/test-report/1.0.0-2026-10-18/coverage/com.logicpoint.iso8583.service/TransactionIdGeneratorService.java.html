@@ -1,0 +1,61 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>TransactionIdGeneratorService.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">iso8583-processor</a> &gt; <a href="index.source.html" class="el_package">com.logicpoint.iso8583.service</a> &gt; <span class="el_source">TransactionIdGeneratorService.java</span></div><h1>TransactionIdGeneratorService.java</h1><pre class="source lang-java linenums">package com.logicpoint.iso8583.service;
+
+import java.time.Instant;
+import java.util.concurrent.atomic.AtomicLong;
+
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+import org.springframework.beans.factory.annotation.Value;
+import org.springframework.stereotype.Service;
+
+@Service
+<span class="fc" id="L12">public class TransactionIdGeneratorService {</span>
+
+<span class="fc" id="L14">    private static final Logger log = LoggerFactory.getLogger(TransactionIdGeneratorService.class);</span>
+
+<span class="fc" id="L16">    private final AtomicLong lastEpochNanos = new AtomicLong();</span>
+
+    @Value(&quot;${switch.site.id:1}&quot;)
+    private int siteId;
+
+    @Value(&quot;${switch.node.id:1}&quot;)
+    private int nodeId;
+
+    public String nextTransactionId() {
+<span class="fc" id="L25">        validateConfiguration();</span>
+<span class="fc" id="L26">        long epochNanos = nextMonotonicEpochNanos();</span>
+<span class="fc" id="L27">        return siteId + String.format(&quot;%02d&quot;, nodeId) + epochNanos;</span>
+    }
+
+    private long nextMonotonicEpochNanos() {
+        while (true) {
+<span class="fc" id="L32">            long candidate = currentEpochNanos();</span>
+<span class="fc" id="L33">            long previous = lastEpochNanos.get();</span>
+<span class="fc" id="L34">            long next = Math.max(candidate, previous + 1);</span>
+<span class="pc bpc" id="L35" title="1 of 2 branches missed.">            if (lastEpochNanos.compareAndSet(previous, next)) {</span>
+<span class="fc" id="L36">                return next;</span>
+            }
+<span class="nc" id="L38">        }</span>
+    }
+
+    private long currentEpochNanos() {
+<span class="fc" id="L42">        Instant now = Instant.now();</span>
+<span class="fc" id="L43">        return (now.getEpochSecond() * 1_000_000_000L) + now.getNano();</span>
+    }
+
+    private void validateConfiguration() {
+<span class="fc bfc" id="L47" title="All 4 branches covered.">        if (siteId &lt; 0 || siteId &gt; 9) {</span>
+<span class="fc" id="L48">            throw new IllegalArgumentException(&quot;switch.site.id must be between 0 and 9&quot;);</span>
+        }
+<span class="fc bfc" id="L50" title="All 4 branches covered.">        if (nodeId &lt; 0 || nodeId &gt; 99) {</span>
+<span class="fc" id="L51">            throw new IllegalArgumentException(&quot;switch.node.id must be between 0 and 99&quot;);</span>
+        }
+<span class="fc" id="L53">    }</span>
+
+    @jakarta.annotation.PostConstruct
+    void logConfiguration() {
+<span class="fc" id="L57">        validateConfiguration();</span>
+<span class="fc" id="L58">        log.info(&quot;Initialized transaction ID generator for site {} node {}&quot;, siteId, String.format(&quot;%02d&quot;, nodeId));</span>
+<span class="fc" id="L59">    }</span>
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.14.202510111229</span></div></body></html>

@@ -1,0 +1,100 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>AesGcmCryptoService.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">iso8583-processor</a> &gt; <a href="index.source.html" class="el_package">com.logicpoint.iso8583.service</a> &gt; <span class="el_source">AesGcmCryptoService.java</span></div><h1>AesGcmCryptoService.java</h1><pre class="source lang-java linenums">package com.logicpoint.iso8583.service;
+
+import java.nio.charset.StandardCharsets;
+import java.security.GeneralSecurityException;
+import java.security.SecureRandom;
+import java.util.Arrays;
+
+import javax.crypto.Cipher;
+import javax.crypto.Mac;
+import javax.crypto.SecretKey;
+import javax.crypto.spec.GCMParameterSpec;
+import javax.crypto.spec.SecretKeySpec;
+
+import org.springframework.stereotype.Service;
+
+@Service
+<span class="fc" id="L17">public class AesGcmCryptoService {</span>
+
+    private static final String AES = &quot;AES&quot;;
+    private static final String AES_GCM = &quot;AES/GCM/NoPadding&quot;;
+    private static final String HMAC_SHA_256 = &quot;HmacSHA256&quot;;
+    private static final int GCM_TAG_LENGTH_BITS = 128;
+    private static final int GCM_IV_LENGTH_BYTES = 12;
+    private static final int GCM_TAG_LENGTH_BYTES = 16;
+
+<span class="fc" id="L26">    private final SecureRandom secureRandom = new SecureRandom();</span>
+
+    public EncryptedFieldValue encrypt(String plaintext, byte[] keyBytes, int keyVersion, String aad) {
+<span class="fc bfc" id="L29" title="All 2 branches covered.">        if (plaintext == null) {</span>
+<span class="fc" id="L30">            return null;</span>
+        }
+
+        try {
+<span class="fc" id="L34">            byte[] iv = new byte[GCM_IV_LENGTH_BYTES];</span>
+<span class="fc" id="L35">            secureRandom.nextBytes(iv);</span>
+
+<span class="fc" id="L37">            Cipher cipher = Cipher.getInstance(AES_GCM);</span>
+<span class="fc" id="L38">            SecretKey key = new SecretKeySpec(keyBytes, AES);</span>
+<span class="fc" id="L39">            cipher.init(Cipher.ENCRYPT_MODE, key, new GCMParameterSpec(GCM_TAG_LENGTH_BITS, iv));</span>
+<span class="fc bfc" id="L40" title="All 2 branches covered.">            if (aad != null) {</span>
+<span class="fc" id="L41">                cipher.updateAAD(aad.getBytes(StandardCharsets.UTF_8));</span>
+            }
+
+<span class="fc" id="L44">            byte[] cipherOutput = cipher.doFinal(plaintext.getBytes(StandardCharsets.UTF_8));</span>
+<span class="fc" id="L45">            int ciphertextLength = cipherOutput.length - GCM_TAG_LENGTH_BYTES;</span>
+<span class="fc" id="L46">            byte[] ciphertext = Arrays.copyOf(cipherOutput, ciphertextLength);</span>
+<span class="fc" id="L47">            byte[] tag = Arrays.copyOfRange(cipherOutput, ciphertextLength, cipherOutput.length);</span>
+<span class="fc" id="L48">            return new EncryptedFieldValue(ciphertext, iv, tag, keyVersion);</span>
+<span class="fc" id="L49">        } catch (GeneralSecurityException ex) {</span>
+<span class="fc" id="L50">            throw new IllegalStateException(&quot;Failed to encrypt field value&quot;, ex);</span>
+        }
+    }
+
+    public String decrypt(byte[] ciphertext, byte[] iv, byte[] tag, byte[] keyBytes, String aad) {
+<span class="pc bpc" id="L55" title="2 of 8 branches missed.">        if (ciphertext == null || iv == null || tag == null || keyBytes == null) {</span>
+<span class="fc" id="L56">            return null;</span>
+        }
+
+        try {
+<span class="fc" id="L60">            byte[] cipherInput = new byte[ciphertext.length + tag.length];</span>
+<span class="fc" id="L61">            System.arraycopy(ciphertext, 0, cipherInput, 0, ciphertext.length);</span>
+<span class="fc" id="L62">            System.arraycopy(tag, 0, cipherInput, ciphertext.length, tag.length);</span>
+
+<span class="fc" id="L64">            Cipher cipher = Cipher.getInstance(AES_GCM);</span>
+<span class="fc" id="L65">            SecretKey key = new SecretKeySpec(keyBytes, AES);</span>
+<span class="fc" id="L66">            cipher.init(Cipher.DECRYPT_MODE, key, new GCMParameterSpec(GCM_TAG_LENGTH_BITS, iv));</span>
+<span class="fc bfc" id="L67" title="All 2 branches covered.">            if (aad != null) {</span>
+<span class="fc" id="L68">                cipher.updateAAD(aad.getBytes(StandardCharsets.UTF_8));</span>
+            }
+
+<span class="fc" id="L71">            return new String(cipher.doFinal(cipherInput), StandardCharsets.UTF_8);</span>
+<span class="fc" id="L72">        } catch (GeneralSecurityException ex) {</span>
+<span class="fc" id="L73">            throw new IllegalStateException(&quot;Failed to decrypt field value&quot;, ex);</span>
+        }
+    }
+
+    public String hmacHex(String value, byte[] keyBytes) {
+<span class="fc bfc" id="L78" title="All 4 branches covered.">        if (value == null || keyBytes == null) {</span>
+<span class="fc" id="L79">            return null;</span>
+        }
+
+        try {
+<span class="fc" id="L83">            Mac mac = Mac.getInstance(HMAC_SHA_256);</span>
+<span class="fc" id="L84">            mac.init(new SecretKeySpec(keyBytes, HMAC_SHA_256));</span>
+<span class="fc" id="L85">            byte[] digest = mac.doFinal(value.getBytes(StandardCharsets.UTF_8));</span>
+<span class="fc" id="L86">            return toHex(digest);</span>
+<span class="nc" id="L87">        } catch (GeneralSecurityException ex) {</span>
+<span class="nc" id="L88">            throw new IllegalStateException(&quot;Failed to compute PAN lookup HMAC&quot;, ex);</span>
+        }
+    }
+
+    private String toHex(byte[] data) {
+<span class="fc" id="L93">        StringBuilder builder = new StringBuilder(data.length * 2);</span>
+<span class="fc bfc" id="L94" title="All 2 branches covered.">        for (byte b : data) {</span>
+<span class="fc" id="L95">            builder.append(String.format(&quot;%02X&quot;, b));</span>
+        }
+<span class="fc" id="L97">        return builder.toString();</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.14.202510111229</span></div></body></html>

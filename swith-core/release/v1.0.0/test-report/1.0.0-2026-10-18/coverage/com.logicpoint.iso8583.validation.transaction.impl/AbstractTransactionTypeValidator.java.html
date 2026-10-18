@@ -1,0 +1,106 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>AbstractTransactionTypeValidator.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">iso8583-processor</a> &gt; <a href="index.source.html" class="el_package">com.logicpoint.iso8583.validation.transaction.impl</a> &gt; <span class="el_source">AbstractTransactionTypeValidator.java</span></div><h1>AbstractTransactionTypeValidator.java</h1><pre class="source lang-java linenums">package com.logicpoint.iso8583.validation.transaction.impl;
+
+import com.logicpoint.iso8583.validation.transaction.TransactionTypeValidator;
+import com.logicpoint.iso8583.validation.ValidationResult;
+import com.logicpoint.iso8583.validation.TransactionType;
+import org.springframework.stereotype.Component;
+
+import java.util.ArrayList;
+import java.util.List;
+import java.util.Map;
+import java.util.HashMap;
+
+/**
+ * Abstract base class for transaction type validators with common functionality.
+ */
+@Component
+<span class="fc" id="L17">public abstract class AbstractTransactionTypeValidator implements TransactionTypeValidator {</span>
+    
+<span class="fc" id="L19">    protected static final Map&lt;TransactionType, List&lt;String&gt;&gt; REQUIRED_FIELDS = new HashMap&lt;&gt;();</span>
+    
+    static {
+        // Define required fields for each transaction type
+<span class="fc" id="L23">        List&lt;String&gt; purchaseFields = new ArrayList&lt;&gt;();</span>
+<span class="fc" id="L24">        purchaseFields.add(&quot;PAN&quot;);</span>
+<span class="fc" id="L25">        purchaseFields.add(&quot;AMOUNT&quot;);</span>
+<span class="fc" id="L26">        purchaseFields.add(&quot;MERCHANT_ID&quot;);</span>
+<span class="fc" id="L27">        purchaseFields.add(&quot;EXPIRY_DATE&quot;);</span>
+<span class="fc" id="L28">        REQUIRED_FIELDS.put(TransactionType.PURCHASE, purchaseFields);</span>
+        
+<span class="fc" id="L30">        List&lt;String&gt; ecommerceFields = new ArrayList&lt;&gt;();</span>
+<span class="fc" id="L31">        ecommerceFields.add(&quot;PAN&quot;);</span>
+<span class="fc" id="L32">        ecommerceFields.add(&quot;AMOUNT&quot;);</span>
+<span class="fc" id="L33">        ecommerceFields.add(&quot;MERCHANT_ID&quot;);</span>
+<span class="fc" id="L34">        ecommerceFields.add(&quot;EXPIRY_DATE&quot;);</span>
+<span class="fc" id="L35">        ecommerceFields.add(&quot;CVV&quot;);</span>
+<span class="fc" id="L36">        ecommerceFields.add(&quot;IP_ADDRESS&quot;);</span>
+<span class="fc" id="L37">        REQUIRED_FIELDS.put(TransactionType.ECOMMERCE, ecommerceFields);</span>
+        
+<span class="fc" id="L39">        List&lt;String&gt; atmFields = new ArrayList&lt;&gt;();</span>
+<span class="fc" id="L40">        atmFields.add(&quot;PAN&quot;);</span>
+<span class="fc" id="L41">        atmFields.add(&quot;AMOUNT&quot;);</span>
+<span class="fc" id="L42">        atmFields.add(&quot;ATM_ID&quot;);</span>
+<span class="fc" id="L43">        atmFields.add(&quot;PIN&quot;);</span>
+<span class="fc" id="L44">        REQUIRED_FIELDS.put(TransactionType.CASH_WITHDRAWAL, atmFields);</span>
+        
+<span class="fc" id="L46">        List&lt;String&gt; refundFields = new ArrayList&lt;&gt;();</span>
+<span class="fc" id="L47">        refundFields.add(&quot;ORIGINAL_TRANSACTION_ID&quot;);</span>
+<span class="fc" id="L48">        refundFields.add(&quot;AMOUNT&quot;);</span>
+<span class="fc" id="L49">        refundFields.add(&quot;MERCHANT_ID&quot;);</span>
+<span class="fc" id="L50">        REQUIRED_FIELDS.put(TransactionType.REFUND, refundFields);</span>
+<span class="fc" id="L51">    }</span>
+    
+    @Override
+    public ValidationResult validate(TransactionType transactionType) {
+<span class="fc" id="L55">        return validateTransactionType(transactionType, (Map&lt;Integer, String&gt;) null);</span>
+    }
+    
+    @Override
+    public ValidationResult validateAmountLimits(TransactionType transactionType, Double amount) {
+<span class="fc" id="L60">        List&lt;String&gt; errors = new ArrayList&lt;&gt;();</span>
+        
+<span class="fc bfc" id="L62" title="All 4 branches covered.">        if (amount == null || amount &lt;= 0) {</span>
+<span class="fc" id="L63">            errors.add(&quot;AMOUNT_LIMIT: Invalid transaction amount&quot;);</span>
+<span class="fc" id="L64">            return new ValidationResult(errors, new ArrayList&lt;&gt;());</span>
+        }
+        
+        // Check transaction type specific limits
+      /*  double maxAmount = getMaxAmountForTransactionType(transactionType);
+        if (amount &gt; maxAmount) {
+            errors.add(&quot;AMOUNT_LIMIT: Amount exceeds maximum limit for &quot; + transactionType);
+        }
+        */
+<span class="fc" id="L73">        return new ValidationResult(errors, new ArrayList&lt;&gt;());</span>
+    }
+    
+    @Override
+    public ValidationResult validateVelocityLimits(TransactionType transactionType, String cardNumber) {
+<span class="fc" id="L78">        List&lt;String&gt; errors = new ArrayList&lt;&gt;();</span>
+        
+        // In a real implementation, this would check against a database
+        // for velocity limits (e.g., max transactions per hour, day, etc.)
+<span class="fc bfc" id="L82" title="All 2 branches covered.">        if (isVelocityLimitExceeded(transactionType, cardNumber)) {</span>
+<span class="fc" id="L83">            errors.add(&quot;VELOCITY_LIMIT: Velocity limit exceeded for &quot; + transactionType);</span>
+        }
+        
+<span class="fc" id="L86">        return new ValidationResult(errors, new ArrayList&lt;&gt;());</span>
+    }
+    
+    /**
+     * Get the maximum amount allowed for a specific transaction type.
+     */
+    protected abstract double getMaxAmountForTransactionType(TransactionType transactionType);
+    
+    /**
+     * Check if velocity limits are exceeded for the given card and transaction type.
+     */
+    protected abstract boolean isVelocityLimitExceeded(TransactionType transactionType, String cardNumber);
+    
+    /**
+     * Get the list of required fields for a transaction type.
+     */
+    protected List&lt;String&gt; getRequiredFields(TransactionType transactionType) {
+<span class="fc" id="L103">        return REQUIRED_FIELDS.getOrDefault(transactionType, new ArrayList&lt;&gt;());</span>
+    }
+} 
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.14.202510111229</span></div></body></html>

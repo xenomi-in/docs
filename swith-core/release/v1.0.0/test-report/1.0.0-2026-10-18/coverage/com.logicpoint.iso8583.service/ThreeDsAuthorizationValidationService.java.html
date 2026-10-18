@@ -1,0 +1,131 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>ThreeDsAuthorizationValidationService.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">iso8583-processor</a> &gt; <a href="index.source.html" class="el_package">com.logicpoint.iso8583.service</a> &gt; <span class="el_source">ThreeDsAuthorizationValidationService.java</span></div><h1>ThreeDsAuthorizationValidationService.java</h1><pre class="source lang-java linenums">package com.logicpoint.iso8583.service;
+
+import com.logicpoint.iso8583.config.ThreeDsAuthorizationProperties;
+import com.logicpoint.iso8583.context.RequestContext;
+import com.logicpoint.iso8583.util.Scheme;
+import com.logicpoint.iso8583.validation.TransactionType;
+import java.util.ArrayList;
+import java.util.Base64;
+import java.util.List;
+import java.util.Map;
+import java.util.Set;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+import org.springframework.stereotype.Service;
+
+/**
+ * Validates network-configured 3DS authorization indicators carried in ISO8583 fields.
+ */
+@Service
+public class ThreeDsAuthorizationValidationService {
+
+<span class="fc" id="L22">    private static final Logger log = LoggerFactory.getLogger(ThreeDsAuthorizationValidationService.class);</span>
+
+    private final ThreeDsAuthorizationProperties properties;
+
+<span class="fc" id="L26">    public ThreeDsAuthorizationValidationService(ThreeDsAuthorizationProperties properties) {</span>
+<span class="fc" id="L27">        this.properties = properties;</span>
+<span class="fc" id="L28">    }</span>
+
+    public List&lt;String&gt; validate(RequestContext requestContext, Scheme scheme, TransactionType transactionType) {
+<span class="fc" id="L31">        List&lt;String&gt; errors = new ArrayList&lt;&gt;();</span>
+<span class="pc bpc" id="L32" title="4 of 8 branches missed.">        if (!properties.isEnabled() || requestContext == null || scheme == null || transactionType == null) {</span>
+<span class="nc" id="L33">            return errors;</span>
+        }
+
+<span class="fc" id="L36">        ThreeDsAuthorizationProperties.SchemeRule rule = properties.getRule(scheme.name());</span>
+<span class="pc bpc" id="L37" title="3 of 6 branches missed.">        if (rule == null || !rule.isEnabled() || !rule.getTransactionTypes().contains(transactionType)) {</span>
+<span class="nc" id="L38">            return errors;</span>
+        }
+
+        Map&lt;String, String&gt; de48Tags;
+        try {
+<span class="fc" id="L43">            de48Tags = requestContext.getParsedTlv(48);</span>
+<span class="nc" id="L44">        } catch (Exception ex) {</span>
+<span class="nc" id="L45">            errors.add(&quot;INVALID_3DS_DE48_FORMAT: Unable to parse DE48 for 3DS authorization data&quot;);</span>
+<span class="nc" id="L46">            return errors;</span>
+<span class="fc" id="L47">        }</span>
+
+<span class="fc" id="L49">        String eci = normalize(de48Tags.get(rule.getEciTag()));</span>
+<span class="pc bpc" id="L50" title="1 of 2 branches missed.">        if (eci == null) {</span>
+<span class="nc" id="L51">            errors.add(&quot;MISSING_3DS_ECI: DE48 tag &quot; + rule.getEciTag() + &quot; is required for &quot; + scheme + &quot; &quot; + transactionType);</span>
+<span class="nc" id="L52">            return errors;</span>
+        }
+
+<span class="pc bpc" id="L55" title="2 of 4 branches missed.">        if (!rule.getAllowedEciValues().isEmpty() &amp;&amp; !rule.getAllowedEciValues().contains(eci)) {</span>
+<span class="nc" id="L56">            errors.add(&quot;INVALID_3DS_ECI: DE48 tag &quot; + rule.getEciTag() + &quot; value &quot; + eci</span>
+                    + &quot; is not configured for &quot; + scheme + &quot; &quot; + transactionType);
+        }
+
+<span class="fc" id="L60">        String cavv = de48Tags.get(rule.getCavvTag());</span>
+<span class="fc bfc" id="L61" title="All 2 branches covered.">        if (!rule.isOnBehalfOf()) {</span>
+<span class="pc bpc" id="L62" title="2 of 4 branches missed.">            if (rule.getCavvRequiredEciValues().contains(eci) &amp;&amp; isBlank(cavv)) {</span>
+<span class="fc" id="L63">                errors.add(&quot;MISSING_3DS_CAVV: DE48 tag &quot; + rule.getCavvTag() + &quot; is required for ECI &quot; + eci);</span>
+<span class="fc" id="L64">                return errors;</span>
+            }
+
+<span class="nc bnc" id="L67" title="All 2 branches missed.">            if (!isBlank(cavv)) {</span>
+<span class="nc" id="L68">                String authResultCode = extractAuthenticationResultCode(cavv);</span>
+<span class="nc bnc" id="L69" title="All 2 branches missed.">                if (authResultCode == null) {</span>
+<span class="nc" id="L70">                    errors.add(&quot;INVALID_3DS_CAVV_FORMAT: DE48 tag &quot; + rule.getCavvTag()</span>
+                            + &quot; is not a valid Base64 encoded authentication value&quot;);
+                } else {
+<span class="nc" id="L73">                    Set&lt;String&gt; allowedAuthResults = rule.getCavvAuthResultByEci().get(eci);</span>
+<span class="nc bnc" id="L74" title="All 4 branches missed.">                    if (allowedAuthResults != null &amp;&amp; !allowedAuthResults.isEmpty()</span>
+<span class="nc bnc" id="L75" title="All 2 branches missed.">                            &amp;&amp; !allowedAuthResults.contains(authResultCode)) {</span>
+<span class="nc" id="L76">                        errors.add(&quot;INVALID_3DS_CAVV_ECI_MAPPING: CAVV authentication result &quot;</span>
+                                + authResultCode + &quot; is not valid for ECI &quot; + eci);
+                    }
+                }
+            }
+        }
+
+<span class="fc" id="L83">        validateOptionalTransactionIdTags(de48Tags, rule.getDsTransactionIdTags(), &quot;DS&quot;);</span>
+<span class="fc" id="L84">        validateOptionalTransactionIdTags(de48Tags, rule.getAcsTransactionIdTags(), &quot;ACS&quot;);</span>
+<span class="fc" id="L85">        return errors;</span>
+    }
+
+    private void validateOptionalTransactionIdTags(Map&lt;String, String&gt; de48Tags, List&lt;String&gt; tags, String owner) {
+<span class="fc bfc" id="L89" title="All 2 branches covered.">        for (String tag : tags) {</span>
+<span class="fc" id="L90">            String value = de48Tags.get(tag);</span>
+<span class="pc bpc" id="L91" title="1 of 2 branches missed.">            if (!isBlank(value)) {</span>
+<span class="nc" id="L92">                log.debug(&quot;{} transaction id found in DE48 tag {}&quot;, owner, tag);</span>
+<span class="nc" id="L93">                return;</span>
+            }
+<span class="fc" id="L95">        }</span>
+<span class="fc" id="L96">    }</span>
+
+    private String extractAuthenticationResultCode(String cavv) {
+        try {
+<span class="nc" id="L100">            byte[] decoded = Base64.getDecoder().decode(cavv);</span>
+<span class="nc bnc" id="L101" title="All 2 branches missed.">            if (decoded.length == 0) {</span>
+<span class="nc" id="L102">                return null;</span>
+            }
+
+<span class="nc" id="L105">            String printable = new String(decoded);</span>
+<span class="nc" id="L106">            String trimmed = printable.trim();</span>
+<span class="nc bnc" id="L107" title="All 2 branches missed.">            if (trimmed.matches(&quot;\\d{2}.*&quot;)) {</span>
+<span class="nc" id="L108">                return trimmed.substring(0, 2);</span>
+            }
+
+<span class="nc" id="L111">            StringBuilder bcd = new StringBuilder(decoded.length * 2);</span>
+<span class="nc bnc" id="L112" title="All 2 branches missed.">            for (byte value : decoded) {</span>
+<span class="nc" id="L113">                bcd.append(Character.forDigit((value &gt;&gt; 4) &amp; 0x0F, 16));</span>
+<span class="nc" id="L114">                bcd.append(Character.forDigit(value &amp; 0x0F, 16));</span>
+            }
+<span class="nc" id="L116">            String numeric = bcd.toString().toUpperCase();</span>
+<span class="nc bnc" id="L117" title="All 2 branches missed.">            return numeric.matches(&quot;\\d{2}.*&quot;) ? numeric.substring(0, 2) : null;</span>
+<span class="nc" id="L118">        } catch (IllegalArgumentException ex) {</span>
+<span class="nc" id="L119">            return null;</span>
+        }
+    }
+
+    private String normalize(String value) {
+<span class="pc bpc" id="L124" title="1 of 2 branches missed.">        return isBlank(value) ? null : value.trim().toUpperCase();</span>
+    }
+
+    private boolean isBlank(String value) {
+<span class="pc bpc" id="L128" title="1 of 4 branches missed.">        return value == null || value.trim().isEmpty();</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.14.202510111229</span></div></body></html>

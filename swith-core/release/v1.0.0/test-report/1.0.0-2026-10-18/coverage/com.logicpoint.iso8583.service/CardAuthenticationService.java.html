@@ -1,0 +1,122 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>CardAuthenticationService.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">iso8583-processor</a> &gt; <a href="index.source.html" class="el_package">com.logicpoint.iso8583.service</a> &gt; <span class="el_source">CardAuthenticationService.java</span></div><h1>CardAuthenticationService.java</h1><pre class="source lang-java linenums">package com.logicpoint.iso8583.service;
+
+import org.springframework.stereotype.Service;
+
+import java.util.Map;
+
+import com.logicpoint.iso8583.emv.ChipData;
+import com.logicpoint.iso8583.emv.ChipDataParser;
+
+/**
+ * Service for card authentication and cryptographic verifications.
+ * Includes CVV, PIN, ARQC, ARPC, and CAVV operations.
+ * Author: LogicPoint Systems
+ * Version: 1.0
+ * Date: 2025-07-23
+ */
+@Service
+<span class="fc" id="L18">public class CardAuthenticationService {</span>
+
+    /**
+     * Verifies the CVV for a card.
+     *
+     * @param pan Primary Account Number (card number)
+     * @param expiryDate Card expiry date (MMYY)
+     * @param cvv Provided CVV value
+     * @param cvvKey Key for CVV calculation (from HSM or config)
+     * @return true if CVV is valid, false otherwise
+     */
+    public boolean verifyCvv(String pan, String expiryDate, String cvv, String cvvKey) {
+        // TODO: Implement CVV calculation/validation (possibly via HSM)
+<span class="fc" id="L31">        return false;</span>
+    }
+
+    /**
+     * Verifies the PIN using PIN block and PAN.
+     *
+     * @param pinBlock Encrypted PIN block (ISO 9564)
+     * @param pan Primary Account Number (card number)
+     * @param pinKey Key for PIN verification (from HSM)
+     * @return true if PIN is valid, false otherwise
+     */
+    public boolean verifyPin(Map&lt;Integer, String&gt; transactionData, String scheme) {
+<span class="fc" id="L43">        String pinBlock = transactionData.get(52);</span>
+<span class="fc" id="L44">        String pan = transactionData.get(2);</span>
+<span class="fc" id="L45">       String bin = pan.substring(0, 6);</span>
+       String pinMethod;
+       String EncyPVK;
+       String pvki;
+       String PinOffset;
+       String PinLength;
+      
+       
+        // TODO: Implement PIN verification (usually via HSM)
+<span class="fc" id="L54">        return false;</span>
+    }
+
+    /**
+     * Verifies the ARQC (Application Request Cryptogram) for EMV transactions.
+     *
+     * @param arqc The ARQC from the card
+     * @param pan Primary Account Number
+     * @param atc Application Transaction Counter
+     * @param data EMV data used for ARQC calculation
+     * @param arqcKey Key for ARQC verification (from HSM)
+     * @return true if ARQC is valid, false otherwise
+     */
+    public boolean verifyArqc(Map&lt;Integer, String&gt; transactionData, String scheme,String emvMethod) {
+        // TODO: Implement ARQC verification (usually via HSM)
+<span class="fc" id="L69">        String emvData = transactionData.get(55);   </span>
+<span class="fc" id="L70">        String pan = transactionData.get(2);</span>
+<span class="fc" id="L71">        String panSeqNumber = transactionData.get(3);</span>
+<span class="fc" id="L72">        ChipData iccData = new ChipDataParser().parseChipData(emvData);</span>
+<span class="fc" id="L73">        System.out.println(iccData.getAllTagsAndValues());</span>
+<span class="fc" id="L74">        String bin = pan.substring(0, 6);</span>
+<span class="fc" id="L75">        String amount = iccData.getTagValue(&quot;9F02&quot;);</span>
+<span class="fc" id="L76">        String otherAmt = iccData.getTagValue(&quot;9F03&quot;);</span>
+<span class="fc" id="L77">        String tvr = iccData.getTagValue(&quot;95&quot;);</span>
+<span class="fc" id="L78">        String countryCode = iccData.getTagValue(&quot;9f1A&quot;);</span>
+<span class="fc" id="L79">        String currencyCode = iccData.getTagValue(&quot;5F2A&quot;);</span>
+<span class="fc" id="L80">        String txnDate = iccData.getTagValue(&quot;9A&quot;);</span>
+<span class="fc" id="L81">        String txnType = iccData.getTagValue(&quot;9C&quot;);</span>
+<span class="fc" id="L82">        String unpredictableNumber = iccData.getTagValue(&quot;9F37&quot;);</span>
+<span class="fc" id="L83">        String aip = iccData.getTagValue(&quot;82&quot;);</span>
+<span class="fc" id="L84">        String atc = iccData.getTagValue(&quot;9F36&quot;);</span>
+
+<span class="fc" id="L86">        String aid_cvr = iccData.getTagValue( &quot;9F10&quot;);</span>
+      
+       
+<span class="fc" id="L89">        return false;</span>
+    }
+
+    /**
+     * Generates ARPC (Application Response Cryptogram) for EMV transactions.
+     *
+     * @param pan Primary Account Number
+     * @param atc Application Transaction Counter
+     * @param arqc The ARQC from the card
+     * @param responseCode Response code to be included in ARPC
+     * @param arqcKey Key for ARPC generation (from HSM)
+     * @return The generated ARPC
+     */
+    public String generateArpc(String pan, String atc, String arqc, String responseCode, String arqcKey) {
+        // TODO: Implement ARPC generation (usually via HSM)
+<span class="fc" id="L104">        return null;</span>
+    }
+
+    /**
+     * Generates CAVV (Cardholder Authentication Verification Value) for 3D Secure.
+     *
+     * @param pan Primary Account Number
+     * @param expiryDate Card expiry date (MMYY)
+     * @param serviceCode Service code
+     * @param cavvKey Key for CAVV generation (from HSM)
+     * @param transactionData Additional transaction data (e.g., challenge data)
+     * @return The generated CAVV
+     */
+    public String generateCavv(String pan, String expiryDate, String serviceCode, String cavvKey, String transactionData) {
+        // TODO: Implement CAVV generation (usually via HSM)
+<span class="fc" id="L119">        return null;</span>
+    }
+} 
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.14.202510111229</span></div></body></html>

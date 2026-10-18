@@ -1,0 +1,42 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>CmsContracts.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">iso8583-processor</a> &gt; <a href="index.source.html" class="el_package">com.logicpoint.iso8583.cmsintegration</a> &gt; <span class="el_source">CmsContracts.java</span></div><h1>CmsContracts.java</h1><pre class="source lang-java linenums">package com.logicpoint.iso8583.cmsintegration;
+
+import jakarta.validation.Valid;
+import jakarta.validation.constraints.*;
+import java.util.List;
+import java.util.UUID;
+
+public final class CmsContracts {
+    private CmsContracts() {}
+<span class="fc" id="L10">    public enum Status { PENDING, ACTIVE, FROZEN, BLOCKED, EXPIRED, CLOSED, REPLACED }</span>
+<span class="fc" id="L11">    public enum Geography { DOMESTIC, INTERNATIONAL }</span>
+<span class="fc" id="L12">    public enum Channel { ATM, POS_CONTACT, ECOM, MOTO, CONTACTLESS_POS }</span>
+<span class="fc" id="L13">    public record Control(@NotNull Geography geography, @NotNull Channel channel,</span>
+            boolean enabled, @PositiveOrZero long perTransactionLimitMinor,
+            boolean contactlessEnabled, @PositiveOrZero long contactlessLimitMinor) {}
+<span class="fc" id="L16">    public record Profile(@NotNull Status effectiveStatus, @Size(max=40) String statusReason,</span>
+            @Positive long lifecycleVersion, @Positive int controlVersion,
+            boolean internationalEnabled, boolean physicalEnabled, boolean digitalEnabled,
+            @Pattern(regexp=&quot;[0-9]{3}&quot;) @NotNull String currencyCode,
+            @NotNull @Size(min=10,max=10) List&lt;@Valid Control&gt; controls) {}
+    // Provisioning material is encrypted to the Switch recipient key. Never retained in command receipts.
+<span class="fc" id="L22">    public record Registration(@NotNull UUID commandId, @NotNull UUID accountReferenceId, UUID predecessorCardId,</span>
+            @NotNull UUID panFamilyId, @Pattern(regexp=&quot;[0-9]{3}&quot;) String physicalSequence,
+            @NotBlank @Size(max=16384) String protectedMaterial,
+            @NotNull @Valid Profile profile) {
+<span class="nc" id="L26">        @Override public String toString() { return &quot;Registration[commandId=&quot; + commandId + &quot;]&quot;; }</span>
+    }
+<span class="fc" id="L28">    public record Update(@NotNull UUID commandId, @Positive long expectedRevision,</span>
+            @Positive long authorizationRevision, @Pattern(regexp=&quot;[0-9]{3}&quot;) String physicalSequence,
+            @NotNull @Valid Profile profile) {
+        public Update(UUID commandId,long expectedRevision,long authorizationRevision,Profile profile) {
+<span class="fc" id="L32">            this(commandId,expectedRevision,authorizationRevision,null,profile);</span>
+<span class="fc" id="L33">        }</span>
+    }
+<span class="fc" id="L35">    public record Cutover(@NotNull UUID commandId, @NotNull UUID predecessorCardId,</span>
+            @NotNull UUID successorCardId, @Positive long predecessorExpectedRevision,
+            @Positive long successorExpectedRevision, @NotNull @Valid Profile predecessor,
+            @NotNull @Valid Profile successor) {}
+<span class="fc" id="L39">    public record Receipt(UUID commandId, UUID cardId, boolean applied, long appliedRevision,</span>
+            Status effectiveStatus) {}
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.14.202510111229</span></div></body></html>

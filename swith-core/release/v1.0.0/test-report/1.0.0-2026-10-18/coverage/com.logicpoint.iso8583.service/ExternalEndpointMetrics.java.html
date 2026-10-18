@@ -1,0 +1,255 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>ExternalEndpointMetrics.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">iso8583-processor</a> &gt; <a href="index.source.html" class="el_package">com.logicpoint.iso8583.service</a> &gt; <span class="el_source">ExternalEndpointMetrics.java</span></div><h1>ExternalEndpointMetrics.java</h1><pre class="source lang-java linenums">package com.logicpoint.iso8583.service;
+
+import com.logicpoint.iso8583.config.AccountingApiProperties;
+import com.logicpoint.iso8583.hsm.SimpleNettyHsmClient;
+import io.micrometer.core.instrument.Gauge;
+import io.micrometer.core.instrument.MeterRegistry;
+import jakarta.annotation.PostConstruct;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+import org.springframework.beans.factory.annotation.Value;
+import org.springframework.scheduling.annotation.Scheduled;
+import org.springframework.stereotype.Component;
+
+import java.net.HttpURLConnection;
+import java.net.URI;
+import java.time.Instant;
+import java.util.concurrent.atomic.AtomicInteger;
+import java.util.concurrent.atomic.AtomicLong;
+
+/** Prometheus gauges for downstream availability and the custom Netty HSM pool. */
+@Component
+public class ExternalEndpointMetrics {
+
+<span class="fc" id="L24">    private static final Logger log = LoggerFactory.getLogger(ExternalEndpointMetrics.class);</span>
+
+    private final HsmKeepAliveServiceInterface hsmHealth;
+    private final SimpleNettyHsmClient hsmClient;
+    private final AccountingApiProperties accounting;
+    private final MeterRegistry registry;
+<span class="fc" id="L30">    private final AtomicInteger accountingUp = new AtomicInteger(0);</span>
+<span class="fc" id="L31">    private final AtomicLong accountingProbeDurationMs = new AtomicLong(0);</span>
+<span class="fc" id="L32">    private final AtomicLong accountingLastCheckEpochSeconds = new AtomicLong(0);</span>
+<span class="fc" id="L33">    private final AtomicLong accountingLastSuccessEpochSeconds = new AtomicLong(0);</span>
+<span class="fc" id="L34">    private final AtomicInteger accountingHttpStatus = new AtomicInteger(0);</span>
+<span class="fc" id="L35">    private final AtomicInteger hsmPreviousUp = new AtomicInteger(0);</span>
+<span class="fc" id="L36">    private final AtomicInteger accountingPreviousUp = new AtomicInteger(0);</span>
+<span class="fc" id="L37">    private final AtomicLong hsmConnectedSinceEpochSeconds = new AtomicLong(0);</span>
+<span class="fc" id="L38">    private final AtomicLong accountingConnectedSinceEpochSeconds = new AtomicLong(0);</span>
+
+    @Value(&quot;${accounting.api.enabled:false}&quot;)
+    private boolean accountingEnabled;
+
+    @Value(&quot;${hsm.futurex.host:unknown}&quot;)
+    private String hsmHost;
+
+    @Value(&quot;${hsm.futurex.port:4121}&quot;)
+    private int hsmPort;
+
+    @Value(&quot;${hsm.futurex.ssl-enabled:true}&quot;)
+    private boolean hsmSslEnabled;
+
+    @Value(&quot;${monitoring.external-endpoints.accounting.connect-timeout-ms:2000}&quot;)
+    private int accountingProbeTimeoutMs;
+
+    @Value(&quot;${monitoring.external-endpoints.accounting.read-timeout-ms:3000}&quot;)
+    private int accountingProbeReadTimeoutMs;
+
+    @Value(&quot;${monitoring.external-endpoints.accounting.path:}&quot;)
+    private String accountingHealthPath;
+
+    public ExternalEndpointMetrics(HsmKeepAliveServiceInterface hsmHealth,
+                                   SimpleNettyHsmClient hsmClient,
+                                   AccountingApiProperties accounting,
+<span class="fc" id="L64">                                   MeterRegistry registry) {</span>
+<span class="fc" id="L65">        this.hsmHealth = hsmHealth;</span>
+<span class="fc" id="L66">        this.hsmClient = hsmClient;</span>
+<span class="fc" id="L67">        this.accounting = accounting;</span>
+<span class="fc" id="L68">        this.registry = registry;</span>
+<span class="fc" id="L69">    }</span>
+
+    @PostConstruct
+    void bindMetrics() {
+<span class="fc" id="L73">        URI accountingUri = buildAccountingProbeUri();</span>
+<span class="fc" id="L74">        String accountingPort = Integer.toString(resolvePort(accountingUri));</span>
+<span class="fc" id="L75">        String hsmAddress = hsmHost + &quot;:&quot; + hsmPort;</span>
+<span class="fc" id="L76">        String accountingAddress = accountingUri.getHost() + &quot;:&quot; + accountingPort;</span>
+
+<span class="fc" id="L78">        Gauge.builder(&quot;switch_external_endpoint_up&quot;, hsmHealth,</span>
+<span class="pc bpc" id="L79" title="1 of 2 branches missed.">                        health -&gt; health.getHealthyConnectionCount() &gt; 0 ? 1 : 0)</span>
+<span class="fc" id="L80">                .description(&quot;Whether the external endpoint is reachable (1) or unavailable (0)&quot;)</span>
+<span class="fc" id="L81">                .tag(&quot;endpoint&quot;, &quot;hsm&quot;)</span>
+<span class="fc" id="L82">                .tag(&quot;address&quot;, hsmAddress)</span>
+<span class="fc" id="L83">                .register(registry);</span>
+<span class="fc" id="L84">        Gauge.builder(&quot;switch_external_endpoint_up&quot;, accountingUp, AtomicInteger::get)</span>
+<span class="fc" id="L85">                .description(&quot;Whether the external endpoint is reachable (1) or unavailable (0)&quot;)</span>
+<span class="fc" id="L86">                .tag(&quot;endpoint&quot;, &quot;accounting&quot;)</span>
+<span class="fc" id="L87">                .tag(&quot;address&quot;, accountingAddress)</span>
+<span class="fc" id="L88">                .register(registry);</span>
+<span class="fc" id="L89">        Gauge.builder(&quot;switch_external_endpoint_configured&quot;, this,</span>
+<span class="pc bpc" id="L90" title="1 of 2 branches missed.">                        ignored -&gt; accountingEnabled ? 1 : 0)</span>
+<span class="fc" id="L91">                .tag(&quot;endpoint&quot;, &quot;accounting&quot;)</span>
+<span class="fc" id="L92">                .register(registry);</span>
+
+<span class="pc" id="L94">        Gauge.builder(&quot;switch_external_endpoint_info&quot;, this, ignored -&gt; 1)</span>
+<span class="fc" id="L95">                .description(&quot;Configured external endpoint details&quot;)</span>
+<span class="fc" id="L96">                .tags(&quot;endpoint&quot;, &quot;hsm&quot;,</span>
+<span class="pc bpc" id="L97" title="1 of 2 branches missed.">                        &quot;scheme&quot;, hsmSslEnabled ? &quot;tls&quot; : &quot;tcp&quot;,</span>
+                        &quot;host&quot;, hsmHost,
+<span class="fc" id="L99">                        &quot;port&quot;, Integer.toString(hsmPort),</span>
+                        &quot;path&quot;, &quot;&quot;)
+<span class="fc" id="L101">                .register(registry);</span>
+<span class="pc" id="L102">        Gauge.builder(&quot;switch_external_endpoint_info&quot;, this, ignored -&gt; 1)</span>
+<span class="fc" id="L103">                .description(&quot;Configured external endpoint details&quot;)</span>
+<span class="fc" id="L104">                .tags(&quot;endpoint&quot;, &quot;accounting&quot;,</span>
+<span class="fc" id="L105">                        &quot;scheme&quot;, nullToEmpty(accountingUri.getScheme()),</span>
+<span class="fc" id="L106">                        &quot;host&quot;, nullToEmpty(accountingUri.getHost()),</span>
+                        &quot;port&quot;, accountingPort,
+<span class="fc" id="L108">                        &quot;path&quot;, nullToEmpty(accountingUri.getPath()))</span>
+<span class="fc" id="L109">                .register(registry);</span>
+
+<span class="fc" id="L111">        bindHsmPoolGauge(&quot;active&quot;, &quot;Connections currently borrowed from the HSM pool&quot;,</span>
+                SimpleNettyHsmClient::getBorrowedConnectionCount);
+<span class="fc" id="L113">        bindHsmPoolGauge(&quot;idle&quot;, &quot;Idle connections in the HSM pool&quot;,</span>
+                SimpleNettyHsmClient::getIdleConnectionCount);
+<span class="fc" id="L115">        bindHsmPoolGauge(&quot;total&quot;, &quot;Total open HSM connections&quot;,</span>
+                SimpleNettyHsmClient::getTotalConnectionCount);
+<span class="fc" id="L117">        bindHsmPoolGauge(&quot;max&quot;, &quot;Maximum HSM pool size&quot;,</span>
+                SimpleNettyHsmClient::getMaxConnectionCount);
+<span class="fc" id="L119">        bindHsmPoolGauge(&quot;pending&quot;, &quot;Callers waiting for an HSM connection&quot;,</span>
+                SimpleNettyHsmClient::getPendingConnectionCount);
+
+<span class="fc" id="L122">        Gauge.builder(&quot;switch_external_endpoint_probe_duration_milliseconds&quot;,</span>
+                        accountingProbeDurationMs, AtomicLong::get)
+<span class="fc" id="L124">                .tag(&quot;endpoint&quot;, &quot;accounting&quot;).register(registry);</span>
+<span class="fc" id="L125">        Gauge.builder(&quot;switch_external_endpoint_last_check_timestamp_seconds&quot;,</span>
+<span class="pc bpc" id="L126" title="1 of 2 branches missed.">                        hsmHealth, health -&gt; health.getLastActivityTime() &gt; 0</span>
+<span class="fc" id="L127">                                ? health.getLastActivityTime() / 1000.0</span>
+<span class="nc" id="L128">                                : 0)</span>
+<span class="fc" id="L129">                .description(&quot;Unix timestamp when endpoint connectivity was last checked&quot;)</span>
+<span class="fc" id="L130">                .tag(&quot;endpoint&quot;, &quot;hsm&quot;)</span>
+<span class="fc" id="L131">                .tag(&quot;address&quot;, hsmAddress)</span>
+<span class="fc" id="L132">                .register(registry);</span>
+<span class="fc" id="L133">        Gauge.builder(&quot;switch_external_endpoint_last_check_timestamp_seconds&quot;,</span>
+                        accountingLastCheckEpochSeconds, AtomicLong::get)
+<span class="fc" id="L135">                .description(&quot;Unix timestamp when endpoint connectivity was last checked&quot;)</span>
+<span class="fc" id="L136">                .tag(&quot;endpoint&quot;, &quot;accounting&quot;)</span>
+<span class="fc" id="L137">                .tag(&quot;address&quot;, accountingAddress)</span>
+<span class="fc" id="L138">                .register(registry);</span>
+<span class="fc" id="L139">        Gauge.builder(&quot;switch_external_endpoint_last_success_timestamp_seconds&quot;,</span>
+                        accountingLastSuccessEpochSeconds, AtomicLong::get)
+<span class="fc" id="L141">                .tag(&quot;endpoint&quot;, &quot;accounting&quot;).register(registry);</span>
+<span class="fc" id="L142">        Gauge.builder(&quot;switch_external_endpoint_connected_since_timestamp_seconds&quot;,</span>
+                        hsmConnectedSinceEpochSeconds, AtomicLong::get)
+<span class="fc" id="L144">                .description(&quot;Unix timestamp when the current endpoint connection became available; zero while down&quot;)</span>
+<span class="fc" id="L145">                .tag(&quot;endpoint&quot;, &quot;hsm&quot;)</span>
+<span class="fc" id="L146">                .tag(&quot;address&quot;, hsmAddress)</span>
+<span class="fc" id="L147">                .register(registry);</span>
+<span class="fc" id="L148">        Gauge.builder(&quot;switch_external_endpoint_connected_since_timestamp_seconds&quot;,</span>
+                        accountingConnectedSinceEpochSeconds, AtomicLong::get)
+<span class="fc" id="L150">                .description(&quot;Unix timestamp when the current endpoint connection became available; zero while down&quot;)</span>
+<span class="fc" id="L151">                .tag(&quot;endpoint&quot;, &quot;accounting&quot;)</span>
+<span class="fc" id="L152">                .tag(&quot;address&quot;, accountingAddress)</span>
+<span class="fc" id="L153">                .register(registry);</span>
+<span class="fc" id="L154">        Gauge.builder(&quot;switch_external_endpoint_http_status&quot;, accountingHttpStatus, AtomicInteger::get)</span>
+<span class="fc" id="L155">                .description(&quot;HTTP status returned by the last Accounting API probe; zero means no response&quot;)</span>
+<span class="fc" id="L156">                .tag(&quot;endpoint&quot;, &quot;accounting&quot;).register(registry);</span>
+<span class="fc" id="L157">    }</span>
+
+    @Scheduled(fixedDelayString = &quot;${monitoring.external-endpoints.hsm.connection-state-interval-ms:1000}&quot;,
+               initialDelayString = &quot;${monitoring.external-endpoints.hsm.connection-state-initial-delay-ms:1000}&quot;)
+    void trackHsmConnectionState() {
+<span class="fc" id="L162">        updateConnectedSince(hsmPreviousUp, hsmConnectedSinceEpochSeconds,</span>
+<span class="fc bfc" id="L163" title="All 2 branches covered.">                hsmHealth.getHealthyConnectionCount() &gt; 0);</span>
+<span class="fc" id="L164">    }</span>
+
+    private void bindHsmPoolGauge(String state, String description,
+                                  java.util.function.ToDoubleFunction&lt;SimpleNettyHsmClient&gt; value) {
+<span class="fc" id="L168">        Gauge.builder(&quot;switch_hsm_connections&quot;, hsmClient, value)</span>
+<span class="fc" id="L169">                .description(description)</span>
+<span class="fc" id="L170">                .tag(&quot;state&quot;, state)</span>
+<span class="fc" id="L171">                .register(registry);</span>
+<span class="fc" id="L172">    }</span>
+
+    /** HTTP reachability probe; it never invokes a transactional API operation. */
+    @Scheduled(fixedDelayString = &quot;${monitoring.external-endpoints.accounting.interval-ms:30000}&quot;,
+               initialDelayString = &quot;${monitoring.external-endpoints.accounting.initial-delay-ms:5000}&quot;)
+    void probeAccounting() {
+<span class="fc bfc" id="L178" title="All 2 branches covered.">        if (!accountingEnabled) {</span>
+<span class="fc" id="L179">            accountingUp.set(0);</span>
+<span class="fc" id="L180">            accountingHttpStatus.set(0);</span>
+<span class="fc" id="L181">            accountingLastCheckEpochSeconds.set(Instant.now().getEpochSecond());</span>
+<span class="fc" id="L182">            updateConnectedSince(accountingPreviousUp, accountingConnectedSinceEpochSeconds, false);</span>
+<span class="fc" id="L183">            return;</span>
+        }
+
+<span class="fc" id="L186">        long started = System.nanoTime();</span>
+<span class="fc" id="L187">        HttpURLConnection connection = null;</span>
+        try {
+<span class="fc" id="L189">            URI uri = buildAccountingProbeUri();</span>
+<span class="fc" id="L190">            connection = (HttpURLConnection) uri.toURL().openConnection();</span>
+<span class="fc" id="L191">            connection.setRequestMethod(&quot;GET&quot;);</span>
+<span class="fc" id="L192">            connection.setConnectTimeout(accountingProbeTimeoutMs);</span>
+<span class="fc" id="L193">            connection.setReadTimeout(accountingProbeReadTimeoutMs);</span>
+<span class="fc" id="L194">            connection.setInstanceFollowRedirects(false);</span>
+<span class="fc" id="L195">            connection.setRequestProperty(&quot;Accept&quot;, &quot;application/json&quot;);</span>
+
+<span class="nc" id="L197">            int status = connection.getResponseCode();</span>
+<span class="nc" id="L198">            accountingHttpStatus.set(status);</span>
+            // Any non-server response proves the HTTP API itself was reached. Authentication
+            // failures and a missing optional health path are therefore still reachable.
+<span class="nc bnc" id="L201" title="All 4 branches missed.">            boolean reachable = status &gt;= 200 &amp;&amp; status &lt; 500;</span>
+<span class="nc bnc" id="L202" title="All 2 branches missed.">            accountingUp.set(reachable ? 1 : 0);</span>
+<span class="nc" id="L203">            updateConnectedSince(accountingPreviousUp, accountingConnectedSinceEpochSeconds, reachable);</span>
+<span class="nc bnc" id="L204" title="All 2 branches missed.">            if (reachable) {</span>
+<span class="nc" id="L205">                accountingLastSuccessEpochSeconds.set(Instant.now().getEpochSecond());</span>
+            }
+<span class="fc" id="L207">        } catch (Exception ex) {</span>
+<span class="fc" id="L208">            accountingUp.set(0);</span>
+<span class="fc" id="L209">            accountingHttpStatus.set(0);</span>
+<span class="fc" id="L210">            updateConnectedSince(accountingPreviousUp, accountingConnectedSinceEpochSeconds, false);</span>
+<span class="fc" id="L211">            log.warn(&quot;Accounting API HTTP probe failed: {}&quot;, ex.getMessage());</span>
+        } finally {
+<span class="pc bpc" id="L213" title="1 of 2 branches missed.">            if (connection != null) {</span>
+<span class="fc" id="L214">                connection.disconnect();</span>
+            }
+<span class="fc" id="L216">            accountingLastCheckEpochSeconds.set(Instant.now().getEpochSecond());</span>
+<span class="fc" id="L217">            accountingProbeDurationMs.set((System.nanoTime() - started) / 1_000_000);</span>
+        }
+<span class="fc" id="L219">    }</span>
+
+    private void updateConnectedSince(AtomicInteger previousState,
+                                      AtomicLong connectedSinceEpochSeconds,
+                                      boolean connected) {
+<span class="fc bfc" id="L224" title="All 2 branches covered.">        int current = connected ? 1 : 0;</span>
+<span class="fc" id="L225">        int previous = previousState.getAndSet(current);</span>
+<span class="fc bfc" id="L226" title="All 2 branches covered.">        if (current == 0) {</span>
+<span class="fc" id="L227">            connectedSinceEpochSeconds.set(0);</span>
+<span class="fc bfc" id="L228" title="All 2 branches covered.">        } else if (previous == 0) {</span>
+<span class="fc" id="L229">            connectedSinceEpochSeconds.set(Instant.now().getEpochSecond());</span>
+        }
+<span class="fc" id="L231">    }</span>
+
+    private URI buildAccountingProbeUri() {
+<span class="fc" id="L234">        String baseUrl = accounting.getBaseUrl().replaceAll(&quot;/+$&quot;, &quot;&quot;);</span>
+<span class="pc bpc" id="L235" title="2 of 4 branches missed.">        if (accountingHealthPath == null || accountingHealthPath.isBlank()) {</span>
+<span class="nc" id="L236">            return URI.create(baseUrl);</span>
+        }
+<span class="fc bfc" id="L238" title="All 2 branches covered.">        String path = accountingHealthPath.startsWith(&quot;/&quot;)</span>
+<span class="fc" id="L239">                ? accountingHealthPath</span>
+<span class="fc" id="L240">                : &quot;/&quot; + accountingHealthPath;</span>
+<span class="fc" id="L241">        return URI.create(baseUrl + path);</span>
+    }
+
+    private int resolvePort(URI uri) {
+<span class="fc bfc" id="L245" title="All 2 branches covered.">        if (uri.getPort() &gt;= 0) {</span>
+<span class="fc" id="L246">            return uri.getPort();</span>
+        }
+<span class="fc bfc" id="L248" title="All 2 branches covered.">        return &quot;https&quot;.equalsIgnoreCase(uri.getScheme()) ? 443 : 80;</span>
+    }
+
+    private String nullToEmpty(String value) {
+<span class="fc bfc" id="L252" title="All 2 branches covered.">        return value == null ? &quot;&quot; : value;</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.14.202510111229</span></div></body></html>

@@ -1,0 +1,1226 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>NettyHsmService.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">iso8583-processor</a> &gt; <a href="index.source.html" class="el_package">com.logicpoint.iso8583.service</a> &gt; <span class="el_source">NettyHsmService.java</span></div><h1>NettyHsmService.java</h1><pre class="source lang-java linenums">package com.logicpoint.iso8583.service;
+
+import java.util.concurrent.CompletableFuture;
+
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.beans.factory.annotation.Value;
+import org.springframework.core.env.Environment;
+import org.springframework.stereotype.Service;
+
+import com.logicpoint.iso8583.emv.ChipData;
+import com.logicpoint.iso8583.hsm.FuturexHsmCmd;
+import com.logicpoint.iso8583.hsm.SimpleNettyHsmClient;
+import com.logicpoint.iso8583.emv.IssuerApplicationData;
+import com.logicpoint.iso8583.util.Scheme;
+import jakarta.annotation.PostConstruct;
+import jakarta.annotation.PreDestroy;
+import com.logicpoint.iso8583.validation.TransactionType;
+import java.util.Random;
+import com.logicpoint.iso8583.service.KeyManagementService;
+import java.math.BigDecimal;
+import java.util.Arrays;
+import java.nio.charset.StandardCharsets;
+/**
+ * Service for HSM operations using Netty-based client with connection pooling.
+ * Provides high-performance async communication with the HSM.
+ *
+ * @author LogicPoint Systems
+ * @version 1.0
+ */
+@Service
+public class NettyHsmService {
+
+    private static final String ICVV_SERVICE_CODE = &quot;620&quot;; // it suppoesed to be 999 , but time being 620 given since ICS from for track2 the data of magstipe given for iCVV we need to use 999 service to generate
+    private static final String CVV2_SERVICE_CODE = &quot;000&quot;;
+    private static final int TRACK_CVV_TYPE = 0;
+    private static final int CVV2_TYPE = 1;
+
+<span class="fc" id="L40">    private static final Logger logger = LoggerFactory.getLogger(NettyHsmService.class);</span>
+    private final SimpleNettyHsmClient hsmClient;
+
+    /**
+     * Raw HSM payloads can contain PAN, PIN blocks, working keys and other SAD.
+     * Keep this disabled except for short, explicitly approved diagnostic sessions.
+     * DEBUG logging must also be enabled for this class before payloads are emitted.
+     */
+    @Value(&quot;${hsm.logging.raw-payload-enabled:false}&quot;)
+    private boolean rawHsmPayloadLoggingEnabled;
+
+    @Autowired
+    private Environment environment;
+
+    @Autowired
+    private KeyManagementService keyManagementService;
+    /**
+     * Constructs the NettyHsmService with injected HSM client.
+     *
+     * @param hsmClient The Netty HSM client
+     */
+    @Autowired
+<span class="fc" id="L62">    public NettyHsmService(SimpleNettyHsmClient hsmClient) {</span>
+<span class="fc" id="L63">        this.hsmClient = hsmClient;</span>
+<span class="fc" id="L64">    }</span>
+
+    @PostConstruct
+    void warnWhenRawHsmPayloadLoggingIsEnabled() {
+<span class="pc bpc" id="L68" title="1 of 2 branches missed.">        if (rawHsmPayloadLoggingEnabled) {</span>
+<span class="pc bpc" id="L69" title="1 of 2 branches missed.">            boolean production = environment != null</span>
+<span class="fc" id="L70">                    &amp;&amp; Arrays.stream(environment.getActiveProfiles())</span>
+<span class="pc bpc" id="L71" title="2 of 4 branches missed.">                            .anyMatch(profile -&gt; &quot;prod&quot;.equalsIgnoreCase(profile)</span>
+<span class="pc bnc" id="L72" title="All 2 branches missed.">                                    || &quot;production&quot;.equalsIgnoreCase(profile));</span>
+<span class="pc bpc" id="L73" title="1 of 2 branches missed.">            if (production) {</span>
+<span class="fc" id="L74">                throw new IllegalStateException(</span>
+                        &quot;Raw HSM payload logging cannot be enabled with a production profile&quot;);
+            }
+<span class="nc" id="L77">            logger.warn(&quot;Raw HSM payload logging is enabled. HSM commands and responses may contain CHD, SAD, or cryptographic keys&quot;);</span>
+        }
+<span class="nc" id="L79">    }</span>
+
+    /*
+     * This command translates a Visa working key from encryption under a key encryption key (KEK) / ZMK to encryption under the MFK,
+     */
+    public String TranslateWorkingKey(String workingKey, String keyType,boolean  isTR31Format, String scheme) {
+<span class="fc" id="L85">        String networkName = normalizeNetworkName(scheme);</span>
+<span class="fc" id="L86">        String kek = keyManagementService.getNetworkKey(networkName, &quot;KEK&quot;);</span>
+<span class="fc bfc" id="L87" title="All 2 branches covered.">        logger.debug(&quot;KEK in TranslateWorkingKey resolved for network: {}, available: {}&quot;, networkName, kek != null);</span>
+<span class="pc bpc" id="L88" title="1 of 4 branches missed.">        if (kek == null || kek.isBlank()) {</span>
+<span class="fc" id="L89">            logger.error(&quot;No active network KEK found for scheme: {}&quot;, networkName);</span>
+<span class="fc" id="L90">            return &quot;01;No active network KEK found for scheme: &quot; + networkName;</span>
+        }
+
+<span class="fc" id="L93">        String modifier = &quot;0&quot;;</span>
+<span class="fc" id="L94">        FuturexHsmCmd futurexHsmCmd = new FuturexHsmCmd(&quot;TVWK&quot;);</span>
+        try {
+<span class="fc bfc" id="L96" title="All 3 branches covered.">            switch (keyType) {</span>
+                case &quot;ZPK&quot;:
+<span class="fc" id="L98">                    modifier = &quot;1&quot;;</span>
+<span class="fc" id="L99">                    break;</span>
+                case &quot;AES&quot;:
+<span class="fc" id="L101">                    break;</span>
+                default:
+            }
+            //futurexHsmCmd.addField(&quot;AO&quot;, &quot;TVWK&quot;); // command indicator
+<span class="fc" id="L105">            futurexHsmCmd.addField(&quot;AS&quot;, modifier); // modifier</span>
+<span class="fc" id="L106">            futurexHsmCmd.addField(&quot;FD&quot;, workingKey); // working key (encrypted under KEK / ZMK)</span>
+<span class="fc" id="L107">            futurexHsmCmd.addField(&quot;AP&quot;, kek); // key encryption key (KEK / ZMK)</span>
+<span class="fc bfc" id="L108" title="All 2 branches covered.">            if(isTR31Format) futurexHsmCmd.addField(&quot;OF&quot;, &quot;T&quot;);</span>
+<span class="fc" id="L109">            else futurexHsmCmd.addField(&quot;OF&quot;, &quot;C&quot;); // output key fromat C: Cryptogram , T: TR-31 , A : AKB format key block</span>
+<span class="fc" id="L110">            String command = futurexHsmCmd.build();</span>
+<span class="fc" id="L111">            String response = hsmClient.sendMessage(command);</span>
+<span class="fc" id="L112">            FuturexHsmCmd responseCmd = FuturexHsmCmd.parse(response);</span>
+<span class="fc bfc" id="L113" title="All 2 branches covered.">            if (responseCmd.isSuccess()) {</span>
+<span class="fc" id="L114">                String keyUnderMFK = responseCmd.getField(&quot;BG&quot;);</span>
+<span class="fc" id="L115">                String KCV = responseCmd.getField(&quot;AE&quot;);</span>
+<span class="fc" id="L116">                return &quot;00;&quot;+keyUnderMFK + &quot;;&quot; + KCV;</span>
+
+            } else {
+<span class="fc" id="L119">                return &quot;01;&quot;+responseCmd.getErroMsg();</span>
+            }
+<span class="fc" id="L121">        } catch (Exception e) {</span>
+<span class="fc" id="L122">            logger.error(&quot;Error building command: {}&quot;, e.getMessage());</span>
+<span class="fc" id="L123">            return null;</span>
+        }
+
+    }
+
+    private String normalizeNetworkName(String scheme) {
+<span class="pc bpc" id="L129" title="1 of 4 branches missed.">        return scheme == null || scheme.isBlank() ? &quot;UNKNOWN&quot; : scheme.trim().toUpperCase();</span>
+    }
+
+    /*
+    * This command generates a working key encrypted under the MFK modifier of the key type. 
+     */
+    public String generateWorkingKey(String keyType) {
+        try {
+<span class="fc" id="L137">            FuturexHsmCmd futurexHsmCmd = new FuturexHsmCmd(&quot;GWKS&quot;);</span>
+            // futurexHsmCmd.addField(&quot;AO&quot;, &quot;GWKS&quot;); // command indicator
+
+<span class="fc" id="L140">            futurexHsmCmd.addField(&quot;FS&quot;, &quot;2&quot;); // 3DES keyType  1 - single DES key , 2 - Double length DES key , 3 - Triple Length DES key</span>
+
+<span class="fc bfc" id="L142" title="All 5 branches covered.">            switch (keyType) {</span>
+                case &quot;PVK&quot;:
+<span class="fc" id="L144">                    futurexHsmCmd.addField(&quot;AS&quot;, &quot;4&quot;); // modifier  4 - PIN verfication Key</span>
+<span class="fc" id="L145">                    break;</span>
+                case &quot;DKE&quot;:
+<span class="fc" id="L147">                    futurexHsmCmd.addField(&quot;AS&quot;, &quot;2&quot;); // modifier  2 - Data Encryption Key</span>
+<span class="fc" id="L148">                    break;</span>
+                case &quot;PGK&quot;:
+<span class="fc" id="L150">                    futurexHsmCmd.addField(&quot;AS&quot;, &quot;9&quot;); // modifier 9 - PIN Generation Key</span>
+<span class="fc" id="L151">                    break;</span>
+                case &quot;CVK&quot;:
+<span class="fc" id="L153">                    futurexHsmCmd.addField(&quot;AS&quot;, &quot;4&quot;); // modifier 4 - CVK</span>
+                    break;
+            }
+<span class="fc" id="L156">            String command = futurexHsmCmd.build();</span>
+<span class="fc" id="L157">            String response = hsmClient.sendMessage(command);</span>
+<span class="fc" id="L158">            FuturexHsmCmd responseCmd = FuturexHsmCmd.parse(response);</span>
+<span class="fc bfc" id="L159" title="All 2 branches covered.">            if (responseCmd.isSuccess()) {</span>
+<span class="fc" id="L160">                String workingKey = responseCmd.getField(&quot;BG&quot;);</span>
+<span class="fc" id="L161">                String KCV = responseCmd.getField(&quot;AE&quot;);</span>
+<span class="fc" id="L162">                return workingKey + &quot;;&quot; + KCV;</span>
+            } else {
+<span class="fc" id="L164">                return responseCmd.getErroMsg();</span>
+            }
+<span class="fc" id="L166">        } catch (Exception e) {</span>
+<span class="fc" id="L167">            logger.error(&quot;Error building command: {}&quot;, e.getMessage());</span>
+<span class="fc" id="L168">            return null;</span>
+        }
+    }
+
+    public HsmWrappedKeyResult wrapClearChdKey(byte[] clearKey, Integer institutionId, String wrappingKeyType, boolean isTr31Format) {
+<span class="pc bpc" id="L173" title="1 of 4 branches missed.">        if (clearKey == null || clearKey.length == 0) {</span>
+<span class="fc" id="L174">            return null;</span>
+        }
+
+<span class="fc" id="L177">        String wrappingKey = getWrappingKeyForInstitution(institutionId, wrappingKeyType);</span>
+<span class="pc bpc" id="L178" title="2 of 4 branches missed.">        if (wrappingKey == null || wrappingKey.isBlank()) {</span>
+<span class="nc" id="L179">            logger.error(&quot;No institution {} wrapping key available for institution {}&quot;, wrappingKeyType, institutionId);</span>
+<span class="nc" id="L180">            return null;</span>
+        }
+
+        try {
+<span class="fc" id="L184">            String wrappedKey = encryptData(bytesToHex(clearKey), wrappingKey, &quot;AES&quot;);</span>
+<span class="pc bpc" id="L185" title="2 of 4 branches missed.">            if (wrappedKey == null || wrappedKey.isBlank()) {</span>
+<span class="nc" id="L186">                return null;</span>
+            }
+
+<span class="fc" id="L189">            String kcv = generateKeyCheckValue(clearKey);</span>
+<span class="fc" id="L190">            return new HsmWrappedKeyResult(wrappedKey, kcv, null);</span>
+        } finally {
+<span class="fc" id="L192">            Arrays.fill(clearKey, (byte) 0);</span>
+        }
+    }
+
+    public byte[] unwrapChdKey(byte[] wrappedKey, Integer institutionId, String wrappingKeyType, boolean isTr31Format) {
+<span class="pc bpc" id="L197" title="1 of 4 branches missed.">        if (wrappedKey == null || wrappedKey.length == 0) {</span>
+<span class="fc" id="L198">            return null;</span>
+        }
+
+<span class="fc" id="L201">        String wrappingKey = getWrappingKeyForInstitution(institutionId, wrappingKeyType);</span>
+<span class="pc bpc" id="L202" title="2 of 4 branches missed.">        if (wrappingKey == null || wrappingKey.isBlank()) {</span>
+<span class="nc" id="L203">            logger.error(&quot;No institution {} wrapping key available for institution {}&quot;, wrappingKeyType, institutionId);</span>
+<span class="nc" id="L204">            return null;</span>
+        }
+
+<span class="fc" id="L207">        String wrappedKeyValue = new String(wrappedKey, StandardCharsets.US_ASCII).trim();</span>
+<span class="fc" id="L208">        String decryptedHex = decryptData(wrappedKeyValue, wrappingKey, &quot;AES&quot;);</span>
+<span class="pc bpc" id="L209" title="2 of 4 branches missed.">        if (decryptedHex == null || decryptedHex.isBlank()) {</span>
+<span class="nc" id="L210">            return null;</span>
+        }
+<span class="fc" id="L212">        return hexToBytes(decryptedHex);</span>
+    }
+
+    /*
+     * This command generates a PVK for a PGK under MFK (modifier 9)
+     */
+    public String generatePVKForPGK(String pgkKey) { 
+        try {
+<span class="fc" id="L220">            String kek = &quot;5EA734F4919BA6550AF9A99B7A12DEB4&quot;;</span>
+            // Translate PGK under MFK (modifier 9) - to KEK (modifier 0)
+<span class="fc" id="L222">            FuturexHsmCmd futurexHsmCmd = new FuturexHsmCmd(&quot;TWKA&quot;);</span>
+<span class="fc" id="L223">            futurexHsmCmd.addField(&quot;AS&quot;, &quot;9&quot;); // modifier 9 - PIN Generation Key</span>
+<span class="fc" id="L224">            futurexHsmCmd.addField(&quot;AP&quot;, kek); // KEK</span>
+<span class="fc" id="L225">            futurexHsmCmd.addField(&quot;BG&quot;, pgkKey); // PIN generation key under MFK (modifier 9)</span>
+<span class="fc" id="L226">            futurexHsmCmd.addField(&quot;OF&quot;, &quot;C&quot;); // Cryptographic algorithm  C - 3DES</span>
+<span class="fc" id="L227">            String command = futurexHsmCmd.build();</span>
+<span class="fc" id="L228">            String response = hsmClient.sendMessage(command);</span>
+<span class="fc" id="L229">            FuturexHsmCmd responseCmd = FuturexHsmCmd.parse(response);</span>
+<span class="fc" id="L230">            String pgkUnderKek = responseCmd.getField(&quot;BG&quot;);</span>
+<span class="fc" id="L231">            String KCV = responseCmd.getField(&quot;AE&quot;);</span>
+            //Importing working key(PGK ency under KEK modifier 0) - PVK
+<span class="fc" id="L233">            futurexHsmCmd = new FuturexHsmCmd(&quot;TVWK&quot;);</span>
+<span class="fc" id="L234">            futurexHsmCmd.addField(&quot;AS&quot;, &quot;4&quot;); // modifier 4 - PIN verfication Key</span>
+<span class="fc" id="L235">            futurexHsmCmd.addField(&quot;AP&quot;, kek); // KEK</span>
+<span class="fc" id="L236">            futurexHsmCmd.addField(&quot;FD&quot;, pgkUnderKek); // PIN generation key under MFK (modifier 9)</span>
+<span class="fc" id="L237">            command = futurexHsmCmd.build();</span>
+<span class="fc" id="L238">            response = hsmClient.sendMessage(command);</span>
+<span class="fc" id="L239">            responseCmd = FuturexHsmCmd.parse(response);</span>
+<span class="fc" id="L240">            String pvkUnderMfk = responseCmd.getField(&quot;BG&quot;);</span>
+<span class="fc" id="L241">            KCV = responseCmd.getField(&quot;AE&quot;);</span>
+<span class="fc" id="L242">            return pvkUnderMfk + &quot;;&quot; + KCV;</span>
+<span class="fc" id="L243">        } catch (Exception e) {</span>
+<span class="fc" id="L244">            logger.error(&quot;Error building command: {}&quot;, e.getMessage());</span>
+<span class="fc" id="L245">            return null;</span>
+        }
+    }
+
+    /*
+ * This command generates an offset for a pin block.
+     */
+    public String generateOffsetWithPinBlock(String pinBlock, String pan, String pinMethod) {
+        try {
+<span class="fc" id="L254">            String pvk = &quot;7C2F09C04E63558BF1D80E171EEC0A58&quot;;</span>
+<span class="fc" id="L255">            String pek = &quot;B41AF6C89B8509CA2A8DDA27F18F86AB&quot;;</span>
+<span class="fc" id="L256">            String decimalizationTable = &quot;0123456789012345&quot;;</span>
+<span class="fc" id="L257">            String pgk = &quot;935258018D5D77017F59E5585CEFDB3B&quot;;  // pin generation key</span>
+<span class="fc" id="L258">            FuturexHsmCmd futurexHsmCmd = new FuturexHsmCmd(&quot;GOFF&quot;);</span>
+            // Extract the rightmost 11 digits of the PAN as per ISO 9564 standard
+            // Remove the check digit (last digit)
+<span class="fc" id="L261">            String withoutCheckDigit = pan.substring(0, pan.length() - 1);</span>
+            // Take the last 11 digits
+<span class="fc" id="L263">            String partialPan = withoutCheckDigit.substring(withoutCheckDigit.length() - 11);</span>
+<span class="fc" id="L264">            String additionalPinBlockData = withoutCheckDigit.substring(withoutCheckDigit.length() - 12);</span>
+<span class="fc bfc" id="L265" title="All 2 branches covered.">            if (pinMethod.equals(&quot;VISA&quot;)) {// VISA </span>
+<span class="fc" id="L266">                futurexHsmCmd.addField(&quot;BF&quot;, &quot;3&quot;);</span>
+<span class="fc" id="L267">                futurexHsmCmd.addField(&quot;BY&quot;, &quot;0&quot;); // PVKI</span>
+<span class="fc" id="L268">                futurexHsmCmd.addField(&quot;CA&quot;, pvk); // PIN verfication Key</span>
+<span class="fc" id="L269">                futurexHsmCmd.addField(&quot;BZ&quot;, partialPan); // partial PAN</span>
+<span class="fc bfc" id="L270" title="All 2 branches covered.">            } else if (pinMethod.equals(&quot;IBM3624&quot;)) {// IBM3624</span>
+<span class="fc" id="L271">                futurexHsmCmd.addField(&quot;BJ&quot;, &quot;1&quot;);   // Major Key = 1( MFK) </span>
+<span class="fc" id="L272">                futurexHsmCmd.addField(&quot;BF&quot;, &quot;2&quot;);   // PIN generation method = 2( IBM3624)</span>
+<span class="fc" id="L273">                futurexHsmCmd.addField(&quot;AW&quot;, &quot;1&quot;);   // PinBlock format = 1(ISO 9564-1 Format 0)</span>
+<span class="fc" id="L274">                futurexHsmCmd.addField(&quot;BS&quot;, decimalizationTable);   // decimalization table </span>
+<span class="fc" id="L275">                futurexHsmCmd.addField(&quot;AT&quot;, &quot;F&quot;); // padding character</span>
+<span class="fc" id="L276">                futurexHsmCmd.addField(&quot;BE&quot;, pan); // PAN value (card number)</span>
+<span class="fc" id="L277">                futurexHsmCmd.addField(&quot;CO&quot;, pgk);   // pin generation key </span>
+<span class="fc bfc" id="L278" title="All 2 branches covered.">            } else if (pinMethod.equals(&quot;ISO9564&quot;)) {</span>
+<span class="fc" id="L279">                futurexHsmCmd.addField(&quot;BF&quot;, &quot;1&quot;); // ISO9564</span>
+
+            } else {
+<span class="fc" id="L282">                return &quot;Invalid pin method&quot;;</span>
+            }
+<span class="fc" id="L284">            futurexHsmCmd.addField(&quot;AL&quot;, pinBlock); // pin block</span>
+<span class="fc" id="L285">            futurexHsmCmd.addField(&quot;AX&quot;, pek); //   pin encryption key PEK</span>
+<span class="fc" id="L286">            futurexHsmCmd.addField(&quot;AK&quot;, additionalPinBlockData); // additional Pin block data</span>
+
+<span class="fc" id="L288">            String command = futurexHsmCmd.build();</span>
+<span class="fc" id="L289">            String response = hsmClient.sendMessage(command);</span>
+<span class="fc" id="L290">            FuturexHsmCmd responseCmd = FuturexHsmCmd.parse(response);</span>
+<span class="fc bfc" id="L291" title="All 2 branches covered.">            if (responseCmd.isSuccess()) {</span>
+<span class="fc" id="L292">                String offset = null;</span>
+<span class="fc bfc" id="L293" title="All 2 branches covered.">                if (pinMethod.equals(&quot;VISA&quot;)) {</span>
+<span class="fc" id="L294">                    offset = responseCmd.getField(&quot;BX&quot;);</span>
+<span class="fc bfc" id="L295" title="All 2 branches covered.">                } else if (pinMethod.equals(&quot;IBM3624&quot;)) {</span>
+<span class="fc" id="L296">                    offset = responseCmd.getField(&quot;AY&quot;);</span>
+                }
+<span class="fc" id="L298">                return offset;</span>
+            } else {
+<span class="fc" id="L300">                return responseCmd.getErroMsg();</span>
+            }
+<span class="nc" id="L302">        } catch (Exception e) {</span>
+<span class="nc" id="L303">            logger.error(&quot;Error building command: {}&quot;, e.getMessage());</span>
+<span class="nc" id="L304">            return null;</span>
+        }
+    }
+
+    /*
+ * This command generates an offset using clear pin.
+     */
+    public String generateOffsetWithClearPin(String clearPin, String pan, String pinMethod) {
+        try {
+           // String pvk = &quot;7C2F09C04E63558BF1D80E171EEC0A58&quot;;
+<span class="fc" id="L314">            String pvk = getWorkingKeyForCard(pan, &quot;PVK&quot;);</span>
+
+            // Extract the rightmost 11 digits of the PAN as per ISO 9564 standard
+            // Remove the check digit (last digit)
+<span class="fc" id="L318">            String withoutCheckDigit = pan.substring(0, pan.length() - 1);</span>
+            // Take the last 11 digits
+<span class="fc" id="L320">            String partialPan = withoutCheckDigit.substring(withoutCheckDigit.length() - 11);</span>
+
+<span class="fc" id="L322">            FuturexHsmCmd futurexHsmCmd = new FuturexHsmCmd(&quot;GOFC&quot;);</span>
+<span class="fc bfc" id="L323" title="All 2 branches covered.">            if (pinMethod.equals(&quot;VISA&quot;)) {</span>
+<span class="fc" id="L324">                futurexHsmCmd.addField(&quot;BF&quot;, &quot;3&quot;); // VISA </span>
+<span class="fc bfc" id="L325" title="All 2 branches covered.">            } else if (pinMethod.equals(&quot;IBM3624&quot;)) {</span>
+<span class="fc" id="L326">                futurexHsmCmd.addField(&quot;BF&quot;, &quot;2&quot;); // IBM3624</span>
+<span class="pc bpc" id="L327" title="1 of 2 branches missed.">            } else if (pinMethod.equals(&quot;ISO9564&quot;)) {</span>
+<span class="nc" id="L328">                futurexHsmCmd.addField(&quot;BF&quot;, &quot;1&quot;); // ISO9564</span>
+
+            } else {
+<span class="fc" id="L331">                return &quot;Invalid pin method&quot;;</span>
+            }
+<span class="fc" id="L333">            futurexHsmCmd.addField(&quot;AF&quot;, clearPin); // clear pin</span>
+<span class="fc" id="L334">            futurexHsmCmd.addField(&quot;AX&quot;, &quot;5CEA600A11C246F35CEA600A11C246F35CEA600A11C246F3&quot;); // Field not processed can be pouplated with any arbitrary value   </span>
+<span class="fc" id="L335">            futurexHsmCmd.addField(&quot;CA&quot;, pvk); // PIN verfication Key</span>
+<span class="fc" id="L336">            futurexHsmCmd.addField(&quot;BY&quot;, &quot;0&quot;); // PVKI</span>
+<span class="fc" id="L337">            futurexHsmCmd.addField(&quot;BZ&quot;, partialPan); // partial PAN</span>
+
+<span class="fc" id="L339">            String command = futurexHsmCmd.build();</span>
+<span class="fc" id="L340">            String response = hsmClient.sendMessage(command);</span>
+<span class="fc" id="L341">            FuturexHsmCmd responseCmd = FuturexHsmCmd.parse(response);</span>
+<span class="pc bpc" id="L342" title="1 of 2 branches missed.">            if (responseCmd.isSuccess()) {</span>
+<span class="fc" id="L343">                String offset = null;</span>
+<span class="fc bfc" id="L344" title="All 2 branches covered.">                if (pinMethod.equals(&quot;VISA&quot;)) {</span>
+<span class="fc" id="L345">                    offset = responseCmd.getField(&quot;BX&quot;);</span>
+<span class="pc bpc" id="L346" title="1 of 2 branches missed.">                } else if (pinMethod.equals(&quot;IBM3624&quot;)) {</span>
+<span class="fc" id="L347">                    offset = responseCmd.getField(&quot;AY&quot;);</span>
+                }
+<span class="fc" id="L349">                return offset;</span>
+            } else {
+<span class="nc" id="L351">                return responseCmd.getErroMsg();</span>
+            }
+<span class="nc" id="L353">        } catch (Exception e) {</span>
+<span class="nc" id="L354">            logger.error(&quot;Error building command: {}&quot;, e.getMessage());</span>
+<span class="nc" id="L355">            return null;</span>
+        }
+    }
+
+    /**
+     * Performs a PIN verification operation.
+     *
+     * @param pinBlock Encrypted PIN block
+     * @param pan Primary Account Number
+     * @return true if PIN is valid, false otherwise
+     */
+    public String pinChangeAndVerify(String pinBlock, String pan, String newPinBlock, String pinMethod, String offset, boolean isVerify) {
+        try {
+           // String pvk = &quot;7C2F09C04E63558BF1D80E171EEC0A58&quot;;
+           // String pek = &quot;B41AF6C89B8509CA2A8DDA27F18F86AB&quot;;  //ZPK
+
+<span class="fc" id="L371">            String pek = getWorkingKeyForCard(pan, &quot;ZPK&quot;);</span>
+<span class="pc bpc" id="L372" title="2 of 4 branches missed.">            logger.debug(&quot;ZPK resolved for PIN operation: {}&quot;, pek != null &amp;&amp; !pek.isBlank());</span>
+<span class="fc" id="L373">            String pvk = getWorkingKeyForCard(pan, &quot;PVK&quot;);</span>
+<span class="pc bpc" id="L374" title="2 of 4 branches missed.">            logger.debug(&quot;PVK resolved for PIN operation: {}&quot;, pvk != null &amp;&amp; !pvk.isBlank());</span>
+            // Extract the rightmost 11 digits of the PAN as per ISO 9564 standard
+            // Remove the check digit (last digit)
+<span class="fc" id="L377">            String withoutCheckDigit = pan.substring(0, pan.length() - 1);</span>
+            // Take the last 11 digits
+<span class="fc" id="L379">            String partialPan = withoutCheckDigit.substring(withoutCheckDigit.length() - 11);</span>
+<span class="fc" id="L380">            String additionalPinBlockData = withoutCheckDigit.substring(withoutCheckDigit.length() - 12);</span>
+<span class="fc" id="L381">            FuturexHsmCmd futurexHsmCmd = new FuturexHsmCmd(&quot;RPIN&quot;);</span>
+<span class="fc bfc" id="L382" title="All 2 branches covered.">            if (pinMethod.equals(&quot;VISA&quot;)) {</span>
+<span class="fc" id="L383">                futurexHsmCmd.addField(&quot;BF&quot;, &quot;3&quot;); // VISA </span>
+<span class="fc bfc" id="L384" title="All 2 branches covered.">            } else if (pinMethod.equals(&quot;IBM3624&quot;)) {</span>
+<span class="fc" id="L385">                futurexHsmCmd.addField(&quot;BF&quot;, &quot;2&quot;); // IBM3624</span>
+<span class="pc bpc" id="L386" title="1 of 2 branches missed.">            } else if (pinMethod.equals(&quot;ISO9564&quot;)) {</span>
+<span class="nc" id="L387">                futurexHsmCmd.addField(&quot;BF&quot;, &quot;1&quot;); // ISO9564</span>
+
+            } else {
+<span class="fc" id="L390">                logger.error(&quot;Invalid pin method&quot;);</span>
+<span class="fc" id="L391">                return &quot;F&quot; + &quot;Invalid pin method&quot;;</span>
+            }
+<span class="fc" id="L393">            futurexHsmCmd.addField(&quot;AW&quot;, &quot;1&quot;); // PIN block type 1 - ANSI X9.8</span>
+<span class="fc" id="L394">            futurexHsmCmd.addField(&quot;AL&quot;, pinBlock); // pin block ( current pin block)</span>
+<span class="fc bfc" id="L395" title="All 2 branches covered.">            if (isVerify) {</span>
+<span class="fc" id="L396">                logger.info(&quot;PIN verification command&quot;);</span>
+<span class="fc" id="L397">                futurexHsmCmd.addField(&quot;FW&quot;, pinBlock); // PIN verification type 1 - PIN change</span>
+            } else {
+<span class="fc" id="L399">                logger.info(&quot;PIN change command&quot;);</span>
+<span class="fc" id="L400">                futurexHsmCmd.addField(&quot;FW&quot;, newPinBlock); // new pinBlock</span>
+            }
+
+<span class="fc" id="L403">            futurexHsmCmd.addField(&quot;AX&quot;, pek); // pin encryption key    </span>
+<span class="fc" id="L404">            futurexHsmCmd.addField(&quot;CA&quot;, pvk); // PIN verfication Key</span>
+<span class="fc" id="L405">            futurexHsmCmd.addField(&quot;BX&quot;, offset); // offset</span>
+<span class="fc" id="L406">            futurexHsmCmd.addField(&quot;BY&quot;, &quot;0&quot;); // PVKI</span>
+<span class="fc" id="L407">            futurexHsmCmd.addField(&quot;BZ&quot;, partialPan); // partial PAN</span>
+<span class="fc" id="L408">            futurexHsmCmd.addField(&quot;AK&quot;, additionalPinBlockData); // additional Pin block data</span>
+
+<span class="fc" id="L410">            String command = futurexHsmCmd.build();</span>
+<span class="fc" id="L411">            String response = hsmClient.sendMessage(command);</span>
+<span class="fc" id="L412">            FuturexHsmCmd responseCmd = FuturexHsmCmd.parse(response);</span>
+<span class="pc bpc" id="L413" title="1 of 2 branches missed.">            if (responseCmd.isSuccess()) {</span>
+<span class="fc" id="L414">                String newOffset = null;</span>
+<span class="fc bfc" id="L415" title="All 2 branches covered.">                if (pinMethod.equals(&quot;VISA&quot;)) {</span>
+<span class="fc" id="L416">                    newOffset = responseCmd.getField(&quot;BX&quot;);</span>
+<span class="pc bpc" id="L417" title="1 of 2 branches missed.">                } else if (pinMethod.equals(&quot;IBM3624&quot;)) {</span>
+<span class="fc" id="L418">                    newOffset = responseCmd.getField(&quot;AY&quot;);</span>
+                }
+<span class="fc" id="L420">                String pinVerifyResult = responseCmd.getField(&quot;BB&quot;);</span>
+<span class="fc" id="L421">                return pinVerifyResult + &quot;;&quot; + newOffset;</span>
+            } else {
+<span class="nc" id="L423">                return &quot;F&quot; + responseCmd.getErroMsg();</span>
+            }
+<span class="nc" id="L425">        } catch (Exception e) {</span>
+<span class="nc" id="L426">            logger.error(&quot;Error building command: {}&quot;, e.getMessage());</span>
+<span class="nc" id="L427">            e.printStackTrace();</span>
+<span class="nc" id="L428">            return null;</span>
+        }
+    }
+
+    /**
+     * Performs a PIN verification operation.
+     *
+     * @param pinBlock Encrypted PIN block
+     * @param pan Primary Account Number
+     * @param pinMethod PIN method
+     * @param offset Offset
+     * @return true if PIN is valid, false otherwise
+     */
+    public String pinVerify(String pinBlock, String pan, String pinMethod, String offset) {
+        try {
+           // String pvk = &quot;7C2F09C04E63558BF1D80E171EEC0A58&quot;;
+            // String pek = &quot;B41AF6C89B8509CA2A8DDA27F18F86AB&quot;;
+<span class="fc" id="L445">            String pek1 = getWorkingKeyForCard(pan, &quot;ZPK&quot;);</span>
+<span class="pc bpc" id="L446" title="2 of 4 branches missed.">            logger.debug(&quot;ZPK resolved for PIN verification: {}&quot;, pek1 != null &amp;&amp; !pek1.isBlank());</span>
+<span class="fc" id="L447">            String pvk1 = getWorkingKeyForCard(pan, &quot;PVK&quot;);</span>
+<span class="pc bpc" id="L448" title="2 of 4 branches missed.">            logger.debug(&quot;PVK resolved for PIN verification: {}&quot;, pvk1 != null &amp;&amp; !pvk1.isBlank());</span>
+<span class="fc" id="L449">            String decimalizationTable = &quot;0123456789012345&quot;;</span>
+<span class="fc" id="L450">            FuturexHsmCmd futurexHsmCmd = new FuturexHsmCmd(&quot;VPIN&quot;);</span>
+            // Extract the rightmost 11 digits of the PAN as per ISO 9564 standard
+            // Remove the check digit (last digit)
+<span class="fc" id="L453">            String withoutCheckDigit = pan.substring(0, pan.length() - 1);</span>
+            // Take the last 11 digits
+<span class="fc" id="L455">            String partialPan = withoutCheckDigit.substring(withoutCheckDigit.length() - 11);</span>
+<span class="fc" id="L456">            String additionalPinBlockData = withoutCheckDigit.substring(withoutCheckDigit.length() - 12);</span>
+<span class="fc bfc" id="L457" title="All 2 branches covered.">            if (pinMethod.equals(&quot;VISA&quot;)) {// VISA </span>
+<span class="fc" id="L458">                futurexHsmCmd.addField(&quot;BF&quot;, &quot;3&quot;);</span>
+<span class="fc" id="L459">                futurexHsmCmd.addField(&quot;BY&quot;, &quot;0&quot;); // PVKI</span>
+<span class="fc" id="L460">                futurexHsmCmd.addField(&quot;CA&quot;, pvk1); // PIN verfication Key</span>
+<span class="fc" id="L461">                futurexHsmCmd.addField(&quot;BZ&quot;, partialPan); // partial PAN</span>
+
+<span class="fc bfc" id="L463" title="All 2 branches covered.">            } else if (pinMethod.equals(&quot;IBM3624&quot;)) {// IBM3624</span>
+
+<span class="fc" id="L465">                futurexHsmCmd.addField(&quot;BJ&quot;, &quot;1&quot;);   // Major Key = 1( MFK) </span>
+<span class="fc" id="L466">                futurexHsmCmd.addField(&quot;BF&quot;, &quot;2&quot;);   // PIN generation method = 2( IBM3624)</span>
+<span class="fc" id="L467">                futurexHsmCmd.addField(&quot;AW&quot;, &quot;1&quot;);   // PinBlock format = 1(ISO 9564-1 Format 0)</span>
+<span class="fc" id="L468">                futurexHsmCmd.addField(&quot;BS&quot;, decimalizationTable);   // decimalization table </span>
+<span class="fc" id="L469">                futurexHsmCmd.addField(&quot;AT&quot;, &quot;F&quot;); // padding character</span>
+<span class="fc" id="L470">                futurexHsmCmd.addField(&quot;BE&quot;, pan); // PAN value (card number)</span>
+<span class="fc" id="L471">                futurexHsmCmd.addField(&quot;AZ&quot;, pvk1);   // PVK (pgk under modifier 4 of MFK)</span>
+<span class="fc" id="L472">                futurexHsmCmd.addField(&quot;AY&quot;, offset); // offset</span>
+<span class="fc" id="L473">                futurexHsmCmd.addField(&quot;AD&quot;, &quot;4&quot;); // PIN length  4 -12 digits</span>
+
+<span class="fc bfc" id="L475" title="All 2 branches covered.">            } else if (pinMethod.equals(&quot;ISO9564&quot;)) {</span>
+<span class="fc" id="L476">                futurexHsmCmd.addField(&quot;BF&quot;, &quot;1&quot;); // ISO9564</span>
+
+            } else {
+<span class="fc" id="L479">                return &quot;Invalid pin method&quot;;</span>
+            }
+<span class="fc" id="L481">            futurexHsmCmd.addField(&quot;AL&quot;, pinBlock); // pin block</span>
+<span class="fc" id="L482">            futurexHsmCmd.addField(&quot;AX&quot;, pek1); //   pin encryption key PEK</span>
+<span class="fc" id="L483">            futurexHsmCmd.addField(&quot;AK&quot;, additionalPinBlockData); // additional Pin block data</span>
+
+<span class="fc" id="L485">            String command = futurexHsmCmd.build();</span>
+<span class="fc" id="L486">            String response = hsmClient.sendMessage(command);</span>
+<span class="fc" id="L487">            FuturexHsmCmd responseCmd = FuturexHsmCmd.parse(response);</span>
+<span class="fc bfc" id="L488" title="All 2 branches covered.">            if (responseCmd.isSuccess()) {</span>
+
+<span class="fc" id="L490">                String pinVerifyResult = responseCmd.getField(&quot;BB&quot;);</span>
+<span class="fc" id="L491">                return pinVerifyResult + &quot;;&quot; + &quot;&quot;;</span>
+            } else {
+<span class="fc" id="L493">                return &quot;F&quot; + responseCmd.getErroMsg();</span>
+            }
+<span class="nc" id="L495">        } catch (Exception e) {</span>
+<span class="nc" id="L496">            logger.error(&quot;Error building command: {}&quot;, e.getMessage());</span>
+<span class="nc" id="L497">            return null;</span>
+        }
+
+    }
+
+    /**
+     * Sends an echo command to test HSM connectivity.
+     *
+     * @return true if successful, false otherwise
+     */
+    public boolean testConnection() {
+        try {
+<span class="fc" id="L509">            FuturexHsmCmd futurexHsmCmd = new FuturexHsmCmd(&quot;ECHO&quot;);</span>
+<span class="fc" id="L510">            futurexHsmCmd.addField(&quot;BJ&quot;, &quot;0&quot;);</span>
+<span class="fc" id="L511">            futurexHsmCmd.addField(&quot;AG&quot;, &quot;Echo Test connection.&quot;);</span>
+<span class="fc" id="L512">            String response = hsmClient.sendMessage(futurexHsmCmd.build());</span>
+<span class="pc bpc" id="L513" title="1 of 4 branches missed.">            if (response == null || response.trim().isEmpty()) {</span>
+<span class="fc" id="L514">                logger.error(&quot;HSM connection test failed: No response received (timeout or connection error)&quot;);</span>
+<span class="fc" id="L515">                return false;</span>
+            }
+<span class="fc" id="L517">            FuturexHsmCmd responseCmd = FuturexHsmCmd.parse(response);</span>
+<span class="fc" id="L518">            logger.info(&quot;HSM echo test response: {}&quot;, responseCmd.toString());</span>
+<span class="fc bfc" id="L519" title="All 2 branches covered.">            if (responseCmd.isSuccess()) {</span>
+<span class="fc" id="L520">                logger.info(&quot;HSM echo test success: {}&quot;, responseCmd.getField(&quot;AG&quot;));</span>
+<span class="fc" id="L521">                return true;</span>
+            } else {
+<span class="fc" id="L523">                logger.error(&quot;HSM echo test failed : {}&quot;, responseCmd.getErroMsg());</span>
+<span class="fc" id="L524">                return false;</span>
+            }
+<span class="fc" id="L526">        } catch (Exception e) {</span>
+<span class="fc" id="L527">            logger.error(&quot;Error testing HSM connection: {}&quot;, e.getMessage());</span>
+<span class="fc" id="L528">            e.printStackTrace();</span>
+<span class="fc" id="L529">            return false;</span>
+        }
+    }
+
+    /**
+     * Sends a message asynchronously to the HSM.
+     *
+     * @param message The message to send
+     * @return CompletableFuture with the response
+     */
+    public CompletableFuture&lt;String&gt; sendMessageAsync(String message) {
+<span class="fc" id="L540">        logRawHsmPayload(&quot;outbound-async&quot;, message);</span>
+<span class="fc" id="L541">        return hsmClient.sendMessageAsync(message)</span>
+<span class="fc" id="L542">                .whenComplete((response, throwable) -&gt; {</span>
+<span class="fc bfc" id="L543" title="All 2 branches covered.">                    if (throwable == null) {</span>
+<span class="fc" id="L544">                        logRawHsmPayload(&quot;inbound-async&quot;, response);</span>
+                    }
+<span class="fc" id="L546">                });</span>
+    }
+
+    /**
+     * Sends a message synchronously to the HSM.
+     *
+     * @param message The message to send
+     * @return Response from HSM
+     * @throws Exception if communication fails
+     */
+    public String sendMessage(String message) throws Exception {
+<span class="fc" id="L557">        logRawHsmPayload(&quot;outbound-sync&quot;, message);</span>
+<span class="fc" id="L558">        String response = hsmClient.sendMessage(message);</span>
+<span class="fc" id="L559">        logRawHsmPayload(&quot;inbound-sync&quot;, response);</span>
+<span class="fc" id="L560">        return response;</span>
+    }
+
+    /**
+     * Sends multiple messages concurrently to demonstrate connection pooling.
+     *
+     * @param messages Array of messages to send
+     * @return Array of CompletableFuture responses
+     */
+    public CompletableFuture&lt;String&gt;[] sendMessagesConcurrently(String... messages) {
+        @SuppressWarnings(&quot;unchecked&quot;)
+<span class="fc" id="L571">        CompletableFuture&lt;String&gt;[] futures = new CompletableFuture[messages.length];</span>
+
+<span class="fc bfc" id="L573" title="All 2 branches covered.">        for (int i = 0; i &lt; messages.length; i++) {</span>
+<span class="fc" id="L574">            final int messageIndex = i;</span>
+<span class="fc" id="L575">            futures[i] = sendMessageAsync(messages[i])</span>
+<span class="fc" id="L576">                    .thenApply(response -&gt; {</span>
+<span class="fc" id="L577">                        logger.debug(&quot;Received HSM response for concurrent message index={}&quot;, messageIndex);</span>
+<span class="fc" id="L578">                        return response;</span>
+                    })
+<span class="fc" id="L580">                    .exceptionally(throwable -&gt; {</span>
+<span class="fc" id="L581">                        logger.error(&quot;Error sending message {}: {}&quot;, messageIndex, throwable.getMessage());</span>
+<span class="fc" id="L582">                        return null;</span>
+                    });
+        }
+
+<span class="fc" id="L586">        return futures;</span>
+    }
+
+    void logRawHsmPayload(String direction, String payload) {
+<span class="pc bpc" id="L590" title="1 of 4 branches missed.">        if (!rawHsmPayloadLoggingEnabled || !logger.isDebugEnabled()) {</span>
+<span class="fc" id="L591">            return;</span>
+        }
+<span class="fc" id="L593">        logger.debug(&quot;Raw HSM payload direction={} payload={}&quot;, direction, payload);</span>
+<span class="fc" id="L594">    }</span>
+
+    /**
+     * Gets connection pool statistics.
+     *
+     * @return Pool statistics string
+     */
+    public String getPoolStats() {
+<span class="fc" id="L602">        return hsmClient.getPoolStats();</span>
+    }
+
+
+    public String verifyArqcAndGenerateArpc(ChipData iccData, Scheme scheme, String emvMethod, String pan, String panSeqNo,TransactionType transactionType,boolean isArpcGeneration , String balanceAmt, char isBalanceType) {
+        try {
+<span class="nc" id="L608">            logger.debug(&quot;scheme in NettyHsmService: {} &quot;, scheme);</span>
+<span class="nc" id="L609">            String CVN = &quot;05&quot;;</span>
+<span class="nc" id="L610">            String ArpcMethod = &quot;1&quot;;</span>
+<span class="nc" id="L611">            String km = &quot;1&quot;;</span>
+<span class="nc bnc" id="L612" title="All 2 branches missed.">            if (iccData.getTagValue(&quot;9F10&quot;) != null) {</span>
+                
+<span class="nc" id="L614">                String iadData = iccData.getTagValue(&quot;9F10&quot;);</span>
+<span class="nc bnc" id="L615" title="All 6 branches missed.">                if (Scheme.RUPAY.equals(scheme) &amp;&amp; (iadData.startsWith(&quot;0105&quot;) || iadData.startsWith(&quot;0106&quot;))) {</span>
+<span class="nc" id="L616">                    CVN = &quot;05&quot;;</span>
+<span class="nc bnc" id="L617" title="All 2 branches missed.">                    if(iadData.startsWith(&quot;0106&quot;)) {</span>
+<span class="nc" id="L618">                        CVN = &quot;06&quot;;</span>
+                    }
+<span class="nc bnc" id="L620" title="All 2 branches missed.">                    if(isArpcGeneration) ArpcMethod = &quot;3&quot;;   // EMV method 3 only ARPC generation  </span>
+<span class="nc" id="L621">                    else ArpcMethod = &quot;1&quot;;   // EMV method 1 for RuPay DPAS with ARQC verification and ARPC generation</span>
+                } else {
+<span class="nc" id="L623">                    IssuerApplicationData iad = new IssuerApplicationData(iadData, scheme);</span>
+<span class="nc" id="L624">                    logger.debug(&quot;iad in NettyHsmService: {} &quot;, iad.toString());</span>
+                    
+<span class="nc" id="L626">                    CVN = iad.getCryptogramVersionNumber();</span>
+<span class="nc bnc" id="L627" title="All 4 branches missed.">                    if(CVN.equals(&quot;B5&quot;)||CVN.equals(&quot;04&quot;))  {</span>
+<span class="nc bnc" id="L628" title="All 2 branches missed.">                        if(isArpcGeneration) ArpcMethod = &quot;4&quot;;   // EMV method 2 for RuPay qSPARC with only ARPC generation  </span>
+<span class="nc" id="L629">                        else ArpcMethod = &quot;2&quot;;  // EMV method 2 for RuPay qSPARC with ARQC verification and ARPC generation</span>
+                    }
+                }
+<span class="nc bnc" id="L632" title="All 2 branches missed.">                if (CVN.equals(&quot;01&quot;)) {</span>
+<span class="nc" id="L633">                    km = &quot;4&quot;;</span>
+<span class="nc bnc" id="L634" title="All 2 branches missed.">                }else if(CVN.equals(&quot;02&quot;)){</span>
+<span class="nc" id="L635">                    km = &quot;7&quot;;</span>
+                }
+<span class="nc" id="L637">            }else{</span>
+<span class="nc" id="L638">                logger.error(&quot;9F10 is missing in the iccData&quot;);</span>
+            }
+           // String encyImk = &quot;3DB5BBAAE7CE75C3B276422113AD03BC&quot;;
+<span class="nc" id="L641">            String encyImk1 = getWorkingKeyForCard(pan, &quot;IMK&quot;);</span>
+<span class="nc" id="L642">            logger.debug(&quot;encyImk1 in NettyHsmService: {} &quot;, encyImk1);</span>
+<span class="nc" id="L643">            String ARC = &quot;0014&quot;;</span>
+<span class="nc" id="L644">            String CSU = &quot;80C40000&quot;;</span>
+<span class="nc" id="L645">            String ipd = &quot;0000&quot;; // issuer proprietary data</span>
+<span class="nc bnc" id="L646" title="All 5 branches missed.">            switch(transactionType){</span>
+                case SERVICE_CREATION:      
+                case SERVICE_CREATION_CONTACTLESS:
+<span class="nc" id="L649">                    CSU = &quot;80C40000&quot;;</span>
+<span class="nc" id="L650">                    ipd = iccData.getTagValue(&quot;DF16&quot;)+iccData.getTagValue(&quot;DF15&quot;)+&quot;00000000&quot;;</span>
+<span class="nc" id="L651">                    break;</span>
+                case MONEY_LOAD:
+<span class="nc" id="L653">                    CSU = &quot;80C44000&quot;;</span>
+                    //ipd = &quot;FFFE&quot;+iccData.getTagValue(&quot;9F02&quot;);
+                    //------ adding 100 to amount request this only for Simulator testing , should be removed after the real accounting system integration done 
+<span class="nc" id="L656">                    BigDecimal amount = new BigDecimal(iccData.getTagValue(&quot;9F02&quot;)).add(BigDecimal.valueOf(00000));</span>
+                    //amount = amount.setScale(2);
+<span class="nc" id="L658">                    logger.info(&quot;Balance info {}&quot;,balanceAmt);</span>
+<span class="nc bnc" id="L659" title="All 2 branches missed.">                    if(isArpcGeneration){</span>
+<span class="nc" id="L660">                        ipd = &quot;FFFE&quot;+String.format(&quot;%012d&quot; ,Long.parseLong(balanceAmt));</span>
+                        //Long ba= Long.parseLong(balanceAmt);
+                    }else {
+<span class="nc" id="L663">                    ipd = &quot;FFFE&quot;+String.format(&quot;%012d&quot; ,amount.longValue());</span>
+                    }
+<span class="nc" id="L665">                    logger.info(&quot;ipd {}&quot;, ipd);</span>
+                    //--------------------------------------------
+<span class="nc" id="L667">                    break;</span>
+                case ML_BALANCEUPDATE:
+<span class="nc" id="L669">                    CSU = &quot;80C44000&quot;;</span>
+<span class="nc" id="L670">                    String balance = &quot;00000000&quot;+String.format(&quot;%04d&quot;, new Random().nextInt(10000));// temp added to execute the test cases , need to be replacesd once the accounting system integration done </span>
+<span class="nc" id="L671">                    ipd = &quot;FFFE&quot;+balance;</span>
+<span class="nc" id="L672">                    break;</span>
+                case PURCHASE:
+                case PURCHASE_CONTACTLESS:
+                case PURCHASE_WITHCASHBACK:
+                case CASH_WITHDRAWAL:
+                case BALANCE_ENQUIRY:
+                case MINI_STATEMENT:
+                case CASH_AT_POS:
+                case CASH_AT_POS_CL:
+                case PIN_CHANGE:    
+<span class="nc" id="L682">                    CSU = &quot;80C40000&quot;;</span>
+<span class="nc bnc" id="L683" title="All 2 branches missed.">                    if(isArpcGeneration) {</span>
+<span class="nc bnc" id="L684" title="All 2 branches missed.">                        if(isBalanceType == 'D'){ CSU = &quot;80C48000&quot;; ipd = &quot;FFFE&quot;+balanceAmt; }</span>
+<span class="nc bnc" id="L685" title="All 2 branches missed.">                        else if(isBalanceType == 'C') { CSU = &quot;80C44000&quot;; ipd = &quot;FFFE&quot;+balanceAmt; }</span>
+<span class="nc" id="L686">                        else ipd = &quot;FFFE&quot;+&quot;000000000000&quot;;</span>
+                    } else {
+<span class="nc" id="L688">                        CSU = &quot;80C40000&quot;;</span>
+<span class="nc" id="L689">                        ipd = &quot;0000&quot;+balanceAmt;</span>
+                    }
+                    break;
+            }
+<span class="nc" id="L693">            FuturexHsmCmd futurexHsmCmd = new FuturexHsmCmd(&quot;EMVA&quot;);</span>
+<span class="nc" id="L694">            futurexHsmCmd.addField(&quot;MK&quot;, &quot;1&quot;); // Master key</span>
+<span class="nc" id="L695">            futurexHsmCmd.addField(&quot;FS&quot;,  ArpcMethod); // ARPC generation method</span>
+
+<span class="nc" id="L697">            futurexHsmCmd.addField(&quot;KM&quot;, km); // Key derivation method</span>
+<span class="nc" id="L698">            futurexHsmCmd.addField(&quot;CH&quot;, &quot;1&quot;); // Master Key Derivation Mode </span>
+<span class="nc" id="L699">            futurexHsmCmd.addField(&quot;KP&quot;, encyImk1); // Key protection</span>
+<span class="nc" id="L700">            futurexHsmCmd.addField(&quot;KQ&quot;, pan); // Key sequence</span>
+<span class="nc" id="L701">            futurexHsmCmd.addField(&quot;KR&quot;, panSeqNo); // Response code</span>
+<span class="nc" id="L702">            futurexHsmCmd.addField(&quot;KS&quot;, iccData.getTagValue(&quot;9F36&quot;)); // ATC</span>
+<span class="nc" id="L703">            futurexHsmCmd.addField(&quot;BO&quot;, iccData.getTagValue(&quot;9F26&quot;)); // Request Cryptogram (ARQC) </span>
+<span class="nc" id="L704">            futurexHsmCmd.addField(&quot;CA&quot;, CSU); // Card Status Update(CSU)</span>
+<span class="nc" id="L705">            futurexHsmCmd.addField(&quot;CB&quot;, ipd); // Proprietary data </span>
+<span class="nc" id="L706">            StringBuilder KT = new StringBuilder();</span>
+<span class="nc" id="L707">            KT.append(iccData.getTagValue(&quot;9F02&quot;)); //Amount</span>
+<span class="nc" id="L708">            KT.append(iccData.getTagValue(&quot;9F03&quot;)); // Other amount </span>
+<span class="nc" id="L709">            KT.append(iccData.getTagValue(&quot;9F1A&quot;)); // Country code</span>
+<span class="nc" id="L710">            KT.append(iccData.getTagValue(&quot;95&quot;)); // TVR (Terminal Verification Results)</span>
+<span class="nc" id="L711">            KT.append(iccData.getTagValue(&quot;5F2A&quot;)); // Currency code</span>
+<span class="nc" id="L712">            KT.append(iccData.getTagValue(&quot;9A&quot;)); // Transaction date</span>
+<span class="nc" id="L713">            KT.append(iccData.getTagValue(&quot;9C&quot;)); // Transaction type</span>
+<span class="nc" id="L714">            KT.append(iccData.getTagValue(&quot;9F37&quot;)); // Unpredictable number (UN)</span>
+<span class="nc" id="L715">            KT.append(iccData.getTagValue(&quot;82&quot;)); //  AIP </span>
+<span class="nc" id="L716">            KT.append(iccData.getTagValue(&quot;9F36&quot;)); // ATC (Application Transaction Counter)</span>
+<span class="nc bnc" id="L717" title="All 2 branches missed.">           if (CVN.equals(&quot;06&quot;)) {   // for CVN =&quot;06&quot; RuPay only CVR is used in ARQC calculation ( byte 3-8)</span>
+<span class="nc" id="L718">               KT.append((iccData.getTagValue(&quot;9F10&quot;)).substring(4)); // IAD </span>
+               
+<span class="nc bnc" id="L720" title="All 6 branches missed.">           }else if (CVN.equals(&quot;04&quot;) || CVN.equals(&quot;01&quot;) || CVN.equals(&quot;02&quot;)) {   // for CVN =04/02/01 for JCB card</span>
+<span class="nc" id="L721">                KT.append((iccData.getTagValue(&quot;9F10&quot;)).substring(6)); // IAD </span>
+           
+<span class="nc" id="L723">            }else KT.append(iccData.getTagValue(&quot;9F10&quot;)); // IAD </span>
+<span class="nc" id="L724">            futurexHsmCmd.addField(&quot;KT&quot;, KT.toString()); // Key usage data</span>
+<span class="nc" id="L725">            futurexHsmCmd.addField(&quot;BJ&quot;, ARC); // Approval response code</span>
+
+<span class="nc" id="L727">            String response = hsmClient.sendMessage(futurexHsmCmd.build());</span>
+<span class="nc bnc" id="L728" title="All 2 branches missed.">            if (response != null) {</span>
+<span class="nc" id="L729">                FuturexHsmCmd responseCmd = FuturexHsmCmd.parse(response);</span>
+<span class="nc bnc" id="L730" title="All 2 branches missed.">                if (responseCmd.isSuccess()) {</span>
+
+<span class="nc" id="L732">                    String verifyResult = responseCmd.getField(&quot;BB&quot;);</span>
+<span class="nc" id="L733">                    String arpc = responseCmd.getField(&quot;BG&quot;) + ARC;</span>
+<span class="nc bnc" id="L734" title="All 2 branches missed.">                    if (CVN.equals(&quot;B5&quot;)) {</span>
+<span class="nc" id="L735">                        arpc = responseCmd.getField(&quot;BG&quot;) + CSU + ipd;</span>
+<span class="nc bnc" id="L736" title="All 2 branches missed.">                    }else if(CVN.equals(&quot;04&quot;)) {</span>
+<span class="nc" id="L737">                        arpc = responseCmd.getField(&quot;BG&quot;) +CSU + ipd;</span>
+                   
+<span class="nc bnc" id="L739" title="All 4 branches missed.">                    }else if (CVN.equals(&quot;05&quot;) || CVN.equals(&quot;06&quot;)) {</span>
+<span class="nc" id="L740">                        arpc = responseCmd.getField(&quot;BG&quot;) + ARC;</span>
+                    }
+                    //verifyResult = &quot;Y&quot;;
+                    //arpc =&quot;2BE58B2A80000000&quot;+ARC;
+<span class="nc" id="L744">                    return verifyResult + &quot;;&quot; + arpc;</span>
+                } else {
+<span class="nc" id="L746">                    return &quot;F&quot; + responseCmd.getErroMsg();</span>
+                }
+            } else {
+<span class="nc" id="L749">                return null;</span>
+            }
+
+<span class="nc" id="L752">        } catch (Exception e) {</span>
+<span class="nc" id="L753">            logger.error(&quot;Error verifying ARQC and generating ARPC: {}&quot;, e.getMessage());</span>
+<span class="nc" id="L754">            return null;</span>
+        }
+    }
+
+
+   
+    /**
+     * Generates CVV (Card Verification Value) for a card.
+     *
+     * @param pan Primary Account Number
+     * @param expiryDate Card expiry date (MMYY format)
+     * @param serviceCode Service code (e.g., &quot;201&quot; for ATM, &quot;101&quot; for POS)
+     * @param cvvKey CVV generation key
+     * @return Generated CVV or null if failed
+     */
+    public String generateCvv(String pan, String expiryDate, String serviceCode, String cvvKey) {
+        try {
+
+            // CMD: [AOGCVC;AV8173193120877474;CAB9381732EB907253611FFD54159116BD;FA3012;FB620;FT1]
+<span class="fc" id="L773">            FuturexHsmCmd futurexHsmCmd = new FuturexHsmCmd(&quot;GCVV&quot;);</span>
+            //cvvKey = &quot;C6CA6CCD5C517A0F0511740BB7ED1860&quot;;
+<span class="fc" id="L775">            cvvKey = getWorkingKeyForCard(pan, &quot;CVK&quot;);</span>
+<span class="pc bpc" id="L776" title="2 of 4 branches missed.">            logger.debug(&quot;CVK resolved for CVV generation: {}&quot;, cvvKey != null &amp;&amp; !cvvKey.isBlank());</span>
+            // Add required fields for CVV generation
+<span class="fc" id="L778">            futurexHsmCmd.addField(&quot;AV&quot;, pan); // PAN</span>
+<span class="fc" id="L779">            futurexHsmCmd.addField(&quot;FA&quot;, expiryDate); // Expiry date</span>
+<span class="fc" id="L780">            futurexHsmCmd.addField(&quot;FB&quot;, serviceCode); // Service code</span>
+<span class="fc" id="L781">            futurexHsmCmd.addField(&quot;CA&quot;, cvvKey); // CVV key</span>
+<span class="fc" id="L782">            futurexHsmCmd.addField(&quot;FT&quot;, &quot;1&quot;); // CVV type</span>
+
+<span class="fc" id="L784">            String command = futurexHsmCmd.build();</span>
+<span class="fc" id="L785">            String response = hsmClient.sendMessage(command);</span>
+<span class="fc bfc" id="L786" title="All 2 branches covered.">            if (response != null) {</span>
+<span class="fc" id="L787">                FuturexHsmCmd responseCmd = FuturexHsmCmd.parse(response);</span>
+
+<span class="pc bpc" id="L789" title="1 of 2 branches missed.">                if (responseCmd.isSuccess()) {</span>
+<span class="fc" id="L790">                    String cvv = responseCmd.getField(&quot;FC&quot;); // Generated CVV</span>
+<span class="fc" id="L791">                    logger.debug(&quot;CVV generated successfully for PAN: {}&quot;, maskPan(pan));</span>
+<span class="fc" id="L792">                    return cvv;</span>
+                } else {
+<span class="nc" id="L794">                    logger.error(&quot;CVV generation failed: {}&quot;, responseCmd.getErroMsg());</span>
+<span class="nc" id="L795">                    return null;</span>
+                }
+            } else {
+<span class="fc" id="L798">                return null;</span>
+            }
+
+<span class="nc" id="L801">        } catch (Exception e) {</span>
+<span class="nc" id="L802">            logger.error(&quot;Error generating CVV: {}&quot;, e.getMessage());</span>
+<span class="nc" id="L803">            return null;</span>
+        }
+    }
+
+    /**
+     * Generates iCVV for EMV chip transactions using the mandated service code.
+     */
+    public String generateIcvv(String pan, String expiryDate, String cvvKey) {
+<span class="fc" id="L811">        return generateCvv(pan, expiryDate, ICVV_SERVICE_CODE, cvvKey);</span>
+    }
+
+    /**
+     * Verifies CVV from magnetic stripe track data using the track service code.
+     */
+    public int verifyMagstripeCvv(String pan, String expiryDate, String serviceCode, String cvv) {
+<span class="fc" id="L818">        return verifyCvv(pan, expiryDate, serviceCode, null, null, cvv, TRACK_CVV_TYPE);</span>
+    }
+
+    /**
+     * Verifies iCVV for EMV chip transactions using service code 999.
+     */
+    public int verifyIcvv(String pan, String expiryDate, String icvv) {
+<span class="fc" id="L825">        return verifyCvv(pan, expiryDate, ICVV_SERVICE_CODE, null, null, icvv, TRACK_CVV_TYPE);</span>
+    }
+
+    /**
+     * Verifies CVV2 for card-not-present transactions using the existing Futurex CVV2 path.
+     */
+    public int verifyCvv2(String pan, String expiryDate, String cvv2) {
+<span class="fc" id="L832">        return verifyCvv(pan, expiryDate, CVV2_SERVICE_CODE, null, null, cvv2, CVV2_TYPE);</span>
+    }
+
+    /**
+     * Verifies CVV (Card Verification Value) for a card.
+     *
+     * @param pan Primary Account Number
+     * @param expiryDate Card expiry date (MMYY format)
+     * @param serviceCode Service code
+     * @param cvvToVerify CVV value to verify
+     * @param cvvKey CVV verification key
+     * @return true if CVV is valid, false otherwise
+     */
+    public int verifyCvv(String pan, String expiryDate, String serviceCode, String cvvToVerify, String cvvKey,String cvv, int cvvType) {
+        try {
+<span class="fc" id="L847">            FuturexHsmCmd futurexHsmCmd = new FuturexHsmCmd(&quot;VCVV&quot;);</span>
+            //cvvKey = &quot;C6CA6CCD5C517A0F0511740BB7ED1860&quot;;
+            // Add required fields for CVV generation
+<span class="fc" id="L850">            String cvvKey1 = getWorkingKeyForCard(pan, &quot;CVK&quot;);</span>
+<span class="pc bpc" id="L851" title="2 of 4 branches missed.">            logger.debug(&quot;CVK resolved for CVV verification: {}&quot;, cvvKey1 != null &amp;&amp; !cvvKey1.isBlank());</span>
+<span class="fc" id="L852">            futurexHsmCmd.addField(&quot;AV&quot;, pan); // PAN</span>
+<span class="fc" id="L853">            futurexHsmCmd.addField(&quot;FA&quot;, expiryDate); // Expiry date</span>
+<span class="fc" id="L854">            futurexHsmCmd.addField(&quot;FB&quot;, serviceCode); // Service code</span>
+<span class="fc" id="L855">            futurexHsmCmd.addField(&quot;CA&quot;, cvvKey1); // CVV key</span>
+<span class="fc bfc" id="L856" title="All 2 branches covered.">            if(cvvType == 0){</span>
+<span class="fc" id="L857">                futurexHsmCmd.addField(&quot;FC&quot;, cvv); // CVV value read from track</span>
+            }else{
+<span class="fc" id="L859">                futurexHsmCmd.addField(&quot;FT&quot;, cvv); // CVV value embossed on card</span>
+            }
+
+<span class="fc" id="L862">            String command = futurexHsmCmd.build();</span>
+<span class="fc" id="L863">            String response = hsmClient.sendMessage(command);</span>
+<span class="fc bfc" id="L864" title="All 2 branches covered.">            if (response != null) {</span>
+<span class="fc" id="L865">                FuturexHsmCmd responseCmd = FuturexHsmCmd.parse(response);</span>
+
+<span class="fc bfc" id="L867" title="All 2 branches covered.">                if (responseCmd.isSuccess()) {</span>
+<span class="fc" id="L868">                    String verficationResult = responseCmd.getField(&quot;BB&quot;); // Generated CVV</span>
+<span class="fc bfc" id="L869" title="All 2 branches covered.">                    if(verficationResult.equals(&quot;Y&quot;)){</span>
+<span class="fc" id="L870">                        logger.debug(&quot;CVV Verification success for PAN: {}&quot;, verficationResult);</span>
+<span class="fc" id="L871">                         return 0;</span>
+                    } else{
+<span class="fc" id="L873">                        logger.error(&quot;CVV Verification failed: {}&quot;, verficationResult);</span>
+<span class="fc" id="L874">                        return 1;</span>
+                    } 
+                } else {
+<span class="fc" id="L877">                    logger.error(&quot;CVV verification failed: {}&quot;, responseCmd.getErroMsg());</span>
+<span class="fc" id="L878">                    return 2;</span>
+                }
+            } else {
+<span class="fc" id="L881">                logger.error(&quot;CVV verification failed(No response from HSM): {}&quot;, response);</span>
+<span class="fc" id="L882">                return 2;</span>
+            }
+
+<span class="nc" id="L885">        } catch (Exception e) {</span>
+<span class="nc" id="L886">            logger.error(&quot;Error verifying CVV: {}&quot;, e.getMessage());</span>
+<span class="nc" id="L887">            return 2;</span>
+        }
+    }
+    /**
+     * Generates a MAC (Message Authentication Code) for the given input string.
+     *
+     * @param data The input data to generate the MAC for
+     * @param scheme The scheme of the card
+     * @return The generated MAC string, or null if failure
+     */
+    public String generateMac(String data, String scheme) {
+        try {
+<span class="fc" id="L899">            FuturexHsmCmd futurexHsmCmd = new FuturexHsmCmd(&quot;GMAC&quot;);</span>
+            // Use ZAK (MAC Key) for MAC generation. For demo, using RuPay default BIN, but you may update as needed.
+<span class="fc" id="L901">            String key = getWorkingKeyForCard(&quot;8000000000000000&quot;, &quot;ZAK&quot;);</span>
+<span class="pc bpc" id="L902" title="1 of 4 branches missed.">            if (key == null || key.isEmpty()) {</span>
+<span class="fc" id="L903">                logger.error(&quot;MAC key is not found for scheme: {}&quot;, scheme);</span>
+<span class="fc" id="L904">                return null;</span>
+            }
+            // Macro fields as per HSM requirements (may adjust for actual integration)
+<span class="fc" id="L907">            futurexHsmCmd.addField(&quot;BN&quot;, &quot;0&quot;); // MAC block number if needed</span>
+<span class="fc" id="L908">            futurexHsmCmd.addField(&quot;AR&quot;, key); // MAC Key</span>
+<span class="fc" id="L909">            futurexHsmCmd.addField(&quot;BO&quot;, data); // Data for MAC</span>
+<span class="fc" id="L910">            futurexHsmCmd.addField(&quot;AD&quot;, &quot;8&quot;); // 8 -&gt; 16 digit Hexadecimal encoded ASCII data</span>
+<span class="fc" id="L911">            futurexHsmCmd.addField(&quot;BF&quot;, &quot;1&quot;); // ISO9797 Algorithm 3 (see verifyMac for rationale)</span>
+            
+<span class="fc" id="L913">            String command = futurexHsmCmd.build();</span>
+<span class="fc" id="L914">            String response = hsmClient.sendMessage(command);</span>
+
+<span class="pc bpc" id="L916" title="1 of 2 branches missed.">            if (response != null) {</span>
+<span class="fc" id="L917">                FuturexHsmCmd responseCmd = FuturexHsmCmd.parse(response);</span>
+<span class="pc bpc" id="L918" title="1 of 2 branches missed.">                if (responseCmd.isSuccess()) {</span>
+<span class="fc" id="L919">                    String macValue = responseCmd.getField(&quot;BP&quot;); // MAC value</span>
+<span class="fc" id="L920">                    logger.debug(&quot;Generated MAC: {} for data: {}&quot;, macValue, data);</span>
+<span class="fc" id="L921">                    return macValue;</span>
+                } else {
+<span class="nc" id="L923">                    logger.error(&quot;MAC generation failed: {}&quot;, responseCmd.getErroMsg());</span>
+<span class="nc" id="L924">                    return null;</span>
+                }
+            } else {
+<span class="nc" id="L927">                logger.error(&quot;MAC generation failed (No response from HSM): {}&quot;, data);</span>
+<span class="nc" id="L928">                return null;</span>
+            }
+<span class="nc" id="L930">        } catch (Exception e) {</span>
+<span class="nc" id="L931">            logger.error(&quot;Error generating MAC: {}&quot;, e.getMessage());</span>
+<span class="nc" id="L932">            return null;</span>
+        }
+    }
+    /**
+     * Verifies the MAC (Message Authentication Code) for the given input string.
+     *
+     * @param data The input data to verify the MAC for
+     * @param mac The MAC value to verify against
+     * @param scheme The scheme of the card
+     * @return true if the MAC is valid, false otherwise
+     */
+    public boolean verifyMac(String data, String mac, String scheme) {
+        try {
+<span class="fc" id="L945">            FuturexHsmCmd futurexHsmCmd = new FuturexHsmCmd(&quot;VMAC&quot;);</span>
+<span class="fc" id="L946">            String zak = keyManagementService.getCurrentSessionNetworkKey(scheme, &quot;ZAK&quot;);</span>
+<span class="fc bfc" id="L947" title="All 2 branches covered.">            logger.debug(&quot;Session ZAK in verifyMac resolved for scheme: {}, available: {}&quot;, scheme, zak != null);</span>
+<span class="pc bpc" id="L948" title="1 of 4 branches missed.">            if (zak == null || zak.isBlank()) {</span>
+<span class="fc" id="L949">                logger.error(&quot;Session-scoped ZAK is not found for scheme: {}&quot;, scheme);</span>
+<span class="fc" id="L950">                return false;</span>
+            }
+            // Add required fields for MAC verification
+<span class="fc" id="L953">            futurexHsmCmd.addField(&quot;BN&quot;, &quot;0&quot;); </span>
+<span class="fc" id="L954">            futurexHsmCmd.addField(&quot;AR&quot;, zak); // MAC Key </span>
+<span class="fc" id="L955">            futurexHsmCmd.addField(&quot;BO&quot;, data); // data to verify the MAC</span>
+<span class="fc" id="L956">            futurexHsmCmd.addField(&quot;BP&quot;, mac); // MAC to verify</span>
+<span class="fc" id="L957">            futurexHsmCmd.addField(&quot;AD&quot;, &quot;8&quot;); // 8 -&gt; 16 digit Hexadecimal encoded ASCII data</span>
+<span class="fc" id="L958">            futurexHsmCmd.addField(&quot;BF&quot;, &quot;1&quot;); /*  0: Standard/FIPS113. The entire length of the key is used for all data blocks. (default)</span>
+                                                                1: ISO9797 Algorithm 3. Key part 1 is used up until the last block (single DES), the entire key length is then used for the last block. */
+
+<span class="fc" id="L961">            String command = futurexHsmCmd.build();</span>
+<span class="fc" id="L962">            String response = hsmClient.sendMessage(command);</span>
+
+<span class="pc bpc" id="L964" title="1 of 2 branches missed.">            if (response != null) {</span>
+<span class="fc" id="L965">                FuturexHsmCmd responseCmd = FuturexHsmCmd.parse(response);</span>
+
+<span class="pc bpc" id="L967" title="1 of 2 branches missed.">                if (responseCmd.isSuccess()) {</span>
+<span class="fc" id="L968">                    String verificationResult = responseCmd.getField(&quot;BB&quot;);</span>
+<span class="fc bfc" id="L969" title="All 2 branches covered.">                    if (&quot;Y&quot;.equalsIgnoreCase(verificationResult)) {</span>
+<span class="fc" id="L970">                        logger.debug(&quot;MAC verification succeeded for data: {}&quot;, data);</span>
+<span class="fc" id="L971">                        return true;</span>
+                    } else {
+<span class="fc" id="L973">                        logger.error(&quot;MAC verification failed: {}&quot;, verificationResult);</span>
+<span class="fc" id="L974">                        return false;</span>
+                    }
+                } else {
+<span class="nc" id="L977">                    logger.error(&quot;MAC verification failed: {}&quot;, responseCmd.getErroMsg());</span>
+<span class="nc" id="L978">                    return false;</span>
+                }
+            } else {
+<span class="nc" id="L981">                logger.error(&quot;MAC verification failed (No response from HSM): {}&quot;, data);</span>
+<span class="nc" id="L982">                return false;</span>
+            }
+<span class="nc" id="L984">        } catch (Exception e) {</span>
+<span class="nc" id="L985">            logger.error(&quot;Error verifying MAC: {}&quot;, e.getMessage());</span>
+<span class="nc" id="L986">            return false;</span>
+        }
+    }
+    /**
+     * Encrypts data using a specified encryption key.
+     *
+     * @param data Data to encrypt (hex string)
+     * @param encryptionKey Encryption key (hex string)
+     * @param algorithm Encryption algorithm (e.g., &quot;DES&quot;, &quot;3DES&quot;, &quot;AES&quot;)
+     * @return Encrypted data or null if failed
+     */
+    public String encryptData(String data, String encryptionKey, String algorithm) {
+        try {
+<span class="fc" id="L999">            FuturexHsmCmd futurexHsmCmd = new FuturexHsmCmd(&quot;CBCE&quot;);</span>
+<span class="fc" id="L1000">            String IV = &quot;0000000000000000&quot;;</span>
+            // Add required fields for encryption
+<span class="fc" id="L1002">            futurexHsmCmd.addField(&quot;GG&quot;, encryptionKey); // encryption key under HSM control</span>
+<span class="fc" id="L1003">            futurexHsmCmd.addField(&quot;GH&quot;, IV); // IV value</span>
+<span class="fc" id="L1004">            futurexHsmCmd.addField(&quot;BO&quot;, data); // Data to be encrypted</span>
+<span class="fc" id="L1005">            futurexHsmCmd.addField(&quot;ZA&quot;, &quot;1&quot;); // clear IV</span>
+
+<span class="fc" id="L1007">            String command = futurexHsmCmd.build();</span>
+<span class="fc" id="L1008">            String response = hsmClient.sendMessage(command);</span>
+<span class="fc" id="L1009">            FuturexHsmCmd responseCmd = FuturexHsmCmd.parse(response);</span>
+
+<span class="pc bpc" id="L1011" title="1 of 2 branches missed.">            if (responseCmd.isSuccess()) {</span>
+<span class="fc" id="L1012">                String encryptedData = responseCmd.getField(&quot;BP&quot;); // Encrypted data</span>
+<span class="fc" id="L1013">                logger.debug(&quot;Data encrypted successfully using algorithm: {}&quot;, algorithm);</span>
+<span class="fc" id="L1014">                return encryptedData;</span>
+            } else {
+<span class="nc" id="L1016">                logger.error(&quot;Data encryption failed: {}&quot;, responseCmd.getErroMsg());</span>
+<span class="nc" id="L1017">                return null;</span>
+            }
+
+<span class="nc" id="L1020">        } catch (Exception e) {</span>
+<span class="nc" id="L1021">            logger.error(&quot;Error encrypting data: {}&quot;, e.getMessage());</span>
+<span class="nc" id="L1022">            return null;</span>
+        }
+    }
+
+    /**
+     * Decrypts data using a specified decryption key.
+     *
+     * @param encryptedData Encrypted data to decrypt (hex string)
+     * @param decryptionKey Decryption key (hex string)
+     * @param algorithm Decryption algorithm (e.g., &quot;DES&quot;, &quot;3DES&quot;, &quot;AES&quot;)
+     * @return Decrypted data or null if failed
+     */
+    public String decryptData(String encryptedData, String decryptionKey, String algorithm) {
+        try {
+<span class="fc" id="L1036">            FuturexHsmCmd futurexHsmCmd = new FuturexHsmCmd(&quot;CBCD&quot;);</span>
+<span class="fc" id="L1037">            String IV = &quot;0000000000000000&quot;;</span>
+
+            // Add required fields for decryption
+<span class="fc" id="L1040">            futurexHsmCmd.addField(&quot;GG&quot;, decryptionKey); // decryption key under HSM control</span>
+<span class="fc" id="L1041">            futurexHsmCmd.addField(&quot;GH&quot;, IV); // IV value</span>
+<span class="fc" id="L1042">            futurexHsmCmd.addField(&quot;BO&quot;, encryptedData); // Data to be decrypted</span>
+<span class="fc" id="L1043">            futurexHsmCmd.addField(&quot;BF&quot;, &quot;0&quot;); // hex-encoded ASCII data</span>
+<span class="fc" id="L1044">            futurexHsmCmd.addField(&quot;ZA&quot;, &quot;1&quot;); // clear IV</span>
+
+
+<span class="fc" id="L1047">            String command = futurexHsmCmd.build();</span>
+<span class="fc" id="L1048">            String response = hsmClient.sendMessage(command);</span>
+<span class="fc" id="L1049">            FuturexHsmCmd responseCmd = FuturexHsmCmd.parse(response);</span>
+
+<span class="pc bpc" id="L1051" title="1 of 2 branches missed.">            if (responseCmd.isSuccess()) {</span>
+<span class="fc" id="L1052">                String decryptedData = responseCmd.getField(&quot;BP&quot;); // Decrypted data</span>
+<span class="fc" id="L1053">                logger.debug(&quot;Data decrypted successfully using algorithm: {}&quot;, algorithm);</span>
+<span class="fc" id="L1054">                return decryptedData;</span>
+            } else {
+<span class="nc" id="L1056">                logger.error(&quot;Data decryption failed: {}&quot;, responseCmd.getErroMsg());</span>
+<span class="nc" id="L1057">                return null;</span>
+            }
+
+<span class="nc" id="L1060">        } catch (Exception e) {</span>
+<span class="nc" id="L1061">            logger.error(&quot;Error decrypting data: {}&quot;, e.getMessage());</span>
+<span class="nc" id="L1062">            return null;</span>
+        }
+    }
+
+
+    /**
+     * Encrypts sensitive card data (PAN, PIN, etc.) using card-specific keys.
+     *
+     * @param cardData Data to encrypt
+     * @param cardNumber Card number for key derivation
+     * @param keyType Type of key to use (e.g., &quot;ZPK&quot;, &quot;PVK&quot;, &quot;CVV&quot;)
+     * @return Encrypted card data or null if failed
+     */
+    public String encryptCardData(String cardNumber, String keyType) {
+        try {
+            // Get the appropriate working key for this card and key type
+<span class="fc" id="L1078">            String workingKey = getWorkingKeyForCard(cardNumber, keyType);</span>
+
+<span class="fc bfc" id="L1080" title="All 2 branches covered.">            if (workingKey != null) {</span>
+<span class="fc" id="L1081">                return encryptData(cardNumber, workingKey, &quot;3DES&quot;);</span>
+            } else {
+<span class="fc" id="L1083">                logger.error(&quot;Could not get working key for card: {} and key type: {}&quot;, maskPan(cardNumber), keyType);</span>
+<span class="fc" id="L1084">                return null;</span>
+            }
+
+<span class="nc" id="L1087">        } catch (Exception e) {</span>
+<span class="nc" id="L1088">            logger.error(&quot;Error encrypting card data: {}&quot;, e.getMessage());</span>
+<span class="nc" id="L1089">            return null;</span>
+        }
+    }
+
+    /**
+     * Decrypts sensitive card data using card-specific keys.
+     *
+     * @param encryptedCardData Encrypted card data
+     * @param cardNumber Card number for key derivation
+     * @param keyType Type of key to use
+     * @return Decrypted card data or null if failed
+     */
+    public String decryptCardData(String encryptedCardData, String cardNumber, String keyType) {
+        try {
+            // Get the appropriate working key for this card and key type
+<span class="fc" id="L1104">            String workingKey = getWorkingKeyForCard(cardNumber, keyType);</span>
+
+<span class="fc bfc" id="L1106" title="All 2 branches covered.">            if (workingKey != null) {</span>
+<span class="fc" id="L1107">                return decryptData(encryptedCardData, workingKey, &quot;3DES&quot;);</span>
+            } else {
+<span class="fc" id="L1109">                logger.error(&quot;Could not get working key for card: {} and key type: {}&quot;, maskPan(cardNumber), keyType);</span>
+<span class="fc" id="L1110">                return null;</span>
+            }
+
+<span class="nc" id="L1113">        } catch (Exception e) {</span>
+<span class="nc" id="L1114">            logger.error(&quot;Error decrypting card data: {}&quot;, e.getMessage());</span>
+<span class="nc" id="L1115">            return null;</span>
+        }
+    }
+
+    /**
+     * Masks PAN for logging purposes.
+     *
+     * @param pan PAN to mask
+     * @return Masked PAN
+     */
+    private String maskPan(String pan) {
+<span class="pc bpc" id="L1126" title="1 of 4 branches missed.">        if (pan == null || pan.length() &lt; 8) {</span>
+<span class="fc" id="L1127">            return &quot;****&quot;;</span>
+        }
+<span class="fc" id="L1129">        return pan.substring(0, 4) + &quot;****&quot; + pan.substring(pan.length() - 4);</span>
+    }
+
+    /**
+     * Shuts down the HSM client gracefully.
+     */
+    @PreDestroy
+    public void shutdown() {
+<span class="fc" id="L1137">        logger.info(&quot;Shutting down Netty HSM service&quot;);</span>
+<span class="fc" id="L1138">        hsmClient.shutdown();</span>
+<span class="fc" id="L1139">    }</span>
+
+    private String getWorkingKeyForCard(String cardNumber, String keyType) {
+        try {
+            // Use the key management service to get cached key
+<span class="fc" id="L1144">            String workingKey = keyManagementService.getWorkingKeyForCard(cardNumber, keyType);</span>
+            
+<span class="fc bfc" id="L1146" title="All 2 branches covered.">            if (workingKey != null) {</span>
+<span class="fc" id="L1147">                logger.debug(&quot;Retrieved cached key for card: {} and key type: {}&quot;, </span>
+<span class="fc" id="L1148">                    maskPan(cardNumber), keyType);</span>
+<span class="fc" id="L1149">                return workingKey;</span>
+            } else {
+<span class="fc" id="L1151">                logger.warn(&quot;No cached key found for card: {} and key type: {}&quot;, </span>
+<span class="fc" id="L1152">                    maskPan(cardNumber), keyType);</span>
+<span class="fc" id="L1153">                return null;</span>
+            }
+            
+<span class="nc" id="L1156">        } catch (Exception e) {</span>
+<span class="nc" id="L1157">            logger.error(&quot;Error getting working key: {}&quot;, e.getMessage());</span>
+<span class="nc" id="L1158">            return null;</span>
+        }
+    }
+
+    private String getWrappingKeyForInstitution(Integer institutionId, String wrappingKeyType) {
+<span class="pc bpc" id="L1163" title="3 of 6 branches missed.">        if (institutionId == null || wrappingKeyType == null || wrappingKeyType.isBlank()) {</span>
+<span class="nc" id="L1164">            return null;</span>
+        }
+
+<span class="fc" id="L1167">        String wrappingKey = keyManagementService.getCurrentInstitutionKeyValue(institutionId, wrappingKeyType);</span>
+<span class="pc bpc" id="L1168" title="2 of 4 branches missed.">        if (wrappingKey == null || wrappingKey.isBlank()) {</span>
+<span class="nc" id="L1169">            logger.warn(&quot;Unable to resolve institution-level {} for institution {}&quot;, wrappingKeyType, institutionId);</span>
+<span class="nc" id="L1170">            return null;</span>
+        }
+<span class="fc" id="L1172">        return wrappingKey;</span>
+    }
+
+    private String generateKeyCheckValue(byte[] clearKey) {
+<span class="fc" id="L1176">        byte[] preview = Arrays.copyOf(clearKey, Math.min(clearKey.length, 3));</span>
+<span class="fc" id="L1177">        return bytesToHex(preview);</span>
+    }
+
+    private String bytesToHex(byte[] data) {
+<span class="fc" id="L1181">        StringBuilder builder = new StringBuilder(data.length * 2);</span>
+<span class="fc bfc" id="L1182" title="All 2 branches covered.">        for (byte b : data) {</span>
+<span class="fc" id="L1183">            builder.append(String.format(&quot;%02X&quot;, b));</span>
+        }
+<span class="fc" id="L1185">        return builder.toString();</span>
+    }
+
+    private byte[] hexToBytes(String hex) {
+<span class="pc bpc" id="L1189" title="2 of 4 branches missed.">        if (hex == null || hex.isBlank()) {</span>
+<span class="nc" id="L1190">            return new byte[0];</span>
+        }
+<span class="fc" id="L1192">        byte[] result = new byte[hex.length() / 2];</span>
+<span class="fc bfc" id="L1193" title="All 2 branches covered.">        for (int i = 0; i &lt; hex.length(); i += 2) {</span>
+<span class="fc" id="L1194">            result[i / 2] = (byte) Integer.parseInt(hex.substring(i, i + 2), 16);</span>
+        }
+<span class="fc" id="L1196">        return result;</span>
+    }
+
+    /**
+     * Example usage method demonstrating concurrent operations.
+     */
+    public void demonstrateConcurrentOperations() {
+<span class="nc" id="L1203">        logger.info(&quot;Demonstrating concurrent HSM operations&quot;);</span>
+
+        // Send multiple echo commands concurrently
+<span class="nc" id="L1206">        String[] messages = {</span>
+            &quot;[AOECHO;BJ0;AGEcho Message 1.;]&quot;,
+            &quot;[AOECHO;BJ0;AGEcho Message 2.;]&quot;,
+            &quot;[AOECHO;BJ0;AGEcho Message 3.;]&quot;,
+            &quot;[AOECHO;BJ0;AGEcho Message 4.;]&quot;,
+            &quot;[AOECHO;BJ0;AGEcho Message 5.;]&quot;
+        };
+
+<span class="nc" id="L1214">        CompletableFuture&lt;String&gt;[] futures = sendMessagesConcurrently(messages);</span>
+
+        // Wait for all responses
+<span class="nc" id="L1217">        CompletableFuture.allOf(futures).thenRun(() -&gt; {</span>
+<span class="nc" id="L1218">            logger.info(&quot;All concurrent operations completed&quot;);</span>
+<span class="nc" id="L1219">            logger.info(&quot;Pool stats: {}&quot;, getPoolStats());</span>
+<span class="nc" id="L1220">        }).exceptionally(throwable -&gt; {</span>
+<span class="nc" id="L1221">            logger.error(&quot;Concurrent operations failed: {}&quot;, throwable.getMessage());</span>
+<span class="nc" id="L1222">            return null;</span>
+        });
+<span class="nc" id="L1224">    }</span>
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.14.202510111229</span></div></body></html>

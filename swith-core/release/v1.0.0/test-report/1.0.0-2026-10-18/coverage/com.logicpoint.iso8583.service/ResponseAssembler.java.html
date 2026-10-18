@@ -1,0 +1,97 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>ResponseAssembler.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">iso8583-processor</a> &gt; <a href="index.source.html" class="el_package">com.logicpoint.iso8583.service</a> &gt; <span class="el_source">ResponseAssembler.java</span></div><h1>ResponseAssembler.java</h1><pre class="source lang-java linenums">package com.logicpoint.iso8583.service;
+
+import com.logicpoint.iso8583.context.RequestContext;
+import com.logicpoint.iso8583.responsecode.InternalResCode;
+import com.logicpoint.iso8583.util.AuthCodeGenerator;
+import com.logicpoint.iso8583.validation.ValidationResult;
+import com.logicpoint.iso8583.validation.TlvUtils;
+import org.springframework.stereotype.Service;
+
+import java.util.LinkedHashMap;
+import java.util.Map;
+
+@Service
+public class ResponseAssembler {
+
+    private final ResponseCodeCacheService responseCodeCacheService;
+
+<span class="fc" id="L18">    public ResponseAssembler(ResponseCodeCacheService responseCodeCacheService) {</span>
+<span class="fc" id="L19">        this.responseCodeCacheService = responseCodeCacheService;</span>
+<span class="fc" id="L20">    }</span>
+
+    public void setResponseMti(RequestContext requestContext) {
+<span class="nc" id="L23">        Map&lt;Integer, String&gt; fields = requestContext.getFields();</span>
+<span class="nc" id="L24">        String requestMti = requestContext.getMti();</span>
+<span class="nc bnc" id="L25" title="All 4 branches missed.">        if (requestMti == null || requestMti.length() != 4) {</span>
+<span class="nc" id="L26">            return;</span>
+        }
+
+<span class="nc bnc" id="L29" title="All 6 branches missed.">        if (requestMti.endsWith(&quot;100&quot;) || requestMti.endsWith(&quot;200&quot;) || requestMti.endsWith(&quot;400&quot;)) {</span>
+<span class="nc" id="L30">            fields.put(0, requestMti.substring(0, 2) + &quot;10&quot;);</span>
+<span class="nc bnc" id="L31" title="All 2 branches missed.">        } else if (requestMti.endsWith(&quot;420&quot;)) {</span>
+<span class="nc" id="L32">            fields.put(0, requestMti.substring(0, 2) + &quot;30&quot;);</span>
+        }
+<span class="nc" id="L34">    }</span>
+
+    public void applyResponseCode(RequestContext requestContext, InternalResCode internalResCode) {
+<span class="nc" id="L37">        requestContext.setInternalResponseCode(internalResCode);</span>
+<span class="nc" id="L38">        responseCodeCacheService.applyToDe39(requestContext);</span>
+<span class="nc" id="L39">    }</span>
+
+    public void ensureResponseCode(RequestContext requestContext) {
+<span class="nc bnc" id="L42" title="All 2 branches missed.">        if (requestContext.getInternalResponseCode() == null) {</span>
+<span class="nc" id="L43">            requestContext.setInternalResponseCode(InternalResCode.SYSTEM_ERROR);</span>
+        }
+<span class="nc" id="L45">        responseCodeCacheService.applyToDe39(requestContext);</span>
+<span class="nc" id="L46">    }</span>
+
+    public void applyValidationUpdates(RequestContext requestContext, ValidationResult validationResult) {
+<span class="pc bpc" id="L49" title="2 of 4 branches missed.">        if (validationResult == null || !validationResult.hasUpdatedDataElements()) {</span>
+<span class="nc" id="L50">            return;</span>
+        }
+
+<span class="fc" id="L53">        Object updatedDe55 = validationResult.getUpdatedDataElements().get(&quot;DE55&quot;);</span>
+<span class="pc bpc" id="L54" title="1 of 2 branches missed.">        if (updatedDe55 instanceof String de55) {</span>
+<span class="nc" id="L55">            requestContext.getFields().put(55, de55);</span>
+        }
+
+<span class="fc" id="L58">        Object updatedDe102 = validationResult.getUpdatedDataElements().get(&quot;DE102&quot;);</span>
+<span class="pc bpc" id="L59" title="1 of 4 branches missed.">        if (updatedDe102 instanceof String de102 &amp;&amp; !de102.isBlank()) {</span>
+<span class="fc" id="L60">            requestContext.getFields().put(102, de102);</span>
+        }
+<span class="fc" id="L62">    }</span>
+
+    public void applyFinancialApproval(RequestContext requestContext) {
+<span class="nc" id="L65">        requestContext.getFields().put(38, AuthCodeGenerator.generateAuthCode());</span>
+<span class="nc" id="L66">        applyResponseCode(requestContext, InternalResCode.APPROVED);</span>
+<span class="nc" id="L67">    }</span>
+
+    public void omitDe120Tag(RequestContext requestContext, String tag) {
+<span class="pc bpc" id="L70" title="3 of 6 branches missed.">        if (requestContext == null || tag == null || tag.isBlank()) {</span>
+<span class="nc" id="L71">            return;</span>
+        }
+
+<span class="fc" id="L74">        Map&lt;Integer, String&gt; fields = requestContext.getFields();</span>
+<span class="fc" id="L75">        String de120 = fields.get(120);</span>
+<span class="pc bpc" id="L76" title="2 of 4 branches missed.">        if (de120 == null || de120.isBlank()) {</span>
+<span class="nc" id="L77">            return;</span>
+        }
+
+<span class="fc" id="L80">        Map&lt;String, String&gt; tags = new LinkedHashMap&lt;&gt;(TlvUtils.parseTlv(de120));</span>
+<span class="pc bpc" id="L81" title="1 of 2 branches missed.">        if (tags.remove(tag) == null) {</span>
+<span class="nc" id="L82">            return;</span>
+        }
+<span class="fc bfc" id="L84" title="All 2 branches covered.">        if (tags.isEmpty()) {</span>
+<span class="fc" id="L85">            fields.remove(120);</span>
+<span class="fc" id="L86">            return;</span>
+        }
+
+<span class="fc" id="L89">        StringBuilder rebuilt = new StringBuilder();</span>
+<span class="fc" id="L90">        tags.forEach((tlvTag, value) -&gt; rebuilt</span>
+<span class="fc" id="L91">                .append(tlvTag)</span>
+<span class="fc" id="L92">                .append(String.format(&quot;%03d&quot;, value.length()))</span>
+<span class="fc" id="L93">                .append(value));</span>
+<span class="fc" id="L94">        fields.put(120, rebuilt.toString());</span>
+<span class="fc" id="L95">    }</span>
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.14.202510111229</span></div></body></html>

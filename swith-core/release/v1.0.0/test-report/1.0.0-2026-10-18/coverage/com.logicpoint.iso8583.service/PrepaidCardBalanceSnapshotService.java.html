@@ -1,0 +1,131 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>PrepaidCardBalanceSnapshotService.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">iso8583-processor</a> &gt; <a href="index.source.html" class="el_package">com.logicpoint.iso8583.service</a> &gt; <span class="el_source">PrepaidCardBalanceSnapshotService.java</span></div><h1>PrepaidCardBalanceSnapshotService.java</h1><pre class="source lang-java linenums">package com.logicpoint.iso8583.service;
+
+import com.logicpoint.iso8583.entity.PrepaidCardBalanceSnapshot;
+import com.logicpoint.iso8583.repository.PrepaidCardBalanceSnapshotRepository;
+import org.springframework.beans.factory.annotation.Value;
+import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
+
+import java.math.BigDecimal;
+import java.math.RoundingMode;
+import java.time.LocalDate;
+import java.time.ZoneId;
+import java.util.Optional;
+
+@Service
+public class PrepaidCardBalanceSnapshotService {
+
+    private final PrepaidCardBalanceSnapshotRepository repository;
+    private final ZoneId businessZone;
+    private final BigDecimal openingLedgerOffset;
+
+    public PrepaidCardBalanceSnapshotService(
+            PrepaidCardBalanceSnapshotRepository repository,
+            @Value(&quot;${prepaid-balance-snapshot.time-zone:Asia/Kolkata}&quot;) String timeZone,
+<span class="fc" id="L25">            @Value(&quot;${prepaid-balance-snapshot.opening-ledger-offset:1.00}&quot;) BigDecimal openingLedgerOffset) {</span>
+<span class="fc" id="L26">        this.repository = repository;</span>
+<span class="fc" id="L27">        this.businessZone = ZoneId.of(timeZone);</span>
+<span class="fc" id="L28">        this.openingLedgerOffset = openingLedgerOffset;</span>
+<span class="fc" id="L29">    }</span>
+
+    @Transactional
+    public PrepaidCardBalanceSnapshot updateFromAccountingAvailable(
+            String panLookupHmac,
+            Integer cardId,
+            String currencyCode,
+            BigDecimal accountingAvailableBalance,
+            BigDecimal accountingLedgerBalance,
+            BigDecimal transactionAmount,
+            boolean debit) {
+<span class="fc" id="L40">        LocalDate businessDate = LocalDate.now(businessZone);</span>
+<span class="fc" id="L41">        BigDecimal availableBalance = normalize(accountingAvailableBalance);</span>
+<span class="pc bpc" id="L42" title="2 of 4 branches missed.">        String currency = currencyCode == null || currencyCode.isBlank() ? &quot;356&quot; : currencyCode;</span>
+
+<span class="fc" id="L44">        Optional&lt;PrepaidCardBalanceSnapshot&gt; existing = repository</span>
+<span class="fc" id="L45">                .findByPanLookupHmacAndBusinessDateAndCurrencyCode(panLookupHmac, businessDate, currency);</span>
+<span class="fc" id="L46">        PrepaidCardBalanceSnapshot snapshot = existing</span>
+<span class="fc" id="L47">                .orElseGet(() -&gt; createOpeningSnapshot(</span>
+                        panLookupHmac,
+                        cardId,
+                        businessDate,
+                        currency,
+                        availableBalance,
+                        accountingLedgerBalance));
+
+<span class="fc" id="L55">        snapshot.setCardId(cardId);</span>
+<span class="fc bfc" id="L56" title="All 2 branches covered.">        if (existing.isPresent()) {</span>
+<span class="fc" id="L57">            snapshot.setAvailableBalance(applyTransactionAmount(</span>
+<span class="fc" id="L58">                    snapshot.getAvailableBalance(),</span>
+                    transactionAmount,
+                    debit));
+        }
+<span class="fc" id="L62">        return repository.save(snapshot);</span>
+    }
+
+    public PrepaidCardBalanceSnapshot updateFromAccountingAvailable(
+            String panLookupHmac,
+            Integer cardId,
+            String currencyCode,
+            BigDecimal accountingAvailableBalance,
+            BigDecimal accountingLedgerBalance) {
+<span class="fc" id="L71">        return updateFromAccountingAvailable(</span>
+                panLookupHmac,
+                cardId,
+                currencyCode,
+                accountingAvailableBalance,
+                accountingLedgerBalance,
+                BigDecimal.ZERO,
+                true);
+    }
+
+    private PrepaidCardBalanceSnapshot createOpeningSnapshot(
+            String panLookupHmac,
+            Integer cardId,
+            LocalDate businessDate,
+            String currencyCode,
+            BigDecimal availableBalance,
+            BigDecimal accountingLedgerBalance) {
+<span class="fc" id="L88">        PrepaidCardBalanceSnapshot snapshot = new PrepaidCardBalanceSnapshot();</span>
+<span class="fc" id="L89">        snapshot.setPanLookupHmac(panLookupHmac);</span>
+<span class="fc" id="L90">        snapshot.setCardId(cardId);</span>
+<span class="fc" id="L91">        snapshot.setBusinessDate(businessDate);</span>
+<span class="fc" id="L92">        snapshot.setCurrencyCode(currencyCode);</span>
+<span class="fc" id="L93">        snapshot.setLedgerBalance(resolveOpeningLedger(</span>
+                panLookupHmac,
+                currencyCode,
+                businessDate,
+                availableBalance,
+                accountingLedgerBalance));
+<span class="fc" id="L99">        snapshot.setAvailableBalance(availableBalance);</span>
+<span class="fc" id="L100">        return snapshot;</span>
+    }
+
+    private BigDecimal resolveOpeningLedger(
+            String panLookupHmac,
+            String currencyCode,
+            LocalDate businessDate,
+            BigDecimal availableBalance,
+            BigDecimal accountingLedgerBalance) {
+<span class="pc bpc" id="L109" title="1 of 2 branches missed.">        if (accountingLedgerBalance != null) {</span>
+<span class="nc" id="L110">            return normalize(accountingLedgerBalance);</span>
+        }
+<span class="fc" id="L112">        return repository.findFirstByPanLookupHmacAndCurrencyCodeAndBusinessDateBeforeOrderByBusinessDateDesc(</span>
+                        panLookupHmac,
+                        currencyCode,
+                        businessDate)
+<span class="fc" id="L116">                .map(PrepaidCardBalanceSnapshot::getAvailableBalance)</span>
+<span class="fc" id="L117">                .map(this::normalize)</span>
+<span class="fc" id="L118">                .orElseGet(() -&gt; normalize(availableBalance.add(openingLedgerOffset)));</span>
+    }
+
+    private BigDecimal applyTransactionAmount(BigDecimal currentAvailable, BigDecimal transactionAmount, boolean debit) {
+<span class="fc" id="L122">        BigDecimal amount = normalize(transactionAmount);</span>
+<span class="fc" id="L123">        BigDecimal available = normalize(currentAvailable);</span>
+<span class="pc bpc" id="L124" title="1 of 2 branches missed.">        return debit ? normalize(available.subtract(amount)) : normalize(available.add(amount));</span>
+    }
+
+    private BigDecimal normalize(BigDecimal amount) {
+<span class="pc bpc" id="L128" title="1 of 2 branches missed.">        return (amount == null ? BigDecimal.ZERO : amount).setScale(2, RoundingMode.DOWN);</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.14.202510111229</span></div></body></html>

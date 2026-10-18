@@ -1,0 +1,511 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>KeyManagementService.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">iso8583-processor</a> &gt; <a href="index.source.html" class="el_package">com.logicpoint.iso8583.service</a> &gt; <span class="el_source">KeyManagementService.java</span></div><h1>KeyManagementService.java</h1><pre class="source lang-java linenums">package com.logicpoint.iso8583.service;
+
+
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.stereotype.Service;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+import org.springframework.cache.Cache;
+import org.springframework.cache.annotation.Cacheable;
+import org.springframework.cache.annotation.CacheEvict;
+import org.springframework.cache.CacheManager;
+import java.util.List;
+import java.util.Map;
+import java.util.HashMap;
+import java.time.LocalDateTime;
+import java.nio.charset.StandardCharsets;
+
+import com.logicpoint.iso8583.entity.KeyManagement;
+import com.logicpoint.iso8583.repository.BinDetailsRepository;
+import com.logicpoint.iso8583.repository.KeyManagementRepository;
+import com.logicpoint.iso8583.entity.BinDetails;
+
+import jakarta.transaction.Transactional;
+
+/*
+ * @author: LogicPoint Systems
+ * @version: 1.0
+ * @date: 2025-10-24
+ * @description: This is the service for the key management.
+ * It is used to get the working key for a specific BIN and key type.
+ * It is also used to get the network key for a specific network and key type.
+ * It is also used to get the working key for a specific card number and key type.
+ * It is also used to get the key history for a specific key type and key scope and bin id.
+ * It is also used to rotate the key for a specific key id and new key.
+ */
+
+@Service
+<span class="fc" id="L38">public class KeyManagementService {</span>
+    
+<span class="fc" id="L40">    private static final Logger logger = LoggerFactory.getLogger(KeyManagementService.class);</span>
+    
+    @Autowired
+    private KeyManagementRepository keyManagementRepository;
+    
+    @Autowired
+    private BinDetailsRepository binDetailsRepository;
+    
+    @Autowired
+    private CacheManager cacheManager;
+
+    @Autowired
+    private NetworkSessionKeyService networkSessionKeyService;
+    
+    /**
+     * Get working key for a specific BIN and key type
+     */
+    @Cacheable(value = &quot;keyManagementCache&quot;, key = &quot;#binNumber + '_' + #keyType&quot;)
+    public String getWorkingKeyForBinNumber(String binNumber, String keyType) {
+        try {
+            // First, find the bin_details record to get the bin_id
+<span class="fc" id="L61">            BinDetails binDetails = binDetailsRepository.findByBinNumber(binNumber);</span>
+<span class="fc bfc" id="L62" title="All 2 branches covered.">            if (binDetails == null) {</span>
+<span class="fc" id="L63">                logger.warn(&quot;BIN not found in bin_details table: {}&quot;, binNumber);</span>
+<span class="fc" id="L64">                return null;</span>
+            }
+            
+<span class="fc" id="L67">            Integer binId = binDetails.getBin_id().intValue();</span>
+<span class="fc" id="L68">            return getWorkingKeyForBinId(binId, keyType);</span>
+            
+<span class="nc" id="L70">        } catch (Exception e) {</span>
+<span class="nc" id="L71">            logger.error(&quot;Error retrieving key for BIN number: {} and key type: {}&quot;, binNumber, keyType, e);</span>
+<span class="nc" id="L72">            return null;</span>
+        }
+    }
+    
+    /**
+     * Get working key for a specific bin_id and key type
+     */
+    public String getWorkingKeyForBinId(Integer binId, String keyType) {
+        try {
+<span class="fc" id="L81">            LocalDateTime now = LocalDateTime.now();</span>
+            
+<span class="fc" id="L83">            List&lt;KeyManagement&gt; keys = keyManagementRepository</span>
+<span class="fc" id="L84">                .findCurrentActiveKeysByBinIdAndKeyType(binId, keyType, now);</span>
+            
+<span class="fc bfc" id="L86" title="All 2 branches covered.">            if (keys.isEmpty()) {</span>
+<span class="fc" id="L87">                logger.warn(&quot;No active key found for bin_id: {} and key type: {}&quot;, binId, keyType);</span>
+<span class="fc" id="L88">                return null;</span>
+            }
+            
+<span class="fc" id="L91">            KeyManagement key = keys.get(0); // Should be only one current active key</span>
+<span class="fc" id="L92">            return bytesToHex(key.getKey_value());</span>
+            
+<span class="fc" id="L94">        } catch (Exception e) {</span>
+<span class="fc" id="L95">            logger.error(&quot;Error retrieving key for bin_id: {} and key type: {}&quot;, binId, keyType, e);</span>
+<span class="fc" id="L96">            return null;</span>
+        }
+    }
+    
+    /**
+     * Get network-based key (like ZPK)
+     */
+    @Cacheable(value = &quot;keyManagementCache&quot;, key = &quot;'NETWORK_' + #networkName + '_' + #keyType&quot;)
+    public String getNetworkKey(String networkName, String keyType) {
+        try {
+<span class="fc" id="L106">            LocalDateTime now = LocalDateTime.now();</span>
+            
+<span class="fc" id="L108">            List&lt;KeyManagement&gt; keys = keyManagementRepository</span>
+<span class="fc" id="L109">                .findCurrentActiveNetworkKeys(networkName, keyType, now);</span>
+            
+<span class="fc bfc" id="L111" title="All 2 branches covered.">            if (keys.isEmpty()) {</span>
+<span class="fc" id="L112">                logger.warn(&quot;No active network key found for network: {} and key type: {}&quot;, networkName, keyType);</span>
+<span class="fc" id="L113">                return null;</span>
+            }
+            
+<span class="fc" id="L116">            KeyManagement key = keys.get(0);</span>
+          
+<span class="fc bfc" id="L118" title="All 2 branches covered.">            return key.getIs_tr31() ? new String(key.getKey_value()) : bytesToHex(key.getKey_value()) ;</span>
+            
+<span class="nc" id="L120">        } catch (Exception e) {</span>
+<span class="nc" id="L121">            logger.error(&quot;Error retrieving network key for network: {} and key type: {}&quot;, networkName, keyType, e);</span>
+<span class="nc" id="L122">            return null;</span>
+        }
+    }
+    
+    /**
+     * Get working key for a card number with fallback logic
+     */
+    public String getWorkingKeyForCard(String cardNumber, String keyType) {
+        try {
+<span class="fc" id="L131">            String binNumber = cardNumber.substring(0, 6);</span>
+<span class="fc" id="L132">            String networkName = determineNetwork(binNumber);</span>
+
+<span class="fc bfc" id="L134" title="All 2 branches covered.">            if (isNetworkBasedKey(keyType)) {</span>
+<span class="fc" id="L135">                String sessionKey = getSessionScopedNetworkKey(networkName, keyType);</span>
+<span class="fc bfc" id="L136" title="All 2 branches covered.">                if (sessionKey != null) {</span>
+<span class="fc" id="L137">                    logger.debug(&quot;Using session-scoped network key for network: {} and key type: {}&quot;, networkName, keyType);</span>
+<span class="fc" id="L138">                    return sessionKey;</span>
+                }
+            }
+            
+            // Try BIN-specific key first
+<span class="fc" id="L143">            String binKey = getCachedWorkingKeyForBinNumber(binNumber, keyType);</span>
+<span class="fc bfc" id="L144" title="All 2 branches covered.">            if (binKey != null) {</span>
+<span class="fc" id="L145">                return binKey;</span>
+            }
+            
+            // Fallback to network key for network-based keys like ZPK
+<span class="pc bpc" id="L149" title="1 of 2 branches missed.">            if (isNetworkBasedKey(keyType)) {</span>
+<span class="fc" id="L150">                String networkKey = getCachedNetworkKey(networkName, keyType);</span>
+<span class="pc bpc" id="L151" title="1 of 2 branches missed.">                if (networkKey != null) {</span>
+<span class="fc" id="L152">                    logger.debug(&quot;Using network key for card: {} and key type: {}&quot;, maskPan(cardNumber), keyType);</span>
+<span class="fc" id="L153">                    return networkKey;</span>
+                }
+            }
+            
+<span class="nc" id="L157">            logger.warn(&quot;No key found for card: {} and key type: {}&quot;, maskPan(cardNumber), keyType);</span>
+<span class="nc" id="L158">            return null;</span>
+            
+<span class="fc" id="L160">        } catch (Exception e) {</span>
+<span class="fc" id="L161">            logger.error(&quot;Error extracting BIN from card number: {}&quot;, cardNumber, e);</span>
+<span class="fc" id="L162">            return null;</span>
+        }
+    }
+    
+    /**
+     * Determine if a key type is network-based
+     */
+    private boolean isNetworkBasedKey(String keyType) {
+<span class="pc bpc" id="L170" title="2 of 6 branches missed.">        return &quot;ZPK&quot;.equals(keyType) || &quot;ZAK&quot;.equals(keyType) || &quot;KEK&quot;.equals(keyType);</span>
+    }
+    
+    /**
+     * Determine network from BIN
+     */
+    private String determineNetwork(String bin) {
+<span class="fc bfc" id="L177" title="All 2 branches covered.">        if (bin.startsWith(&quot;4&quot;)) return &quot;VISA&quot;;</span>
+<span class="pc bpc" id="L178" title="1 of 4 branches missed.">        if (bin.startsWith(&quot;5&quot;) || bin.startsWith(&quot;2&quot;)) return &quot;MASTERCARD&quot;;</span>
+<span class="pc bpc" id="L179" title="1 of 4 branches missed.">        if (bin.startsWith(&quot;6&quot;) || bin.startsWith(&quot;8&quot;)) return &quot;RUPAY&quot;;</span>
+<span class="nc" id="L180">        return &quot;UNKNOWN&quot;;</span>
+    }
+
+    private String getCachedWorkingKeyForBinNumber(String binNumber, String keyType) {
+<span class="fc" id="L184">        String cacheKey = binNumber + &quot;_&quot; + keyType;</span>
+<span class="fc" id="L185">        Cache cache = cacheManager.getCache(&quot;keyManagementCache&quot;);</span>
+<span class="pc bpc" id="L186" title="1 of 2 branches missed.">        if (cache != null) {</span>
+<span class="fc" id="L187">            String cached = cache.get(cacheKey, String.class);</span>
+<span class="fc bfc" id="L188" title="All 2 branches covered.">            if (cached != null) {</span>
+<span class="fc" id="L189">                return cached;</span>
+            }
+        }
+
+<span class="fc" id="L193">        String resolved = getWorkingKeyForBinNumber(binNumber, keyType);</span>
+<span class="pc bpc" id="L194" title="1 of 4 branches missed.">        if (cache != null &amp;&amp; resolved != null) {</span>
+<span class="fc" id="L195">            cache.put(cacheKey, resolved);</span>
+        }
+<span class="fc" id="L197">        return resolved;</span>
+    }
+
+    private String getCachedNetworkKey(String networkName, String keyType) {
+<span class="fc" id="L201">        String cacheKey = &quot;NETWORK_&quot; + networkName + &quot;_&quot; + keyType;</span>
+<span class="fc" id="L202">        Cache cache = cacheManager.getCache(&quot;keyManagementCache&quot;);</span>
+<span class="pc bpc" id="L203" title="1 of 2 branches missed.">        if (cache != null) {</span>
+<span class="fc" id="L204">            String cached = cache.get(cacheKey, String.class);</span>
+<span class="pc bpc" id="L205" title="1 of 2 branches missed.">            if (cached != null) {</span>
+<span class="fc" id="L206">                return cached;</span>
+            }
+        }
+
+<span class="nc" id="L210">        String resolved = getNetworkKey(networkName, keyType);</span>
+<span class="nc bnc" id="L211" title="All 4 branches missed.">        if (cache != null &amp;&amp; resolved != null) {</span>
+<span class="nc" id="L212">            cache.put(cacheKey, resolved);</span>
+        }
+<span class="nc" id="L214">        return resolved;</span>
+    }
+
+    private String getSessionScopedNetworkKey(String networkName, String keyType) {
+<span class="fc" id="L218">        NetworkSessionContextHolder.NetworkSessionContext sessionContext = NetworkSessionContextHolder.get();</span>
+<span class="fc bfc" id="L219" title="All 2 branches covered.">        if (sessionContext == null) {</span>
+<span class="fc" id="L220">            return null;</span>
+        }
+
+<span class="fc" id="L223">        String scheme = sessionContext.scheme();</span>
+<span class="pc bpc" id="L224" title="2 of 4 branches missed.">        if (scheme == null || scheme.isBlank()) {</span>
+<span class="fc" id="L225">            scheme = networkName;</span>
+        }
+
+<span class="fc" id="L228">        return networkSessionKeyService.getActiveKeyValue(</span>
+<span class="fc" id="L229">                sessionContext.siteId(),</span>
+<span class="fc" id="L230">                sessionContext.listenerId(),</span>
+<span class="fc" id="L231">                sessionContext.connectionId(),</span>
+                scheme,
+                keyType
+        );
+    }
+
+    public String getCurrentSessionNetworkKey(String scheme, String keyType) {
+<span class="fc" id="L238">        NetworkSessionContextHolder.NetworkSessionContext sessionContext = NetworkSessionContextHolder.get();</span>
+<span class="fc bfc" id="L239" title="All 2 branches covered.">        if (sessionContext == null) {</span>
+<span class="fc" id="L240">            logger.warn(&quot;No network session context available for key type: {}&quot;, keyType);</span>
+<span class="fc" id="L241">            return null;</span>
+        }
+
+<span class="fc" id="L244">        String resolvedScheme = scheme;</span>
+<span class="pc bpc" id="L245" title="1 of 4 branches missed.">        if (resolvedScheme == null || resolvedScheme.isBlank()) {</span>
+<span class="fc" id="L246">            resolvedScheme = sessionContext.scheme();</span>
+        }
+<span class="pc bpc" id="L248" title="1 of 4 branches missed.">        if (resolvedScheme == null || resolvedScheme.isBlank()) {</span>
+<span class="fc" id="L249">            logger.warn(&quot;No scheme available for session-scoped network key lookup. keyType={}&quot;, keyType);</span>
+<span class="fc" id="L250">            return null;</span>
+        }
+<span class="fc" id="L252">        resolvedScheme = resolvedScheme.trim().toUpperCase();</span>
+
+<span class="fc" id="L254">        String sessionKey = null;</span>
+<span class="pc bpc" id="L255" title="2 of 4 branches missed.">        if (sessionContext.connectionId() != null &amp;&amp; !sessionContext.connectionId().isBlank()) {</span>
+<span class="fc" id="L256">            sessionKey = networkSessionKeyService.getActiveKeyValue(</span>
+<span class="fc" id="L257">                    sessionContext.siteId(),</span>
+<span class="fc" id="L258">                    sessionContext.listenerId(),</span>
+<span class="fc" id="L259">                    sessionContext.connectionId(),</span>
+                    resolvedScheme,
+                    keyType
+            );
+        }
+<span class="pc bpc" id="L264" title="1 of 2 branches missed.">        if (sessionKey == null) {</span>
+<span class="fc" id="L265">            sessionKey = networkSessionKeyService.getActiveKeyValue(</span>
+<span class="fc" id="L266">                    sessionContext.siteId(),</span>
+<span class="fc" id="L267">                    sessionContext.listenerId(),</span>
+                    resolvedScheme,
+                    keyType
+            );
+        }
+
+<span class="pc bpc" id="L273" title="1 of 2 branches missed.">        if (sessionKey == null) {</span>
+<span class="nc" id="L274">            logger.warn(&quot;No session-scoped network key found for site: {}, listener: {}, scheme: {}, key type: {}&quot;,</span>
+<span class="nc" id="L275">                    sessionContext.siteId(),</span>
+<span class="nc" id="L276">                    sessionContext.listenerId(),</span>
+                    resolvedScheme,
+                    keyType);
+        }
+<span class="fc" id="L280">        return sessionKey;</span>
+    }
+    
+    /**
+     * Load all active keys into cache on startup
+     */
+    @Cacheable(&quot;keyManagementCache&quot;)
+    public Map&lt;String, String&gt; loadAllActiveKeys() {
+<span class="fc" id="L288">        logger.info(&quot;Loading all active HSM keys into cache&quot;);</span>
+<span class="fc" id="L289">        Map&lt;String, String&gt; keyCache = new HashMap&lt;&gt;();</span>
+        
+        try {
+<span class="fc" id="L292">            LocalDateTime now = LocalDateTime.now();</span>
+<span class="fc" id="L293">            List&lt;KeyManagement&gt; activeKeys = keyManagementRepository</span>
+<span class="fc" id="L294">                .findAllCurrentActiveKeys(now);</span>
+            
+<span class="fc bfc" id="L296" title="All 2 branches covered.">            for (KeyManagement key : activeKeys) {</span>
+                String cacheKey;
+                
+<span class="fc bfc" id="L299" title="All 2 branches covered.">                if (&quot;BIN&quot;.equals(key.getKey_scope())) {</span>
+<span class="fc" id="L300">                    BinDetails binDetails = binDetailsRepository.findById(key.getBin_id().longValue()).orElse(null);</span>
+<span class="fc bfc" id="L301" title="All 2 branches covered.">                    if (binDetails != null) {</span>
+<span class="fc" id="L302">                        cacheKey = binDetails.getBinNumber() + &quot;_&quot; + key.getKey_type();</span>
+                    } else {
+                        continue;
+                    }
+<span class="fc bfc" id="L306" title="All 2 branches covered.">                } else if (&quot;NETWORK&quot;.equals(key.getKey_scope())) {</span>
+<span class="fc" id="L307">                    cacheKey = &quot;NETWORK_&quot; + key.getNetwork_name() + &quot;_&quot; + key.getKey_type();</span>
+                } else {
+<span class="fc" id="L309">                    cacheKey = &quot;INSTITUTION_&quot; + key.getInstitution_id() + &quot;_&quot; + key.getKey_type();</span>
+                }
+                
+<span class="fc" id="L312">                String keyValue = bytesToHex(key.getKey_value());</span>
+<span class="fc" id="L313">                keyCache.put(cacheKey, keyValue);</span>
+                
+<span class="fc" id="L315">                logger.debug(&quot;Cached key: {}&quot;, cacheKey);</span>
+<span class="fc" id="L316">            }</span>
+            
+<span class="fc" id="L318">            logger.info(&quot;Loaded {} active keys into cache&quot;, activeKeys.size());</span>
+            
+<span class="fc" id="L320">        } catch (Exception e) {</span>
+<span class="fc" id="L321">            logger.error(&quot;Error loading keys into cache&quot;, e);</span>
+<span class="fc" id="L322">        }</span>
+        
+<span class="fc" id="L324">        return keyCache;</span>
+    }
+    
+    /**
+     * Get key history for audit purposes
+     */
+    public List&lt;KeyManagement&gt; getKeyHistory(String keyType, String keyScope, Integer binId) {
+<span class="fc" id="L331">        return keyManagementRepository.findKeyHistory(keyType, keyScope, binId);</span>
+    }
+
+    public KeyManagement getCurrentInstitutionKey(Integer institutionId, String keyType) {
+<span class="fc" id="L335">        LocalDateTime now = LocalDateTime.now();</span>
+<span class="fc" id="L336">        List&lt;KeyManagement&gt; keys = keyManagementRepository</span>
+<span class="fc" id="L337">            .findCurrentActiveInstitutionKeys(institutionId, keyType, now);</span>
+<span class="fc bfc" id="L338" title="All 2 branches covered.">        return keys.isEmpty() ? null : keys.get(0);</span>
+    }
+
+    public List&lt;KeyManagement&gt; getActiveInstitutionKeyVersions(Integer institutionId, String keyType) {
+<span class="fc" id="L342">        return keyManagementRepository.findActiveKeysByInstitutionIdAndKeyType(</span>
+<span class="fc" id="L343">            institutionId, keyType, &quot;A&quot;, LocalDateTime.now());</span>
+    }
+
+    public String getCurrentInstitutionKeyValue(Integer institutionId, String keyType) {
+<span class="fc" id="L347">        KeyManagement key = getCurrentInstitutionKey(institutionId, keyType);</span>
+<span class="pc bpc" id="L348" title="2 of 6 branches missed.">        if (key == null || key.getKey_value() == null || key.getKey_value().length == 0) {</span>
+<span class="fc" id="L349">            return null;</span>
+        }
+
+<span class="fc bfc" id="L352" title="All 2 branches covered.">        return Boolean.TRUE.equals(key.getIs_tr31())</span>
+<span class="fc" id="L353">                ? new String(key.getKey_value(), StandardCharsets.US_ASCII)</span>
+<span class="fc" id="L354">                : bytesToHex(key.getKey_value());</span>
+    }
+
+    public KeyManagement getInstitutionKeyByVersion(Integer institutionId, String keyType, Integer keyVersion) {
+<span class="fc bfc" id="L358" title="All 6 branches covered.">        if (institutionId == null || keyType == null || keyVersion == null) {</span>
+<span class="fc" id="L359">            return null;</span>
+        }
+
+<span class="fc" id="L362">        return getActiveInstitutionKeyVersions(institutionId, keyType).stream()</span>
+<span class="fc" id="L363">            .filter(key -&gt; keyVersion.equals(key.getKey_version()))</span>
+<span class="fc" id="L364">            .findFirst()</span>
+<span class="fc" id="L365">            .orElse(null);</span>
+    }
+
+    @Transactional
+    public KeyManagement saveInstitutionWrappedKey(Integer institutionId,
+                                                   String keyType,
+                                                   String wrappedKey,
+                                                   String kcv,
+                                                   String algorithm,
+                                                   String wrappingKeyRef,
+                                                   String createdBy) {
+<span class="fc" id="L376">        LocalDateTime now = LocalDateTime.now();</span>
+<span class="fc" id="L377">        List&lt;KeyManagement&gt; currentKeys = keyManagementRepository.findCurrentActiveInstitutionKeys(institutionId, keyType, now);</span>
+<span class="fc" id="L378">        Integer nextVersion = 1;</span>
+
+<span class="fc bfc" id="L380" title="All 2 branches covered.">        for (KeyManagement currentKey : currentKeys) {</span>
+<span class="fc" id="L381">            currentKey.setIs_current(false);</span>
+<span class="fc" id="L382">            currentKey.setUpdated_at(now);</span>
+<span class="fc" id="L383">            keyManagementRepository.save(currentKey);</span>
+<span class="pc bpc" id="L384" title="2 of 4 branches missed.">            if (currentKey.getKey_version() != null &amp;&amp; currentKey.getKey_version() &gt;= nextVersion) {</span>
+<span class="fc" id="L385">                nextVersion = currentKey.getKey_version() + 1;</span>
+            }
+<span class="fc" id="L387">        }</span>
+
+<span class="fc" id="L389">        KeyManagement key = new KeyManagement();</span>
+<span class="fc" id="L390">        key.setInstitution_id(institutionId);</span>
+<span class="fc" id="L391">        key.setKey_type(keyType);</span>
+<span class="fc" id="L392">        key.setKey_scope(&quot;INSTITUTION&quot;);</span>
+<span class="fc" id="L393">        key.setKey_status(&quot;A&quot;);</span>
+<span class="fc" id="L394">        key.setIs_current(true);</span>
+<span class="fc" id="L395">        key.setKey_version(nextVersion);</span>
+<span class="fc" id="L396">        key.setKey_value(wrappedKey.getBytes(StandardCharsets.US_ASCII));</span>
+<span class="fc" id="L397">        key.setKey_check_value(kcv);</span>
+<span class="fc" id="L398">        key.setIs_tr31(true);</span>
+<span class="fc" id="L399">        key.setValid_from(now);</span>
+<span class="fc" id="L400">        key.setValid_to(now.plusYears(2));</span>
+<span class="fc" id="L401">        key.setCreated_at(now);</span>
+<span class="fc" id="L402">        key.setUpdated_at(now);</span>
+<span class="fc" id="L403">        key.setCreated_by(createdBy);</span>
+<span class="fc" id="L404">        key.setAlgorithm(algorithm);</span>
+<span class="fc" id="L405">        key.setWrapping_key_ref(wrappingKeyRef);</span>
+<span class="fc" id="L406">        return keyManagementRepository.save(key);</span>
+    }
+    
+    /**
+     * Rotate key (deactivate current, activate new)
+     */
+    @Transactional
+    public boolean  rotateKey(String keyType, String scheme, String keyStatus, String newKey, String kcv) {
+        // Deactivate current key
+<span class="fc" id="L415">        List&lt;KeyManagement&gt; currentKey = keyManagementRepository.findByKeyTypeAndNetworkNameAndKeyStatus(keyType, scheme, &quot;A&quot;);</span>
+<span class="fc bfc" id="L416" title="All 2 branches covered.">        if (currentKey.isEmpty()) {</span>
+<span class="fc" id="L417">            logger.warn(&quot;No active key found for key type: {} and scheme: {}&quot;, keyType, scheme);</span>
+<span class="fc" id="L418">            return false;</span>
+        }
+<span class="fc" id="L420">        KeyManagement currentKeyEntity = currentKey.get(0);</span>
+<span class="fc" id="L421">        currentKeyEntity.setKey_status(&quot;I&quot;);</span>
+<span class="fc" id="L422">        currentKeyEntity.setUpdated_at(LocalDateTime.now());</span>
+<span class="fc" id="L423">        keyManagementRepository.save(currentKeyEntity);</span>
+        
+        // Activate new key
+<span class="fc" id="L426">        KeyManagement newKeyEntity = new KeyManagement();</span>
+<span class="fc" id="L427">        newKeyEntity.setInstitution_id(currentKey.get(0).getInstitution_id());</span>
+<span class="fc" id="L428">        newKeyEntity.setKey_type(keyType);</span>
+<span class="fc" id="L429">        newKeyEntity.setKey_status(&quot;A&quot;);</span>
+<span class="fc" id="L430">        newKeyEntity.setIs_current(true);</span>
+<span class="fc" id="L431">        newKeyEntity.setKey_scope(&quot;NETWORK&quot;);</span>
+<span class="pc bpc" id="L432" title="1 of 2 branches missed.">        newKeyEntity.setKey_version(currentKeyEntity.getKey_version()!=null ? currentKeyEntity.getKey_version() + 1 : 1);</span>
+<span class="fc" id="L433">        newKeyEntity.setNetwork_name(scheme);</span>
+<span class="fc" id="L434">        newKeyEntity.setKey_value(newKey.getBytes());</span>
+<span class="fc" id="L435">        newKeyEntity.setKey_check_value(kcv);</span>
+<span class="fc" id="L436">        newKeyEntity.setKey_value_tr31(newKey.getBytes());</span>
+<span class="fc" id="L437">        newKeyEntity.setKey_check_value_tr31(kcv);</span>
+<span class="fc" id="L438">        newKeyEntity.setUpdated_at(LocalDateTime.now());</span>
+<span class="fc" id="L439">        newKeyEntity.setCreated_at(LocalDateTime.now());</span>
+<span class="fc" id="L440">        newKeyEntity.setCreated_by(&quot;SYSTEM-DKE&quot;);</span>
+<span class="fc" id="L441">        newKeyEntity.setValid_from(LocalDateTime.now());</span>
+<span class="fc" id="L442">        newKeyEntity.setValid_to(LocalDateTime.now().plusYears(10));</span>
+<span class="fc" id="L443">        newKeyEntity.setIs_tr31(true);</span>
+<span class="fc" id="L444">        keyManagementRepository.save(newKeyEntity);</span>
+        
+        // Refresh cache
+<span class="fc" id="L447">        refreshKeyCache();</span>
+<span class="fc" id="L448">        return true;</span>
+    }
+
+    public boolean rotateSessionNetworkKey(String keyType,
+                                           String scheme,
+                                           String siteId,
+                                           String listenerId,
+                                           String connectionId,
+                                           String newKey,
+                                           String kcv) {
+<span class="fc" id="L458">        return networkSessionKeyService.rotateSessionKey(</span>
+                keyType,
+                scheme,
+                siteId,
+                listenerId,
+                connectionId,
+                newKey,
+                kcv,
+                &quot;SYSTEM-DKE&quot;
+        );
+    }
+    
+    /**
+     * Refresh the key management cache
+     * Clears the existing cache and reloads all active keys
+     */
+    @CacheEvict(value = &quot;keyManagementCache&quot;, allEntries = true)
+    public void refreshKeyCache() {
+<span class="fc" id="L476">        logger.info(&quot;Refreshing key management cache&quot;);</span>
+        try {
+            // Clear the cache
+<span class="fc" id="L479">            var cache = cacheManager.getCache(&quot;keyManagementCache&quot;);</span>
+<span class="pc bpc" id="L480" title="1 of 2 branches missed.">            if (cache != null) {</span>
+<span class="fc" id="L481">                cache.clear();</span>
+<span class="fc" id="L482">                logger.debug(&quot;Cleared keyManagementCache&quot;);</span>
+            }
+            
+            // Reload all active keys into cache by calling the loadAllActiveKeys method
+            // This will repopulate the cache with the latest data from the database
+<span class="fc" id="L487">            loadAllActiveKeys();</span>
+<span class="fc" id="L488">            logger.info(&quot;Key management cache refreshed successfully&quot;);</span>
+            
+<span class="fc" id="L490">        } catch (Exception e) {</span>
+<span class="fc" id="L491">            logger.error(&quot;Error refreshing key management cache&quot;, e);</span>
+<span class="fc" id="L492">            throw new RuntimeException(&quot;Failed to refresh key management cache&quot;, e);</span>
+<span class="fc" id="L493">        }</span>
+<span class="fc" id="L494">    }</span>
+    
+    private String bytesToHex(byte[] bytes) {
+<span class="fc" id="L497">        StringBuilder result = new StringBuilder();</span>
+<span class="fc bfc" id="L498" title="All 2 branches covered.">        for (byte b : bytes) {</span>
+<span class="fc" id="L499">            result.append(String.format(&quot;%02X&quot;, b));</span>
+        }
+<span class="fc" id="L501">        return result.toString();</span>
+    }
+    
+    private String maskPan(String pan) {
+<span class="pc bpc" id="L505" title="2 of 4 branches missed.">        if (pan == null || pan.length() &lt; 8) {</span>
+<span class="nc" id="L506">            return &quot;****&quot;;</span>
+        }
+<span class="fc" id="L508">        return pan.substring(0, 4) + &quot;****&quot; + pan.substring(pan.length() - 4);</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.14.202510111229</span></div></body></html>

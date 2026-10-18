@@ -1,0 +1,80 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>WebClientNotificationClient.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">iso8583-processor</a> &gt; <a href="index.source.html" class="el_package">com.logicpoint.iso8583.notification.client</a> &gt; <span class="el_source">WebClientNotificationClient.java</span></div><h1>WebClientNotificationClient.java</h1><pre class="source lang-java linenums">package com.logicpoint.iso8583.notification.client;
+
+import com.logicpoint.iso8583.notification.dto.NotificationPublishResponse;
+import com.logicpoint.iso8583.notification.dto.NotificationRequest;
+import com.logicpoint.iso8583.notification.exception.NonRetryableNotificationException;
+import com.logicpoint.iso8583.notification.exception.RetryableNotificationException;
+import io.github.resilience4j.circuitbreaker.annotation.CircuitBreaker;
+import java.util.Objects;
+import org.springframework.beans.factory.annotation.Qualifier;
+import org.springframework.http.HttpHeaders;
+import org.springframework.http.HttpStatus;
+import org.springframework.retry.annotation.Backoff;
+import org.springframework.retry.annotation.Retryable;
+import org.springframework.stereotype.Component;
+import org.springframework.web.reactive.function.client.WebClient;
+import org.springframework.web.reactive.function.client.WebClientRequestException;
+import org.springframework.web.reactive.function.client.WebClientResponseException;
+
+@Component
+public class WebClientNotificationClient implements NotificationClient {
+
+    private static final String PUBLISH_PATH = &quot;/notifications/publish&quot;;
+    private static final String TRACE_ID_HEADER = &quot;X-Trace-Id&quot;;
+    private static final String EVENT_ID_HEADER = &quot;X-Event-Id&quot;;
+
+    private final WebClient webClient;
+
+<span class="fc" id="L28">    public WebClientNotificationClient(@Qualifier(&quot;notificationWebClient&quot;) WebClient webClient) {</span>
+<span class="fc" id="L29">        this.webClient = webClient;</span>
+<span class="fc" id="L30">    }</span>
+
+    @Override
+    @CircuitBreaker(name = &quot;notificationService&quot;)
+    @Retryable(
+            retryFor = RetryableNotificationException.class,
+            noRetryFor = NonRetryableNotificationException.class,
+            maxAttemptsExpression = &quot;${notification.retry.max-attempts:3}&quot;,
+            backoff = @Backoff(delayExpression = &quot;${notification.retry.backoff-millis:500}&quot;)
+    )
+    public NotificationPublishResponse publish(NotificationRequest request, String traceId) {
+        try {
+<span class="fc" id="L42">            return webClient.post()</span>
+<span class="fc" id="L43">                    .uri(PUBLISH_PATH)</span>
+<span class="fc" id="L44">                    .header(TRACE_ID_HEADER, traceId)</span>
+<span class="fc" id="L45">                    .bodyValue(request)</span>
+<span class="fc" id="L46">                    .exchangeToMono(response -&gt; {</span>
+<span class="fc" id="L47">                        HttpStatus status = HttpStatus.valueOf(response.statusCode().value());</span>
+<span class="fc bfc" id="L48" title="All 2 branches covered.">                        if (status == HttpStatus.ACCEPTED) {</span>
+<span class="fc" id="L49">                            HttpHeaders headers = response.headers().asHttpHeaders();</span>
+<span class="fc" id="L50">                            String responseTraceId = firstNonBlank(headers.getFirst(TRACE_ID_HEADER), traceId);</span>
+<span class="fc" id="L51">                            return response.releaseBody()</span>
+<span class="fc" id="L52">                                    .thenReturn(new NotificationPublishResponse(headers.getFirst(EVENT_ID_HEADER), responseTraceId));</span>
+                        }
+<span class="fc bfc" id="L54" title="All 2 branches covered.">                        if (status == HttpStatus.SERVICE_UNAVAILABLE) {</span>
+<span class="fc" id="L55">                            return response.bodyToMono(String.class)</span>
+<span class="fc" id="L56">                                    .defaultIfEmpty(&quot;&quot;)</span>
+<span class="fc" id="L57">                                    .map(body -&gt; new RetryableNotificationException(&quot;Notification service unavailable: &quot; + body))</span>
+<span class="fc" id="L58">                                    .flatMap(error -&gt; reactor.core.publisher.Mono.error(error));</span>
+                        }
+<span class="fc" id="L60">                        return response.bodyToMono(String.class)</span>
+<span class="fc" id="L61">                                .defaultIfEmpty(&quot;&quot;)</span>
+<span class="fc" id="L62">                                .map(body -&gt; new NonRetryableNotificationException(</span>
+<span class="fc" id="L63">                                        &quot;Notification publish rejected with HTTP &quot; + status.value() + &quot;: &quot; + body))</span>
+<span class="fc" id="L64">                                .flatMap(error -&gt; reactor.core.publisher.Mono.error(error));</span>
+                    })
+<span class="fc" id="L66">                    .block();</span>
+<span class="nc" id="L67">        } catch (WebClientRequestException ex) {</span>
+<span class="nc" id="L68">            throw new RetryableNotificationException(&quot;Notification service request failed&quot;, ex);</span>
+<span class="nc" id="L69">        } catch (WebClientResponseException.ServiceUnavailable ex) {</span>
+<span class="nc" id="L70">            throw new RetryableNotificationException(&quot;Notification service unavailable&quot;, ex);</span>
+<span class="nc" id="L71">        } catch (WebClientResponseException.BadRequest ex) {</span>
+<span class="nc" id="L72">            throw new NonRetryableNotificationException(&quot;Notification request validation failed: &quot; + ex.getResponseBodyAsString());</span>
+        }
+    }
+
+    private String firstNonBlank(String value, String fallback) {
+<span class="pc bpc" id="L77" title="2 of 4 branches missed.">        return value == null || value.isBlank() ? Objects.requireNonNull(fallback) : value;</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.14.202510111229</span></div></body></html>

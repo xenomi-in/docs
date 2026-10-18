@@ -1,0 +1,1748 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>ISOUtil.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">iso8583-processor</a> &gt; <a href="index.source.html" class="el_package">com.logicpoint.iso8583.util</a> &gt; <span class="el_source">ISOUtil.java</span></div><h1>ISOUtil.java</h1><pre class="source lang-java linenums">package com.logicpoint.iso8583.util;
+
+
+ import java.math.BigDecimal;
+ import java.nio.ByteBuffer;
+ import java.nio.charset.Charset;
+ import java.nio.charset.StandardCharsets;
+ import java.text.DecimalFormat;
+ import java.time.Duration;
+ import java.util.ArrayList;
+ import java.util.Arrays;
+ import java.util.BitSet;
+ import java.util.List;
+ import java.util.Random;
+ import java.util.StringJoiner;
+ import java.util.StringTokenizer;
+ import java.util.concurrent.locks.LockSupport;
+ import java.util.regex.Pattern;
+ import java.util.stream.Collectors;
+ import com.logicpoint.iso8583.exception.ISOException;
+ 
+ /**
+  * various functions needed to pack/unpack ISO-8583 fields
+  *
+  * @author apr@jpos.org
+  * @author Hani S. Kirollos
+  * @author Alwyn Schoeman
+  * @version $Id$
+  * @see ISOComponent
+  */
+ @SuppressWarnings(&quot;unused&quot;)
+ public class ISOUtil {
+     /**
+      * All methods in this class are static, so there's usually no need to instantiate it
+      * We provide this public constructor in order to deal with some legacy script integration
+      * that needs an instance of this class in a rendering context.
+      */
+     public ISOUtil() {
+<span class="nc" id="L39">         super();</span>
+<span class="nc" id="L40">     }</span>
+     public static final String[] hexStrings;
+ 
+     static {
+<span class="fc" id="L44">         hexStrings = new String[256];</span>
+<span class="fc bfc" id="L45" title="All 2 branches covered.">         for (int i = 0; i &lt; 256; i++ ) {</span>
+<span class="fc" id="L46">             StringBuilder d = new StringBuilder(2);</span>
+<span class="fc" id="L47">             char ch = Character.forDigit((byte)i &gt;&gt; 4 &amp; 0x0F, 16);</span>
+<span class="fc" id="L48">             d.append(Character.toUpperCase(ch));</span>
+<span class="fc" id="L49">             ch = Character.forDigit((byte)i &amp; 0x0F, 16);</span>
+<span class="fc" id="L50">             d.append(Character.toUpperCase(ch));</span>
+<span class="fc" id="L51">             hexStrings[i] = d.toString();</span>
+         }
+     }
+     /**
+      * Default encoding (charset) for bytes transmissions over network
+      * @deprecated use {@link #CHARSET} instead
+      */
+     @Deprecated
+     public static final String ENCODING  = &quot;ISO8859_1&quot;;
+<span class="fc" id="L60">     public static final Pattern unicodePattern = Pattern.compile(&quot;u00([0-9a-fA-F]{2})+&quot;);</span>
+ 
+     /**
+      * Default charset for bytes transmissions over network
+      */
+<span class="fc" id="L65">     public static final Charset CHARSET  = StandardCharsets.ISO_8859_1;</span>
+<span class="fc" id="L66">     public static final Charset EBCDIC   = Charset.forName(&quot;IBM1047&quot;);</span>
+ 
+     public static final byte STX = 0x02;
+     public static final byte FS  = 0x1C;
+     public static final byte US  = 0x1F;
+     public static final byte RS  = 0x1D;
+     public static final byte GS  = 0x1E;
+     public static final byte ETX = 0x03;
+ 
+     public static String ebcdicToAscii(byte[] e) {
+<span class="fc" id="L76">         return EBCDIC.decode(ByteBuffer.wrap(e)).toString();</span>
+     }
+     public static String ebcdicToAscii(byte[] e, int offset, int len) {
+<span class="fc" id="L79">         return EBCDIC.decode(ByteBuffer.wrap(e, offset, len)).toString();</span>
+     }
+     public static byte[] ebcdicToAsciiBytes (byte[] e) {
+<span class="fc" id="L82">         return ebcdicToAsciiBytes (e, 0, e.length);</span>
+     }
+     public static byte[] ebcdicToAsciiBytes (byte[] e, int offset, int len) {
+<span class="fc" id="L85">         return ebcdicToAscii(e, offset, len).getBytes(CHARSET);</span>
+     }
+     public static byte[] asciiToEbcdic(String s) {
+<span class="fc" id="L88">         return EBCDIC.encode(s).array();</span>
+     }
+     public static byte[] asciiToEbcdic(byte[] a) {
+<span class="nc" id="L91">         return EBCDIC.encode(new String(a, CHARSET)).array();</span>
+     }
+     public static void asciiToEbcdic(String s, byte[] e, int offset) {
+<span class="fc" id="L94">         System.arraycopy (asciiToEbcdic(s), 0, e, offset, s.length());</span>
+<span class="fc" id="L95">     }</span>
+     public static void asciiToEbcdic(byte[] s, byte[] e, int offset) {
+<span class="nc" id="L97">         asciiToEbcdic(new String(s, CHARSET), e, offset);</span>
+<span class="nc" id="L98">     }</span>
+ 
+     /**
+      * pad to the left
+      * @param s - original string
+      * @param len - desired len
+      * @param c - padding char
+      * @return padded string
+      * @throws ISOException on error
+      */
+     public static String padleft(String s, int len, char c)
+         throws ISOException 
+     {
+<span class="fc" id="L111">         s = s.trim();</span>
+<span class="fc bfc" id="L112" title="All 2 branches covered.">         if (s.length() &gt; len)</span>
+<span class="fc" id="L113">             throw new ISOException(&quot;invalid len &quot; +s.length() + &quot;/&quot; +len);</span>
+<span class="fc" id="L114">         StringBuilder d = new StringBuilder (len);</span>
+<span class="fc" id="L115">         int fill = len - s.length();</span>
+<span class="fc bfc" id="L116" title="All 2 branches covered.">         while (fill-- &gt; 0)</span>
+<span class="fc" id="L117">             d.append (c);</span>
+<span class="fc" id="L118">         d.append(s);</span>
+<span class="fc" id="L119">         return d.toString();</span>
+     }
+     
+     /**
+      * pad to the right
+      * 
+      * @param s -
+      *            original string
+      * @param len -
+      *            desired len
+      * @param c -
+      *            padding char
+      * @return padded string
+      * @throws ISOException if String's length greater than pad length
+      */
+     public static String padright(String s, int len, char c) throws ISOException {
+<span class="fc" id="L135">         s = s.trim();</span>
+<span class="fc bfc" id="L136" title="All 2 branches covered.">         if (s.length() &gt; len)</span>
+<span class="fc" id="L137">             throw new ISOException(&quot;invalid len &quot; + s.length() + &quot;/&quot; + len);</span>
+<span class="fc" id="L138">         StringBuilder d = new StringBuilder(len);</span>
+<span class="fc" id="L139">         int fill = len - s.length();</span>
+<span class="fc" id="L140">         d.append(s);</span>
+<span class="fc bfc" id="L141" title="All 2 branches covered.">         while (fill-- &gt; 0)</span>
+<span class="fc" id="L142">             d.append(c);</span>
+<span class="fc" id="L143">         return d.toString();</span>
+     }
+ 
+    /**
+     * trim String (if not null)
+     * @param s String to trim
+     * @return String (may be null)
+     */
+     public static String trim (String s) {
+<span class="fc bfc" id="L152" title="All 2 branches covered.">         return s != null ? s.trim() : null;</span>
+     }
+ 
+     /**
+      * left pad with '0'
+      * @param s - original string
+      * @param len - desired len
+      * @return zero padded string
+      * @throws ISOException if string's length greater than len
+      */
+     public static String zeropad(String s, int len) throws ISOException {
+<span class="fc" id="L163">         return padleft(s, len, '0');</span>
+     }
+ 
+     /**
+      * zeropads a long without throwing an ISOException (performs modulus operation)
+      *
+      * @param l the long
+      * @param len the length
+      * @return zeropadded value
+      */
+     public static String zeropad(long l, int len) {
+         try {
+<span class="fc" id="L175">             return padleft (Long.toString ((long) (l % Math.pow (10, len))), len, '0');</span>
+<span class="nc" id="L176">         } catch (ISOException ignored) { }</span>
+<span class="nc" id="L177">         return null; // should never happen</span>
+     }
+ 
+     /**
+      * pads to the right
+      * @param s - original string
+      * @param len - desired len
+      * @return space padded string
+      */
+     public static String strpad(String s, int len) {
+<span class="fc" id="L187">         StringBuilder d = new StringBuilder(s);</span>
+<span class="fc bfc" id="L188" title="All 2 branches covered.">         while (d.length() &lt; len)</span>
+<span class="fc" id="L189">             d.append(' ');</span>
+<span class="fc" id="L190">         return d.toString();</span>
+     }
+     public static String zeropadRight (String s, int len) {
+<span class="fc" id="L193">         StringBuilder d = new StringBuilder(s);</span>
+<span class="fc bfc" id="L194" title="All 2 branches covered.">         while (d.length() &lt; len)</span>
+<span class="fc" id="L195">             d.append('0');</span>
+<span class="fc" id="L196">         return d.toString();</span>
+     }
+     /**
+      * converts to BCD
+      * @param s - the number
+      * @param padLeft - flag indicating left/right padding
+      * @param d The byte array to copy into.
+      * @param offset Where to start copying into.
+      * @return BCD representation of the number
+      */
+     public static byte[] str2bcd(String s, boolean padLeft, byte[] d, int offset) {
+<span class="fc" id="L207">         int len = s.length();</span>
+<span class="pc bpc" id="L208" title="1 of 4 branches missed.">         int start = (len &amp; 1) == 1 &amp;&amp; padLeft ? 1 : 0;</span>
+<span class="fc bfc" id="L209" title="All 2 branches covered.">         for (int i=start; i &lt; len+start; i++) </span>
+<span class="fc bfc" id="L210" title="All 2 branches covered.">             d [offset + (i &gt;&gt; 1)] |= s.charAt(i-start)-'0' &lt;&lt; ((i &amp; 1) == 1 ? 0 : 4);</span>
+<span class="fc" id="L211">         return d;</span>
+     }
+ 
+     /**
+      * converts to BCD
+      * @param s - the number
+      * @param padLeft - flag indicating left/right padding
+      * @param d The byte array to copy into.
+      * @param offset Where to start copying into.
+      * @return BCD representation of the number
+      */
+     public static byte[] str2hex(String s, boolean padLeft, byte[] d, int offset) {
+<span class="fc" id="L223">         int len = s.length();</span>
+<span class="pc bpc" id="L224" title="2 of 4 branches missed.">         int start = (len &amp; 1) == 1 &amp;&amp; padLeft ? 1 : 0;</span>
+<span class="fc bfc" id="L225" title="All 2 branches covered.">         for (int i=start; i &lt; len+start; i++)</span>
+<span class="fc bfc" id="L226" title="All 2 branches covered.">             d [offset + (i &gt;&gt; 1)] |= Character.digit(s.charAt(i-start),16) &lt;&lt; ((i &amp; 1) == 1 ? 0 : 4);</span>
+<span class="fc" id="L227">         return d;</span>
+     }
+ 
+     /**
+      * converts to BCD
+      * @param s - the number
+      * @param padLeft - flag indicating left/right padding
+      * @return BCD representation of the number
+      */
+     public static byte[] str2bcd(String s, boolean padLeft) {
+<span class="fc" id="L237">         int len = s.length();</span>
+<span class="fc" id="L238">         byte[] d = new byte[ len+1 &gt;&gt; 1 ];</span>
+<span class="fc" id="L239">         return str2bcd(s, padLeft, d, 0);</span>
+     }
+     /**
+      * converts to BCD
+      * @param s - the number
+      * @param padLeft - flag indicating left/right padding
+      * @param fill - fill value
+      * @return BCD representation of the number
+      */
+     public static byte[] str2bcd(String s, boolean padLeft, byte fill) {
+<span class="fc" id="L249">         int len = s.length();</span>
+<span class="fc" id="L250">         byte[] d = new byte[ len+1 &gt;&gt; 1 ];</span>
+<span class="fc bfc" id="L251" title="All 2 branches covered.">         if (d.length &gt; 0) {</span>
+<span class="fc bfc" id="L252" title="All 2 branches covered.">             if (padLeft)</span>
+<span class="fc" id="L253">                 d[0] = (byte) ((fill &amp; 0xF) &lt;&lt; 4);</span>
+<span class="fc bfc" id="L254" title="All 4 branches covered.">             int start = (len &amp; 1) == 1 &amp;&amp; padLeft ? 1 : 0;</span>
+             int i;
+<span class="fc bfc" id="L256" title="All 2 branches covered.">             for (i=start; i &lt; len+start; i++)</span>
+<span class="fc bfc" id="L257" title="All 2 branches covered.">                 d [i &gt;&gt; 1] |= s.charAt(i-start)-'0' &lt;&lt; ((i &amp; 1) == 1 ? 0 : 4);</span>
+<span class="fc bfc" id="L258" title="All 2 branches covered.">             if ((i &amp; 1) == 1)</span>
+<span class="fc" id="L259">                 d [i &gt;&gt; 1] |= fill &amp; 0xF;</span>
+         }
+<span class="fc" id="L261">         return d;</span>
+     }
+     /**
+      * converts a BCD representation of a number to a String
+      * @param b - BCD representation
+      * @param offset - starting offset
+      * @param len - BCD field len
+      * @param padLeft - was padLeft packed?
+      * @return the String representation of the number
+      */
+     public static String bcd2str(byte[] b, int offset,
+                         int len, boolean padLeft)
+     {
+<span class="fc" id="L274">         StringBuilder d = new StringBuilder(len);</span>
+<span class="pc bpc" id="L275" title="1 of 4 branches missed.">         int start = (len &amp; 1) == 1 &amp;&amp; padLeft ? 1 : 0;</span>
+<span class="fc bfc" id="L276" title="All 2 branches covered.">         for (int i=start; i &lt; len+start; i++) {</span>
+<span class="fc bfc" id="L277" title="All 2 branches covered.">             int shift = (i &amp; 1) == 1 ? 0 : 4;</span>
+<span class="fc" id="L278">             char c = Character.forDigit (</span>
+                     b[offset+ (i&gt;&gt;1)] &gt;&gt; shift &amp; 0x0F, 16);
+<span class="fc bfc" id="L280" title="All 2 branches covered.">             if (c == 'd')</span>
+<span class="fc" id="L281">                 c = '=';</span>
+<span class="fc" id="L282">             d.append (Character.toUpperCase (c));</span>
+         }
+<span class="fc" id="L284">         return d.toString();</span>
+     }
+     /**
+      * converts a a byte array to a String with padding support
+      * @param b - HEX representation
+      * @param offset - starting offset
+      * @param len - BCD field len
+      * @param padLeft - was padLeft packed?
+      * @return the String representation of the number
+      */
+     public static String hex2str(byte[] b, int offset,
+                                  int len, boolean padLeft)
+     {
+<span class="fc" id="L297">         StringBuilder d = new StringBuilder(len);</span>
+<span class="pc bpc" id="L298" title="2 of 4 branches missed.">         int start = (len &amp; 1) == 1 &amp;&amp; padLeft ? 1 : 0;</span>
+ 
+<span class="fc bfc" id="L300" title="All 2 branches covered.">         for (int i=start; i &lt; len+start; i++) {</span>
+<span class="fc bfc" id="L301" title="All 2 branches covered.">             int shift = (i &amp; 1) == 1 ? 0 : 4;</span>
+<span class="fc" id="L302">             char c = Character.forDigit (</span>
+                     b[offset+ (i&gt;&gt;1)] &gt;&gt; shift &amp; 0x0F, 16);
+<span class="fc" id="L304">             d.append (Character.toUpperCase (c));</span>
+         }
+<span class="fc" id="L306">         return d.toString();</span>
+     }
+ 
+     /**
+      * converts a byte array to hex string 
+      * (suitable for dumps and ASCII packaging of Binary fields
+      * @param b - byte array
+      * @return String representation
+      */
+     public static String hexString(byte[] b) {
+<span class="fc" id="L316">         StringBuilder d = new StringBuilder(b.length * 2);</span>
+<span class="fc bfc" id="L317" title="All 2 branches covered.">         for (byte aB : b) {</span>
+<span class="fc" id="L318">             d.append(hexStrings[(int) aB &amp; 0xFF]);</span>
+         }
+<span class="fc" id="L320">         return d.toString();</span>
+     }
+     /**
+      * converts a byte array to printable characters
+      * @param b - byte array
+      * @return String representation
+      */
+     public static String dumpString(byte[] b) {
+<span class="fc" id="L328">         StringBuilder d = new StringBuilder(b.length * 2);</span>
+<span class="fc bfc" id="L329" title="All 2 branches covered.">         for (byte aB : b) {</span>
+<span class="fc" id="L330">             char c = (char) aB;</span>
+<span class="fc bfc" id="L331" title="All 2 branches covered.">             if (Character.isISOControl(c)) {</span>
+                 // TODO: complete list of control characters,
+                 // use a String[] instead of this weird switch
+<span class="fc bfc" id="L334" title="All 16 branches covered.">                 switch (c) {</span>
+                     case '\r':
+<span class="fc" id="L336">                         d.append(&quot;{CR}&quot;);</span>
+<span class="fc" id="L337">                         break;</span>
+                     case '\n':
+<span class="fc" id="L339">                         d.append(&quot;{LF}&quot;);</span>
+<span class="fc" id="L340">                         break;</span>
+                     case '\000':
+<span class="fc" id="L342">                         d.append(&quot;{NULL}&quot;);</span>
+<span class="fc" id="L343">                         break;</span>
+                     case '\001':
+<span class="fc" id="L345">                         d.append(&quot;{SOH}&quot;);</span>
+<span class="fc" id="L346">                         break;</span>
+                     case '\002':
+<span class="fc" id="L348">                         d.append(&quot;{STX}&quot;);</span>
+<span class="fc" id="L349">                         break;</span>
+                     case '\003':
+<span class="fc" id="L351">                         d.append(&quot;{ETX}&quot;);</span>
+<span class="fc" id="L352">                         break;</span>
+                     case '\004':
+<span class="fc" id="L354">                         d.append(&quot;{EOT}&quot;);</span>
+<span class="fc" id="L355">                         break;</span>
+                     case '\005':
+<span class="fc" id="L357">                         d.append(&quot;{ENQ}&quot;);</span>
+<span class="fc" id="L358">                         break;</span>
+                     case '\006':
+<span class="fc" id="L360">                         d.append(&quot;{ACK}&quot;);</span>
+<span class="fc" id="L361">                         break;</span>
+                     case '\007':
+<span class="fc" id="L363">                         d.append(&quot;{BEL}&quot;);</span>
+<span class="fc" id="L364">                         break;</span>
+                     case '\020':
+<span class="fc" id="L366">                         d.append(&quot;{DLE}&quot;);</span>
+<span class="fc" id="L367">                         break;</span>
+                     case '\025':
+<span class="fc" id="L369">                         d.append(&quot;{NAK}&quot;);</span>
+<span class="fc" id="L370">                         break;</span>
+                     case '\026':
+<span class="fc" id="L372">                         d.append(&quot;{SYN}&quot;);</span>
+<span class="fc" id="L373">                         break;</span>
+                     case '\034':
+<span class="fc" id="L375">                         d.append(&quot;{FS}&quot;);</span>
+<span class="fc" id="L376">                         break;</span>
+                     case '\036':
+<span class="fc" id="L378">                         d.append(&quot;{RS}&quot;);</span>
+<span class="fc" id="L379">                         break;</span>
+                     default:
+<span class="fc" id="L381">                         d.append('[');</span>
+<span class="fc" id="L382">                         d.append(hexStrings[(int) aB &amp; 0xFF]);</span>
+<span class="fc" id="L383">                         d.append(']');</span>
+<span class="fc" id="L384">                         break;</span>
+                 }
+             } else
+<span class="fc" id="L387">                 d.append(c);</span>
+ 
+         }
+<span class="fc" id="L390">         return d.toString();</span>
+     }
+     /**
+      * converts a byte array to hex string 
+      * (suitable for dumps and ASCII packaging of Binary fields
+      * @param b - byte array
+      * @param offset  - starting position
+      * @param len the length
+      * @return String representation
+      */
+     public static String hexString(byte[] b, int offset, int len) {
+<span class="nc" id="L401">         StringBuilder d = new StringBuilder(len * 2);</span>
+<span class="nc" id="L402">         len += offset;</span>
+<span class="nc bnc" id="L403" title="All 2 branches missed.">         for (int i=offset; i&lt;len; i++) {</span>
+<span class="nc" id="L404">             d.append(hexStrings[(int)b[i] &amp; 0xFF]);</span>
+         }
+<span class="nc" id="L406">         return d.toString();</span>
+     }
+ 
+     /**
+      * bit representation of a BitSet
+      * suitable for dumps and debugging
+      * @param b - the BitSet
+      * @return string representing the bits (i.e. 011010010...)
+      */
+     public static String bitSet2String (BitSet b) {
+<span class="fc" id="L416">         int len = b.size();                             // BBB Should be length()?</span>
+<span class="pc bpc" id="L417" title="1 of 2 branches missed.">         len = len &gt; 128 ? 128: len;                     // BBB existence of 3rd bitmap not considered here</span>
+<span class="fc" id="L418">         StringBuilder d = new StringBuilder(len);</span>
+<span class="fc bfc" id="L419" title="All 2 branches covered.">         for (int i=0; i&lt;len; i++)</span>
+<span class="fc bfc" id="L420" title="All 2 branches covered.">             d.append (b.get(i) ? '1' : '0');</span>
+<span class="fc" id="L421">         return d.toString();</span>
+     }
+     /**
+      * converts a BitSet into a binary field
+      * used in pack routines
+      *
+      * This method will set bits 0 (and 65) if there's a secondary (and tertiary) bitmap
+      * (i.e., if the bitmap length is &gt; 64 (and &gt; 128))
+      *
+      * @param b - the BitSet
+      * @return binary representation
+      */
+     public static byte[] bitSet2byte (BitSet b)
+     {
+<span class="fc" id="L435">         int len = b.length()+62 &gt;&gt;6 &lt;&lt;6;        // +62 because we don't use bit 0 in the BitSet</span>
+<span class="fc" id="L436">         byte[] d = new byte[len &gt;&gt; 3];</span>
+<span class="fc bfc" id="L437" title="All 2 branches covered.">         for (int i=0; i&lt;len; i++) </span>
+<span class="fc bfc" id="L438" title="All 2 branches covered.">             if (b.get(i+1))                     // +1 because we don't use bit 0 of the BitSet</span>
+<span class="fc" id="L439">                 d[i &gt;&gt; 3] |= 0x80 &gt;&gt; i % 8;</span>
+<span class="pc bpc" id="L440" title="1 of 2 branches missed.">         if (len&gt;64)</span>
+<span class="nc" id="L441">             d[0] |= 0x80;</span>
+<span class="pc bpc" id="L442" title="1 of 2 branches missed.">         if (len&gt;128)</span>
+<span class="nc" id="L443">             d[8] |= 0x80;</span>
+<span class="fc" id="L444">         return d;</span>
+     }
+     
+     /**
+      * converts a BitSet into a binary field
+      * used in pack routines
+      *
+      * This method will set bits 0 (and 65) if there's a secondary (and tertiary) bitmap
+      * (i.e., if the bitmap length is &gt; 64 (and &gt; 128))
+      *
+      * @param b - the BitSet
+      * @param bytes - number of bytes to return
+      * @return binary representation
+      */    
+     public static byte[] bitSet2byte (BitSet b, int bytes)
+     {
+<span class="fc" id="L460">         int len = bytes * 8;</span>
+         
+<span class="fc" id="L462">         byte[] d = new byte[bytes];</span>
+<span class="fc bfc" id="L463" title="All 2 branches covered.">         for (int i=0; i&lt;len; i++) </span>
+<span class="fc bfc" id="L464" title="All 2 branches covered.">             if (b.get(i+1))                     // +1 because we don't use bit 0 of the BitSet</span>
+<span class="fc" id="L465">                 d[i &gt;&gt; 3] |= 0x80 &gt;&gt; i % 8;</span>
+         //TODO: review why 2nd &amp; 3rd bit map flags are set here??? 
+<span class="pc bpc" id="L467" title="1 of 2 branches missed.">         if (len&gt;64)</span>
+<span class="fc" id="L468">             d[0] |= 0x80;</span>
+<span class="pc bpc" id="L469" title="1 of 2 branches missed.">         if (len&gt;128)</span>
+<span class="fc" id="L470">             d[8] |= 0x80;</span>
+<span class="fc" id="L471">         return d;</span>
+     }
+     
+     /*
+      * Convert BitSet to int value.
+      */
+     public static int bitSet2Int(BitSet bs) {
+<span class="fc" id="L478">         int total = 0;</span>
+<span class="fc" id="L479">         int b = bs.length() - 1;</span>
+<span class="pc bpc" id="L480" title="1 of 2 branches missed.">         if (b &gt; 0) {</span>
+<span class="fc" id="L481">             int value = (int) Math.pow(2,b);</span>
+<span class="fc bfc" id="L482" title="All 2 branches covered.">             for (int i = 0; i &lt;= b; i++) {</span>
+<span class="fc bfc" id="L483" title="All 2 branches covered.">                 if (bs.get(i))</span>
+<span class="fc" id="L484">                     total += value;</span>
+ 
+<span class="fc" id="L486">                 value = value &gt;&gt; 1;</span>
+             }
+         }
+         
+<span class="fc" id="L490">         return total;</span>
+     }
+     
+     /*
+      * Convert int value to BitSet.
+      */
+     public static BitSet int2BitSet(int value) {
+         
+<span class="fc" id="L498">         return int2BitSet(value,0);</span>
+     }
+     
+     /*
+      * Convert int value to BitSet.
+      */
+     public static BitSet int2BitSet(int value, int offset) {
+         
+<span class="fc" id="L506">         BitSet bs = new BitSet();</span>
+         
+<span class="fc" id="L508">         String hex = Integer.toHexString(value);</span>
+<span class="fc" id="L509">         hex2BitSet(bs, hex.getBytes(), offset);</span>
+         
+<span class="fc" id="L511">         return bs;</span>
+     }
+ 
+     /**
+      * Converts a binary representation of a Bitmap field
+      * into a Java BitSet
+      * @param b - binary representation
+      * @param offset - staring offset
+      * @param bitZeroMeansExtended - true for ISO-8583
+      * @return java BitSet object
+      */
+     public static BitSet byte2BitSet 
+         (byte[] b, int offset, boolean bitZeroMeansExtended)
+     {
+<span class="nc bnc" id="L525" title="All 2 branches missed.">         int len = bitZeroMeansExtended ?</span>
+<span class="nc bnc" id="L526" title="All 2 branches missed.">                 (b[offset] &amp; 0x80) == 0x80 ? 128 : 64 : 64;</span>
+<span class="nc" id="L527">         BitSet bmap = new BitSet (len);</span>
+<span class="nc bnc" id="L528" title="All 2 branches missed.">         for (int i=0; i&lt;len; i++) </span>
+<span class="nc bnc" id="L529" title="All 2 branches missed.">             if ((b[offset + (i &gt;&gt; 3)] &amp; 0x80 &gt;&gt; i % 8) &gt; 0)</span>
+<span class="nc" id="L530">                 bmap.set(i+1);</span>
+<span class="nc" id="L531">         return bmap;</span>
+     }
+     /**
+      * Converts a binary representation of a Bitmap field
+      * into a Java BitSet
+      * @param b - binary representation
+      * @param offset - staring offset
+      * @param maxBits - max number of bits (supports 64,128 or 192)
+      * @return java BitSet object
+      */
+     public static BitSet byte2BitSet (byte[] b, int offset, int maxBits) {
+<span class="pc bpc" id="L542" title="1 of 2 branches missed.">         boolean  b1= (b[offset] &amp; 0x80) == 0x80;</span>
+<span class="pc bpc" id="L543" title="1 of 4 branches missed.">         boolean b65= (b.length &gt; offset+8) &amp;&amp; ((b[offset+8] &amp; 0x80) == 0x80);</span>
+ 
+<span class="pc bpc" id="L545" title="2 of 6 branches missed.">         int len=  (maxBits &gt; 128 &amp;&amp; b1 &amp;&amp; b65) ?     192 :</span>
+<span class="pc bpc" id="L546" title="3 of 4 branches missed.">                   (maxBits &gt;  64 &amp;&amp; b1)        ?     128 :</span>
+<span class="fc bfc" id="L547" title="All 2 branches covered.">                   (maxBits &lt;  64)              ? maxBits : 64;</span>
+ 
+<span class="fc" id="L549">         BitSet bmap = new BitSet (len);</span>
+<span class="fc bfc" id="L550" title="All 2 branches covered.">         for (int i=0; i&lt;len; i++)</span>
+<span class="fc bfc" id="L551" title="All 2 branches covered.">             if ((b[offset + (i &gt;&gt; 3)] &amp; 0x80 &gt;&gt; i % 8) &gt; 0)</span>
+<span class="fc" id="L552">                 bmap.set(i+1);</span>
+<span class="fc" id="L553">         return bmap;</span>
+     }
+ 
+     /**
+      * Converts a binary representation of a Bitmap field
+      * into a Java BitSet.
+      *
+      * The byte[] will be fully consumed, and fed into the given BitSet starting at bitOffset+1
+      *
+      * @param bmap - BitSet
+      * @param b - hex representation
+      * @param bitOffset - (i.e. 0 for primary bitmap, 64 for secondary)
+      * @return the same java BitSet object given as first argument
+      */
+     public static BitSet byte2BitSet (BitSet bmap, byte[] b, int bitOffset)
+     {
+<span class="fc" id="L569">         int len = b.length &lt;&lt; 3;</span>
+<span class="fc bfc" id="L570" title="All 2 branches covered.">         for (int i=0; i&lt;len; i++) </span>
+<span class="fc bfc" id="L571" title="All 2 branches covered.">             if ((b[i &gt;&gt; 3] &amp; 0x80 &gt;&gt; i % 8) &gt; 0)</span>
+<span class="fc" id="L572">                 bmap.set(bitOffset + i + 1);</span>
+<span class="fc" id="L573">         return bmap;</span>
+     }
+ 
+     /**
+      * Converts an ASCII representation of a Bitmap field
+      * into a Java BitSet
+      * @param b - hex representation
+      * @param offset - starting offset
+      * @param bitZeroMeansExtended - true for ISO-8583
+      * @return java BitSet object
+      */
+     public static BitSet hex2BitSet 
+         (byte[] b, int offset, boolean bitZeroMeansExtended)
+     {
+<span class="fc bfc" id="L587" title="All 2 branches covered.">         int len = bitZeroMeansExtended ?</span>
+<span class="pc bpc" id="L588" title="1 of 2 branches missed.">                     (Character.digit((char)b[offset],16) &amp; 0x08) == 8 ? 128 : 64 :</span>
+<span class="fc" id="L589">                   64;</span>
+<span class="fc" id="L590">         BitSet bmap = new BitSet (len);</span>
+<span class="fc bfc" id="L591" title="All 2 branches covered.">         for (int i=0; i&lt;len; i++) {</span>
+<span class="fc" id="L592">             int digit = Character.digit((char)b[offset + (i &gt;&gt; 2)], 16);</span>
+<span class="fc bfc" id="L593" title="All 2 branches covered.">             if ((digit &amp; 0x08 &gt;&gt; i%4) &gt; 0)</span>
+<span class="fc" id="L594">                 bmap.set(i+1);</span>
+         }
+<span class="fc" id="L596">         return bmap;</span>
+     }
+ 
+     /**
+      * Converts an ASCII representation of a Bitmap field
+      * into a Java BitSet
+      * @param b - hex representation
+      * @param offset - starting offset
+      * @param maxBits - max number of bits (supports 8, 16, 24, 32, 48, 52, 64,.. 128 or 192)
+      * @return java BitSet object
+      */
+     public static BitSet hex2BitSet (byte[] b, int offset, int maxBits) {
+<span class="pc bpc" id="L608" title="1 of 2 branches missed.">         int len = maxBits &gt; 64 ?</span>
+<span class="pc bpc" id="L609" title="1 of 2 branches missed.">                     (Character.digit((char)b[offset],16) &amp; 0x08) == 8 ? 128 : 64 :</span>
+<span class="pc" id="L610">                   maxBits;</span>
+<span class="pc bpc" id="L611" title="3 of 6 branches missed.">         if (len &gt; 64 &amp;&amp; maxBits &gt; 128 &amp;&amp;</span>
+             b.length &gt; offset+16 &amp;&amp;
+<span class="pc bpc" id="L613" title="1 of 2 branches missed.">             (Character.digit((char)b[offset+16],16) &amp; 0x08) == 8)</span>
+         {
+<span class="fc" id="L615">             len = 192;</span>
+         }
+<span class="fc" id="L617">         BitSet bmap = new BitSet (len);</span>
+<span class="fc bfc" id="L618" title="All 2 branches covered.">         for (int i=0; i&lt;len; i++) {</span>
+<span class="fc" id="L619">             int digit = Character.digit((char)b[offset + (i &gt;&gt; 2)], 16);</span>
+<span class="fc bfc" id="L620" title="All 2 branches covered.">             if ((digit &amp; 0x08 &gt;&gt; i%4) &gt; 0) {</span>
+<span class="fc" id="L621">                 bmap.set(i+1);</span>
+<span class="pc bpc" id="L622" title="3 of 4 branches missed.">                 if (i==65 &amp;&amp; maxBits &gt; 128)     // BBB this is redundant (check already done outside</span>
+<span class="nc" id="L623">                     len = 192;                  // BBB of the loop), but I'll leave it for now..</span>
+             }
+         }
+<span class="fc" id="L626">         return bmap;</span>
+     }
+ 
+     /**
+      * Converts an ASCII representation of a Bitmap field
+      * into a Java BitSet
+      * @param bmap - BitSet
+      * @param b - hex representation
+      * @param bitOffset - (i.e. 0 for primary bitmap, 64 for secondary)
+      * @return java BitSet object
+      */
+     public static BitSet hex2BitSet (BitSet bmap, byte[] b, int bitOffset)
+     {
+<span class="fc" id="L639">         int len = b.length &lt;&lt; 2;</span>
+<span class="fc bfc" id="L640" title="All 2 branches covered.">         for (int i=0; i&lt;len; i++) {</span>
+<span class="fc" id="L641">             int digit = Character.digit((char)b[i &gt;&gt; 2], 16);</span>
+<span class="fc bfc" id="L642" title="All 2 branches covered.">             if ((digit &amp; 0x08 &gt;&gt; i%4) &gt; 0)</span>
+<span class="fc" id="L643">                 bmap.set (bitOffset + i + 1);</span>
+         }
+<span class="fc" id="L645">         return bmap;</span>
+     }
+ 
+     /**
+      * @param   b       source byte array
+      * @param   offset  starting offset
+      * @param   len     number of bytes in destination (processes len*2)
+      * @return  byte[len]
+      */
+     public static byte[] hex2byte (byte[] b, int offset, int len) {
+<span class="fc" id="L655">         byte[] d = new byte[len];</span>
+<span class="fc bfc" id="L656" title="All 2 branches covered.">         for (int i=0; i&lt;len*2; i++) {</span>
+<span class="fc bfc" id="L657" title="All 2 branches covered.">             int shift = i%2 == 1 ? 0 : 4;</span>
+<span class="fc" id="L658">             d[i&gt;&gt;1] |= Character.digit((char) b[offset+i], 16) &lt;&lt; shift;</span>
+         }
+<span class="fc" id="L660">         return d;</span>
+     }
+     /**
+      * Converts a hex string into a byte array
+      * @param s source string (with Hex representation)
+      * @return byte array
+      */
+     public static byte[] hex2byte (String s) {
+<span class="fc" id="L668">         return hex2byte (s, CHARSET);</span>
+     }
+     /**
+      * Converts a hex string into a byte array
+      * @param s source string (with Hex representation)
+      * @param charset character set to be used
+      * @return byte array
+      */
+     public static byte[] hex2byte (String s, Charset charset) {
+<span class="pc bpc" id="L677" title="1 of 2 branches missed.">         if (charset == null) charset = CHARSET;</span>
+<span class="fc bfc" id="L678" title="All 2 branches covered.">         if (s.length() % 2 == 0) {</span>
+<span class="fc" id="L679">             return hex2byte (s.getBytes(charset), 0, s.length() &gt;&gt; 1);</span>
+         } else {
+             // Padding left zero to make it even size #Bug raised by tommy
+<span class="fc" id="L682">             return hex2byte(&quot;0&quot;+s, charset);</span>
+         }
+     }
+ 
+     /**
+      * Converts a byte array into a hex string
+      * @param bs source byte array
+      * @return hexadecimal representation of bytes
+      */
+     public static String byte2hex(byte[] bs) {
+<span class="fc" id="L692">         return byte2hex(bs, 0, bs.length);</span>
+     }
+ 
+     /**
+      * Converts an integer into a byte array of hex
+      *
+      * @param value
+      * @return bytes representation of integer
+      */
+     public static byte[] int2byte(int value) {
+<span class="fc bfc" id="L702" title="All 2 branches covered.">         if (value &lt; 0) {</span>
+<span class="fc" id="L703">             return new byte[]{(byte) (value &gt;&gt;&gt; 24 &amp; 0xFF), (byte) (value &gt;&gt;&gt; 16 &amp; 0xFF),</span>
+                     (byte) (value &gt;&gt;&gt; 8 &amp; 0xFF), (byte) (value &amp; 0xFF)};
+<span class="fc bfc" id="L705" title="All 2 branches covered.">         } else if (value &lt;= 0xFF) {</span>
+<span class="fc" id="L706">             return new byte[]{(byte) (value &amp; 0xFF)};</span>
+<span class="fc bfc" id="L707" title="All 2 branches covered.">         } else if (value &lt;= 0xFFFF) {</span>
+<span class="fc" id="L708">             return new byte[]{(byte) (value &gt;&gt;&gt; 8 &amp; 0xFF), (byte) (value &amp; 0xFF)};</span>
+<span class="pc bpc" id="L709" title="1 of 2 branches missed.">         } else if (value &lt;= 0xFFFFFF) {</span>
+<span class="fc" id="L710">             return new byte[]{(byte) (value &gt;&gt;&gt; 16 &amp; 0xFF), (byte) (value &gt;&gt;&gt; 8 &amp; 0xFF),</span>
+                     (byte) (value &amp; 0xFF)};
+         } else {
+<span class="nc" id="L713">             return new byte[]{(byte) (value &gt;&gt;&gt; 24 &amp; 0xFF), (byte) (value &gt;&gt;&gt; 16 &amp; 0xFF),</span>
+                     (byte) (value &gt;&gt;&gt; 8 &amp; 0xFF), (byte) (value &amp; 0xFF)};
+         }
+     }
+ 
+     /**
+      * Converts a byte array of hex into an integer
+      *
+      * @param bytes
+      * @return integer representation of bytes
+      */
+     public static int byte2int(byte[] bytes) {
+<span class="pc bpc" id="L725" title="1 of 4 branches missed.">         if (bytes == null || bytes.length == 0) {</span>
+<span class="fc" id="L726">             return 0;</span>
+         }
+<span class="fc" id="L728">         ByteBuffer byteBuffer = ByteBuffer.allocate(4);</span>
+<span class="fc bfc" id="L729" title="All 2 branches covered.">         for (int i = 0; i &lt; 4 - bytes.length; i++) {</span>
+<span class="fc" id="L730">             byteBuffer.put((byte) 0);</span>
+         }
+<span class="fc bfc" id="L732" title="All 2 branches covered.">         for (int i = 0; i &lt; bytes.length; i++) {</span>
+<span class="fc" id="L733">             byteBuffer.put(bytes[i]);</span>
+         }
+<span class="fc" id="L735">         byteBuffer.position(0);</span>
+<span class="fc" id="L736">         return byteBuffer.getInt();</span>
+     }
+ 
+     /**
+      * Converts a byte array into a string of lower case hex chars.
+      *
+      * @param bs     A byte array
+      * @param off    The index of the first byte to read
+      * @param length The number of bytes to read.
+      * @return the string of hex chars.
+      */
+     public static String byte2hex(byte[] bs, int off, int length) {
+<span class="pc bpc" id="L748" title="1 of 4 branches missed.">         if (bs.length &lt;= off || bs.length &lt; off + length)</span>
+<span class="fc" id="L749">             throw new IllegalArgumentException();</span>
+<span class="fc" id="L750">         StringBuilder sb = new StringBuilder(length * 2);</span>
+<span class="fc" id="L751">         byte2hexAppend(bs, off, length, sb);</span>
+<span class="fc" id="L752">         return sb.toString();</span>
+     }
+ 
+     private static void byte2hexAppend(byte[] bs, int off, int length, StringBuilder sb) {
+<span class="pc bpc" id="L756" title="2 of 4 branches missed.">         if (bs.length &lt;= off || bs.length &lt; off + length)</span>
+<span class="nc" id="L757">             throw new IllegalArgumentException();</span>
+<span class="fc" id="L758">         sb.ensureCapacity(sb.length() + length * 2);</span>
+<span class="fc bfc" id="L759" title="All 2 branches covered.">         for (int i = off; i &lt; off + length; i++) {</span>
+<span class="fc" id="L760">             sb.append(Character.forDigit(bs[i] &gt;&gt;&gt; 4 &amp; 0xf, 16));</span>
+<span class="fc" id="L761">             sb.append(Character.forDigit(bs[i] &amp; 0xf, 16));</span>
+         }
+<span class="fc" id="L763">     }</span>
+ 
+     /**
+      * format double value
+      * @param d    the amount
+      * @param len  the field len
+      * @return a String of fieldLen characters (right justified)
+      */
+     public static String formatDouble(double d, int len) {
+<span class="fc" id="L772">         String prefix = Long.toString((long) d);</span>
+<span class="fc" id="L773">         String suffix = Integer.toString (</span>
+<span class="fc" id="L774">             (int) (Math.round(d * 100f) % 100) );</span>
+         try {
+<span class="pc bpc" id="L776" title="1 of 2 branches missed.">             if (len &gt; 3)</span>
+<span class="fc" id="L777">                 prefix = ISOUtil.padleft(prefix,len-3,' ');</span>
+<span class="fc" id="L778">             suffix = ISOUtil.zeropad(suffix, 2);</span>
+<span class="nc" id="L779">         } catch (ISOException e) {</span>
+             // should not happen
+<span class="fc" id="L781">         }</span>
+<span class="fc" id="L782">         return prefix + &quot;.&quot; + suffix;</span>
+     }
+     /**
+      * prepare long value used as amount for display
+      * (implicit 2 decimals)
+      * @param l value
+      * @param len display len
+      * @return formated field
+      * @exception ISOException
+      */
+     public static String formatAmount(long l, int len) throws ISOException {
+<span class="fc" id="L793">         String buf = Long.toString(l);</span>
+<span class="pc bpc" id="L794" title="1 of 2 branches missed.">         if (l &lt; 100)</span>
+<span class="nc" id="L795">             buf = zeropad(buf, 3);</span>
+<span class="fc" id="L796">         StringBuilder s = new StringBuilder(padleft (buf, len-1, ' ') );</span>
+<span class="fc" id="L797">         s.insert(len-3, '.');</span>
+<span class="fc" id="L798">         return s.toString();</span>
+     }
+ 
+     /**
+      * XML normalizer
+      * @param s source String
+      * @param canonical true if we want to normalize \r and \n as well
+      * @return normalized string suitable for XML Output
+      */
+     public static String normalize (String s, boolean canonical) {
+<span class="fc" id="L808">         StringBuilder str = new StringBuilder();</span>
+ 
+<span class="pc bpc" id="L810" title="1 of 2 branches missed.">         int len = s != null ? s.length() : 0;</span>
+<span class="fc bfc" id="L811" title="All 2 branches covered.">         for (int i = 0; i &lt; len; i++) {</span>
+<span class="fc" id="L812">             char ch = s.charAt(i);</span>
+<span class="fc bfc" id="L813" title="All 7 branches covered.">             switch (ch) {</span>
+                 case '&lt;': 
+<span class="fc" id="L815">                     str.append(&quot;&amp;lt;&quot;);</span>
+<span class="fc" id="L816">                     break;</span>
+                 case '&gt;': 
+<span class="fc" id="L818">                     str.append(&quot;&amp;gt;&quot;);</span>
+<span class="fc" id="L819">                     break;</span>
+                 case '&amp;': 
+<span class="fc" id="L821">                     str.append(&quot;&amp;amp;&quot;);</span>
+<span class="fc" id="L822">                     break;</span>
+                 case '&quot;': 
+<span class="fc" id="L824">                     str.append(&quot;&amp;quot;&quot;);</span>
+<span class="fc" id="L825">                     break;</span>
+                 case '\'':
+<span class="fc" id="L827">                     str.append(&quot;&amp;apos;&quot;);</span>
+<span class="fc" id="L828">                     break;</span>
+                 case '\r':
+                 case '\n':
+<span class="pc bpc" id="L831" title="1 of 2 branches missed.">                     if (!canonical) {</span>
+<span class="fc" id="L832">                         str.append(&quot;&amp;#&quot;);</span>
+<span class="fc" id="L833">                         str.append(Integer.toString(ch &amp; 0xFF));</span>
+<span class="fc" id="L834">                         str.append(';');</span>
+<span class="fc" id="L835">                         break;</span>
+                     }
+                     // else, default append char
+                 default: 
+<span class="pc bpc" id="L839" title="1 of 2 branches missed.">                     if (ch &lt; 0x20) {</span>
+<span class="nc" id="L840">                         str.append(String.format(&quot;\\u%04x&quot;, (int) (ch &amp; 0xFF)));</span>
+                     } else {
+<span class="fc" id="L842">                         str.append(ch);</span>
+                     }
+             }
+         }
+<span class="fc" id="L846">         return str.toString();</span>
+     }
+ 
+     public static String stripUnicode (String s) {
+<span class="fc" id="L850">         StringBuilder sb = new StringBuilder();</span>
+<span class="pc bpc" id="L851" title="1 of 2 branches missed.">         int len = s != null ? s.length() : 0;</span>
+<span class="fc" id="L852">         boolean escape = false;</span>
+<span class="fc bfc" id="L853" title="All 2 branches covered.">         for (int i = 0; i &lt; len; i++) {</span>
+<span class="fc" id="L854">             char ch = s.charAt(i);</span>
+<span class="pc bpc" id="L855" title="2 of 6 branches missed.">             if (ch == '\\' &amp;&amp; i &lt; len-5 &amp;&amp; isInternalUnicodeSequence(s.substring(i+1, i+6))) {</span>
+<span class="fc" id="L856">                 sb.append((char) (Character.digit(s.charAt(i + 4), 16) &lt;&lt; 4 | (Character.digit(s.charAt(i + 5), 16))));</span>
+<span class="fc" id="L857">                 i += 5;</span>
+             } else
+<span class="fc" id="L859">                 sb.append(ch);</span>
+         }
+<span class="fc" id="L861">         return sb.toString();</span>
+     }
+ 
+     private static boolean isInternalUnicodeSequence(String s) {
+<span class="fc" id="L865">         return unicodePattern.matcher(s).matches();</span>
+     }
+     /**
+      * XML normalizer (default canonical)
+      * @param s source String
+      * @return normalized string suitable for XML Output
+      */
+     public static String normalize (String s) {
+<span class="fc" id="L873">         return normalize(s, true);</span>
+     }
+     /**
+      * Protects PAN, Track2, CVC (suitable for logs).
+      *
+      * &lt;pre&gt;
+      * &quot;40000101010001&quot; is converted to &quot;400001____0001&quot;
+      * &quot;40000101010001=020128375&quot; is converted to &quot;400001____0001=0201_____&quot;
+      * &quot;40000101010001D020128375&quot; is converted to &quot;400001____0001D0201_____&quot;
+      * &quot;123&quot; is converted to &quot;___&quot;
+      * &lt;/pre&gt;
+      * @param s string to be protected
+      * @param mask char used to protect the string
+      * @return 'protected' String
+      */
+ 
+     public static String protect(String s, char mask) {
+         // Validation for minimum length
+<span class="fc bfc" id="L891" title="All 2 branches covered.">         if (s.length() &lt;= 4) {</span>
+<span class="fc" id="L892">             char[] maskedArray = new char[s.length()];</span>
+<span class="fc" id="L893">             Arrays.fill(maskedArray, mask);// 6 (BIN) + 4 (last digits) = 10</span>
+<span class="fc" id="L894">             return new String(maskedArray);</span>
+         }
+<span class="fc" id="L896">         StringBuilder ps = new StringBuilder(s);</span>
+ 
+         // Identify the positions of separators (^ and =)
+<span class="pc bpc" id="L899" title="1 of 4 branches missed.">         String separator = s.contains(&quot;^&quot;) ? &quot;^&quot; : s.contains(&quot;=&quot;) ? &quot;=&quot; : null;</span>
+<span class="fc bfc" id="L900" title="All 2 branches covered.">         int firstSeparatorIndex = separator != null ? ps.indexOf(separator) : s.length();</span>
+<span class="pc bpc" id="L901" title="1 of 2 branches missed.">         if (firstSeparatorIndex &lt; 6) {</span>
+<span class="nc" id="L902">             return s; // nothing to do</span>
+         }
+<span class="fc" id="L904">         int lastDigitIndex = firstSeparatorIndex - 4;</span>
+ 
+         // Replace characters with underscore except BIN, last four digits and separators
+<span class="fc bfc" id="L907" title="All 2 branches covered.">         for (int i = 6; i &lt; lastDigitIndex; i++) {</span>
+<span class="fc" id="L908">             ps.setCharAt(i, mask);</span>
+         }
+<span class="fc bfc" id="L910" title="All 2 branches covered.">         if (separator != null) {</span>
+<span class="fc bfc" id="L911" title="All 2 branches covered.">             for (int i = firstSeparatorIndex + 1; i &lt; ps.length(); i++) {</span>
+<span class="fc" id="L912">                 char c = ps.charAt(i);</span>
+<span class="pc bpc" id="L913" title="2 of 4 branches missed.">                 if ((c != '=' &amp;&amp; c != '^')) {</span>
+<span class="fc" id="L914">                     ps.setCharAt(i, mask);</span>
+                 }
+             }
+         }
+<span class="fc" id="L918">         return ps.toString();</span>
+     }
+     public static String protect(String s) {
+<span class="fc" id="L921">         return protect(s, '_');</span>
+     }
+     public static int[] toIntArray(String s) {
+<span class="fc" id="L924">         StringTokenizer st = new StringTokenizer (s);</span>
+<span class="fc" id="L925">         int[] array = new int [st.countTokens()];</span>
+<span class="fc bfc" id="L926" title="All 2 branches covered.">         for (int i=0; st.hasMoreTokens(); i++) </span>
+<span class="fc" id="L927">             array[i] = Integer.parseInt (st.nextToken());</span>
+<span class="fc" id="L928">         return array;</span>
+     }
+     public static String[] toStringArray(String s) {
+<span class="fc" id="L931">         StringTokenizer st = new StringTokenizer (s);</span>
+<span class="fc" id="L932">         String[] array = new String [st.countTokens()];</span>
+<span class="fc bfc" id="L933" title="All 2 branches covered.">         for (int i=0; st.hasMoreTokens(); i++) </span>
+<span class="fc" id="L934">             array[i] = st.nextToken();</span>
+<span class="fc" id="L935">         return array;</span>
+     }
+     /**
+      * Bitwise XOR between corresponding bytes
+      * @param op1 byteArray1
+      * @param op2 byteArray2
+      * @return an array of length = the smallest between op1 and op2
+      */
+     public static byte[] xor (byte[] op1, byte[] op2) {
+         byte[] result;
+         // Use the smallest array
+<span class="pc bpc" id="L946" title="1 of 2 branches missed.">         if (op2.length &gt; op1.length) {</span>
+<span class="nc" id="L947">             result = new byte[op1.length];</span>
+         }
+         else {
+<span class="fc" id="L950">             result = new byte[op2.length];</span>
+         }
+<span class="fc bfc" id="L952" title="All 2 branches covered.">         for (int i = 0; i &lt; result.length; i++) {</span>
+<span class="fc" id="L953">             result[i] = (byte)(op1[i] ^ op2[i]);</span>
+         }
+<span class="fc" id="L955">         return  result;</span>
+     }
+     /**
+      * Bitwise XOR between corresponding byte arrays represented in hex
+      * @param op1 hexstring 1
+      * @param op2 hexstring 2
+      * @return an array of length = the smallest between op1 and op2
+      */
+     public static String hexor (String op1, String op2) {
+<span class="fc" id="L964">         byte[] xor = xor (hex2byte (op1), hex2byte (op2));</span>
+<span class="fc" id="L965">         return hexString (xor);</span>
+     }
+ 
+     /**
+      * Trims a byte[] to a certain length
+      * @param array the byte[] to be trimmed
+      * @param length the wanted length
+      * @return the trimmed byte[]
+      */
+     public static byte[] trim (byte[] array, int length) {
+<span class="fc" id="L975">         byte[] trimmedArray = new byte[length];</span>
+<span class="fc" id="L976">         System.arraycopy(array, 0, trimmedArray, 0, length);</span>
+<span class="fc" id="L977">         return  trimmedArray;</span>
+     }
+ 
+     /**
+      * Concatenates two byte arrays (array1 and array2)
+      * @param array1 first part
+      * @param array2 last part
+      * @return the concatenated array
+      */
+     public static byte[] concat (byte[] array1, byte[] array2) {
+<span class="fc" id="L987">         byte[] concatArray = new byte[array1.length + array2.length];</span>
+<span class="fc" id="L988">         System.arraycopy(array1, 0, concatArray, 0, array1.length);</span>
+<span class="fc" id="L989">         System.arraycopy(array2, 0, concatArray, array1.length, array2.length);</span>
+<span class="fc" id="L990">         return  concatArray;</span>
+     }
+ 
+     /**
+      * Concatenates two byte arrays (array1 and array2)
+      * @param array1 first part
+      * @param beginIndex1 initial index
+      * @param length1  length
+      * @param array2 last part
+      * @param beginIndex2 last part index
+      * @param length2 last part length
+      * @return the concatenated array
+      */
+     public static byte[] concat (byte[] array1, int beginIndex1, int length1, byte[] array2,
+             int beginIndex2, int length2) {
+<span class="fc" id="L1005">         byte[] concatArray = new byte[length1 + length2];</span>
+<span class="fc" id="L1006">         System.arraycopy(array1, beginIndex1, concatArray, 0, length1);</span>
+<span class="fc" id="L1007">         System.arraycopy(array2, beginIndex2, concatArray, length1, length2);</span>
+<span class="fc" id="L1008">         return  concatArray;</span>
+     }
+     /** 
+      * Causes the currently executing thread to sleep (temporarily cease 
+      * execution) for the specified number of milliseconds. The thread 
+      * does not lose ownership of any monitors.
+      *
+      * @param      millis   the length of time to sleep in milliseconds.
+      */
+     public static void sleep (long millis) {
+<span class="pc bpc" id="L1018" title="1 of 2 branches missed.">         if (millis &gt; 0)</span>
+<span class="nc" id="L1019">             LockSupport.parkNanos(Duration.ofMillis(millis).toNanos());</span>
+<span class="fc bfc" id="L1020" title="All 2 branches covered.">         else if (millis == 0)</span>
+<span class="fc" id="L1021">             Thread.yield();</span>
+         else
+<span class="fc" id="L1023">             throw new IllegalArgumentException (&quot;timeout value is negative&quot;);</span>
+<span class="fc" id="L1024">     }</span>
+ 
+     /**
+      * Left unPad with '0'
+      * @param s - original string
+      * @return zero unPadded string
+      */
+     public static String zeroUnPad( String s ) {
+<span class="fc" id="L1032">         return unPadLeft(s, '0');</span>
+     }
+     /**
+      * Right unPad with ' '
+      * @param s - original string
+      * @return blank unPadded string
+      */
+     public static String blankUnPad( String s ) {
+<span class="fc" id="L1040">         return unPadRight(s, ' ');</span>
+     }
+ 
+     /**
+      * Unpad from right. 
+      * @param s - original string
+      * @param c - padding char
+      * @return unPadded string.
+      */
+     public static String unPadRight(String s, char c) {
+<span class="fc" id="L1050">         int end = s.length();</span>
+<span class="pc bpc" id="L1051" title="1 of 2 branches missed.">         if (end == 0)</span>
+<span class="nc" id="L1052">             return s;</span>
+<span class="pc bpc" id="L1053" title="1 of 4 branches missed.">         while ( 0 &lt; end &amp;&amp; s.charAt(end-1) == c) end --;</span>
+<span class="pc bpc" id="L1054" title="1 of 2 branches missed.">         return 0 &lt; end ? s.substring( 0, end ): s.substring( 0, 1 );</span>
+     }
+ 
+     /**
+      * Unpad from left. 
+      * @param s - original string
+      * @param c - padding char
+      * @return unPadded string.
+      */
+     public static String unPadLeft(String s, char c) {
+<span class="fc" id="L1064">         int fill = 0, end = s.length();</span>
+<span class="pc bpc" id="L1065" title="1 of 2 branches missed.">         if (end == 0)</span>
+<span class="nc" id="L1066">             return s;</span>
+<span class="fc bfc" id="L1067" title="All 4 branches covered.">         while ( fill &lt; end &amp;&amp; s.charAt(fill) == c) fill ++;</span>
+<span class="fc bfc" id="L1068" title="All 2 branches covered.">         return fill &lt; end ? s.substring( fill, end ): s.substring( fill-1, end );</span>
+     }
+ 
+     /**
+      * @return true if the string is zero-filled ( 0 char filled )
+      **/
+     public static boolean isZero( String s ) {
+<span class="fc" id="L1075">         int i = 0, len = s.length();</span>
+<span class="fc bfc" id="L1076" title="All 4 branches covered.">         while ( i &lt; len &amp;&amp; s.charAt( i ) == '0'){</span>
+<span class="fc" id="L1077">             i++;</span>
+         }
+<span class="fc bfc" id="L1079" title="All 2 branches covered.">         return i &gt;= len;</span>
+     }
+ 
+     /**
+      * @return true if the string is blank filled (space char filled)
+      */
+     public static boolean isBlank( String s ){
+<span class="pc bpc" id="L1086" title="1 of 2 branches missed.">         return s.trim().length() == 0;</span>
+     }
+ 
+     /**
+      * Return true if the string is alphanum.
+      **/
+     public static boolean isAlphaNumeric ( String s ) {
+<span class="fc" id="L1093">         int len = s.length();</span>
+<span class="fc bfc" id="L1094" title="All 2 branches covered.">         for (int i=0; i&lt;len; i++) {</span>
+<span class="fc" id="L1095">             char c = s.charAt(i);</span>
+<span class="fc bfc" id="L1096" title="All 2 branches covered.">             if (!Character.isLetterOrDigit(s.charAt(i)))</span>
+<span class="fc" id="L1097">                 return false;</span>
+         }
+<span class="pc bpc" id="L1099" title="1 of 2 branches missed.">         return len &gt; 0;</span>
+     }
+ 
+     /**
+      * Return true if the string represent a number
+      * in the specified radix.
+      * &lt;br&gt;&lt;br&gt;
+      **/
+     public static boolean isNumeric ( String s, int radix ) {
+<span class="fc" id="L1108">         int i = 0, len = s.length();</span>
+<span class="fc bfc" id="L1109" title="All 4 branches covered.">         while ( i &lt; len &amp;&amp; Character.digit(s.charAt(i), radix) &gt; -1  ){</span>
+<span class="fc" id="L1110">             i++;</span>
+         }
+<span class="pc bpc" id="L1112" title="1 of 4 branches missed.">         return i &gt;= len &amp;&amp; len &gt; 0;</span>
+     }
+ 
+     /**
+      * Converts a BitSet into an extended binary field
+      * used in pack routines. The result is always in the
+      * extended format: (16 bytes of length)
+      * &lt;br&gt;&lt;br&gt;
+      * @param b the BitSet
+      * @return binary representation
+      */
+     public static byte[] bitSet2extendedByte ( BitSet b ){
+<span class="fc" id="L1124">         int len = 128;</span>
+<span class="fc" id="L1125">         byte[] d = new byte[len &gt;&gt; 3];</span>
+<span class="fc bfc" id="L1126" title="All 2 branches covered.">         for ( int i=0; i&lt;len; i++ )</span>
+<span class="fc bfc" id="L1127" title="All 2 branches covered.">             if (b.get(i+1))</span>
+<span class="fc" id="L1128">                 d[i &gt;&gt; 3] |= 0x80 &gt;&gt; i % 8;</span>
+<span class="fc" id="L1129">         d[0] |= 0x80;</span>
+<span class="fc" id="L1130">         return d;</span>
+     }
+ 
+     /**
+      * Converts a String to an integer of base radix.
+      * &lt;br&gt;&lt;br&gt;
+      * String constraints are:
+      * &lt;li&gt;Number must be less than 10 digits&lt;/li&gt;
+      * &lt;li&gt;Number must be positive&lt;/li&gt;
+      * @param s String representation of number
+      * @param radix Number base to use
+      * @return integer value of number
+      * @throws NumberFormatException
+      */
+     public static int parseInt (String s, int radix) throws NumberFormatException {
+<span class="fc" id="L1145">         int length = s.length();</span>
+<span class="fc bfc" id="L1146" title="All 2 branches covered.">         if (length &gt; 9)</span>
+<span class="fc" id="L1147">             throw new NumberFormatException (&quot;Number can have maximum 9 digits&quot;);</span>
+         int result;
+<span class="fc" id="L1149">         int index = 0;</span>
+<span class="fc" id="L1150">         int digit = Character.digit (s.charAt(index++), radix);</span>
+<span class="pc bpc" id="L1151" title="1 of 2 branches missed.">         if (digit == -1)</span>
+<span class="nc" id="L1152">             throw new NumberFormatException (&quot;String contains non-digit&quot;);</span>
+<span class="fc" id="L1153">         result = digit;</span>
+<span class="fc bfc" id="L1154" title="All 2 branches covered.">         while (index &lt; length) {</span>
+<span class="fc" id="L1155">             result *= radix;</span>
+<span class="fc" id="L1156">             digit = Character.digit (s.charAt(index++), radix);</span>
+<span class="fc bfc" id="L1157" title="All 2 branches covered.">             if (digit == -1)</span>
+<span class="fc" id="L1158">                 throw new NumberFormatException (&quot;String contains non-digit&quot;);</span>
+<span class="fc" id="L1159">             result += digit;</span>
+         }
+<span class="fc" id="L1161">         return result;</span>
+     }
+ 
+     /**
+      * Converts a String to an integer of radix 10.
+      * &lt;br&gt;&lt;br&gt;
+      * String constraints are:
+      * &lt;li&gt;Number must be less than 10 digits&lt;/li&gt;
+      * &lt;li&gt;Number must be positive&lt;/li&gt;
+      * @param s String representation of number
+      * @return integer value of number
+      * @throws NumberFormatException
+      */
+     public static int parseInt (String s) throws NumberFormatException {
+<span class="fc" id="L1175">         return parseInt (s, 10);</span>
+     }
+ 
+     /**
+      * Converts a character array to an integer of base radix.
+      * &lt;br&gt;&lt;br&gt;
+      * Array constraints are:
+      * &lt;li&gt;Number must be less than 10 digits&lt;/li&gt;
+      * &lt;li&gt;Number must be positive&lt;/li&gt;
+      * @param cArray Character Array representation of number
+      * @param radix Number base to use
+      * @return integer value of number
+      * @throws NumberFormatException
+      */
+     public static int parseInt (char[] cArray, int radix) throws NumberFormatException {
+<span class="fc" id="L1190">         int length = cArray.length;</span>
+<span class="pc bpc" id="L1191" title="1 of 2 branches missed.">         if (length &gt; 9)</span>
+<span class="nc" id="L1192">             throw new NumberFormatException (&quot;Number can have maximum 9 digits&quot;);</span>
+         int result;
+<span class="fc" id="L1194">         int index = 0;</span>
+<span class="fc" id="L1195">         int digit = Character.digit(cArray[index++], radix);</span>
+<span class="pc bpc" id="L1196" title="1 of 2 branches missed.">         if (digit == -1)</span>
+<span class="nc" id="L1197">             throw new NumberFormatException (&quot;Char array contains non-digit&quot;);</span>
+<span class="fc" id="L1198">         result = digit;</span>
+<span class="fc bfc" id="L1199" title="All 2 branches covered.">         while (index &lt; length) {</span>
+<span class="fc" id="L1200">             result *= radix;</span>
+<span class="fc" id="L1201">             digit = Character.digit(cArray[index++],radix);</span>
+<span class="pc bpc" id="L1202" title="1 of 2 branches missed.">             if (digit == -1)</span>
+<span class="nc" id="L1203">                 throw new NumberFormatException (&quot;Char array contains non-digit&quot;);</span>
+<span class="fc" id="L1204">             result += digit;</span>
+         }
+<span class="fc" id="L1206">         return result;</span>
+     }
+ 
+     /**
+      * Converts a character array to an integer of radix 10.
+      * &lt;br&gt;&lt;br&gt;
+      * Array constraints are:
+      * &lt;li&gt;Number must be less than 10 digits&lt;/li&gt;
+      * &lt;li&gt;Number must be positive&lt;/li&gt;
+      * @param cArray Character Array representation of number
+      * @return integer value of number
+      * @throws NumberFormatException
+      */
+     public static int parseInt (char[] cArray) throws NumberFormatException {
+<span class="fc" id="L1220">         return parseInt (cArray,10);</span>
+     }
+ 
+     /**
+      * Converts a byte array to an integer of base radix.
+      * &lt;br&gt;&lt;br&gt;
+      * Array constraints are:
+      * &lt;li&gt;Number must be less than 10 digits&lt;/li&gt;
+      * &lt;li&gt;Number must be positive&lt;/li&gt;
+      * @param bArray Byte Array representation of number
+      * @param radix Number base to use
+      * @return integer value of number
+      * @throws NumberFormatException
+      */
+     public static int parseInt (byte[] bArray, int radix) throws NumberFormatException {
+<span class="fc" id="L1235">         int length = bArray.length;</span>
+<span class="pc bpc" id="L1236" title="1 of 2 branches missed.">         if (length &gt; 9)</span>
+<span class="nc" id="L1237">             throw new NumberFormatException (&quot;Number can have maximum 9 digits&quot;);</span>
+         int result;
+<span class="fc" id="L1239">         int index = 0;</span>
+<span class="fc" id="L1240">         int digit = Character.digit((char)bArray[index++], radix);</span>
+<span class="pc bpc" id="L1241" title="1 of 2 branches missed.">         if (digit == -1)</span>
+<span class="nc" id="L1242">             throw new NumberFormatException (&quot;Byte array contains non-digit&quot;);</span>
+<span class="fc" id="L1243">         result = digit;</span>
+<span class="fc bfc" id="L1244" title="All 2 branches covered.">         while (index &lt; length) {</span>
+<span class="fc" id="L1245">             result *= radix;</span>
+<span class="fc" id="L1246">             digit = Character.digit((char)bArray[index++],radix);</span>
+<span class="pc bpc" id="L1247" title="1 of 2 branches missed.">             if (digit == -1)</span>
+<span class="nc" id="L1248">                 throw new NumberFormatException (&quot;Byte array contains non-digit&quot;);</span>
+<span class="fc" id="L1249">             result += digit;</span>
+         }
+<span class="fc" id="L1251">         return result;</span>
+     }
+ 
+     /**
+      * Converts a byte array to an integer of radix 10.
+      * &lt;br&gt;&lt;br&gt;
+      * Array constraints are:
+      * &lt;li&gt;Number must be less than 10 digits&lt;/li&gt;
+      * &lt;li&gt;Number must be positive&lt;/li&gt;
+      * @param bArray Byte Array representation of number
+      * @return integer value of number
+      * @throws NumberFormatException
+      */
+     public static int parseInt (byte[] bArray) throws NumberFormatException {
+<span class="nc" id="L1265">         return parseInt (bArray,10);</span>
+     }
+     private static String hexOffset (int i) {
+<span class="fc" id="L1268">         i = i&gt;&gt;4 &lt;&lt; 4;</span>
+<span class="pc bpc" id="L1269" title="1 of 2 branches missed.">         int w = i &gt; 0xFFFF ? 8 : 4;</span>
+         try {
+<span class="fc" id="L1271">             return zeropad (Integer.toString (i, 16), w);</span>
+<span class="nc" id="L1272">         } catch (ISOException e) {</span>
+             // should not happen
+<span class="nc" id="L1274">             return e.getMessage();</span>
+         }
+     }
+ 
+     /**
+      * @param b a byte[] buffer
+      * @return hexdump
+      */
+     public static String hexdump (byte[] b) {
+<span class="fc" id="L1283">         return hexdump (b, 0, b.length);</span>
+     }
+ 
+     /**
+      * @param b a byte[] buffer
+      * @param offset starting offset
+      */
+     public static String hexdump (byte[] b, int offset) {
+<span class="nc" id="L1291">         return hexdump (b, offset, b.length-offset);</span>
+     }
+ 
+     /**
+      * @param b a byte[] buffer
+      * @param offset starting offset
+      * @param len the Length
+      * @return hexdump
+      */
+     public static String hexdump (byte[] b, int offset, int len) {
+<span class="fc" id="L1301">         StringBuilder sb    = new StringBuilder ();</span>
+<span class="fc" id="L1302">         StringBuilder hex   = new StringBuilder ();</span>
+<span class="fc" id="L1303">         StringBuilder ascii = new StringBuilder ();</span>
+<span class="fc" id="L1304">         String sep         = &quot;  &quot;;</span>
+<span class="fc" id="L1305">         String lineSep     = System.getProperty (&quot;line.separator&quot;);</span>
+<span class="fc" id="L1306">         len = offset + len;</span>
+ 
+<span class="fc bfc" id="L1308" title="All 2 branches covered.">         for (int i=offset; i&lt;len; i++) {</span>
+<span class="fc" id="L1309">             hex.append(hexStrings[(int)b[i] &amp; 0xFF]);</span>
+<span class="fc" id="L1310">             hex.append (' ');</span>
+<span class="fc" id="L1311">             char c = (char) b[i];</span>
+<span class="pc bpc" id="L1312" title="2 of 4 branches missed.">             ascii.append (c &gt;= 32 &amp;&amp; c &lt; 127 ? c : '.');</span>
+ 
+<span class="fc" id="L1314">             int j = i % 16;</span>
+<span class="pc bpc" id="L1315" title="2 of 3 branches missed.">             switch (j) {</span>
+                 case 7 :
+<span class="nc" id="L1317">                     hex.append (' ');</span>
+<span class="nc" id="L1318">                     break;</span>
+                 case 15 :
+<span class="nc" id="L1320">                     sb.append (hexOffset (i));</span>
+<span class="nc" id="L1321">                     sb.append (sep);</span>
+<span class="nc" id="L1322">                     sb.append (hex.toString());</span>
+<span class="nc" id="L1323">                     sb.append (' ');</span>
+<span class="nc" id="L1324">                     sb.append (ascii.toString());</span>
+<span class="nc" id="L1325">                     sb.append (lineSep);</span>
+<span class="nc" id="L1326">                     hex   = new StringBuilder ();</span>
+<span class="nc" id="L1327">                     ascii = new StringBuilder ();</span>
+                     break;
+             }
+         }
+<span class="pc bpc" id="L1331" title="1 of 2 branches missed.">         if (hex.length() &gt; 0) {</span>
+<span class="fc bfc" id="L1332" title="All 2 branches covered.">             while (hex.length () &lt; 49)</span>
+<span class="fc" id="L1333">                 hex.append (' ');</span>
+ 
+<span class="fc" id="L1335">             sb.append (hexOffset (len));</span>
+<span class="fc" id="L1336">             sb.append (sep);</span>
+<span class="fc" id="L1337">             sb.append (hex.toString());</span>
+<span class="fc" id="L1338">             sb.append (' ');</span>
+<span class="fc" id="L1339">             sb.append (ascii.toString());</span>
+<span class="fc" id="L1340">             sb.append (lineSep);</span>
+         }
+<span class="fc" id="L1342">         return sb.toString();</span>
+     }
+     /**
+      * pads a string with 'F's (useful for pinoffset management)
+      * @param s an [hex]string
+      * @param len desired length
+      * @return string right padded with 'F's
+      */
+     public static String strpadf (String s, int len) {
+<span class="fc" id="L1351">         StringBuilder d = new StringBuilder(s);</span>
+<span class="fc bfc" id="L1352" title="All 2 branches covered.">         while (d.length() &lt; len)</span>
+<span class="fc" id="L1353">             d.append('F');</span>
+<span class="fc" id="L1354">         return d.toString();</span>
+     }
+     /**
+      * reverse the effect of strpadf
+      * @param s F padded string
+      * @return trimmed string
+      */
+     public static String trimf (String s) {
+<span class="fc bfc" id="L1362" title="All 2 branches covered.">         if (s != null) {</span>
+<span class="fc" id="L1363">             int l = s.length();</span>
+<span class="pc bpc" id="L1364" title="1 of 2 branches missed.">             if (l &gt; 0) {</span>
+<span class="pc bpc" id="L1365" title="1 of 2 branches missed.">                 while (--l &gt;= 0) {</span>
+<span class="fc bfc" id="L1366" title="All 2 branches covered.">                     if (s.charAt (l) != 'F')</span>
+<span class="fc" id="L1367">                         break;</span>
+                 }
+<span class="pc bpc" id="L1369" title="1 of 2 branches missed.">                 s = l == 0 ? &quot;&quot; : s.substring (0, l+1);</span>
+             }
+         }
+<span class="fc" id="L1372">         return s;</span>
+     }
+     
+     /**
+      * return the last n characters of the passed String, left padding where required with 0
+      * 
+      * @param s
+      *            String to take from
+      * @param n nuber of characters to take
+      * 
+      * @return String (may be null)
+      */
+     public static String takeLastN(String s,int n) throws ISOException {
+<span class="fc bfc" id="L1385" title="All 2 branches covered.">         if (s.length()&gt;n) {</span>
+<span class="fc" id="L1386">             return s.substring(s.length()-n);</span>
+         }
+         else {
+<span class="pc bpc" id="L1389" title="1 of 2 branches missed.">             if (s.length()&lt;n){</span>
+<span class="fc" id="L1390">                 return zeropad(s,n);                </span>
+             }
+             else {
+<span class="nc" id="L1393">                 return s;</span>
+             }
+         }
+     }
+     
+     /**
+      * return the first n characters of the passed String, left padding where required with 0
+      * 
+      * @param s
+      *            String to take from
+      * @param n nuber of characters to take
+      * 
+      * @return String (may be null)
+      */
+     public static String takeFirstN(String s,int n) throws ISOException {
+<span class="fc bfc" id="L1408" title="All 2 branches covered.">         if (s.length()&gt;n) {</span>
+<span class="fc" id="L1409">             return s.substring(0,n);</span>
+         }
+         else {
+<span class="pc bpc" id="L1412" title="1 of 2 branches missed.">             if (s.length()&lt;n){</span>
+<span class="fc" id="L1413">                 return zeropad(s,n);                </span>
+             }
+             else {
+<span class="nc" id="L1416">                 return s;</span>
+             }
+         }
+     }
+     public static String millisToString (long millis) {
+<span class="fc" id="L1421">         StringBuilder sb = new StringBuilder();</span>
+<span class="fc bfc" id="L1422" title="All 2 branches covered.">         if (millis &lt; 0) {</span>
+<span class="fc" id="L1423">             millis = -millis;</span>
+<span class="fc" id="L1424">             sb.append('-');</span>
+         }
+<span class="fc" id="L1426">         int ms = (int) (millis % 1000);</span>
+<span class="fc" id="L1427">         millis /= 1000;</span>
+<span class="fc" id="L1428">         int dd = (int) (millis/86400);</span>
+<span class="fc" id="L1429">         millis -= dd * 86400;</span>
+<span class="fc" id="L1430">         int hh = (int) (millis/3600);</span>
+<span class="fc" id="L1431">         millis -= hh * 3600;</span>
+<span class="fc" id="L1432">         int mm = (int) (millis/60);</span>
+<span class="fc" id="L1433">         millis -= mm * 60;</span>
+<span class="fc" id="L1434">         int ss = (int) millis;</span>
+<span class="fc bfc" id="L1435" title="All 2 branches covered.">         if (dd &gt; 0) {</span>
+<span class="fc" id="L1436">             sb.append (Long.toString(dd));</span>
+<span class="fc" id="L1437">             sb.append (&quot;d &quot;);</span>
+         }
+<span class="fc" id="L1439">         sb.append (zeropad (hh, 2));</span>
+<span class="fc" id="L1440">         sb.append (':');</span>
+<span class="fc" id="L1441">         sb.append (zeropad (mm, 2));</span>
+<span class="fc" id="L1442">         sb.append (':');</span>
+<span class="fc" id="L1443">         sb.append (zeropad (ss, 2));</span>
+<span class="fc" id="L1444">         sb.append ('.');</span>
+<span class="fc" id="L1445">         sb.append (zeropad (ms, 3));</span>
+<span class="fc" id="L1446">         return sb.toString();</span>
+     }
+ 
+     /**
+      * Format a string containing a amount conversion rate in the proper format
+      * &lt;p/&gt;
+      * Format:
+      * The leftmost digit (i.e., position 1) of this data element denotes the number of
+      * positions the decimal separator must be moved from the right. Positions 2–8 of
+      * this data element specify the rate. For example, a conversion rate value of
+      * 91234567 in this data element would equate to 0.001234567.
+      *
+      * @param convRate - amount conversion rate
+      * @return a string containing a amount conversion rate in the proper format,
+      *         witch is suitable for create fields 10 and 11
+      * @throws ISOException
+      */
+     public static String formatAmountConversionRate(double convRate) throws ISOException {
+<span class="fc bfc" id="L1464" title="All 2 branches covered.">         if (convRate == 0)</span>
+<span class="fc" id="L1465">             return null;</span>
+<span class="fc" id="L1466">         BigDecimal cr = new BigDecimal(convRate);</span>
+<span class="fc" id="L1467">         int x = 7 - cr.precision() + cr.scale();</span>
+<span class="fc" id="L1468">         String bds = cr.movePointRight(cr.scale()).toString();</span>
+<span class="pc bpc" id="L1469" title="1 of 2 branches missed.">         if (x &gt; 9)</span>
+<span class="nc" id="L1470">             bds = ISOUtil.zeropad(bds, bds.length() + x - 9);</span>
+<span class="fc" id="L1471">         String ret = ISOUtil.zeropadRight(bds, 7);</span>
+<span class="fc" id="L1472">         return Math.min(9, x) + ISOUtil.takeFirstN(ret, 7);</span>
+     }
+ 
+     /**
+      * Parse currency amount conversion rate string
+      * &lt;p/&gt;
+      * Suitble for parse fields 10 and 11
+      *
+      * @param convRate amount conversation rate
+      * @return parsed currency amount conversation rate
+      * @throws IllegalArgumentException
+      */
+     public static double parseAmountConversionRate(String convRate) {
+<span class="pc bpc" id="L1485" title="1 of 4 branches missed.">         if (convRate == null || convRate.length() != 8)</span>
+<span class="fc" id="L1486">             throw new IllegalArgumentException(&quot;Invalid amount converion rate argument: '&quot; +</span>
+                     convRate + &quot;'&quot;);
+<span class="fc" id="L1488">         BigDecimal bd = new BigDecimal(convRate);</span>
+<span class="fc" id="L1489">         int pow = bd.movePointLeft(7).intValue();</span>
+<span class="fc" id="L1490">         bd = new BigDecimal(convRate.substring(1));</span>
+<span class="fc" id="L1491">         return bd.movePointLeft(pow).doubleValue();</span>
+     }
+ 
+ 
+     /**
+      * Converts a string[] or multiple strings into one comma-delimited String.
+      *
+      * Takes care of escaping commas using a backlash
+      * @see ISOUtil#commaDecode(String)
+      * @param ss string array to be comma encoded
+      * @return comma encoded string
+      */
+     public static String commaEncode (String... ss) {
+<span class="fc" id="L1504">         return charEncode(',', ss);</span>
+     }
+ 
+     /**
+      * Decodes a comma encoded String as encoded by commaEncode
+      * @see ISOUtil#commaEncode(String[])
+      * @param s the command encoded String
+      * @return String[]
+      */
+     public static String[] commaDecode (String s) {
+<span class="fc" id="L1514">         return charDecode(',', s);</span>
+     }
+ 
+     /**
+      * Decodes a comma encoded String returning element in position i
+      * @param s comma encoded string
+      * @param i position (starts at 0)
+      * @return element in position i of comma encoded string, or null
+      */
+     public static String commaDecode (String s, int i) {
+<span class="fc" id="L1524">         String[] ss = commaDecode(s);</span>
+<span class="fc" id="L1525">         int l = ss.length;</span>
+<span class="pc bpc" id="L1526" title="1 of 4 branches missed.">         return i &gt;= 0 &amp;&amp; i &lt; l ? ss[i] : null;</span>
+     }
+ 
+     /**
+      * Compute card's check digit (LUHN)
+      * @param p PAN (without checkdigit)
+      * @return the checkdigit
+      */
+     public static char calcLUHN (String p) {
+         int i, crc;
+<span class="fc" id="L1536">         int odd = p.length() % 2;</span>
+ 
+<span class="fc bfc" id="L1538" title="All 2 branches covered.">         for (i=crc=0; i&lt;p.length(); i++) {</span>
+<span class="fc" id="L1539">             char c = p.charAt(i);</span>
+<span class="fc bfc" id="L1540" title="All 2 branches covered.">             if (!Character.isDigit (c)) {</span>
+<span class="fc" id="L1541">                 throw new IllegalArgumentException(&quot;Invalid PAN &quot; + p);</span>
+             }
+<span class="fc" id="L1543">             c = (char) (c - '0');</span>
+<span class="fc bfc" id="L1544" title="All 2 branches covered.">             if (i % 2 != odd)</span>
+<span class="fc bfc" id="L1545" title="All 2 branches covered.">                 crc+= c*2 &gt;= 10 ? c*2 -9 : c*2;</span>
+             else
+<span class="fc" id="L1547">                 crc+=c;</span>
+         }
+ 
+<span class="pc bpc" id="L1550" title="1 of 2 branches missed.">         return (char) ((crc % 10 == 0 ? 0 : 10 - crc % 10) + '0');</span>
+     }
+ 
+     public static String getRandomDigits(Random r, int l, int radix) {
+<span class="fc" id="L1554">         StringBuilder sb = new StringBuilder();</span>
+<span class="fc bfc" id="L1555" title="All 2 branches covered.">         for (int i=0; i&lt;l; i++) {</span>
+<span class="fc" id="L1556">             sb.append (r.nextInt(radix));</span>
+         }
+<span class="fc" id="L1558">         return sb.toString();</span>
+     }
+ 
+     // See http://stackoverflow.com/questions/3263892/format-file-size-as-mb-gb-etc
+     // and http://physics.nist.gov/cuu/Units/binary.html
+     public static String readableFileSize(long size) {
+<span class="fc bfc" id="L1564" title="All 2 branches covered.">         if(size &lt;= 0) return &quot;0&quot;;</span>
+<span class="fc" id="L1565">         final String[] units = new String[] { &quot;Bi&quot;, &quot;KiB&quot;, &quot;MiB&quot;, &quot;GiB&quot;, &quot;TiB&quot;, &quot;PiB&quot;, &quot;EiB&quot; };</span>
+<span class="fc" id="L1566">         int digitGroups = (int) (Math.log10(size)/Math.log10(1024));</span>
+<span class="fc" id="L1567">         return new DecimalFormat(&quot;#,##0.#&quot;).format(size/Math.pow(1024, digitGroups)) + &quot; &quot; + units[digitGroups];</span>
+     }
+     
+     /**
+      * At times when the charset is not the default usual one the dump will have more unprintable characters than printable.
+      * The charset will allow printing of more printable character. Usually when your data is in EBCDIC format you will run into this.
+      * 
+      * The standard hexdump that exists would print a byte array of F0F1F2 as 
+      * F0 F1 F2        ...
+      * 
+      * This hexdump, if the Charset.forName(&quot;IBM1047&quot;) is passedin as charset will print
+      * F0 F1 F2       | 123      
+      * 
+      * 
+      * @param array
+      *            the array that needs to be dumped.
+      * @param offset
+      *            From where the data needs to be dumped.
+      * @param length
+      *            The number of byte that ned to be dumped.
+      * @param charSet
+      *            The Charset encoding the array is i.
+      * @return The hexdump string.
+      */
+     public static String hexDump(byte[] array, int offset, int length, Charset charSet) {
+         // https://gist.github.com/jen20/906db194bd97c14d91df
+<span class="fc" id="L1593">         final int width = 16;</span>
+ 
+<span class="fc" id="L1595">         StringBuilder builder = new StringBuilder();</span>
+ 
+<span class="fc bfc" id="L1597" title="All 2 branches covered.">         for (int rowOffset = offset; rowOffset &lt; offset + length; rowOffset += width) {</span>
+<span class="fc" id="L1598">             builder.append(String.format(&quot;%06d:  &quot;, rowOffset));</span>
+ 
+<span class="fc bfc" id="L1600" title="All 2 branches covered.">             for (int index = 0; index &lt; width; index++) {</span>
+<span class="fc bfc" id="L1601" title="All 2 branches covered.">                 if (rowOffset + index &lt; array.length) {</span>
+<span class="fc" id="L1602">                     builder.append(String.format(&quot;%02x &quot;, array[rowOffset + index]).toUpperCase());</span>
+                 }
+                 else {
+<span class="fc" id="L1605">                     builder.append(&quot;   &quot;);</span>
+                 }
+             }
+ 
+<span class="pc bpc" id="L1609" title="1 of 2 branches missed.">             if (rowOffset &lt; array.length) {</span>
+<span class="fc" id="L1610">                 int asciiWidth = Math.min(width, array.length - rowOffset);</span>
+<span class="fc" id="L1611">                 builder.append(&quot;  |  &quot;);</span>
+<span class="fc" id="L1612">                 builder.append(new String(array, rowOffset, asciiWidth, charSet).replaceAll(&quot;\r\n&quot;, &quot; &quot;)</span>
+<span class="fc" id="L1613">                         .replaceAll(&quot;\n&quot;, &quot; &quot;));</span>
+             }
+ 
+<span class="fc" id="L1616">             builder.append(String.format(&quot;%n&quot;));</span>
+         }
+ 
+<span class="fc" id="L1619">         return builder.toString();</span>
+     }
+ 
+     public static byte[] decodeHexDump(String s) {
+<span class="fc" id="L1623">         return hex2byte(</span>
+<span class="fc" id="L1624">             Arrays.stream(s.split(&quot;\\r\\n|[\\r\\n]&quot;))</span>
+<span class="fc" id="L1625">                 .map(x -&gt;</span>
+<span class="fc" id="L1626">                          x.replaceAll(&quot;^.{4}  &quot;, &quot;&quot;).</span>
+<span class="fc" id="L1627">                              replaceAll(&quot;\\s\\s&quot;, &quot; &quot;).</span>
+<span class="fc" id="L1628">                              replaceAll(&quot;(([0-9A-F][0-9A-F]\\s){1,16}).*$&quot;, &quot;$1&quot;).</span>
+<span class="fc" id="L1629">                              replaceAll(&quot;\\s&quot;, &quot;&quot;)</span>
+<span class="fc" id="L1630">                 ).collect(Collectors.joining()));</span>
+     }
+ 
+     /**
+      * Converts a string[] or multiple strings into one char-delimited String.
+      *
+      * Takes care of escaping char using a backlash
+      *
+      * NOTE: for backward compatibility, an empty String returns a zero-length array
+      *
+      * @see ISOUtil#charDecode(char, String)
+      * @param delimiter char used to delimit
+      * @param ss string array to be char encoded
+      * @return char encoded string
+      */
+     public static String charEncode (char delimiter, String... ss) {
+<span class="fc" id="L1646">         StringJoiner sj = new StringJoiner(String.valueOf(delimiter));</span>
+<span class="fc bfc" id="L1647" title="All 2 branches covered.">         for (String s : ss) {</span>
+<span class="pc bpc" id="L1648" title="1 of 4 branches missed.">             if (s == null || s.length() == 0) {</span>
+<span class="fc" id="L1649">                 sj.add(&quot;&quot;);</span>
+<span class="fc" id="L1650">                 continue;</span>
+             }
+<span class="fc" id="L1652">             StringBuilder sb = new StringBuilder();</span>
+<span class="fc bfc" id="L1653" title="All 2 branches covered.">             for (char c : s.toCharArray()) {</span>
+<span class="fc bfc" id="L1654" title="All 4 branches covered.">                 if (c == delimiter || c == '\\') {</span>
+<span class="fc" id="L1655">                     sb.append(&quot;\\&quot;);</span>
+                 }
+<span class="fc" id="L1657">                 sb.append(c);</span>
+             }
+<span class="fc" id="L1659">             sj.add(sb.toString());</span>
+         }
+<span class="fc" id="L1661">         return sj.toString();</span>
+     }
+ 
+     /**
+      * Decodes a char encoded String as encoded by charEncode
+      * @see ISOUtil#charEncode(char, String[])
+      * @param delimiter char used to delimit
+      * @param s the char encoded String
+      * @return String[]
+      */
+     public static String[] charDecode (char delimiter, String s) {
+<span class="fc bfc" id="L1672" title="All 2 branches covered.">         if (s == null) {</span>
+<span class="fc" id="L1673">             return null;</span>
+         }
+<span class="fc bfc" id="L1675" title="All 2 branches covered.">         if (s.length() == 0) {</span>
+<span class="fc" id="L1676">             return new String[0];</span>
+         }
+<span class="fc" id="L1678">         List&lt;String&gt; l = new ArrayList&lt;&gt;();</span>
+<span class="fc" id="L1679">         StringBuilder sb = new StringBuilder();</span>
+<span class="fc" id="L1680">         boolean escaped = false;</span>
+<span class="fc bfc" id="L1681" title="All 2 branches covered.">         for (int i = 0; i &lt; s.length(); i++) {</span>
+<span class="fc" id="L1682">             char c = s.charAt(i);</span>
+<span class="fc bfc" id="L1683" title="All 2 branches covered.">             if (!escaped) {</span>
+<span class="fc bfc" id="L1684" title="All 2 branches covered.">                 if (c == '\\'){</span>
+<span class="fc" id="L1685">                     escaped = true;</span>
+<span class="fc" id="L1686">                     continue;</span>
+                 }
+<span class="fc bfc" id="L1688" title="All 2 branches covered.">                 if (c == delimiter){</span>
+<span class="fc" id="L1689">                     l.add(sb.toString());</span>
+<span class="fc" id="L1690">                     sb = new StringBuilder();</span>
+<span class="fc" id="L1691">                     continue;</span>
+                 }
+             }
+<span class="fc" id="L1694">             sb.append(c);</span>
+<span class="fc" id="L1695">             escaped = false;</span>
+         }
+<span class="fc" id="L1697">         l.add(sb.toString());</span>
+<span class="fc" id="L1698">         return l.toArray(new String[l.size()]);</span>
+     }
+ 
+     /**
+      * Decodes a char encoded String returning element in position i
+      * @param s comma encoded string
+      * @param delimiter char used to delimit
+      * @param i position (starts at 0)
+      * @return element in position i of comma encoded string, or empty
+      */
+     public static String charDecode(String s, char delimiter, int i) {
+<span class="pc bpc" id="L1709" title="2 of 4 branches missed.">         if (s == null || s.length() == 0) {</span>
+<span class="fc" id="L1710">             return &quot;&quot;;</span>
+         }
+<span class="nc" id="L1712">         String[] split = charDecode(delimiter, s);</span>
+<span class="nc bnc" id="L1713" title="All 2 branches missed.">         if (split.length &lt;= 0) {</span>
+<span class="nc" id="L1714">             return &quot;&quot;;</span>
+         } else {
+<span class="nc bnc" id="L1716" title="All 2 branches missed.">             return i &lt; split.length ? split[i] : &quot;&quot;;</span>
+         }
+     }
+ 
+     public static String toUnicodeString(String input) {
+<span class="fc" id="L1721">         StringBuilder sb = new StringBuilder();</span>
+<span class="fc bfc" id="L1722" title="All 2 branches covered.">         for (char c : input.toCharArray()) {</span>
+<span class="fc" id="L1723">             sb.append(String.format(&quot;\\u%04x&quot;, (int) c));</span>
+         }
+<span class="fc" id="L1725">         return sb.toString();</span>
+     }
+ 
+     public static String toASCII(String s) {
+<span class="fc" id="L1729">         return toSingleByte (s, 0x7F);</span>
+     }
+     public static String toLatin(String s) {
+<span class="fc" id="L1732">         return toSingleByte (s, 0xFF);</span>
+     }
+     
+     private static String toSingleByte(String s, int mask) {
+<span class="fc" id="L1736">         StringBuilder sb = new StringBuilder();</span>
+<span class="fc" id="L1737">         s.codePoints().forEach(cp -&gt; {</span>
+<span class="fc bfc" id="L1738" title="All 2 branches covered.">             if (cp &gt; mask) {</span>
+<span class="fc" id="L1739">                 sb.append(&quot; &quot;);</span>
+<span class="pc bpc" id="L1740" title="1 of 2 branches missed.">                 if (cp &gt; 0xFFFF) // multi-byte character</span>
+<span class="nc" id="L1741">                     sb.append(&quot; &quot;);</span>
+             } else
+<span class="fc" id="L1743">                 sb.appendCodePoint(cp); // Append the single-byte character</span>
+<span class="fc" id="L1744">         });</span>
+<span class="fc" id="L1745">         return sb.toString();</span>
+     }
+ }
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.14.202510111229</span></div></body></html>

@@ -1,0 +1,372 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>NcmcTxnValidation.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">iso8583-processor</a> &gt; <a href="index.source.html" class="el_package">com.logicpoint.iso8583.validation.transaction.impl</a> &gt; <span class="el_source">NcmcTxnValidation.java</span></div><h1>NcmcTxnValidation.java</h1><pre class="source lang-java linenums">package com.logicpoint.iso8583.validation.transaction.impl;
+
+import com.logicpoint.iso8583.context.RequestContext;
+import java.util.ArrayList;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
+import java.util.Set;
+import java.util.stream.Collectors;
+
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.stereotype.Service;
+
+import com.logicpoint.iso8583.emv.ChipData;
+import com.logicpoint.iso8583.emv.IssuerApplicationData;
+import com.logicpoint.iso8583.entity.NcmcService;
+import com.logicpoint.iso8583.repository.NcmcServiceRepository;
+import com.logicpoint.iso8583.responsecode.InternalResCode;
+import com.logicpoint.iso8583.util.Scheme;
+import com.logicpoint.iso8583.util.rupay.RuPayDe61Parser;
+import com.logicpoint.iso8583.util.rupay.RuPayDe61Parser.RuPayDE61Subfields;
+import com.logicpoint.iso8583.validation.TransactionType;
+import com.logicpoint.iso8583.validation.ValidationResult;
+import java.io.ByteArrayOutputStream;
+import java.io.PrintStream;
+import java.math.BigDecimal;
+
+import org.springframework.beans.factory.annotation.Value;
+/*
+ * @author : Logicpoint Systems
+ * @version : 1.0
+ * @since : 2025-10-12
+ * 
+ * @description Validator for NCMC transactions
+ */
+@Service
+<span class="fc" id="L39">public class NcmcTxnValidation extends AbstractTransactionTypeValidator{</span>
+<span class="fc" id="L40">    private static final Logger log = LoggerFactory.getLogger(NcmcTxnValidation.class);</span>
+
+    @Autowired
+    private NcmcServiceRepository ncmcServiceRepository;
+
+    @Value(&quot;${scheme.rupay.ncmc.afa.enabled:false}&quot;)
+    private boolean afaEnabled;
+
+<span class="fc" id="L48">    @Value(&quot;${scheme.rupay.ncmc.afa.limit:200}&quot;)</span>
+    private BigDecimal afaLimit = new BigDecimal(&quot;200&quot;);
+
+<span class="fc" id="L51">    private static final Map&lt;String, Map&lt;TransactionType, De61ValidationRules&gt;&gt; SCHEME_RULES = Map.of(</span>
+<span class="fc" id="L52">        &quot;RUPAY&quot;, Map.of(</span>
+            TransactionType.SERVICE_CREATION, new De61ValidationRules(
+<span class="fc" id="L54">                Set.of(&quot;4&quot;,&quot;8&quot;), // SF1: Card Data Input Capability</span>
+<span class="fc" id="L55">                Set.of(&quot;1&quot;), // SF5: Cardholder Present</span>
+<span class="fc" id="L56">                Set.of(&quot;2&quot;), // SF6: Card Present</span>
+<span class="fc" id="L57">                Set.of(&quot;3&quot;,&quot;4&quot;), // SF7: Card Data Input Mode</span>
+<span class="fc" id="L58">                Set.of(&quot;1&quot;,&quot;2&quot;) // SF8: Cardholder Authentication Method</span>
+            ),
+            TransactionType.SERVICE_CREATION_CONTACTLESS, new De61ValidationRules(
+<span class="fc" id="L61">                Set.of(&quot;4&quot;,&quot;8&quot;), // SF1: Card Data Input Capability</span>
+<span class="fc" id="L62">                Set.of(&quot;1&quot;), // SF5: Cardholder Present</span>
+<span class="fc" id="L63">                Set.of(&quot;2&quot;), // SF6: Card Present</span>
+<span class="fc" id="L64">                Set.of(&quot;3&quot;,&quot;4&quot;), // SF7: Card Data Input Mode</span>
+<span class="fc" id="L65">                Set.of(&quot;1&quot;,&quot;2&quot;) // SF8: Cardholder Authentication Method</span>
+            ),
+            TransactionType.MONEY_LOAD, new De61ValidationRules(
+<span class="fc" id="L68">                Set.of(&quot;4&quot;,&quot;8&quot;), // SF1: Card Data Input Capability</span>
+<span class="fc" id="L69">                Set.of(&quot;1&quot;), // SF5: Cardholder Present</span>
+<span class="fc" id="L70">                Set.of(&quot;2&quot;), // SF6: Card Present</span>
+<span class="fc" id="L71">                Set.of(&quot;3&quot;,&quot;4&quot;), // SF7: Card Data Input Mode</span>
+<span class="fc" id="L72">                Set.of(&quot;1&quot;,&quot;2&quot;) // SF8: Cardholder Authentication Method Method</span>
+            ),
+            TransactionType.ML_BALANCEUPDATE, new De61ValidationRules(
+<span class="fc" id="L75">                Set.of(&quot;4&quot;,&quot;8&quot;), // SF1: Card Data Input Capability</span>
+<span class="fc" id="L76">                Set.of(&quot;1&quot;), // SF5: Cardholder Present</span>
+<span class="fc" id="L77">                Set.of(&quot;2&quot;), // SF6: Card Present</span>
+<span class="fc" id="L78">                Set.of(&quot;3&quot;,&quot;4&quot;), // SF7: Card Data Input Mode</span>
+<span class="fc" id="L79">                Set.of(&quot;1&quot;,&quot;2&quot;) // SF8: Cardholder Authentication Method Method</span>
+            )
+        )
+    );
+    /**
+     * Subfield validation mappings
+     */
+<span class="fc" id="L86">    private static final Map&lt;RuPayDE61Subfields, String&gt; SUBFIELD_NAMES = Map.of(</span>
+        RuPayDE61Subfields.CARD_DATA_INPUT_CAPABILITY, &quot;SF1 (Card Data Input Capability)&quot;,
+        RuPayDE61Subfields.CARDHOLDER_PRESENT, &quot;SF5 (Cardholder Present)&quot;,
+        RuPayDE61Subfields.CARD_PRESENT, &quot;SF6 (Card Present)&quot;,
+        RuPayDE61Subfields.CARD_DATA_INPUT_MODE, &quot;SF7 (Card Data Input Mode)&quot;,
+        RuPayDE61Subfields.CARDHOLDER_AUTH_METHOD, &quot;SF8 (Cardholder Authentication Method)&quot;
+    );
+    @Override
+    public ValidationResult validateTransactionType(TransactionType transactionType, Map&lt;Integer, String&gt; transactionData) {
+<span class="nc" id="L95">        return validateTransactionType(transactionType, buildFallbackRequestContext(transactionData));</span>
+    }
+
+    @Override
+    public ValidationResult validateTransactionType(TransactionType transactionType, RequestContext requestContext) {
+<span class="pc bpc" id="L100" title="1 of 2 branches missed.">        Map&lt;Integer, String&gt; transactionData = requestContext != null ? requestContext.getFields() : null;</span>
+<span class="fc" id="L101">        List&lt;String&gt; errors = new ArrayList&lt;&gt;();</span>
+<span class="pc bpc" id="L102" title="2 of 4 branches missed.">        Scheme scheme = requestContext != null &amp;&amp; requestContext.getScheme() != null</span>
+<span class="fc" id="L103">                ? requestContext.getScheme()</span>
+<span class="pc" id="L104">                : Scheme.RUPAY;</span>
+        
+<span class="pc bpc" id="L106" title="1 of 2 branches missed.">        Map&lt;String, String&gt; tlvData = requestContext != null ? requestContext.getParsedTlv(48) : Map.of();</span>
+        
+<span class="fc bfc" id="L108" title="All 2 branches covered.">        if(scheme == Scheme.RUPAY){</span>
+<span class="fc" id="L109">            validateMoneyLoadAfa(requestContext, transactionType, transactionData, errors);</span>
+<span class="fc bfc" id="L110" title="All 2 branches covered.">            if (!errors.isEmpty()) {</span>
+<span class="fc" id="L111">                return new ValidationResult(errors, new ArrayList&lt;&gt;());</span>
+            }
+
+<span class="pc bpc" id="L114" title="1 of 2 branches missed.">            ChipData chipData = requestContext != null ? requestContext.getParsedChipData(55) : null;</span>
+<span class="fc" id="L115">            validateSchemeBasedDe61(requestContext, scheme, transactionType, transactionData, errors);</span>
+<span class="fc bfc" id="L116" title="All 2 branches covered.">            if (chipData == null) {</span>
+<span class="fc" id="L117">                errors.add(&quot;MISSING_DE55: ICC data is required for NCMC validation&quot;);</span>
+<span class="fc" id="L118">                return new ValidationResult(errors, new ArrayList&lt;&gt;());</span>
+            }
+<span class="fc" id="L120">            String iadValue = chipData.getTagValue(&quot;9F10&quot;);</span>
+<span class="pc bpc" id="L121" title="3 of 4 branches missed.">            if (iadValue == null || iadValue.isBlank()) {</span>
+<span class="fc" id="L122">                errors.add(&quot;MISSING_DE55_TAG_9F10: Issuer Application Data is required for NCMC validation&quot;);</span>
+<span class="fc" id="L123">                return new ValidationResult(errors, new ArrayList&lt;&gt;());</span>
+            }
+
+            IssuerApplicationData issuerApplicationData;
+            try {
+<span class="nc" id="L128">                issuerApplicationData = new IssuerApplicationData(iadValue, scheme);</span>
+<span class="nc" id="L129">            } catch (IllegalArgumentException ex) {</span>
+<span class="nc" id="L130">                errors.add(&quot;INVALID_DE55_TAG_9F10: Invalid Issuer Application Data for NCMC validation&quot;);</span>
+<span class="nc" id="L131">                return new ValidationResult(errors, new ArrayList&lt;&gt;());</span>
+<span class="nc" id="L132">            }</span>
+<span class="nc" id="L133">            ByteArrayOutputStream baos = new ByteArrayOutputStream();</span>
+<span class="nc" id="L134">            PrintStream ps = new PrintStream(baos);</span>
+<span class="nc" id="L135">            issuerApplicationData.dump(ps, &quot;&quot;);</span>
+<span class="nc" id="L136">            log.debug(&quot;Issuer Application Data: {}&quot;, baos.toString());</span>
+<span class="nc bnc" id="L137" title="All 4 branches missed.">            switch (transactionType) {</span>
+                case SERVICE_CREATION:                   
+                case SERVICE_CREATION_CONTACTLESS:
+<span class="nc" id="L140">                    validateServiceCreation(issuerApplicationData,chipData,tlvData,errors); </span>
+<span class="nc" id="L141">                    break;</span>
+                case MONEY_LOAD:
+<span class="nc" id="L143">                    validateMoneyLoad(issuerApplicationData,chipData,tlvData,errors);</span>
+<span class="nc" id="L144">                    break;</span>
+                case ML_BALANCEUPDATE:
+<span class="nc" id="L146">                    validateMoneyLoadBalanceUpdate(issuerApplicationData,chipData,tlvData,errors);</span>
+                    break;
+            }
+
+            
+        }
+<span class="fc" id="L152">        return new ValidationResult(errors, new ArrayList&lt;&gt;());</span>
+    }
+
+    private void validateMoneyLoadAfa(RequestContext requestContext,
+                                      TransactionType transactionType,
+                                      Map&lt;Integer, String&gt; transactionData,
+                                      List&lt;String&gt; errors) {
+<span class="pc bpc" id="L159" title="2 of 6 branches missed.">        if (!afaEnabled || transactionType != TransactionType.MONEY_LOAD || transactionData == null) {</span>
+<span class="fc" id="L160">            return;</span>
+        }
+
+<span class="fc" id="L163">        BigDecimal amount = parseAmount(transactionData.get(4));</span>
+<span class="fc bfc" id="L164" title="All 6 branches covered.">        if (amount == null || amount.compareTo(afaLimit) &lt;= 0 || hasPinData(transactionData)) {</span>
+<span class="fc" id="L165">            return;</span>
+        }
+
+<span class="pc bpc" id="L168" title="1 of 2 branches missed.">        if (requestContext != null) {</span>
+<span class="fc" id="L169">            requestContext.setInternalResponseCode(InternalResCode.INVALID_PIN);</span>
+        }
+<span class="fc" id="L171">        errors.add(String.format(&quot;INVALID_PIN: NCMC Money Load amount %s exceeds AFA limit %s without PIN data&quot;,</span>
+                amount, afaLimit));
+<span class="fc" id="L173">    }</span>
+
+    private BigDecimal parseAmount(String amountField) {
+<span class="fc bfc" id="L176" title="All 4 branches covered.">        if (amountField == null || amountField.isBlank()) {</span>
+<span class="fc" id="L177">            return null;</span>
+        }
+        try {
+<span class="fc" id="L180">            return new BigDecimal(amountField).movePointLeft(2);</span>
+<span class="fc" id="L181">        } catch (NumberFormatException ex) {</span>
+<span class="fc" id="L182">            return null;</span>
+        }
+    }
+
+    private boolean hasPinData(Map&lt;Integer, String&gt; transactionData) {
+<span class="fc" id="L187">        String pinData = transactionData.get(52);</span>
+<span class="pc bpc" id="L188" title="1 of 4 branches missed.">        return pinData != null &amp;&amp; !pinData.isBlank();</span>
+    }
+
+    private RequestContext buildFallbackRequestContext(Map&lt;Integer, String&gt; transactionData) {
+<span class="nc bnc" id="L192" title="All 4 branches missed.">        return new RequestContext(&quot;&quot;, &quot;&quot;, transactionData != null ? transactionData.get(32) : null, &quot;&quot;, Scheme.RUPAY, transactionData != null ? transactionData : new HashMap&lt;&gt;());</span>
+    }
+
+    /**
+     * Gets validation rules for scheme and transaction type
+     */
+    private De61ValidationRules getValidationRules(Scheme scheme, TransactionType transactionType) {
+<span class="fc" id="L199">        Map&lt;TransactionType, De61ValidationRules&gt; schemeRules = SCHEME_RULES.get(scheme.name());</span>
+<span class="pc bpc" id="L200" title="1 of 2 branches missed.">        return schemeRules != null ? schemeRules.get(transactionType) : null;</span>
+    }
+      /**
+     * Validates DE61 field based on scheme and transaction type
+     */
+    private void validateSchemeBasedDe61(RequestContext requestContext, Scheme scheme, TransactionType transactionType,
+                                        Map&lt;Integer, String&gt; transactionData, List&lt;String&gt; errors) {
+<span class="fc" id="L207">        String de61 = transactionData.get(61);</span>
+<span class="pc bpc" id="L208" title="1 of 4 branches missed.">        if (de61 == null || de61.isEmpty()) {</span>
+<span class="fc" id="L209">            errors.add(String.format(&quot;MISSING_DE61: POS Data Code (DE61) is required for %s %s transactions&quot;, </span>
+                scheme, transactionType));
+<span class="fc" id="L211">            return;</span>
+        }
+        
+        try {
+<span class="pc bpc" id="L215" title="1 of 2 branches missed.">            RuPayDe61Parser.RuPayDE61Data de61data = requestContext != null</span>
+<span class="fc" id="L216">                    ? requestContext.getParsedDe61(61)</span>
+<span class="pc" id="L217">                    : RuPayDe61Parser.parseDE61(de61);</span>
+<span class="fc bfc" id="L218" title="All 2 branches covered.">            if (de61data.hasErrors()) {</span>
+<span class="fc" id="L219">                errors.addAll(de61data.getErrors());</span>
+<span class="fc" id="L220">                return;</span>
+            }
+            
+<span class="fc" id="L223">            log.debug(&quot;Validating DE61 for scheme: {}, transaction type: {}&quot;, scheme, transactionType);</span>
+            
+            // Get validation rules for the scheme and transaction type
+<span class="fc" id="L226">            De61ValidationRules rules = getValidationRules(scheme, transactionType);</span>
+<span class="pc bpc" id="L227" title="1 of 2 branches missed.">            if (rules != null) {</span>
+<span class="fc" id="L228">                validateDe61Subfields(de61data, rules, scheme, transactionType, errors);</span>
+            } else {
+<span class="nc" id="L230">                log.warn(&quot;No validation rules found for scheme: {} and transaction type: {}&quot;, scheme, transactionType);</span>
+                // For unsupported schemes, use RuPay rules as fallback
+<span class="nc bnc" id="L232" title="All 2 branches missed.">                if (scheme != Scheme.RUPAY) {</span>
+<span class="nc" id="L233">                    De61ValidationRules rupayRules = getValidationRules(Scheme.RUPAY, transactionType);</span>
+<span class="nc bnc" id="L234" title="All 2 branches missed.">                    if (rupayRules != null) {</span>
+<span class="nc" id="L235">                        log.info(&quot;Using RuPay rules as fallback for scheme: {}&quot;, scheme);</span>
+<span class="nc" id="L236">                        validateDe61Subfields(de61data, rupayRules, scheme, transactionType, errors);</span>
+                    }
+                }
+            }
+            
+            
+<span class="nc" id="L242">        } catch (Exception e) {</span>
+<span class="nc" id="L243">            log.error(&quot;Error parsing DE61 for {} {} transaction: {}&quot;, scheme, transactionType, e.getMessage());</span>
+<span class="nc" id="L244">            errors.add(String.format(&quot;INVALID_DE61: Error parsing DE61 field for %s %s transaction&quot;, </span>
+                scheme, transactionType));
+<span class="fc" id="L246">        }</span>
+<span class="fc" id="L247">    }</span>
+
+     /**
+     * Validates DE61 subfields based on rules
+     */
+    private void validateDe61Subfields(RuPayDe61Parser.RuPayDE61Data de61data, De61ValidationRules rules,
+                                      Scheme scheme, TransactionType transactionType, List&lt;String&gt; errors) {
+        
+        // Validate SF1 (Card Data Input Capability) - only for E-commerce
+<span class="pc bpc" id="L256" title="3 of 4 branches missed.">        if (transactionType == TransactionType.ECOMMERCE &amp;&amp; rules.getSf1Values() != null) {</span>
+<span class="nc" id="L257">            validateSubfield(de61data, RuPayDE61Subfields.CARD_DATA_INPUT_CAPABILITY, </span>
+<span class="nc" id="L258">                rules.getSf1Values(), scheme, transactionType, errors);</span>
+        }
+        
+        // Validate SF5 (Cardholder Present)
+<span class="fc" id="L262">        validateSubfield(de61data, RuPayDE61Subfields.CARDHOLDER_PRESENT, </span>
+<span class="fc" id="L263">            rules.getSf5Values(), scheme, transactionType, errors);</span>
+        
+        // Validate SF6 (Card Present)
+<span class="fc" id="L266">        validateSubfield(de61data, RuPayDE61Subfields.CARD_PRESENT, </span>
+<span class="fc" id="L267">            rules.getSf6Values(), scheme, transactionType, errors);</span>
+        
+        // Validate SF7 (Card Data Input Mode)
+<span class="fc" id="L270">        validateSubfield(de61data, RuPayDE61Subfields.CARD_DATA_INPUT_MODE, </span>
+<span class="fc" id="L271">            rules.getSf7Values(), scheme, transactionType, errors);</span>
+        
+        // Validate SF8 (Cardholder Authentication Method)
+<span class="fc" id="L274">        validateSubfield(de61data, RuPayDE61Subfields.CARDHOLDER_AUTH_METHOD, </span>
+<span class="fc" id="L275">            rules.getSf8Values(), scheme, transactionType, errors);</span>
+<span class="fc" id="L276">    }</span>
+    
+    /**
+     * Validates a specific subfield
+     */
+    private void validateSubfield(RuPayDe61Parser.RuPayDE61Data de61data, RuPayDE61Subfields subfield,
+                                 Set&lt;String&gt; allowedValues, Scheme scheme, TransactionType transactionType, 
+                                 List&lt;String&gt; errors) {
+<span class="pc bpc" id="L284" title="1 of 2 branches missed.">        if (allowedValues == null) return;</span>
+        
+<span class="fc" id="L286">        String value = de61data.getSubfieldValue(subfield);</span>
+<span class="fc bfc" id="L287" title="All 2 branches covered.">        String normalizedValue = subfield == RuPayDE61Subfields.CARDHOLDER_AUTH_METHOD ? </span>
+<span class="fc" id="L288">            value.toUpperCase() : value;</span>
+        
+<span class="pc bpc" id="L290" title="1 of 2 branches missed.">        if (!allowedValues.contains(normalizedValue)) {</span>
+<span class="nc" id="L291">            String allowedValuesStr = allowedValues.stream().sorted().collect(Collectors.joining(&quot;,&quot;));</span>
+<span class="nc" id="L292">            String subfieldName = SUBFIELD_NAMES.get(subfield);</span>
+<span class="nc" id="L293">            errors.add(String.format(&quot;INVALID_DE61: %s Expected one of [%s] for %s %s transactions&quot;, </span>
+                subfieldName, allowedValuesStr, scheme, transactionType));
+        }
+<span class="fc" id="L296">    }</span>
+    
+    @Override
+    public ValidationResult validateAmountLimits(TransactionType transactionType, Double amount) {
+<span class="fc" id="L300">        return null;</span>
+    }
+
+    @Override
+    public ValidationResult validateVelocityLimits(TransactionType transactionType, String cardNumber) {
+<span class="fc" id="L305">        return null;</span>
+    }
+
+    @Override
+    public double getMaxAmountForTransactionType(TransactionType transactionType) {
+<span class="fc" id="L310">        return 0;</span>
+    }
+
+    @Override
+    public boolean isVelocityLimitExceeded(TransactionType transactionType, String cardNumber) {
+<span class="fc" id="L315">        return false;</span>
+    }
+
+    @Override
+    public String getValidatorType() {
+<span class="fc" id="L320">        return &quot;NcmcTxnValidation&quot;;</span>
+    }
+  
+ /**
+     * DE61 validation rules container
+     */
+    private static class De61ValidationRules {
+        private final Set&lt;String&gt; sf1Values; // Card Data Input Capability
+        private final Set&lt;String&gt; sf5Values; // Cardholder Present
+        private final Set&lt;String&gt; sf6Values; // Card Present
+        private final Set&lt;String&gt; sf7Values; // Card Data Input Mode
+        private final Set&lt;String&gt; sf8Values; // Cardholder Authentication Method
+        
+        public De61ValidationRules(Set&lt;String&gt; sf1Values, Set&lt;String&gt; sf5Values, 
+<span class="fc" id="L334">                                  Set&lt;String&gt; sf6Values, Set&lt;String&gt; sf7Values, Set&lt;String&gt; sf8Values) {</span>
+<span class="fc" id="L335">            this.sf1Values = sf1Values;</span>
+<span class="fc" id="L336">            this.sf5Values = sf5Values;</span>
+<span class="fc" id="L337">            this.sf6Values = sf6Values;</span>
+<span class="fc" id="L338">            this.sf7Values = sf7Values;</span>
+<span class="fc" id="L339">            this.sf8Values = sf8Values;</span>
+<span class="fc" id="L340">        }</span>
+        
+        // Getters
+<span class="nc" id="L343">        public Set&lt;String&gt; getSf1Values() { return sf1Values; }</span>
+<span class="fc" id="L344">        public Set&lt;String&gt; getSf5Values() { return sf5Values; }</span>
+<span class="fc" id="L345">        public Set&lt;String&gt; getSf6Values() { return sf6Values; }</span>
+<span class="fc" id="L346">        public Set&lt;String&gt; getSf7Values() { return sf7Values; }</span>
+<span class="fc" id="L347">        public Set&lt;String&gt; getSf8Values() { return sf8Values; }</span>
+    }
+     public ValidationResult validateServiceCreation(IssuerApplicationData issuerApplicationDat,ChipData chipData,Map&lt;String, String&gt; de48,List&lt;String&gt; errors){ 
+        
+        // validate service ID with the DB
+<span class="fc" id="L352">        String serviceMagIn = chipData.getTagValue(&quot;DF15&quot;);</span>
+<span class="fc" id="L353">        String serviceCode = chipData.getTagValue(&quot;DF16&quot;);</span>
+<span class="fc" id="L354">        String txnIdentifier = de48.get(&quot;079&quot;);</span>
+<span class="fc" id="L355">        String serviceId = de48.get(&quot;084&quot;);</span>
+
+<span class="fc" id="L357">        NcmcService ncmcService = ncmcServiceRepository.findByServiceIdAndIsActiveTrue(serviceCode).orElse(null);</span>
+<span class="fc bfc" id="L358" title="All 2 branches covered.">        if(ncmcService == null){</span>
+<span class="fc" id="L359">            errors.add(&quot;INVALID_SERVICE_ID: Service ID is not valid(&quot;+serviceCode+&quot;)&quot;);</span>
+<span class="fc" id="L360">            return new ValidationResult(errors, new ArrayList&lt;&gt;());</span>
+        }
+       
+<span class="fc" id="L363">        return new ValidationResult(errors, new ArrayList&lt;&gt;());</span>
+     }
+     public ValidationResult validateMoneyLoad(IssuerApplicationData issuerApplicationDat,ChipData chipData,Map&lt;String, String&gt; de48,List&lt;String&gt; errors){
+<span class="fc" id="L366">        return new ValidationResult(errors, new ArrayList&lt;&gt;());</span>
+     }
+     public ValidationResult validateMoneyLoadBalanceUpdate(IssuerApplicationData issuerApplicationDat,ChipData chipData,Map&lt;String, String&gt; de48,List&lt;String&gt; errors){
+<span class="fc" id="L369">        return new ValidationResult(errors, new ArrayList&lt;&gt;());</span>
+     }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.14.202510111229</span></div></body></html>

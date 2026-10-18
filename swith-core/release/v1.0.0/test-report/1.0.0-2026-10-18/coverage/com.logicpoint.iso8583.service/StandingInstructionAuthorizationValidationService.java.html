@@ -1,0 +1,219 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>StandingInstructionAuthorizationValidationService.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">iso8583-processor</a> &gt; <a href="index.source.html" class="el_package">com.logicpoint.iso8583.service</a> &gt; <span class="el_source">StandingInstructionAuthorizationValidationService.java</span></div><h1>StandingInstructionAuthorizationValidationService.java</h1><pre class="source lang-java linenums">package com.logicpoint.iso8583.service;
+
+import com.logicpoint.iso8583.config.StandingInstructionAuthorizationProperties;
+import com.logicpoint.iso8583.context.RequestContext;
+import com.logicpoint.iso8583.util.Scheme;
+import com.logicpoint.iso8583.validation.TransactionType;
+import java.math.BigDecimal;
+import java.time.LocalDate;
+import java.time.format.DateTimeFormatter;
+import java.time.format.DateTimeParseException;
+import java.time.format.ResolverStyle;
+import java.util.ArrayList;
+import java.util.List;
+import java.util.Map;
+import org.springframework.stereotype.Service;
+
+/**
+ * Validates standing-instruction mandate data carried in ISO8583 authorization TLV fields.
+ */
+@Service
+public class StandingInstructionAuthorizationValidationService {
+
+    public static final String ATTR_SI_REQUEST_TYPE = &quot;si_request_type&quot;;
+    public static final String ATTR_SI_MANDATE_ID = &quot;si_mandate_id&quot;;
+
+<span class="fc" id="L26">    private static final DateTimeFormatter SI_DATE_FORMAT =</span>
+<span class="fc" id="L27">            DateTimeFormatter.ofPattern(&quot;ddMMuuuu&quot;).withResolverStyle(ResolverStyle.STRICT);</span>
+
+    private final StandingInstructionAuthorizationProperties properties;
+    private final StandingInstructionMandateService mandateService;
+
+    public StandingInstructionAuthorizationValidationService(StandingInstructionAuthorizationProperties properties,
+<span class="fc" id="L33">                                                            StandingInstructionMandateService mandateService) {</span>
+<span class="fc" id="L34">        this.properties = properties;</span>
+<span class="fc" id="L35">        this.mandateService = mandateService;</span>
+<span class="fc" id="L36">    }</span>
+
+    public List&lt;String&gt; validate(RequestContext requestContext, Scheme scheme, TransactionType transactionType) {
+<span class="fc" id="L39">        List&lt;String&gt; errors = new ArrayList&lt;&gt;();</span>
+<span class="fc bfc" id="L40" title="All 8 branches covered.">        if (!properties.isEnabled() || requestContext == null || scheme == null || transactionType == null) {</span>
+<span class="fc" id="L41">            return errors;</span>
+        }
+
+<span class="fc" id="L44">        StandingInstructionAuthorizationProperties.SchemeRule rule = properties.getRule(scheme.name());</span>
+<span class="fc bfc" id="L45" title="All 6 branches covered.">        if (rule == null || !rule.isEnabled() || !isStandingInstruction(transactionType)) {</span>
+<span class="fc" id="L46">            return errors;</span>
+        }
+
+        Map&lt;String, String&gt; tags;
+        try {
+<span class="fc" id="L51">            tags = requestContext.getParsedTlv(rule.getDataField());</span>
+<span class="fc" id="L52">        } catch (Exception ex) {</span>
+<span class="fc" id="L53">            errors.add(&quot;INVALID_SI_DATA_FORMAT: Unable to parse DE&quot; + rule.getDataField()</span>
+                    + &quot; for standing-instruction data&quot;);
+<span class="fc" id="L55">            return errors;</span>
+<span class="fc" id="L56">        }</span>
+
+<span class="fc" id="L58">        String mandateId = extractMandateId(requestContext, tags, rule);</span>
+<span class="fc" id="L59">        ParsedSiData siData = validateSiData(requestContext, tags, rule, mandateId, errors);</span>
+<span class="pc bpc" id="L60" title="1 of 4 branches missed.">        if (errors.isEmpty() &amp;&amp; siData != null) {</span>
+<span class="fc" id="L61">            errors.addAll(mandateService.apply(requestContext, scheme, transactionType, siData));</span>
+        }
+<span class="fc" id="L63">        return errors;</span>
+    }
+
+    private String extractMandateId(RequestContext requestContext,
+                                    Map&lt;String, String&gt; tags,
+                                    StandingInstructionAuthorizationProperties.SchemeRule rule) {
+<span class="fc" id="L69">        String mandateId = normalize(tags.get(rule.getMandateIdTag()));</span>
+<span class="fc" id="L70">        requestContext.setAttribute(ATTR_SI_MANDATE_ID, mandateId);</span>
+<span class="fc" id="L71">        return mandateId;</span>
+    }
+
+    private ParsedSiData validateSiData(RequestContext requestContext,
+                                        Map&lt;String, String&gt; tags,
+                                        StandingInstructionAuthorizationProperties.SchemeRule rule,
+                                        String mandateId,
+                                        List&lt;String&gt; errors) {
+<span class="fc" id="L79">        String siData = tags.get(rule.getSiDataTag());</span>
+<span class="fc bfc" id="L80" title="All 2 branches covered.">        if (isBlank(siData)) {</span>
+<span class="fc" id="L81">            return new ParsedSiData(mandateId, null, null, null, null, null, null, null, null, null);</span>
+        }
+
+<span class="fc bfc" id="L84" title="All 2 branches covered.">        if (siData.length() &lt; 49) {</span>
+<span class="fc" id="L85">            errors.add(&quot;INVALID_SI_DATA: DE&quot; + rule.getDataField() + &quot; tag &quot; + rule.getSiDataTag()</span>
+                    + &quot; is too short; expected at least 49 characters&quot;);
+<span class="fc" id="L87">            return null;</span>
+        }
+
+<span class="fc" id="L90">        String requestType = siData.substring(0, 2);</span>
+<span class="fc" id="L91">        String numberOfInstallments = siData.substring(2, 5);</span>
+<span class="fc" id="L92">        String preferredDay = siData.substring(5, 7);</span>
+<span class="fc" id="L93">        String minAmount = siData.substring(7, 19);</span>
+<span class="fc" id="L94">        String maxAmount = siData.substring(19, 31);</span>
+<span class="fc" id="L95">        String startDate = siData.substring(31, 39);</span>
+<span class="fc" id="L96">        String endDate = siData.substring(39, 47);</span>
+<span class="fc" id="L97">        String notificationMode = siData.substring(47, 48);</span>
+<span class="fc" id="L98">        String frequencyIndicator = siData.substring(48, 49);</span>
+
+<span class="fc" id="L100">        requestContext.setAttribute(ATTR_SI_REQUEST_TYPE, requestType);</span>
+<span class="fc" id="L101">        validateNumeric(&quot;INVALID_SI_DATA_NO_OF_INSTALLMENTS&quot;,</span>
+                &quot;Number of instalments must be 3 digits&quot;, numberOfInstallments, &quot;\\d{3}&quot;, errors);
+<span class="fc" id="L103">        validatePreferredDay(preferredDay, errors);</span>
+<span class="fc" id="L104">        AmountRange amountRange = validateAmountRange(minAmount, maxAmount, errors);</span>
+<span class="fc" id="L105">        DateRange dateRange = validateDateRange(startDate, endDate, errors);</span>
+<span class="fc" id="L106">        validateNumeric(&quot;INVALID_SI_DATA_NOTIFICATION_MODE&quot;,</span>
+                &quot;Notification mode must be 0, 1, or 2&quot;, notificationMode, &quot;[012]&quot;, errors);
+<span class="fc" id="L108">        validateNumeric(&quot;INVALID_SI_DATA_FREQUENCY_INDICATOR&quot;,</span>
+                &quot;Frequency indicator must be 0-6&quot;, frequencyIndicator, &quot;[0-6]&quot;, errors);
+<span class="fc" id="L110">        return new ParsedSiData(</span>
+                mandateId,
+                requestType,
+                numberOfInstallments,
+                preferredDay,
+<span class="fc" id="L115">                amountRange.minAmount(),</span>
+<span class="fc" id="L116">                amountRange.maxAmount(),</span>
+<span class="fc" id="L117">                dateRange.startDate(),</span>
+<span class="fc" id="L118">                dateRange.endDate(),</span>
+                notificationMode,
+                frequencyIndicator);
+    }
+
+    private void validatePreferredDay(String preferredDay, List&lt;String&gt; errors) {
+<span class="fc bfc" id="L124" title="All 2 branches covered.">        if (!preferredDay.matches(&quot;\\d{2}&quot;)) {</span>
+<span class="fc" id="L125">            errors.add(&quot;INVALID_SI_DATA_PREFERRED_DAY: Preferred day must be 2 digits&quot;);</span>
+<span class="fc" id="L126">            return;</span>
+        }
+
+<span class="fc" id="L129">        int day = Integer.parseInt(preferredDay);</span>
+<span class="pc bpc" id="L130" title="1 of 4 branches missed.">        if (day &lt; 1 || day &gt; 31) {</span>
+<span class="fc" id="L131">            errors.add(&quot;INVALID_SI_DATA_PREFERRED_DAY: Preferred day must be between 01 and 31&quot;);</span>
+        }
+<span class="fc" id="L133">    }</span>
+
+    private AmountRange validateAmountRange(String minAmount, String maxAmount, List&lt;String&gt; errors) {
+<span class="fc bfc" id="L136" title="All 2 branches covered.">        if (!minAmount.matches(&quot;\\d{12}&quot;)) {</span>
+<span class="fc" id="L137">            errors.add(&quot;INVALID_SI_DATA_MIN_AMOUNT: Minimum amount must be 12 digits&quot;);</span>
+<span class="fc" id="L138">            return new AmountRange(null, null);</span>
+        }
+<span class="fc bfc" id="L140" title="All 2 branches covered.">        if (!maxAmount.matches(&quot;\\d{12}&quot;)) {</span>
+<span class="fc" id="L141">            errors.add(&quot;INVALID_SI_DATA_MAX_AMOUNT: Maximum amount must be 12 digits&quot;);</span>
+<span class="fc" id="L142">            return new AmountRange(null, null);</span>
+        }
+
+<span class="fc" id="L145">        BigDecimal min = new BigDecimal(minAmount).movePointLeft(2);</span>
+<span class="fc" id="L146">        BigDecimal max = new BigDecimal(maxAmount).movePointLeft(2);</span>
+<span class="fc bfc" id="L147" title="All 2 branches covered.">        if (min.compareTo(max) &gt; 0) {</span>
+<span class="fc" id="L148">            errors.add(&quot;INVALID_SI_DATA_AMOUNT_RANGE: Minimum amount cannot exceed maximum amount&quot;);</span>
+        }
+<span class="fc" id="L150">        return new AmountRange(min, max);</span>
+    }
+
+    private DateRange validateDateRange(String startDate, String endDate, List&lt;String&gt; errors) {
+<span class="fc" id="L154">        LocalDate parsedStart = parseDate(&quot;INVALID_SI_DATA_START_DATE&quot;, &quot;Start date&quot;, startDate, errors);</span>
+<span class="fc" id="L155">        LocalDate parsedEnd = parseDate(&quot;INVALID_SI_DATA_END_DATE&quot;, &quot;End date&quot;, endDate, errors);</span>
+<span class="pc bpc" id="L156" title="1 of 6 branches missed.">        if (parsedStart != null &amp;&amp; parsedEnd != null &amp;&amp; parsedStart.isAfter(parsedEnd)) {</span>
+<span class="fc" id="L157">            errors.add(&quot;INVALID_SI_DATA_DATE_RANGE: Start date cannot be after end date&quot;);</span>
+        }
+<span class="fc" id="L159">        return new DateRange(parsedStart, parsedEnd);</span>
+    }
+
+    private LocalDate parseDate(String code, String label, String value, List&lt;String&gt; errors) {
+<span class="pc bpc" id="L163" title="1 of 4 branches missed.">        if (isBlank(value) || &quot;00000000&quot;.equals(value)) {</span>
+<span class="fc" id="L164">            return null;</span>
+        }
+<span class="fc bfc" id="L166" title="All 2 branches covered.">        if (!value.matches(&quot;\\d{8}&quot;)) {</span>
+<span class="fc" id="L167">            errors.add(code + &quot;: &quot; + label + &quot; must be 8 digits in DDMMYYYY format&quot;);</span>
+<span class="fc" id="L168">            return null;</span>
+        }
+        try {
+<span class="fc" id="L171">            return LocalDate.parse(value, SI_DATE_FORMAT);</span>
+<span class="fc" id="L172">        } catch (DateTimeParseException ex) {</span>
+<span class="fc" id="L173">            errors.add(code + &quot;: &quot; + label + &quot; must be a valid DDMMYYYY date&quot;);</span>
+<span class="fc" id="L174">            return null;</span>
+        }
+    }
+
+    private void validateNumeric(String code, String message, String value, String pattern, List&lt;String&gt; errors) {
+<span class="fc bfc" id="L179" title="All 2 branches covered.">        if (!value.matches(pattern)) {</span>
+<span class="fc" id="L180">            errors.add(code + &quot;: &quot; + message);</span>
+        }
+<span class="fc" id="L182">    }</span>
+
+    private String normalize(String value) {
+<span class="fc bfc" id="L185" title="All 2 branches covered.">        return isBlank(value) ? null : value.trim().toUpperCase();</span>
+    }
+
+    private boolean isBlank(String value) {
+<span class="pc bpc" id="L189" title="1 of 4 branches missed.">        return value == null || value.trim().isEmpty();</span>
+    }
+
+    private boolean isStandingInstruction(TransactionType transactionType) {
+<span class="fc bfc" id="L193" title="All 2 branches covered.">        return switch (transactionType) {</span>
+            case SI_REGISTRATION, SI_EDIT, SI_TRANSACTION, SI_DEREGISTRATION,
+<span class="fc" id="L195">                    SI_REVOKEALL, SI_PAUSE, SI_START, SI_PDN -&gt; true;</span>
+<span class="fc" id="L196">            default -&gt; false;</span>
+        };
+    }
+
+<span class="fc" id="L200">    public record ParsedSiData(</span>
+            String mandateId,
+            String requestType,
+            String numberOfInstallments,
+            String preferredDay,
+            BigDecimal minAmount,
+            BigDecimal maxAmount,
+            LocalDate startDate,
+            LocalDate endDate,
+            String notificationMode,
+            String frequencyIndicator) {
+    }
+
+<span class="fc" id="L213">    private record AmountRange(BigDecimal minAmount, BigDecimal maxAmount) {</span>
+    }
+
+<span class="fc" id="L216">    private record DateRange(LocalDate startDate, LocalDate endDate) {</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.14.202510111229</span></div></body></html>

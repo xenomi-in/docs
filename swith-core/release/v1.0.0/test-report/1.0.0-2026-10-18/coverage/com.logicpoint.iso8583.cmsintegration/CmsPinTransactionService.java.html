@@ -1,0 +1,78 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>CmsPinTransactionService.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">iso8583-processor</a> &gt; <a href="index.source.html" class="el_package">com.logicpoint.iso8583.cmsintegration</a> &gt; <span class="el_source">CmsPinTransactionService.java</span></div><h1>CmsPinTransactionService.java</h1><pre class="source lang-java linenums">package com.logicpoint.iso8583.cmsintegration;
+
+import static com.logicpoint.iso8583.cmsintegration.CmsPinContracts.*;
+import com.logicpoint.iso8583.service.KeyManagementService;
+import com.logicpoint.iso8583.responsecode.InternalResCode;
+import tools.jackson.databind.JsonNode;
+import java.util.*;
+import java.nio.charset.StandardCharsets;
+import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
+
+@Service
+public class CmsPinTransactionService {
+    private final CmsPinState state;
+    private final CmsPinHsm hsm;
+    private final CmsPinKeys keys;
+    private final KeyManagementService networkKeys;
+    private final CmsPinOperationService operations;
+    public CmsPinTransactionService(CmsPinState state,CmsPinHsm hsm,CmsPinKeys keys,
+<span class="fc" id="L20">            KeyManagementService networkKeys,CmsPinOperationService operations) {</span>
+<span class="fc" id="L21">        this.state=state;this.hsm=hsm;this.keys=keys;this.networkKeys=networkKeys;this.operations=operations;</span>
+<span class="fc" id="L22">    }</span>
+<span class="nc bnc" id="L23" title="All 2 branches missed.">    public boolean managed(Long authId) { return state.family(authId)!=null; }</span>
+
+    @Transactional
+    public InternalResCode verify(Long authId,String pinBlock) {
+<span class="fc" id="L27">        var f=state.family(authId);</span>
+<span class="pc bpc" id="L28" title="1 of 2 branches missed.">        if(f==null) return null;</span>
+<span class="fc" id="L29">        state.lockFamily(f);</span>
+        // Unenrolled existing CMS cards retain their prior verification path.
+<span class="pc bpc" id="L31" title="1 of 2 branches missed.">        if(!state.configured(f)) return null;</span>
+<span class="fc" id="L32">        var row=state.profile(f);</span>
+<span class="pc bpc" id="L33" title="1 of 2 branches missed.">        if(((Number)row.get(&quot;active_pin_version&quot;)).longValue()==0) return InternalResCode.RESTRICTED_CARD;</span>
+<span class="pc bpc" id="L34" title="1 of 2 branches missed.">        if(state.blocked(f)) return InternalResCode.RESTRICTED_CARD;</span>
+<span class="fc" id="L35">        var profile=state.decode(row);</span>
+<span class="fc" id="L36">        var card=state.card(f);</span>
+<span class="fc" id="L37">        boolean valid=hsm.verify(card.getPan(),pinBlock,networkKeys.getWorkingKeyForCard(card.getPan(),&quot;ZPK&quot;),</span>
+<span class="fc" id="L38">                keys.resolve(f.institution(),profile.keyBindingReference(),&quot;PVK&quot;),profile,card.getPvv_offest());</span>
+<span class="fc" id="L39">        state.counters(f,valid);</span>
+<span class="pc bpc" id="L40" title="1 of 2 branches missed.">        return valid?InternalResCode.APPROVED:InternalResCode.INVALID_PIN;</span>
+    }
+
+    @Transactional
+    public JsonNode change(Long authId,String transactionId,String currentBlock,String newBlock) {
+<span class="fc" id="L45">        var f=state.family(authId);</span>
+<span class="pc bpc" id="L46" title="1 of 2 branches missed.">        if(f==null) throw CmsIntegrationException.bad(&quot;CMS card required&quot;);</span>
+<span class="pc bpc" id="L47" title="2 of 4 branches missed.">        if(transactionId==null || transactionId.isBlank()) throw CmsIntegrationException.bad(&quot;Stable transaction identity required&quot;);</span>
+<span class="fc" id="L48">        UUID id=UUID.nameUUIDFromBytes((&quot;network-pin:&quot;+f.institution()+&quot;:&quot;+authId+&quot;:&quot;+transactionId).getBytes(StandardCharsets.UTF_8));</span>
+<span class="fc" id="L49">        String hash=CmsPinGrantVerifier.hash(&quot;network:&quot;+authId+&quot;:&quot;+transactionId+&quot;:&quot;+currentBlock+&quot;:&quot;+newBlock);</span>
+<span class="fc" id="L50">        state.jdbc().queryForList(&quot;select pg_advisory_xact_lock(hashtextextended(?,0))&quot;,&quot;cms-pin-operation:&quot;+f.institution()+&quot;:&quot;+id);</span>
+<span class="fc" id="L51">        state.lock(f);</span>
+<span class="fc" id="L52">        var prior=state.jdbc().queryForList(&quot;select request_hash,receipt::text from cms_pin_operation where cms_institution_id=? and operation_id=?&quot;,f.institution(),id);</span>
+<span class="pc bpc" id="L53" title="1 of 2 branches missed.">        if(!prior.isEmpty()) {</span>
+<span class="pc bpc" id="L54" title="1 of 2 branches missed.">            if(!hash.equals(prior.getFirst().get(&quot;request_hash&quot;))) throw CmsIntegrationException.conflict(&quot;Transaction PIN payload conflict&quot;);</span>
+<span class="fc" id="L55">            try { return state.mapper().readTree(prior.getFirst().get(&quot;receipt&quot;).toString()); }</span>
+<span class="nc" id="L56">            catch(Exception e) { throw CmsIntegrationException.unavailable(&quot;PIN receipt is unreadable&quot;); }</span>
+        }
+<span class="nc" id="L58">        var row=state.profile(f);</span>
+<span class="nc" id="L59">        long version=((Number)row.get(&quot;active_pin_version&quot;)).longValue();</span>
+<span class="nc bnc" id="L60" title="All 2 branches missed.">        if(version==0) throw CmsIntegrationException.conflict(&quot;PIN is not established&quot;);</span>
+<span class="nc" id="L61">        var profile=state.decode(row);</span>
+<span class="nc" id="L62">        var command=new PinCommand(id,f.institution(),f.family(),((Number)row.get(&quot;policy_profile_version&quot;)).longValue(),</span>
+                version,Operation.CHANGE_PIN,null,null);
+        CmsPinOperationExecutor.Result result;
+<span class="nc bnc" id="L65" title="All 2 branches missed.">        if(state.blocked(f)) result=CmsPinOperationExecutor.Result.failed(&quot;PIN_BLOCKED&quot;);</span>
+        else {
+<span class="nc" id="L67">            var card=state.card(f);</span>
+<span class="nc" id="L68">            String pek=networkKeys.getWorkingKeyForCard(card.getPan(),&quot;ZPK&quot;);</span>
+<span class="nc" id="L69">            String pvk=keys.resolve(f.institution(),profile.keyBindingReference(),&quot;PVK&quot;);</span>
+<span class="nc bnc" id="L70" title="All 2 branches missed.">            if(!hsm.verify(card.getPan(),currentBlock,pek,pvk,profile,card.getPvv_offest())) {</span>
+<span class="nc" id="L71">                state.counters(f,false);</span>
+<span class="nc" id="L72">                result=CmsPinOperationExecutor.Result.failed(&quot;INVALID_PIN&quot;);</span>
+<span class="nc" id="L73">            } else result=CmsPinOperationExecutor.Result.completed(hsm.derive(card.getPan(),newBlock,pek,pvk,profile),null);</span>
+        }
+<span class="nc" id="L75">        return operations.commitNetwork(command,hash,result);</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.14.202510111229</span></div></body></html>

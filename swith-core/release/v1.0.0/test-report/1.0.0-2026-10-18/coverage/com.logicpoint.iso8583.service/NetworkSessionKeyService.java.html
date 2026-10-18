@@ -1,0 +1,185 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>NetworkSessionKeyService.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">iso8583-processor</a> &gt; <a href="index.source.html" class="el_package">com.logicpoint.iso8583.service</a> &gt; <span class="el_source">NetworkSessionKeyService.java</span></div><h1>NetworkSessionKeyService.java</h1><pre class="source lang-java linenums">package com.logicpoint.iso8583.service;
+
+import com.logicpoint.iso8583.entity.NetworkSessionKey;
+import com.logicpoint.iso8583.repository.NetworkSessionKeyRepository;
+import jakarta.transaction.Transactional;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+import org.springframework.cache.Cache;
+import org.springframework.cache.CacheManager;
+import org.springframework.stereotype.Service;
+
+import java.nio.charset.StandardCharsets;
+import java.time.LocalDateTime;
+import java.util.List;
+import java.util.Optional;
+
+@Service
+public class NetworkSessionKeyService {
+
+<span class="fc" id="L20">    private static final Logger log = LoggerFactory.getLogger(NetworkSessionKeyService.class);</span>
+
+    private final NetworkSessionKeyRepository repository;
+    private final CacheManager cacheManager;
+
+<span class="fc" id="L25">    public NetworkSessionKeyService(NetworkSessionKeyRepository repository, CacheManager cacheManager) {</span>
+<span class="fc" id="L26">        this.repository = repository;</span>
+<span class="fc" id="L27">        this.cacheManager = cacheManager;</span>
+<span class="fc" id="L28">    }</span>
+
+    public String getActiveKeyValue(String siteId, String listenerId, String connectionId, String scheme, String keyType) {
+<span class="pc bpc" id="L31" title="4 of 10 branches missed.">        if (isBlank(siteId) || isBlank(listenerId) || isBlank(connectionId) || isBlank(scheme) || isBlank(keyType)) {</span>
+<span class="fc" id="L32">            return null;</span>
+        }
+
+<span class="fc" id="L35">        String cacheKey = buildCacheKey(siteId, listenerId, connectionId, scheme, keyType);</span>
+<span class="fc" id="L36">        Cache cache = cacheManager.getCache(&quot;networkSessionKeyCache&quot;);</span>
+<span class="pc bpc" id="L37" title="1 of 2 branches missed.">        if (cache != null) {</span>
+<span class="fc" id="L38">            String cached = cache.get(cacheKey, String.class);</span>
+<span class="fc bfc" id="L39" title="All 2 branches covered.">            if (cached != null) {</span>
+<span class="fc" id="L40">                return cached;</span>
+            }
+        }
+
+<span class="fc" id="L44">        Optional&lt;NetworkSessionKey&gt; key = repository.findCurrentActiveKey(siteId, listenerId, connectionId, scheme, keyType);</span>
+<span class="fc bfc" id="L45" title="All 2 branches covered.">        if (key.isEmpty()) {</span>
+<span class="fc" id="L46">            return null;</span>
+        }
+
+<span class="fc" id="L49">        String resolved = resolveKeyValue(key.get());</span>
+
+<span class="pc bpc" id="L51" title="2 of 4 branches missed.">        if (resolved != null &amp;&amp; cache != null) {</span>
+<span class="fc" id="L52">            cache.put(cacheKey, resolved);</span>
+        }
+
+<span class="fc" id="L55">        return resolved;</span>
+    }
+
+    public String getActiveKeyValue(String siteId, String listenerId, String scheme, String keyType) {
+<span class="pc bpc" id="L59" title="3 of 8 branches missed.">        if (isBlank(siteId) || isBlank(listenerId) || isBlank(scheme) || isBlank(keyType)) {</span>
+<span class="fc" id="L60">            return null;</span>
+        }
+
+<span class="fc" id="L63">        String cacheKey = buildListenerCacheKey(siteId, listenerId, scheme, keyType);</span>
+<span class="fc" id="L64">        Cache cache = cacheManager.getCache(&quot;networkSessionKeyCache&quot;);</span>
+<span class="pc bpc" id="L65" title="1 of 2 branches missed.">        if (cache != null) {</span>
+<span class="fc" id="L66">            String cached = cache.get(cacheKey, String.class);</span>
+<span class="pc bpc" id="L67" title="1 of 2 branches missed.">            if (cached != null) {</span>
+<span class="nc" id="L68">                return cached;</span>
+            }
+        }
+
+<span class="fc" id="L72">        Optional&lt;NetworkSessionKey&gt; key = repository.findCurrentActiveKeyForListener(siteId, listenerId, scheme, keyType);</span>
+<span class="pc bpc" id="L73" title="1 of 2 branches missed.">        if (key.isEmpty()) {</span>
+<span class="nc" id="L74">            return null;</span>
+        }
+
+<span class="fc" id="L77">        String resolved = resolveKeyValue(key.get());</span>
+
+<span class="pc bpc" id="L79" title="1 of 4 branches missed.">        if (resolved != null &amp;&amp; cache != null) {</span>
+<span class="fc" id="L80">            cache.put(cacheKey, resolved);</span>
+        }
+
+<span class="fc" id="L83">        return resolved;</span>
+    }
+
+    @Transactional
+    public boolean rotateSessionKey(String keyType,
+                                    String scheme,
+                                    String siteId,
+                                    String listenerId,
+                                    String connectionId,
+                                    String newKey,
+                                    String kcv,
+                                    String createdBy) {
+<span class="pc bpc" id="L95" title="5 of 12 branches missed.">        if (isBlank(keyType) || isBlank(scheme) || isBlank(siteId) || isBlank(listenerId) || isBlank(connectionId) || isBlank(newKey)) {</span>
+<span class="fc" id="L96">            return false;</span>
+        }
+
+<span class="fc" id="L99">        List&lt;NetworkSessionKey&gt; existing = repository.findKeyHistory(siteId, listenerId, connectionId, scheme, keyType);</span>
+<span class="fc" id="L100">        long nextVersion = 1L;</span>
+<span class="fc" id="L101">        LocalDateTime now = LocalDateTime.now();</span>
+
+<span class="fc bfc" id="L103" title="All 2 branches covered.">        for (NetworkSessionKey key : existing) {</span>
+<span class="pc bpc" id="L104" title="2 of 4 branches missed.">            if (key.getKeyVersion() != null &amp;&amp; key.getKeyVersion() &gt;= nextVersion) {</span>
+<span class="fc" id="L105">                nextVersion = key.getKeyVersion() + 1;</span>
+            }
+<span class="pc bpc" id="L107" title="1 of 4 branches missed.">            if (&quot;ACTIVE&quot;.equalsIgnoreCase(key.getSessionStatus()) &amp;&amp; &quot;A&quot;.equalsIgnoreCase(key.getKeyStatus())) {</span>
+<span class="fc" id="L108">                key.setSessionStatus(&quot;INACTIVE&quot;);</span>
+<span class="fc" id="L109">                key.setKeyStatus(&quot;I&quot;);</span>
+<span class="fc" id="L110">                key.setUpdatedAt(now);</span>
+<span class="fc" id="L111">                repository.save(key);</span>
+            }
+<span class="fc" id="L113">        }</span>
+
+<span class="fc" id="L115">        NetworkSessionKey sessionKey = new NetworkSessionKey();</span>
+<span class="fc" id="L116">        sessionKey.setSiteId(siteId);</span>
+<span class="fc" id="L117">        sessionKey.setListenerId(listenerId);</span>
+<span class="fc" id="L118">        sessionKey.setConnectionId(connectionId);</span>
+<span class="fc" id="L119">        sessionKey.setScheme(scheme);</span>
+<span class="fc" id="L120">        sessionKey.setKeyType(keyType);</span>
+<span class="fc" id="L121">        sessionKey.setKeyValue(newKey.getBytes(StandardCharsets.US_ASCII));</span>
+<span class="fc" id="L122">        sessionKey.setKeyValueTr31(newKey.getBytes(StandardCharsets.US_ASCII));</span>
+<span class="fc" id="L123">        sessionKey.setKeyCheckValue(kcv);</span>
+<span class="fc" id="L124">        sessionKey.setKeyCheckValueTr31(kcv);</span>
+<span class="fc" id="L125">        sessionKey.setKeyStatus(&quot;A&quot;);</span>
+<span class="fc" id="L126">        sessionKey.setSessionStatus(&quot;ACTIVE&quot;);</span>
+<span class="fc" id="L127">        sessionKey.setKeyVersion(nextVersion);</span>
+<span class="fc" id="L128">        sessionKey.setActivatedAt(now);</span>
+<span class="fc" id="L129">        sessionKey.setCreatedAt(now);</span>
+<span class="fc" id="L130">        sessionKey.setUpdatedAt(now);</span>
+<span class="fc" id="L131">        sessionKey.setCreatedBy(createdBy);</span>
+<span class="fc" id="L132">        repository.save(sessionKey);</span>
+<span class="fc" id="L133">        putCacheValue(siteId, listenerId, connectionId, scheme, keyType, newKey);</span>
+<span class="fc" id="L134">        log.info(&quot;Rotated session key for site={}, listener={}, connection={}, scheme={}, keyType={}&quot;,</span>
+                siteId, listenerId, connectionId, scheme, keyType);
+<span class="fc" id="L136">        return true;</span>
+    }
+
+    public void evictSessionKey(String siteId, String listenerId, String connectionId, String scheme, String keyType) {
+<span class="fc" id="L140">        Cache cache = cacheManager.getCache(&quot;networkSessionKeyCache&quot;);</span>
+<span class="pc bpc" id="L141" title="1 of 2 branches missed.">        if (cache != null) {</span>
+<span class="fc" id="L142">            cache.evict(buildCacheKey(siteId, listenerId, connectionId, scheme, keyType));</span>
+        }
+<span class="fc" id="L144">    }</span>
+
+    private void putCacheValue(String siteId, String listenerId, String connectionId, String scheme, String keyType, String keyValue) {
+<span class="fc" id="L147">        Cache cache = cacheManager.getCache(&quot;networkSessionKeyCache&quot;);</span>
+<span class="pc bpc" id="L148" title="2 of 4 branches missed.">        if (cache != null &amp;&amp; keyValue != null) {</span>
+<span class="fc" id="L149">            cache.put(buildCacheKey(siteId, listenerId, connectionId, scheme, keyType), keyValue);</span>
+        }
+<span class="fc" id="L151">    }</span>
+
+    private void touchLastUsedAt(NetworkSessionKey sessionKey) {
+<span class="fc" id="L154">        LocalDateTime now = LocalDateTime.now();</span>
+<span class="fc" id="L155">        LocalDateTime lastUsedAt = sessionKey.getLastUsedAt();</span>
+<span class="pc bpc" id="L156" title="1 of 4 branches missed.">        if (lastUsedAt == null || lastUsedAt.isBefore(now.minusMinutes(1))) {</span>
+<span class="fc" id="L157">            sessionKey.setLastUsedAt(now);</span>
+<span class="fc" id="L158">            repository.save(sessionKey);</span>
+        }
+<span class="fc" id="L160">    }</span>
+
+    private String resolveKeyValue(NetworkSessionKey sessionKey) {
+<span class="fc" id="L163">        touchLastUsedAt(sessionKey);</span>
+<span class="pc bpc" id="L164" title="1 of 4 branches missed.">        if (sessionKey.getKeyValueTr31() != null &amp;&amp; sessionKey.getKeyValueTr31().length &gt; 0) {</span>
+<span class="fc" id="L165">            return new String(sessionKey.getKeyValueTr31(), StandardCharsets.US_ASCII);</span>
+        }
+<span class="pc bpc" id="L167" title="1 of 4 branches missed.">        if (sessionKey.getKeyValue() != null &amp;&amp; sessionKey.getKeyValue().length &gt; 0) {</span>
+<span class="fc" id="L168">            return new String(sessionKey.getKeyValue(), StandardCharsets.US_ASCII);</span>
+        }
+<span class="fc" id="L170">        return null;</span>
+    }
+
+    private String buildCacheKey(String siteId, String listenerId, String connectionId, String scheme, String keyType) {
+<span class="fc" id="L174">        return String.join(&quot;::&quot;, siteId, listenerId, connectionId, scheme, keyType);</span>
+    }
+
+    private String buildListenerCacheKey(String siteId, String listenerId, String scheme, String keyType) {
+<span class="fc" id="L178">        return String.join(&quot;::&quot;, siteId, listenerId, scheme, keyType);</span>
+    }
+
+    private boolean isBlank(String value) {
+<span class="fc bfc" id="L182" title="All 4 branches covered.">        return value == null || value.isBlank();</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.14.202510111229</span></div></body></html>

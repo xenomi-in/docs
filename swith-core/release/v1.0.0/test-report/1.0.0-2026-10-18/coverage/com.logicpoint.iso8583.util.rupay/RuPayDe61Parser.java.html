@@ -1,0 +1,430 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>RuPayDe61Parser.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">iso8583-processor</a> &gt; <a href="index.source.html" class="el_package">com.logicpoint.iso8583.util.rupay</a> &gt; <span class="el_source">RuPayDe61Parser.java</span></div><h1>RuPayDe61Parser.java</h1><pre class="source lang-java linenums">package com.logicpoint.iso8583.util.rupay;
+
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+import java.util.HashMap;
+import java.util.Map;
+import java.util.List;
+import java.util.ArrayList;
+
+/**
+ * Parser for RuPay DE61 (POS Data) field.
+ * DE61 contains Point of Sale data in fixed-position format for RuPay transactions.
+ * Each subfield is exactly 1 digit.
+ */
+<span class="nc" id="L15">public class RuPayDe61Parser {</span>
+    
+<span class="fc" id="L17">    private static final Logger logger = LoggerFactory.getLogger(RuPayDe61Parser.class);</span>
+    
+    /**
+     * RuPay DE61 Subfield definitions
+     */
+<span class="fc" id="L22">    public enum RuPayDE61Subfields {</span>
+        // Subfield 1: Card Data Input Capability
+<span class="fc" id="L24">        CARD_DATA_INPUT_CAPABILITY(0, &quot;Card Data Input Capability&quot;),</span>
+        
+        // Subfield 2: Cardholder Authentication Capability  
+<span class="fc" id="L27">        CARDHOLDER_AUTH_CAPABILITY(1, &quot;Cardholder Authentication Capability&quot;),</span>
+        
+        // Subfield 3: Card Capture Capability
+<span class="fc" id="L30">        CARD_CAPTURE_CAPABILITY(2, &quot;Card Capture Capability&quot;),</span>
+        
+        // Subfield 4: Terminal Operating Environment
+<span class="fc" id="L33">        TERMINAL_OPERATING_ENVIRONMENT(3, &quot;Terminal Operating Environment&quot;),</span>
+        
+        // Subfield 5: Cardholder Present
+<span class="fc" id="L36">        CARDHOLDER_PRESENT(4, &quot;Cardholder Present&quot;),</span>
+        
+        // Subfield 6: Card Present
+<span class="fc" id="L39">        CARD_PRESENT(5, &quot;Card Present&quot;),</span>
+        
+        // Subfield 7: Card Data Input Mode
+<span class="fc" id="L42">        CARD_DATA_INPUT_MODE(6, &quot;Card Data Input Mode&quot;),</span>
+        
+        // Subfield 8: Cardholder Authentication Method
+<span class="fc" id="L45">        CARDHOLDER_AUTH_METHOD(7, &quot;Cardholder Authentication Method&quot;),</span>
+        
+        // Subfield 9: Cardholder Authentication Entity
+<span class="fc" id="L48">        CARDHOLDER_AUTH_ENTITY(8, &quot;Cardholder Authentication Entity&quot;),</span>
+        
+        // Subfield 10: Card Data Output Capability
+<span class="fc" id="L51">        CARD_DATA_OUTPUT_CAPABILITY(9, &quot;Card Data Output Capability&quot;),</span>
+        
+        // Subfield 11: Terminal Output Capability
+<span class="fc" id="L54">        TERMINAL_OUTPUT_CAPABILITY(10, &quot;Terminal Output Capability&quot;),</span>
+        
+        // Subfield 12: PIN Capture Capability
+<span class="fc" id="L57">        PIN_CAPTURE_CAPABILITY(11, &quot;PIN Capture Capability&quot;);</span>
+        
+        private final int position;
+        private final String description;
+        
+<span class="fc" id="L62">        RuPayDE61Subfields(int position, String description) {</span>
+<span class="fc" id="L63">            this.position = position;</span>
+<span class="fc" id="L64">            this.description = description;</span>
+<span class="fc" id="L65">        }</span>
+        
+<span class="fc" id="L67">        public int getPosition() { return position; }</span>
+<span class="nc" id="L68">        public String getDescription() { return description; }</span>
+    }
+    
+    /**
+     * Card Data Input Capability values
+     */
+<span class="fc" id="L74">    public enum CardDataInputCapability {</span>
+<span class="fc" id="L75">        UNKNOWN(&quot;0&quot;, &quot;Unknown&quot;),</span>
+<span class="fc" id="L76">        MAGNETIC_STRIPE_READ(&quot;1&quot;, &quot;Magnetic Stripe Read capability&quot;),</span>
+<span class="fc" id="L77">        ICC_CAPABILITY(&quot;2&quot;, &quot;ICC Capability&quot;),</span>
+<span class="fc" id="L78">        MAGNETIC_STRIPE_AND_KEY_ENTRY(&quot;3&quot;, &quot;Magnetic stripe and key entry capability&quot;),</span>
+<span class="fc" id="L79">        MAGNETIC_STRIPE_AND_ICC(&quot;4&quot;, &quot;Magnetic stripe and ICC capability&quot;),</span>
+<span class="fc" id="L80">        MANUAL_NO_TERMINAL(&quot;5&quot;, &quot;Manual, no terminal&quot;),</span>
+<span class="fc" id="L81">        KEY_ENTERED(&quot;6&quot;, &quot;Key entered&quot;),</span>
+<span class="fc" id="L82">        CONTACTLESS_ONLY(&quot;7&quot;, &quot;Contactless Only&quot;),</span>
+<span class="fc" id="L83">        MAGSTRIPE_CONTACT_ICC_CONTACTLESS(&quot;8&quot;, &quot;Magstripe &amp; contact ICC &amp; Contactless Capability&quot;);</span>
+        
+        private final String value;
+        private final String description;
+        
+<span class="fc" id="L88">        CardDataInputCapability(String value, String description) {</span>
+<span class="fc" id="L89">            this.value = value;</span>
+<span class="fc" id="L90">            this.description = description;</span>
+<span class="fc" id="L91">        }</span>
+        
+<span class="nc" id="L93">        public String getValue() { return value; }</span>
+<span class="nc" id="L94">        public String getDescription() { return description; }</span>
+        
+        public static CardDataInputCapability fromValue(String value) {
+<span class="fc bfc" id="L97" title="All 2 branches covered.">            for (CardDataInputCapability capability : values()) {</span>
+<span class="fc bfc" id="L98" title="All 2 branches covered.">                if (capability.value.equals(value)) {</span>
+<span class="fc" id="L99">                    return capability;</span>
+                }
+            }
+<span class="fc" id="L102">            return UNKNOWN;</span>
+        }
+    }
+    
+    /**
+     * Cardholder Authentication Capability values
+     */
+<span class="fc" id="L109">    public enum CardholderAuthCapability {</span>
+<span class="fc" id="L110">        UNKNOWN(&quot;0&quot;, &quot;Unknown&quot;),</span>
+<span class="fc" id="L111">        OTHER_AUTH(&quot;1&quot;, &quot;Authentication method other than PIN/Biometric&quot;),</span>
+<span class="fc" id="L112">        PIN_ENTRY(&quot;2&quot;, &quot;PIN Entry&quot;),</span>
+<span class="fc" id="L113">        BIOMETRIC(&quot;3&quot;, &quot;Biometric&quot;);</span>
+        
+        private final String value;
+        private final String description;
+        
+<span class="fc" id="L118">        CardholderAuthCapability(String value, String description) {</span>
+<span class="fc" id="L119">            this.value = value;</span>
+<span class="fc" id="L120">            this.description = description;</span>
+<span class="fc" id="L121">        }</span>
+        
+<span class="nc" id="L123">        public String getValue() { return value; }</span>
+<span class="nc" id="L124">        public String getDescription() { return description; }</span>
+        
+        public static CardholderAuthCapability fromValue(String value) {
+<span class="pc bpc" id="L127" title="1 of 2 branches missed.">            for (CardholderAuthCapability capability : values()) {</span>
+<span class="fc bfc" id="L128" title="All 2 branches covered.">                if (capability.value.equals(value)) {</span>
+<span class="fc" id="L129">                    return capability;</span>
+                }
+            }
+<span class="nc" id="L132">            return UNKNOWN;</span>
+        }
+    }
+    
+    /**
+     * Card Capture Capability values
+     */
+<span class="fc" id="L139">    public enum CardCaptureCapability {</span>
+<span class="fc" id="L140">        UNKNOWN(&quot;0&quot;, &quot;Unknown&quot;),</span>
+<span class="fc" id="L141">        NO_CAPTURE(&quot;1&quot;, &quot;No capture capability&quot;),</span>
+<span class="fc" id="L142">        CAPTURE_CAPABILITY(&quot;2&quot;, &quot;Capture Capability&quot;);</span>
+        
+        private final String value;
+        private final String description;
+        
+<span class="fc" id="L147">        CardCaptureCapability(String value, String description) {</span>
+<span class="fc" id="L148">            this.value = value;</span>
+<span class="fc" id="L149">            this.description = description;</span>
+<span class="fc" id="L150">        }</span>
+        
+<span class="nc" id="L152">        public String getValue() { return value; }</span>
+<span class="nc" id="L153">        public String getDescription() { return description; }</span>
+        
+        public static CardCaptureCapability fromValue(String value) {
+<span class="pc bpc" id="L156" title="1 of 2 branches missed.">            for (CardCaptureCapability capability : values()) {</span>
+<span class="fc bfc" id="L157" title="All 2 branches covered.">                if (capability.value.equals(value)) {</span>
+<span class="fc" id="L158">                    return capability;</span>
+                }
+            }
+<span class="nc" id="L161">            return UNKNOWN;</span>
+        }
+    }
+    
+    /**
+     * Terminal Operating Environment values
+     */
+<span class="fc" id="L168">    public enum TerminalOperatingEnvironment {</span>
+<span class="fc" id="L169">        UNKNOWN(&quot;0&quot;, &quot;Unknown&quot;),</span>
+<span class="fc" id="L170">        ON_PREMISES_ATTENDED(&quot;1&quot;, &quot;On premises of card acceptor, attended&quot;),</span>
+<span class="fc" id="L171">        ON_PREMISES_UNATTENDED(&quot;2&quot;, &quot;On premises of card acceptor, unattended&quot;),</span>
+<span class="fc" id="L172">        OFF_PREMISES_ATTENDED(&quot;3&quot;, &quot;Off premises of card acceptor, attended&quot;),</span>
+<span class="fc" id="L173">        OFF_PREMISES_UNATTENDED(&quot;4&quot;, &quot;Off premises of card acceptor, unattended&quot;),</span>
+<span class="fc" id="L174">        ON_PREMISES_CARDHOLDER_UNATTENDED(&quot;5&quot;, &quot;On premises of cardholder, unattended&quot;),</span>
+<span class="fc" id="L175">        NO_TERMINAL_USED(&quot;6&quot;, &quot;No terminal used&quot;),</span>
+<span class="fc" id="L176">        ON_PREMISES_ATTENDED_MPOS(&quot;7&quot;, &quot;On premises of card acceptor, attended M-POS&quot;),</span>
+<span class="fc" id="L177">        ON_PREMISES_UNATTENDED_MPOS(&quot;8&quot;, &quot;On premises of card acceptor, unattended M-POS&quot;);</span>
+        
+        private final String value;
+        private final String description;
+        
+<span class="fc" id="L182">        TerminalOperatingEnvironment(String value, String description) {</span>
+<span class="fc" id="L183">            this.value = value;</span>
+<span class="fc" id="L184">            this.description = description;</span>
+<span class="fc" id="L185">        }</span>
+        
+<span class="nc" id="L187">        public String getValue() { return value; }</span>
+<span class="nc" id="L188">        public String getDescription() { return description; }</span>
+        
+        public static TerminalOperatingEnvironment fromValue(String value) {
+<span class="pc bpc" id="L191" title="1 of 2 branches missed.">            for (TerminalOperatingEnvironment env : values()) {</span>
+<span class="fc bfc" id="L192" title="All 2 branches covered.">                if (env.value.equals(value)) {</span>
+<span class="fc" id="L193">                    return env;</span>
+                }
+            }
+<span class="nc" id="L196">            return UNKNOWN;</span>
+        }
+    }
+    
+    /**
+     * Parsed DE61 data structure
+     */
+    public static class RuPayDE61Data {
+        private final String rawData;
+        private final Map&lt;RuPayDE61Subfields, String&gt; subfieldValues;
+        private final List&lt;String&gt; errors;
+        private final List&lt;String&gt; warnings;
+        
+        public RuPayDE61Data(String rawData, Map&lt;RuPayDE61Subfields, String&gt; subfieldValues, 
+<span class="fc" id="L210">                           List&lt;String&gt; errors, List&lt;String&gt; warnings) {</span>
+<span class="fc" id="L211">            this.rawData = rawData;</span>
+<span class="fc" id="L212">            this.subfieldValues = subfieldValues;</span>
+<span class="fc" id="L213">            this.errors = errors;</span>
+<span class="fc" id="L214">            this.warnings = warnings;</span>
+<span class="fc" id="L215">        }</span>
+        
+<span class="nc" id="L217">        public String getRawData() { return rawData; }</span>
+<span class="nc" id="L218">        public Map&lt;RuPayDE61Subfields, String&gt; getSubfieldValues() { return subfieldValues; }</span>
+<span class="fc" id="L219">        public List&lt;String&gt; getErrors() { return errors; }</span>
+<span class="nc" id="L220">        public List&lt;String&gt; getWarnings() { return warnings; }</span>
+<span class="fc bfc" id="L221" title="All 2 branches covered.">        public boolean hasErrors() { return !errors.isEmpty(); }</span>
+<span class="nc bnc" id="L222" title="All 2 branches missed.">        public boolean hasWarnings() { return !warnings.isEmpty(); }</span>
+        
+        public String getSubfieldValue(RuPayDE61Subfields subfield) {
+<span class="fc" id="L225">            return subfieldValues.get(subfield);</span>
+        }
+        
+        public CardDataInputCapability getCardDataInputCapability() {
+<span class="fc" id="L229">            String value = getSubfieldValue(RuPayDE61Subfields.CARD_DATA_INPUT_CAPABILITY);</span>
+<span class="fc" id="L230">            return CardDataInputCapability.fromValue(value);</span>
+        }
+        
+        public CardholderAuthCapability getCardholderAuthCapability() {
+<span class="nc" id="L234">            String value = getSubfieldValue(RuPayDE61Subfields.CARDHOLDER_AUTH_CAPABILITY);</span>
+<span class="nc" id="L235">            return CardholderAuthCapability.fromValue(value);</span>
+        }
+        
+        public CardCaptureCapability getCardCaptureCapability() {
+<span class="nc" id="L239">            String value = getSubfieldValue(RuPayDE61Subfields.CARD_CAPTURE_CAPABILITY);</span>
+<span class="nc" id="L240">            return CardCaptureCapability.fromValue(value);</span>
+        }
+        
+        public TerminalOperatingEnvironment getTerminalOperatingEnvironment() {
+<span class="nc" id="L244">            String value = getSubfieldValue(RuPayDE61Subfields.TERMINAL_OPERATING_ENVIRONMENT);</span>
+<span class="nc" id="L245">            return TerminalOperatingEnvironment.fromValue(value);</span>
+        }
+    }
+    
+    /**
+     * Parse RuPay DE61 field
+     */
+    public static RuPayDE61Data parseDE61(String de61Data) {
+<span class="fc" id="L253">        Map&lt;RuPayDE61Subfields, String&gt; subfieldValues = new HashMap&lt;&gt;();</span>
+<span class="fc" id="L254">        List&lt;String&gt; errors = new ArrayList&lt;&gt;();</span>
+<span class="fc" id="L255">        List&lt;String&gt; warnings = new ArrayList&lt;&gt;();</span>
+        
+<span class="pc bpc" id="L257" title="2 of 4 branches missed.">        if (de61Data == null || de61Data.trim().isEmpty()) {</span>
+<span class="nc" id="L258">            errors.add(&quot;DE61 data is null or empty&quot;);</span>
+<span class="nc" id="L259">            return new RuPayDE61Data(de61Data, subfieldValues, errors, warnings);</span>
+        }
+        
+        // Validate length - DE61 should be at least 12 digits for all subfields
+<span class="fc bfc" id="L263" title="All 2 branches covered.">        if (de61Data.length() &lt; 12) {</span>
+<span class="fc" id="L264">            errors.add(&quot;DE61 data too short: expected at least 12 digits, got &quot; + de61Data.length());</span>
+<span class="fc" id="L265">            return new RuPayDE61Data(de61Data, subfieldValues, errors, warnings);</span>
+        }
+        
+        try {
+            // Parse each subfield by position (each is 1 digit)
+<span class="fc bfc" id="L270" title="All 2 branches covered.">            for (RuPayDE61Subfields subfield : RuPayDE61Subfields.values()) {</span>
+<span class="pc bpc" id="L271" title="1 of 2 branches missed.">                if (subfield.getPosition() &lt; de61Data.length()) {</span>
+<span class="fc" id="L272">                    String value = String.valueOf(de61Data.charAt(subfield.getPosition()));</span>
+<span class="fc" id="L273">                    subfieldValues.put(subfield, value);</span>
+                    
+                    // Validate subfield value
+<span class="fc" id="L276">                    validateSubfieldValue(subfield, value, errors, warnings);</span>
+<span class="fc" id="L277">                } else {</span>
+<span class="nc" id="L278">                    warnings.add(&quot;Subfield &quot; + subfield.getDescription() + &quot; not present in data&quot;);</span>
+                }
+            }
+            
+            // Additional business validations
+<span class="fc" id="L283">            validateBusinessRules(subfieldValues, errors, warnings);</span>
+            
+<span class="nc" id="L285">        } catch (Exception e) {</span>
+<span class="nc" id="L286">            logger.error(&quot;Error parsing DE61 data: {}&quot;, de61Data, e);</span>
+<span class="nc" id="L287">            errors.add(&quot;Failed to parse DE61 data: &quot; + e.getMessage());</span>
+<span class="fc" id="L288">        }</span>
+        
+<span class="fc" id="L290">        return new RuPayDE61Data(de61Data, subfieldValues, errors, warnings);</span>
+    }
+    
+    /**
+     * Validate individual subfield value
+     */
+    private static void validateSubfieldValue(RuPayDE61Subfields subfield, String value, 
+                                            List&lt;String&gt; errors, List&lt;String&gt; warnings) {
+        
+<span class="pc bpc" id="L299" title="1 of 2 branches missed.">        if (!value.matches(&quot;\\d&quot;)) {</span>
+<span class="nc" id="L300">            errors.add(&quot;Invalid &quot; + subfield.getDescription() + &quot;: must be a single digit, got '&quot; + value + &quot;'&quot;);</span>
+<span class="nc" id="L301">            return;</span>
+        }
+        
+<span class="fc bfc" id="L304" title="All 5 branches covered.">        switch (subfield) {</span>
+            case CARD_DATA_INPUT_CAPABILITY:
+<span class="fc" id="L306">                validateCardDataInputCapability(value, errors, warnings);</span>
+<span class="fc" id="L307">                break;</span>
+                
+            case CARDHOLDER_AUTH_CAPABILITY:
+<span class="fc" id="L310">                validateCardholderAuthCapability(value, errors, warnings);</span>
+<span class="fc" id="L311">                break;</span>
+                
+            case CARD_CAPTURE_CAPABILITY:
+<span class="fc" id="L314">                validateCardCaptureCapability(value, errors, warnings);</span>
+<span class="fc" id="L315">                break;</span>
+                
+            case TERMINAL_OPERATING_ENVIRONMENT:
+<span class="fc" id="L318">                validateTerminalOperatingEnvironment(value, errors, warnings);</span>
+                break;
+        }
+<span class="fc" id="L321">    }</span>
+    
+    /**
+     * Validate Card Data Input Capability
+     */
+    private static void validateCardDataInputCapability(String value, List&lt;String&gt; errors, List&lt;String&gt; warnings) {
+<span class="fc" id="L327">        CardDataInputCapability capability = CardDataInputCapability.fromValue(value);</span>
+<span class="fc bfc" id="L328" title="All 2 branches covered.">        if (capability == CardDataInputCapability.UNKNOWN) {</span>
+<span class="fc" id="L329">            warnings.add(&quot;Unknown Card Data Input Capability: &quot; + value);</span>
+        }
+        
+        // Business rule validations
+<span class="pc bpc" id="L333" title="1 of 2 branches missed.">        if (&quot;0&quot;.equals(value)) {</span>
+<span class="nc" id="L334">            warnings.add(&quot;Card Data Input Capability is 'Unknown' - may indicate data quality issue&quot;);</span>
+        }
+<span class="fc" id="L336">    }</span>
+    
+    /**
+     * Validate Cardholder Authentication Capability
+     */
+    private static void validateCardholderAuthCapability(String value, List&lt;String&gt; errors, List&lt;String&gt; warnings) {
+<span class="fc" id="L342">        CardholderAuthCapability capability = CardholderAuthCapability.fromValue(value);</span>
+<span class="pc bpc" id="L343" title="1 of 2 branches missed.">        if (capability == CardholderAuthCapability.UNKNOWN) {</span>
+<span class="nc" id="L344">            warnings.add(&quot;Unknown Cardholder Authentication Capability: &quot; + value);</span>
+        }
+<span class="fc" id="L346">    }</span>
+    
+    /**
+     * Validate Card Capture Capability
+     */
+    private static void validateCardCaptureCapability(String value, List&lt;String&gt; errors, List&lt;String&gt; warnings) {
+<span class="fc" id="L352">        CardCaptureCapability capability = CardCaptureCapability.fromValue(value);</span>
+<span class="pc bpc" id="L353" title="1 of 2 branches missed.">        if (capability == CardCaptureCapability.UNKNOWN) {</span>
+<span class="nc" id="L354">            warnings.add(&quot;Unknown Card Capture Capability: &quot; + value);</span>
+        }
+<span class="fc" id="L356">    }</span>
+    
+    /**
+     * Validate Terminal Operating Environment
+     */
+    private static void validateTerminalOperatingEnvironment(String value, List&lt;String&gt; errors, List&lt;String&gt; warnings) {
+<span class="fc" id="L362">        TerminalOperatingEnvironment env = TerminalOperatingEnvironment.fromValue(value);</span>
+<span class="pc bpc" id="L363" title="1 of 2 branches missed.">        if (env == TerminalOperatingEnvironment.UNKNOWN) {</span>
+<span class="nc" id="L364">            warnings.add(&quot;Unknown Terminal Operating Environment: &quot; + value);</span>
+        }
+        
+        // Business rule validations
+<span class="pc bpc" id="L368" title="1 of 2 branches missed.">        if (&quot;6&quot;.equals(value)) {</span>
+<span class="nc" id="L369">            warnings.add(&quot;Terminal Operating Environment is 'No terminal used' - verify transaction type&quot;);</span>
+        }
+<span class="fc" id="L371">    }</span>
+    
+    /**
+     * Validate business rules across subfields
+     */
+    private static void validateBusinessRules(Map&lt;RuPayDE61Subfields, String&gt; subfieldValues, 
+                                            List&lt;String&gt; errors, List&lt;String&gt; warnings) {
+        
+        // Rule 1: If card data input capability is 0 (Unknown), other fields should be validated
+<span class="fc" id="L380">        String cardDataInput = subfieldValues.get(RuPayDE61Subfields.CARD_DATA_INPUT_CAPABILITY);</span>
+<span class="pc bpc" id="L381" title="1 of 2 branches missed.">        if (&quot;0&quot;.equals(cardDataInput)) {</span>
+<span class="nc" id="L382">            warnings.add(&quot;Card Data Input Capability is 'Unknown' - verify transaction data quality&quot;);</span>
+        }
+        
+        // Rule 2: If terminal operating environment is 6 (No terminal used), validate other fields
+<span class="fc" id="L386">        String terminalEnv = subfieldValues.get(RuPayDE61Subfields.TERMINAL_OPERATING_ENVIRONMENT);</span>
+<span class="pc bpc" id="L387" title="1 of 2 branches missed.">        if (&quot;6&quot;.equals(terminalEnv)) {</span>
+<span class="nc" id="L388">            warnings.add(&quot;Terminal Operating Environment is 'No terminal used' - verify for e-commerce transactions&quot;);</span>
+        }
+        
+        // Rule 3: Check for suspicious combinations
+<span class="fc" id="L392">        String cardDataInputCap = subfieldValues.get(RuPayDE61Subfields.CARD_DATA_INPUT_CAPABILITY);</span>
+<span class="fc" id="L393">        String cardholderAuth = subfieldValues.get(RuPayDE61Subfields.CARDHOLDER_AUTH_CAPABILITY);</span>
+        
+<span class="pc bpc" id="L395" title="1 of 4 branches missed.">        if (&quot;7&quot;.equals(cardDataInputCap) &amp;&amp; &quot;0&quot;.equals(cardholderAuth)) {</span>
+<span class="nc" id="L396">            warnings.add(&quot;Contactless transaction with unknown authentication method&quot;);</span>
+        }
+        
+        // Rule 4: Validate M-POS transactions
+<span class="pc bpc" id="L400" title="2 of 4 branches missed.">        if (&quot;7&quot;.equals(terminalEnv) || &quot;8&quot;.equals(terminalEnv)) {</span>
+<span class="nc" id="L401">            logger.info(&quot;M-POS transaction detected&quot;);</span>
+            // Additional M-POS specific validations can be added here
+        }
+<span class="fc" id="L404">    }</span>
+    
+    /**
+     * Create DE61 data from subfield values
+     */
+    public static String createDE61(Map&lt;RuPayDE61Subfields, String&gt; subfieldValues) {
+<span class="nc" id="L410">        StringBuilder de61 = new StringBuilder();</span>
+        
+        // Initialize with zeros for all 12 positions
+<span class="nc bnc" id="L413" title="All 2 branches missed.">        for (int i = 0; i &lt; 12; i++) {</span>
+<span class="nc" id="L414">            de61.append(&quot;0&quot;);</span>
+        }
+        
+        // Set values for provided subfields
+<span class="nc bnc" id="L418" title="All 2 branches missed.">        for (Map.Entry&lt;RuPayDE61Subfields, String&gt; entry : subfieldValues.entrySet()) {</span>
+<span class="nc" id="L419">            RuPayDE61Subfields subfield = entry.getKey();</span>
+<span class="nc" id="L420">            String value = entry.getValue();</span>
+            
+<span class="nc bnc" id="L422" title="All 6 branches missed.">            if (value != null &amp;&amp; value.length() == 1 &amp;&amp; value.matches(&quot;\\d&quot;)) {</span>
+<span class="nc" id="L423">                de61.setCharAt(subfield.getPosition(), value.charAt(0));</span>
+            }
+<span class="nc" id="L425">        }</span>
+        
+<span class="nc" id="L427">        return de61.toString();</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.14.202510111229</span></div></body></html>

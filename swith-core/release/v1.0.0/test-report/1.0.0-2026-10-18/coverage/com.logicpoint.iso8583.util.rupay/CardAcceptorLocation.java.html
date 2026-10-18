@@ -1,0 +1,70 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>CardAcceptorLocation.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">iso8583-processor</a> &gt; <a href="index.source.html" class="el_package">com.logicpoint.iso8583.util.rupay</a> &gt; <span class="el_source">CardAcceptorLocation.java</span></div><h1>CardAcceptorLocation.java</h1><pre class="source lang-java linenums">package com.logicpoint.iso8583.util.rupay;
+
+    /**
+     * @author logic point systems
+     * @version 1.0.0
+     * @since 2025-09-16
+     * @description Utility methods for parsing the Card Acceptor Location (DE43) field.
+     * Format:
+     *  01-23: Terminal Owner Name (right padded with spaces)
+     *  24-36: Terminal City (right padded with spaces)  
+     *  37-38: Terminal State Code
+     *  39-40: Terminal Country Code
+     */
+   
+public class CardAcceptorLocation {
+        private final String terminalOwnerName;
+        private final String terminalCity;
+        private final String terminalStateCode;
+        private final String terminalCountryCode;
+
+<span class="fc" id="L21">        public CardAcceptorLocation(String terminalOwnerName, String terminalCity, String terminalStateCode, String terminalCountryCode) {</span>
+<span class="fc" id="L22">            this.terminalOwnerName = terminalOwnerName;</span>
+<span class="fc" id="L23">            this.terminalCity = terminalCity;</span>
+<span class="fc" id="L24">            this.terminalStateCode = terminalStateCode;</span>
+<span class="fc" id="L25">            this.terminalCountryCode = terminalCountryCode;</span>
+<span class="fc" id="L26">        }</span>
+
+        public String getTerminalOwnerName() {
+<span class="nc" id="L29">            return terminalOwnerName;</span>
+        }
+
+        public String getTerminalCity() {
+<span class="nc" id="L33">            return terminalCity;</span>
+        }
+
+        public String getTerminalStateCode() {
+<span class="nc" id="L37">            return terminalStateCode;</span>
+        }
+
+        public String getTerminalCountryCode() {
+<span class="fc" id="L41">            return terminalCountryCode;</span>
+        }
+
+        @Override
+        public String toString() {
+<span class="nc" id="L46">            return &quot;CardAcceptorLocation{&quot; +</span>
+                    &quot;terminalOwnerName='&quot; + terminalOwnerName + '\'' +
+                    &quot;, terminalCity='&quot; + terminalCity + '\'' +
+                    &quot;, terminalStateCode='&quot; + terminalStateCode + '\'' +
+                    &quot;, terminalCountryCode='&quot; + terminalCountryCode + '\'' +
+                    '}';
+        }
+    /**
+     * Parses the Card Acceptor Location (DE43) field according to the specification.
+     * @param de43Value the 40-character DE43 string
+     * @return CardAcceptorLocation object with parsed fields
+     * @throws IllegalArgumentException if input is null or not 40 characters
+     */
+    public static CardAcceptorLocation parse(String de43Value) {
+<span class="fc bfc" id="L60" title="All 4 branches covered.">        if (de43Value == null || de43Value.length() != 40) {</span>
+<span class="fc" id="L61">            throw new IllegalArgumentException(&quot;DE43 value must be exactly 40 characters&quot;);</span>
+        }
+<span class="fc" id="L63">        String terminalOwnerName = de43Value.substring(0, 23).trim();</span>
+<span class="fc" id="L64">        String terminalCity = de43Value.substring(23, 36).trim();</span>
+<span class="fc" id="L65">        String terminalStateCode = de43Value.substring(36, 38);</span>
+<span class="fc" id="L66">        String terminalCountryCode = de43Value.substring(38, 40);</span>
+<span class="fc" id="L67">        return new CardAcceptorLocation(terminalOwnerName, terminalCity, terminalStateCode, terminalCountryCode);</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.14.202510111229</span></div></body></html>

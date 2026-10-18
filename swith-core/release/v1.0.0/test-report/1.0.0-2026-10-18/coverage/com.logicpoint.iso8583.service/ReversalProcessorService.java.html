@@ -1,0 +1,679 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>ReversalProcessorService.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">iso8583-processor</a> &gt; <a href="index.source.html" class="el_package">com.logicpoint.iso8583.service</a> &gt; <span class="el_source">ReversalProcessorService.java</span></div><h1>ReversalProcessorService.java</h1><pre class="source lang-java linenums">package com.logicpoint.iso8583.service;
+
+import java.math.BigDecimal;
+
+import com.logicpoint.iso8583.context.RequestContext;
+import com.logicpoint.iso8583.entity.Transaction;
+import com.logicpoint.iso8583.entity.TransactionResponse;
+import com.logicpoint.iso8583.repository.TransactionRepository;
+import com.logicpoint.iso8583.responsecode.InternalResCode;
+import com.logicpoint.iso8583.util.Scheme;
+import com.logicpoint.iso8583.util.MacGeneration;
+
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+import com.logicpoint.iso8583.config.RawDataLogging;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.beans.factory.annotation.Value;
+import org.springframework.stereotype.Service;
+
+import com.logicpoint.iso8583.service.AccountingApiService;
+import com.logicpoint.iso8583.model.accounting.AccountingAuthorizationResponse;
+import java.time.LocalDate;
+
+import com.logicpoint.iso8583.repository.TransactionResponseRepository;
+
+import java.util.List;
+import java.util.Map;
+
+
+/**
+ * Service class for processing ISO 8583 reversal requests.
+ * Handles reversal validation, original transaction lookup, and response generation.
+ *
+ * @author LogicPoint Systems
+ * @version 1.0
+ */
+@Service
+public class ReversalProcessorService {
+
+<span class="fc" id="L40">    private static final Logger log = LoggerFactory.getLogger(ReversalProcessorService.class);</span>
+    
+    private final TransactionRepository transactionRepository;
+    private final TransactionResponseRepository transactionResponseRepository;
+    private final AccountingApiService accountingApiService;
+    private final TransactionIdGeneratorService transactionIdGeneratorService;
+    private final ResponseAssembler responseAssembler;
+    @Value(&quot;${scheme.rupay.mac.enabled:false}&quot;)
+    private boolean macValidationEnabled;
+    @Value(&quot;${reversal.processing-mode:accounting-api}&quot;)
+    private String reversalProcessingMode;
+
+    @Autowired
+<span class="fc" id="L53">    public ReversalProcessorService(TransactionRepository transactionRepository, TransactionResponseRepository transactionResponseRepository, AccountingApiService accountingApiService, TransactionIdGeneratorService transactionIdGeneratorService, ResponseAssembler responseAssembler) {</span>
+<span class="fc" id="L54">        this.transactionResponseRepository = transactionResponseRepository;</span>
+<span class="fc" id="L55">        this.transactionRepository = transactionRepository;</span>
+<span class="fc" id="L56">        this.accountingApiService = accountingApiService;</span>
+<span class="fc" id="L57">        this.transactionIdGeneratorService = transactionIdGeneratorService;</span>
+<span class="fc" id="L58">        this.responseAssembler = responseAssembler;</span>
+<span class="fc" id="L59">    }</span>
+
+    /**
+     * Processes a reversal request.
+     *
+     * @param fields Map of ISO 8583 field numbers to their values
+     * @param scheme The payment scheme
+     * @return Processed message fields with response codes
+     */
+    public Map&lt;Integer, String&gt; processReversalRequest(RequestContext requestContext) {
+<span class="fc" id="L69">        Map&lt;Integer, String&gt; fields = requestContext.getFields();</span>
+<span class="fc" id="L70">        Scheme scheme = requestContext.getScheme();</span>
+<span class="fc" id="L71">        log.info(&quot;Processing reversal request for scheme: {}&quot;, scheme);</span>
+<span class="fc" id="L72">        responseAssembler.setResponseMti(requestContext);</span>
+        
+        try {
+            // Extract key fields for reversal processing
+<span class="fc" id="L76">            String processingCode = fields.get(3);</span>
+<span class="fc" id="L77">            String posEntryMode = fields.get(22);</span>
+<span class="fc" id="L78">            String posConditionCode = fields.get(25);</span>
+<span class="fc" id="L79">            String de48 = fields.getOrDefault(48, &quot;&quot;);</span>
+<span class="fc" id="L80">            String de90 = fields.getOrDefault(90, &quot;&quot;); // Original Data Elements</span>
+<span class="fc" id="L81">            String de120Tag001 = fields.getOrDefault(120, &quot;&quot;);</span>
+<span class="fc" id="L82">            String rrn = fields.get(37);</span>
+<span class="fc" id="L83">            String stan = fields.get(11);</span>
+<span class="fc" id="L84">            String terminalId = fields.get(41);</span>
+<span class="fc" id="L85">            String transmissionTime = fields.get(7);</span>
+            
+           
+            
+            // Validate required fields for reversal
+<span class="pc bpc" id="L90" title="1 of 4 branches missed.">            if (rrn == null || rrn.trim().isEmpty()) {</span>
+<span class="fc" id="L91">                log.error(&quot;Missing RRN for reversal request&quot;);</span>
+<span class="fc" id="L92">                responseAssembler.applyResponseCode(requestContext, InternalResCode.FORMAT_ERROR);</span>
+<span class="fc" id="L93">                return fields;</span>
+            }
+            
+<span class="pc bpc" id="L96" title="1 of 4 branches missed.">            if (stan == null || stan.trim().isEmpty()) {</span>
+<span class="fc" id="L97">                log.error(&quot;Missing STAN for reversal request&quot;);</span>
+<span class="fc" id="L98">                responseAssembler.applyResponseCode(requestContext, InternalResCode.FORMAT_ERROR);</span>
+<span class="fc" id="L99">                return fields;</span>
+            }
+            
+            // Validate DE90 (Original Data Elements) if present
+<span class="pc bpc" id="L103" title="2 of 4 branches missed.">            if (de90 != null &amp;&amp; !de90.trim().isEmpty()) {</span>
+<span class="fc bfc" id="L104" title="All 2 branches covered.">                if (!validateDe90(de90, fields)) {</span>
+<span class="fc" id="L105">                    log.error(&quot;DE90 validation failed for reversal request&quot;);</span>
+<span class="fc" id="L106">                    responseAssembler.applyResponseCode(requestContext, InternalResCode.FORMAT_ERROR);</span>
+<span class="fc" id="L107">                    return fields;</span>
+                }
+            }
+            
+            // Find the original transaction to reverse
+<span class="fc" id="L112">            Transaction originalTransaction = findOriginalTransaction(rrn, stan, terminalId, transmissionTime,de90.substring(0,4));</span>
+            
+<span class="fc bfc" id="L114" title="All 2 branches covered.">            if (originalTransaction == null) {</span>
+<span class="fc" id="L115">                log.warn(&quot;Original transaction not found for reversal - RRN: {}, STAN: {}&quot;, rrn, stan);</span>
+<span class="fc" id="L116">                responseAssembler.applyResponseCode(requestContext, InternalResCode.INVALID_TRANSACTION);</span>
+<span class="fc" id="L117">                return fields;</span>
+            }
+            
+            // Check if transaction is already reversed
+<span class="fc bfc" id="L121" title="All 2 branches covered.">            if (isTransactionAlreadyReversed(originalTransaction)) {</span>
+<span class="fc" id="L122">                log.warn(&quot;Transaction already reversed - RRN: {}, STAN: {}&quot;, rrn, stan);</span>
+<span class="fc" id="L123">                responseAssembler.applyResponseCode(requestContext, InternalResCode.DUPLICATE_TRANSACTION);</span>
+<span class="fc" id="L124">                return fields;</span>
+            }
+            
+            // Check if reversal is within time limit
+<span class="fc bfc" id="L128" title="All 2 branches covered.">            if (!isReversalWithinTimeLimit(originalTransaction, transmissionTime)) {</span>
+<span class="fc" id="L129">                log.warn(&quot;Reversal request outside time limit - RRN: {}, STAN: {}&quot;, rrn, stan);</span>
+<span class="fc" id="L130">                responseAssembler.applyResponseCode(requestContext, InternalResCode.INVALID_AMOUNT);</span>
+<span class="fc" id="L131">                return fields;</span>
+            }
+            
+            // Process reversal based on scheme
+<span class="fc bfc" id="L135" title="All 4 branches covered.">            switch (scheme) {</span>
+                case RUPAY:
+<span class="fc" id="L137">                    return processRuPayReversal(requestContext, originalTransaction, processingCode, posEntryMode, posConditionCode, de48, de90, de120Tag001);</span>
+                case VISA:
+<span class="fc" id="L139">                    return processVisaReversal(requestContext, originalTransaction, processingCode, posEntryMode, posConditionCode, de90);</span>
+                case MASTERCARD:
+<span class="fc" id="L141">                    return processMastercardReversal(requestContext, originalTransaction, processingCode, posEntryMode, posConditionCode, de90);</span>
+                default:
+<span class="fc" id="L143">                    log.warn(&quot;Unsupported scheme for reversal: {}&quot;, scheme);</span>
+<span class="fc" id="L144">                    responseAssembler.applyResponseCode(requestContext, InternalResCode.DO_NOT_HONOR);</span>
+<span class="fc" id="L145">                    return fields;</span>
+            }
+            
+<span class="nc" id="L148">        } catch (Exception e) {</span>
+<span class="nc" id="L149">            log.error(&quot;Error processing reversal request&quot;, e);</span>
+<span class="nc" id="L150">            responseAssembler.applyResponseCode(requestContext, InternalResCode.SYSTEM_ERROR);</span>
+<span class="nc" id="L151">            return fields;</span>
+        }
+    }
+
+    /**
+     * Validates DE90 (Original Data Elements) for reversal requests.
+     * DE90 contains: Original MTI (4) + Original STAN (6) + Original Transmission Date (4) + Original Transmission Time (6)
+     *
+     * @param de90 Original Data Elements field
+     * @param fields Current message fields
+     * @return true if validation passes, false otherwise
+     */
+    private boolean validateDe90(String de90, Map&lt;Integer, String&gt; fields) {
+        try {
+<span class="fc" id="L165">            log.info(&quot;Validating DE90: {}&quot;, de90);</span>
+            
+            // DE90 should be 20 characters: MTI(4) + STAN(6) + Date(4) + Time(6)
+<span class="fc bfc" id="L168" title="All 2 branches covered.">            if (de90.length() != 42) {</span>
+<span class="fc" id="L169">                log.error(&quot;DE90 length invalid: expected 42, got {}&quot;, de90.length());</span>
+<span class="fc" id="L170">                return false;</span>
+            }
+            
+            // Extract components from DE90
+            // DE90 format breakdown based on specification:
+            //  1-4:   Original message type (MTI)           [0,4)
+            //  5-10:  Original STAN number                  [4,10)
+            // 11-20:  Original Transmission date and time   [10,20)
+            // 21-31:  Original acquirer ID                  [20,31)
+            // 32-42:  Original forwarding institution id    [31,42)
+            // Example: &quot;02001234561231231230012345678901234567890&quot;
+<span class="fc" id="L181">            String originalMti = de90.substring(0, 4);</span>
+<span class="fc" id="L182">            String originalStan = de90.substring(4, 10);</span>
+<span class="fc" id="L183">            String originalTransDateTime = de90.substring(10, 20);</span>
+<span class="pc bpc" id="L184" title="1 of 2 branches missed.">            String originalAcquirerId = de90.length() &gt;= 31 ? de90.substring(20, 31) : null;</span>
+<span class="pc bpc" id="L185" title="1 of 2 branches missed.">            String originalForwardingInstId = de90.length() &gt;= 42 ? de90.substring(31, 42) : null;</span>
+           
+            
+<span class="fc" id="L188">            log.debug(&quot;DE90 components - MTI: {}, STAN: {}, DateTime: {}&quot;, </span>
+                     originalMti, originalStan, originalTransDateTime);
+            
+            // Validate original MTI (should be a financial transaction)
+<span class="fc bfc" id="L192" title="All 2 branches covered.">            if (!isValidFinancialMti(originalMti)) {</span>
+<span class="fc" id="L193">                log.error(&quot;Invalid original MTI in DE90: {}&quot;, originalMti);</span>
+<span class="fc" id="L194">                return false;</span>
+            }
+            
+            // Validate original STAN format (should be numeric)
+<span class="fc bfc" id="L198" title="All 2 branches covered.">            if (!originalStan.matches(&quot;\\d{6}&quot;)) {</span>
+<span class="fc" id="L199">                log.error(&quot;Invalid original STAN format in DE90: {}&quot;, originalStan);</span>
+<span class="fc" id="L200">                return false;</span>
+            }
+            
+            // Validate original date format (MMDD)
+<span class="fc bfc" id="L204" title="All 2 branches covered.">            if (!originalTransDateTime.matches(&quot;\\d{10}&quot;)) {</span>
+<span class="fc" id="L205">                log.error(&quot;Invalid original date format in DE90: {}&quot;, originalTransDateTime);</span>
+<span class="fc" id="L206">                return false;</span>
+            }
+            
+          
+            
+            // Cross-validate with current message fields if available
+<span class="fc" id="L212">            String currentStan = fields.get(11);</span>
+<span class="pc bpc" id="L213" title="2 of 4 branches missed.">            if (currentStan != null &amp;&amp; !currentStan.equals(originalStan)) {</span>
+<span class="fc" id="L214">                log.warn(&quot;DE90 STAN {} does not match current STAN {}&quot;, originalStan, currentStan);</span>
+                // This might be acceptable in some cases, so we log as warning, not error
+            }
+            
+<span class="fc" id="L218">            log.info(&quot;DE90 validation successful&quot;);</span>
+<span class="fc" id="L219">            return true;</span>
+            
+<span class="nc" id="L221">        } catch (Exception e) {</span>
+<span class="nc" id="L222">            log.error(&quot;Error validating DE90: {}&quot;, e.getMessage());</span>
+<span class="nc" id="L223">            return false;</span>
+        }
+    }
+
+    /**
+     * Checks if the MTI represents a valid financial transaction.
+     *
+     * @param mti Message Type Indicator
+     * @return true if valid financial MTI, false otherwise
+     */
+    private boolean isValidFinancialMti(String mti) {
+        // Valid financial transaction MTIs
+<span class="pc bpc" id="L235" title="1 of 4 branches missed.">        return &quot;0100&quot;.equals(mti) || &quot;0200&quot;.equals(mti) || </span>
+<span class="pc bpc" id="L236" title="2 of 4 branches missed.">               &quot;0101&quot;.equals(mti) || &quot;0201&quot;.equals(mti) ||</span>
+<span class="pc bpc" id="L237" title="2 of 4 branches missed.">               &quot;0400&quot;.equals(mti) || &quot;0420&quot;.equals(mti);</span>
+    }
+
+    /**
+     * Finds the original transaction to be reversed.
+     *
+     * @param rrn Retrieval Reference Number
+     * @param stan System Trace Audit Number
+     * @param terminalId Terminal ID
+     * @param transmissionTime Transmission time
+     * @return Original transaction or null if not found
+     */
+    private Transaction findOriginalTransaction(String rrn, String stan, String terminalId, String transmissionTime,String orgMti) {
+        try {
+            // First try to find by RRN , Terminal id and mti
+<span class="fc" id="L252">            List&lt;Transaction&gt; transactions = transactionRepository.findByRrnAndTID(terminalId, rrn, transmissionTime, orgMti);</span>
+            
+<span class="fc bfc" id="L254" title="All 2 branches covered.">            if (!transactions.isEmpty()) {</span>
+                // If multiple found, prefer the most recent one
+<span class="fc" id="L256">                return transactions.stream()</span>
+<span class="fc" id="L257">                        .max((t1, t2) -&gt; t1.getDe7TransmissionDatetime().compareTo(t2.getDe7TransmissionDatetime()))</span>
+<span class="fc" id="L258">                        .orElse(null);</span>
+            }
+            // Convert transmissionTime (MMDDhhmmss) into LocalDate
+            // Assumes current year; adjust as needed for cross-year reversals
+<span class="fc" id="L262">            LocalDate transmissionDate = null;</span>
+<span class="pc bpc" id="L263" title="2 of 4 branches missed.">            if (transmissionTime != null &amp;&amp; transmissionTime.length() &gt;= 4) {</span>
+<span class="fc" id="L264">                int month = Integer.parseInt(transmissionTime.substring(0, 2));</span>
+<span class="fc" id="L265">                int day = Integer.parseInt(transmissionTime.substring(2, 4));</span>
+<span class="fc" id="L266">                int year = LocalDate.now().getYear();</span>
+                try {
+<span class="fc" id="L268">                    transmissionDate = LocalDate.of(year, month, day);</span>
+<span class="nc" id="L269">                } catch (Exception ex) {</span>
+<span class="nc" id="L270">                    log.warn(&quot;Failed to parse transmissionTime {} to LocalDate: {}&quot;, transmissionTime, ex.getMessage());</span>
+<span class="fc" id="L271">                }</span>
+            }
+            // If not found by RRN and STAN, try by terminal and time
+<span class="pc bpc" id="L274" title="2 of 4 branches missed.">            if (terminalId != null &amp;&amp; transmissionTime != null) {</span>
+<span class="fc" id="L275">                List&lt;Transaction&gt; terminalTransactions = transactionRepository.findByTerminalAndDate(terminalId, transmissionTime);</span>
+<span class="fc bfc" id="L276" title="All 2 branches covered.">                if (!terminalTransactions.isEmpty()) {</span>
+<span class="fc" id="L277">                    return terminalTransactions.get(0);</span>
+                }
+            }
+            
+<span class="fc" id="L281">            return null;</span>
+<span class="nc" id="L282">        } catch (Exception e) {</span>
+<span class="nc" id="L283">            log.error(&quot;Error finding original transaction&quot;, e);</span>
+<span class="nc" id="L284">            return null;</span>
+        }
+    }
+
+    /**
+     * Checks if the transaction is already reversed.
+     *
+     * @param transaction The transaction to check
+     * @return true if already reversed, false otherwise
+     */
+    private boolean isTransactionAlreadyReversed(Transaction transaction) {
+        // Check if there's a reversal record for this transaction
+        try {
+<span class="fc" id="L297">            List&lt;TransactionResponse&gt; reversals = transactionResponseRepository.findByOriginalData(transaction.getDe90OriginalDataElements());</span>
+<span class="fc bfc" id="L298" title="All 2 branches covered.">            return !reversals.isEmpty();</span>
+<span class="fc" id="L299">        } catch (Exception e) {</span>
+<span class="fc" id="L300">            log.error(&quot;Error checking if transaction is already reversed&quot;, e);</span>
+<span class="fc" id="L301">            return false;</span>
+        }
+    }
+
+    /**
+     * Checks if reversal is within the allowed time limit.
+     *
+     * @param originalTransaction The original transaction
+     * @param reversalTime The reversal request time
+     * @return true if within time limit, false otherwise
+     */
+    private boolean isReversalWithinTimeLimit(Transaction originalTransaction, String reversalTime) {
+        try {
+            // Parse original transaction time
+<span class="fc" id="L315">            String originalTime = originalTransaction.getDe7TransmissionDatetime();</span>
+            
+            // Calculate time difference (assuming MMDDhhmmss format)
+<span class="fc" id="L318">            long originalTimestamp = parseTransmissionTime(originalTime);</span>
+<span class="fc" id="L319">            long reversalTimestamp = parseTransmissionTime(reversalTime);</span>
+            
+            // Allow reversal within 24 hours (86400 seconds)
+<span class="fc" id="L322">            long timeDifference = reversalTimestamp - originalTimestamp;</span>
+<span class="pc bpc" id="L323" title="1 of 4 branches missed.">            return timeDifference &lt;= 86400 &amp;&amp; timeDifference &gt;= 0;</span>
+            
+<span class="fc" id="L325">        } catch (Exception e) {</span>
+<span class="fc" id="L326">            log.error(&quot;Error checking reversal time limit&quot;, e);</span>
+<span class="fc" id="L327">            return false;</span>
+        }
+    }
+
+    /**
+     * Parses transmission time from MMDDhhmmss format to timestamp.
+     *
+     * @param transmissionTime Time in MMDDhhmmss format
+     * @return Timestamp in seconds
+     */
+    private long parseTransmissionTime(String transmissionTime) {
+<span class="pc bpc" id="L338" title="1 of 4 branches missed.">        if (transmissionTime == null || transmissionTime.length() != 10) {</span>
+<span class="fc" id="L339">            throw new IllegalArgumentException(&quot;Invalid transmission time format&quot;);</span>
+        }
+        
+        try {
+<span class="fc" id="L343">            int month = Integer.parseInt(transmissionTime.substring(0, 2));</span>
+<span class="fc" id="L344">            int day = Integer.parseInt(transmissionTime.substring(2, 4));</span>
+<span class="fc" id="L345">            int hour = Integer.parseInt(transmissionTime.substring(4, 6));</span>
+<span class="fc" id="L346">            int minute = Integer.parseInt(transmissionTime.substring(6, 8));</span>
+<span class="fc" id="L347">            int second = Integer.parseInt(transmissionTime.substring(8, 10));</span>
+            
+            // Create a timestamp (simplified - assumes current year)
+<span class="fc" id="L350">            java.time.LocalDateTime dateTime = java.time.LocalDateTime.now()</span>
+<span class="fc" id="L351">                    .withMonth(month)</span>
+<span class="fc" id="L352">                    .withDayOfMonth(day)</span>
+<span class="fc" id="L353">                    .withHour(hour)</span>
+<span class="fc" id="L354">                    .withMinute(minute)</span>
+<span class="fc" id="L355">                    .withSecond(second);</span>
+            
+<span class="fc" id="L357">            return dateTime.toEpochSecond(java.time.ZoneOffset.UTC);</span>
+<span class="nc" id="L358">        } catch (Exception e) {</span>
+<span class="nc" id="L359">            throw new IllegalArgumentException(&quot;Error parsing transmission time: &quot; + transmissionTime, e);</span>
+        }
+    }
+
+    /**
+     * Processes RuPay reversal request.
+     *
+     * @param fields Message fields
+     * @param originalTransaction Original transaction
+     * @param processingCode Processing code
+     * @param posEntryMode POS entry mode
+     * @param posConditionCode POS condition code
+     * @param de48 Additional data
+     * @param de90 Original data elements
+     * @param de120Tag001 Tag 001 from DE120
+     * @return Processed fields
+     */
+    private Map&lt;Integer, String&gt; processRuPayReversal(RequestContext requestContext, Transaction originalTransaction,
+                                                     String processingCode, String posEntryMode, String posConditionCode, 
+                                                     String de48, String de90, String de120Tag001) {
+<span class="fc" id="L379">        Map&lt;Integer, String&gt; fields = requestContext.getFields();</span>
+<span class="fc" id="L380">        log.info(&quot;Processing RuPay reversal request&quot;);</span>
+        
+        try {
+            // Identify transaction type
+           // RuPayTxnType type = RuPayTxnType.identifyByNetwork(processingCode, posEntryMode, posConditionCode, de48, de120Tag001, &quot;RuPay&quot;);
+<span class="fc" id="L385">            log.info(&quot;RuPay reversal transaction type: {}&quot;);</span>
+            
+            // Validate reversal amount matches original (if amount is present)
+<span class="pc bpc" id="L388" title="1 of 2 branches missed.">            if (fields.containsKey(4)) {</span>
+                // Convert field 4 (amount) into double, considering rightmost 2 digits as fraction part
+<span class="fc" id="L390">                String field4 = fields.get(4);</span>
+<span class="fc" id="L391">                BigDecimal reversalAmountDouble = BigDecimal.ZERO;</span>
+<span class="pc bpc" id="L392" title="3 of 6 branches missed.">                if (field4 != null &amp;&amp; !field4.isEmpty() &amp;&amp; field4.matches(&quot;\\d+&quot;)) {</span>
+<span class="fc" id="L393">                    long amountLong = Long.parseLong(field4);</span>
+<span class="fc" id="L394">                    reversalAmountDouble = BigDecimal.valueOf(amountLong / 100.0);</span>
+                }
+            
+<span class="pc bpc" id="L397" title="1 of 2 branches missed.">                BigDecimal originalAmount = originalTransaction.getDe4AmountTransaction() != null ? </span>
+<span class="pc" id="L398">                        originalTransaction.getDe4AmountTransaction(): null;</span>
+                
+<span class="pc bpc" id="L400" title="1 of 4 branches missed.">                if (originalAmount != null &amp;&amp; reversalAmountDouble.compareTo(originalAmount) != 0) {</span>
+<span class="fc" id="L401">                    log.warn(&quot;Reversal amount {} does not match original amount {}&quot;, reversalAmountDouble, originalAmount);</span>
+<span class="fc" id="L402">                    responseAssembler.applyResponseCode(requestContext, InternalResCode.INVALID_AMOUNT);</span>
+<span class="fc" id="L403">                    return fields;</span>
+                }
+            }
+            
+            // Create reversal transaction record
+<span class="fc" id="L408">            Transaction reversalTransaction = createReversalTransaction(originalTransaction, fields);</span>
+<span class="fc" id="L409">            Transaction savedReversal = transactionRepository.save(reversalTransaction);</span>
+            
+           
+<span class="pc bpc" id="L412" title="1 of 2 branches missed.">            if (savedReversal != null) {</span>
+<span class="fc" id="L413">                log.info(&quot;Reversal transaction saved with ID: {}&quot;, savedReversal.getTransactionId());</span>
+
+<span class="fc bfc" id="L415" title="All 2 branches covered.">                if (isApplicationProcessedReversal()) {</span>
+<span class="fc" id="L416">                    log.info(&quot;Approving RuPay reversal in application based on reversal.processing-mode={}&quot;, reversalProcessingMode);</span>
+<span class="fc" id="L417">                    approveReversalInApplication(requestContext, originalTransaction);</span>
+<span class="fc" id="L418">                    return fields;</span>
+                }
+                
+<span class="fc" id="L421">                AccountingAuthorizationResponse authResponse = accountingApiService.authorizeReversal(</span>
+                    requestContext,
+<span class="fc" id="L423">                    new BigDecimal(fields.get(4)),</span>
+<span class="fc" id="L424">                    fields.get(49),</span>
+<span class="fc" id="L425">                    de90.substring(0, 4),</span>
+<span class="fc" id="L426">                    requestContext.getScheme().name(),</span>
+<span class="fc" id="L427">                    originalTransaction.getTransactionId());</span>
+
+<span class="pc bpc" id="L429" title="1 of 4 branches missed.">                    if (authResponse != null &amp;&amp; !&quot;00&quot;.equals(authResponse.getResponseCode())) {</span>
+<span class="fc" id="L430">                        responseAssembler.applyResponseCode(requestContext, InternalResCode.DO_NOT_HONOR);</span>
+<span class="fc" id="L431">                        return fields;</span>
+                    }
+                // Update original transaction status
+<span class="fc" id="L434">                approveReversalInApplication(requestContext, originalTransaction);</span>
+                
+               
+                
+            } 
+            
+<span class="fc" id="L440">        } catch (Exception e) {</span>
+<span class="fc" id="L441">            log.error(&quot;Error processing RuPay reversal&quot;, e);</span>
+<span class="fc" id="L442">            responseAssembler.applyResponseCode(requestContext, InternalResCode.SYSTEM_ERROR);</span>
+<span class="fc" id="L443">        }</span>
+        
+<span class="fc" id="L445">        return fields;</span>
+    }
+
+    private boolean isApplicationProcessedReversal() {
+<span class="pc bpc" id="L449" title="1 of 2 branches missed.">        return &quot;application&quot;.equalsIgnoreCase(reversalProcessingMode != null ? reversalProcessingMode.trim() : &quot;&quot;);</span>
+    }
+
+    private void approveReversalInApplication(RequestContext requestContext, Transaction originalTransaction) {
+<span class="fc" id="L453">        originalTransaction.setStatus(Transaction.Status.FAILED);</span>
+<span class="fc" id="L454">        transactionRepository.save(originalTransaction);</span>
+
+<span class="fc" id="L456">        responseAssembler.applyResponseCode(requestContext, InternalResCode.APPROVED);</span>
+<span class="fc" id="L457">        applyReversalAuthCode(requestContext, originalTransaction);</span>
+<span class="fc" id="L458">    }</span>
+
+    void applyReversalAuthCode(RequestContext requestContext, Transaction originalTransaction) {
+<span class="fc" id="L461">        String requestAuthCode = requestContext.getFields().get(38);</span>
+<span class="pc bpc" id="L462" title="1 of 4 branches missed.">        if (requestAuthCode != null &amp;&amp; !requestAuthCode.isBlank()) {</span>
+<span class="fc" id="L463">            requestContext.getFields().put(38, requestAuthCode);</span>
+<span class="fc" id="L464">            return;</span>
+        }
+
+<span class="fc" id="L467">        String originalAuthCode = originalTransaction.getDe38AuthApprovalCode();</span>
+<span class="pc bpc" id="L468" title="1 of 4 branches missed.">        if (originalAuthCode != null &amp;&amp; !originalAuthCode.isBlank()) {</span>
+<span class="fc" id="L469">            requestContext.getFields().put(38, originalAuthCode);</span>
+        } else {
+<span class="fc" id="L471">            requestContext.getFields().remove(38);</span>
+<span class="fc" id="L472">            log.warn(&quot;Reversal request and original transaction {} do not contain DE38; omitting DE38 in response&quot;,</span>
+<span class="fc" id="L473">                    originalTransaction.getTransactionId());</span>
+        }
+<span class="fc" id="L475">    }</span>
+
+    /**
+     * Processes Visa reversal request.
+     *
+     * @param fields Message fields
+     * @param originalTransaction Original transaction
+     * @param processingCode Processing code
+     * @param posEntryMode POS entry mode
+     * @param posConditionCode POS condition code
+     * @param de90 Original data elements
+     * @return Processed fields
+     */
+    private Map&lt;Integer, String&gt; processVisaReversal(RequestContext requestContext, Transaction originalTransaction,
+                                                    String processingCode, String posEntryMode, String posConditionCode, 
+                                                    String de90) {
+<span class="fc" id="L491">        Map&lt;Integer, String&gt; fields = requestContext.getFields();</span>
+<span class="fc" id="L492">        log.info(&quot;Processing Visa reversal request&quot;);</span>
+        
+        try {
+            // Visa-specific reversal logic
+            // Validate reversal amount
+<span class="pc bpc" id="L497" title="1 of 2 branches missed.">            if (fields.containsKey(4)) {</span>
+<span class="fc" id="L498">                String reversalAmount = fields.get(4);</span>
+<span class="pc bpc" id="L499" title="1 of 2 branches missed.">                String originalAmount = originalTransaction.getDe4AmountTransaction() != null ? </span>
+<span class="pc" id="L500">                        originalTransaction.getDe4AmountTransaction().toString() : null;</span>
+                
+<span class="pc bpc" id="L502" title="1 of 4 branches missed.">                if (originalAmount != null &amp;&amp; !reversalAmount.equals(originalAmount)) {</span>
+<span class="fc" id="L503">                    log.warn(&quot;Visa reversal amount mismatch&quot;);</span>
+<span class="fc" id="L504">                    responseAssembler.applyResponseCode(requestContext, InternalResCode.INVALID_AMOUNT);</span>
+<span class="fc" id="L505">                    return fields;</span>
+                }
+            }
+            
+            // Create reversal record
+<span class="fc" id="L510">            Transaction reversalTransaction = createReversalTransaction(originalTransaction, fields);</span>
+<span class="fc" id="L511">            Transaction savedReversal = transactionRepository.save(reversalTransaction);</span>
+            
+<span class="fc bfc" id="L513" title="All 2 branches covered.">            if (savedReversal != null) {</span>
+<span class="fc" id="L514">                log.info(&quot;Visa reversal transaction saved with ID: {}&quot;, savedReversal.getTransactionId());</span>
+<span class="fc" id="L515">                responseAssembler.applyResponseCode(requestContext, InternalResCode.APPROVED);</span>
+<span class="fc" id="L516">                applyReversalAuthCode(requestContext, originalTransaction);</span>
+            } else {
+<span class="fc" id="L518">                responseAssembler.applyResponseCode(requestContext, InternalResCode.SYSTEM_ERROR);</span>
+            }
+            
+<span class="nc" id="L521">        } catch (Exception e) {</span>
+<span class="nc" id="L522">            log.error(&quot;Error processing Visa reversal&quot;, e);</span>
+<span class="nc" id="L523">            responseAssembler.applyResponseCode(requestContext, InternalResCode.SYSTEM_ERROR);</span>
+<span class="fc" id="L524">        }</span>
+        
+<span class="fc" id="L526">        return fields;</span>
+    }
+
+    /**
+     * Processes Mastercard reversal request.
+     *
+     * @param fields Message fields
+     * @param originalTransaction Original transaction
+     * @param processingCode Processing code
+     * @param posEntryMode POS entry mode
+     * @param posConditionCode POS condition code
+     * @param de90 Original data elements
+     * @return Processed fields
+     */
+    private Map&lt;Integer, String&gt; processMastercardReversal(RequestContext requestContext, Transaction originalTransaction,
+                                                          String processingCode, String posEntryMode, String posConditionCode, 
+                                                          String de90) {
+<span class="fc" id="L543">        Map&lt;Integer, String&gt; fields = requestContext.getFields();</span>
+<span class="fc" id="L544">        log.info(&quot;Processing Mastercard reversal request&quot;);</span>
+        
+        try {
+            // Mastercard-specific reversal logic
+            // Similar to Visa but with Mastercard-specific validations
+            
+<span class="pc bpc" id="L550" title="1 of 2 branches missed.">            if (fields.containsKey(4)) {</span>
+<span class="fc" id="L551">                String reversalAmount = fields.get(4);</span>
+<span class="pc bpc" id="L552" title="1 of 2 branches missed.">                String originalAmount = originalTransaction.getDe4AmountTransaction() != null ? </span>
+<span class="pc" id="L553">                        originalTransaction.getDe4AmountTransaction().toString() : null;</span>
+                
+<span class="pc bpc" id="L555" title="2 of 4 branches missed.">                if (originalAmount != null &amp;&amp; !reversalAmount.equals(originalAmount)) {</span>
+<span class="nc" id="L556">                    log.warn(&quot;Mastercard reversal amount mismatch&quot;);</span>
+<span class="nc" id="L557">                    responseAssembler.applyResponseCode(requestContext, InternalResCode.INVALID_AMOUNT);</span>
+<span class="nc" id="L558">                    return fields;</span>
+                }
+            }
+            
+<span class="fc" id="L562">            Transaction reversalTransaction = createReversalTransaction(originalTransaction, fields);</span>
+<span class="fc" id="L563">            Transaction savedReversal = transactionRepository.save(reversalTransaction);</span>
+            
+<span class="pc bpc" id="L565" title="1 of 2 branches missed.">            if (savedReversal != null) {</span>
+<span class="fc" id="L566">                log.info(&quot;Mastercard reversal transaction saved with ID: {}&quot;, savedReversal.getTransactionId());</span>
+<span class="fc" id="L567">                responseAssembler.applyResponseCode(requestContext, InternalResCode.APPROVED);</span>
+<span class="fc" id="L568">                applyReversalAuthCode(requestContext, originalTransaction);</span>
+            } else {
+<span class="nc" id="L570">                responseAssembler.applyResponseCode(requestContext, InternalResCode.SYSTEM_ERROR);</span>
+            }
+            
+<span class="fc" id="L573">        } catch (Exception e) {</span>
+<span class="fc" id="L574">            log.error(&quot;Error processing Mastercard reversal&quot;, e);</span>
+<span class="fc" id="L575">            responseAssembler.applyResponseCode(requestContext, InternalResCode.SYSTEM_ERROR);</span>
+<span class="fc" id="L576">        }</span>
+        
+<span class="fc" id="L578">        return fields;</span>
+    }
+
+    /**
+     * Creates a reversal transaction record based on the original transaction.
+     *
+     * @param originalTransaction The original transaction
+     * @param fields The reversal request fields
+     * @return New reversal transaction
+     */
+    private Transaction createReversalTransaction(Transaction originalTransaction, Map&lt;Integer, String&gt; fields) {
+<span class="fc" id="L589">        Transaction reversalTransaction = new Transaction();</span>
+        
+        // Copy original transaction data
+<span class="fc" id="L592">        reversalTransaction.setDe2Pan(originalTransaction.getDe2Pan());</span>
+<span class="fc" id="L593">        reversalTransaction.setDe2PanCt(originalTransaction.getDe2PanCt());</span>
+<span class="fc" id="L594">        reversalTransaction.setDe2PanIv(originalTransaction.getDe2PanIv());</span>
+<span class="fc" id="L595">        reversalTransaction.setDe2PanTag(originalTransaction.getDe2PanTag());</span>
+<span class="fc" id="L596">        reversalTransaction.setDe2PanMasked(originalTransaction.getDe2PanMasked());</span>
+<span class="fc" id="L597">        reversalTransaction.setTxnChdKeyVersion(originalTransaction.getTxnChdKeyVersion());</span>
+<span class="fc" id="L598">        reversalTransaction.setInstitutionId(originalTransaction.getInstitutionId());</span>
+<span class="fc" id="L599">        reversalTransaction.setPanLookupHmac(originalTransaction.getPanLookupHmac());</span>
+<span class="fc" id="L600">        reversalTransaction.setDe3ProcessingCode(originalTransaction.getDe3ProcessingCode());</span>
+<span class="fc" id="L601">        reversalTransaction.setDe4AmountTransaction(originalTransaction.getDe4AmountTransaction());</span>
+<span class="fc" id="L602">        reversalTransaction.setDe35Track2(null);</span>
+<span class="fc" id="L603">        reversalTransaction.setDe45Track1(null);</span>
+<span class="fc" id="L604">        reversalTransaction.setDe7TransmissionDatetime(fields.get(7)); // Use reversal time</span>
+<span class="fc" id="L605">        reversalTransaction.setDe11Stan(fields.get(11)); // Use reversal STAN</span>
+<span class="fc" id="L606">        reversalTransaction.setDe32AcquiringInstitutionId(originalTransaction.getDe32AcquiringInstitutionId());</span>
+<span class="fc" id="L607">        reversalTransaction.setDe37Rrn(originalTransaction.getDe37Rrn());</span>
+<span class="fc" id="L608">        reversalTransaction.setDe38AuthApprovalCode(originalTransaction.getDe38AuthApprovalCode()); // Use correct method name</span>
+<span class="fc" id="L609">        reversalTransaction.setDe41TerminalId(originalTransaction.getDe41TerminalId());</span>
+<span class="fc" id="L610">        reversalTransaction.setDe42CardAcceptorId(originalTransaction.getDe42CardAcceptorId());</span>
+<span class="fc" id="L611">        reversalTransaction.setDe48AdditionalDataPrivate(fields.get(48));</span>
+<span class="fc" id="L612">        reversalTransaction.setDe49CurrencyCodeTransaction(originalTransaction.getDe49CurrencyCodeTransaction());</span>
+<span class="fc" id="L613">        reversalTransaction.setDe90OriginalDataElements(fields.get(90)); // Store DE90</span>
+        
+        // Set reversal-specific fields
+<span class="fc" id="L616">        reversalTransaction.setMti(fields.get(0));</span>
+<span class="fc" id="L617">        reversalTransaction.setStatus(Transaction.Status.FAILED); // Use enum value</span>
+<span class="fc" id="L618">        reversalTransaction.setDe52PinBlock(null);</span>
+        // Note: originalTransactionId field doesn't exist in the entity, so we'll store it in a comment or additional field
+        
+<span class="fc" id="L621">        reversalTransaction.setTransactionId(transactionIdGeneratorService.nextTransactionId());</span>
+        
+<span class="fc" id="L623">        return reversalTransaction;</span>
+    }
+
+    /**
+     * Adds MAC to reversal response if MAC validation is enabled.
+     *
+     * @param fields The response fields
+     */
+    private void addMacToReversal(RequestContext requestContext) {
+        try {
+<span class="nc" id="L633">            Map&lt;Integer, String&gt; fields = requestContext.getFields();</span>
+<span class="nc" id="L634">            String de38 = fields.get(38);</span>
+<span class="nc bnc" id="L635" title="All 2 branches missed.">            if (de38 == null) de38 = &quot;&quot;;</span>
+            
+<span class="nc" id="L637">            String inputString = fields.get(0) + fields.get(2) + fields.get(3) + fields.get(4) + </span>
+<span class="nc" id="L638">                               fields.get(11) + fields.get(12) + fields.get(37) + de38 + fields.get(39);</span>
+<span class="nc" id="L639">            String mac = MacGeneration.generateMACvalue(getMacKey(), inputString);</span>
+            
+<span class="nc" id="L641">            Map&lt;String, String&gt; tlvMap = new java.util.HashMap&lt;&gt;(requestContext.getParsedTlv(48));</span>
+<span class="nc" id="L642">            tlvMap.remove(&quot;099&quot;);</span>
+<span class="nc" id="L643">            tlvMap.put(&quot;099&quot;, mac);</span>
+            
+<span class="nc" id="L645">            String tlvString = packTlv(tlvMap);</span>
+<span class="nc" id="L646">            fields.put(48, tlvString);</span>
+            
+<span class="nc" id="L648">            log.info(&quot;MAC added to reversal response&quot;);</span>
+<span class="nc" id="L649">            RawDataLogging.value(&quot;Reversal response MAC&quot;, mac);</span>
+<span class="nc" id="L650">        } catch (Exception e) {</span>
+<span class="nc" id="L651">            log.error(&quot;Error adding MAC to reversal response&quot;, e);</span>
+<span class="nc" id="L652">        }</span>
+<span class="nc" id="L653">    }</span>
+
+    /**
+     * Helper to get MAC key from properties or config.
+     */
+    private String getMacKey() {
+        // Ideally inject via @Value or config class, fallback to default
+<span class="nc" id="L660">        return System.getenv().getOrDefault(&quot;MAC_KEY&quot;, &quot;3EBF5B2F98FD3886BA4F34857504A7C8&quot;);</span>
+    }
+
+    /**
+     * Packs a map of tag-value pairs into TLV string format.
+     *
+     * @param tlvMap Map of tag-value pairs
+     * @return TLV formatted string
+     */
+    private String packTlv(Map&lt;String, String&gt; tlvMap) {
+<span class="nc" id="L670">        StringBuilder sb = new StringBuilder();</span>
+<span class="nc bnc" id="L671" title="All 2 branches missed.">        for (Map.Entry&lt;String, String&gt; entry : tlvMap.entrySet()) {</span>
+<span class="nc" id="L672">            String tag = entry.getKey();</span>
+<span class="nc" id="L673">            String value = entry.getValue();</span>
+<span class="nc" id="L674">            sb.append(String.format(&quot;%03d%03d%s&quot;, Integer.parseInt(tag), value.length(), value));</span>
+<span class="nc" id="L675">        }</span>
+<span class="nc" id="L676">        return sb.toString();</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.14.202510111229</span></div></body></html>

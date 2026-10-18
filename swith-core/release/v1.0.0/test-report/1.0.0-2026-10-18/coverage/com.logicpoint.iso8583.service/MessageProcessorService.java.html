@@ -1,0 +1,580 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>MessageProcessorService.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">iso8583-processor</a> &gt; <a href="index.source.html" class="el_package">com.logicpoint.iso8583.service</a> &gt; <span class="el_source">MessageProcessorService.java</span></div><h1>MessageProcessorService.java</h1><pre class="source lang-java linenums">package com.logicpoint.iso8583.service;
+
+import com.logicpoint.iso8583.context.RequestContext;
+import com.logicpoint.iso8583.context.TransactionChannel;
+import com.logicpoint.iso8583.model.Iso8583Message;
+import com.logicpoint.iso8583.model.MessageType;
+import com.logicpoint.iso8583.responsecode.InternalResCode;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+import org.springframework.stereotype.Service;
+
+import java.util.HashMap;
+import java.util.Map;
+import java.util.Objects;
+import java.util.Set;
+
+import com.logicpoint.iso8583.util.Scheme;
+import com.logicpoint.iso8583.validation.TransactionType;
+import java.time.LocalDateTime;
+import java.io.IOException;
+import java.math.BigDecimal;
+
+import com.logicpoint.iso8583.entity.Transaction;
+import com.logicpoint.iso8583.repository.TransactionRepository;
+
+import org.springframework.beans.factory.annotation.Autowired;
+
+import com.logicpoint.iso8583.hsm.DataEncryptor;
+import com.logicpoint.iso8583.config.RawDataLogging;
+
+import org.springframework.beans.factory.annotation.Value;
+
+
+/**
+ * Service class for processing ISO 8583 messages. Handles message validation,
+ * transaction type identification, and response generation.
+ *
+ * @author Logicpoint Sysytems
+ */
+@Service
+public class MessageProcessorService {
+
+<span class="fc" id="L43">    private static final Logger log = LoggerFactory.getLogger(MessageProcessorService.class);</span>
+<span class="fc" id="L44">    private static final Set&lt;TransactionType&gt; ATM_TRANSACTION_TYPES = Set.of(</span>
+            TransactionType.CASH_WITHDRAWAL, TransactionType.CASH_WITHDRAWAL_FALLBACK,
+            TransactionType.CASH_WITHDRAWAL_CONTACTLESS, TransactionType.BALANCE_ENQUIRY,
+            TransactionType.BALANCE_ENQUIRY_CL, TransactionType.MINI_STATEMENT,
+            TransactionType.PIN_CHANGE, TransactionType.SERVICE_CREATION,
+            TransactionType.SERVICE_CREATION_CONTACTLESS, TransactionType.MOBILE_NUMBER_UPDATE,
+            TransactionType.CHEQUEBOOK_REQUEST, TransactionType.AADHAR_INQUIRY,
+            TransactionType.BIOMETIC_VERIFICATION);
+<span class="fc" id="L52">    private static final Set&lt;TransactionType&gt; ECOMMERCE_TRANSACTION_TYPES = Set.of(</span>
+            TransactionType.ECOMMERCE, TransactionType.MOTO, TransactionType.IVR_PURCHASE,
+            TransactionType.EMI_PURCHASE, TransactionType.SI_REGISTRATION,
+            TransactionType.SI_EDIT, TransactionType.SI_TRANSACTION,
+            TransactionType.SI_DEREGISTRATION, TransactionType.SI_REVOKEALL,
+            TransactionType.SI_PAUSE, TransactionType.SI_START, TransactionType.SI_PDN);
+    private final TransactionRepository transactionRepository;
+    private final DataEncryptor dataEncryptor;
+    private final NettyHsmService nettyHsmService;
+    private final ReversalProcessorService reversalProcessService;
+    private final TransactionIdGeneratorService transactionIdGeneratorService;
+    private final ResponseAssembler responseAssembler;
+    private final DuplicateCheckService duplicateCheckService;
+    private final FinancialRequestProcessor financialRequestProcessor;
+    private final TransactionChdEncryptionService transactionChdEncryptionService;
+    private final IssuerMandateRevocationService issuerMandateRevocationService;
+
+    @Value(&quot;${scheme.rupay.mac.enabled:false}&quot;)
+    private boolean macValidationEnabled;
+    @Value(&quot;${scheme.rupay.mac.process:normal}&quot;)
+    private String macProcess;
+
+    /**
+     * Constructs a new MessageProcessorService. Initializes the validator with
+     * rules from the specified directory.
+     *
+     * @throws IOException if there's an error loading validation rules
+     */
+    @Autowired
+    public MessageProcessorService(
+            TransactionRepository transactionRepository,
+            DataEncryptor dataEncryptor,
+            NettyHsmService nettyHsmService,
+            ReversalProcessorService reversalProcessService,
+            TransactionIdGeneratorService transactionIdGeneratorService,
+            ResponseAssembler responseAssembler,
+            DuplicateCheckService duplicateCheckService,
+            FinancialRequestProcessor financialRequestProcessor,
+            TransactionChdEncryptionService transactionChdEncryptionService,
+            IssuerMandateRevocationService issuerMandateRevocationService
+<span class="fc" id="L92">    ) throws IOException {</span>
+<span class="fc" id="L93">        this.transactionRepository = transactionRepository;</span>
+<span class="fc" id="L94">        this.dataEncryptor = dataEncryptor;</span>
+<span class="fc" id="L95">        this.nettyHsmService = nettyHsmService;</span>
+<span class="fc" id="L96">        this.reversalProcessService = reversalProcessService;</span>
+<span class="fc" id="L97">        this.transactionIdGeneratorService = transactionIdGeneratorService;</span>
+<span class="fc" id="L98">        this.responseAssembler = responseAssembler;</span>
+<span class="fc" id="L99">        this.duplicateCheckService = duplicateCheckService;</span>
+<span class="fc" id="L100">        this.financialRequestProcessor = financialRequestProcessor;</span>
+<span class="fc" id="L101">        this.transactionChdEncryptionService = transactionChdEncryptionService;</span>
+<span class="fc" id="L102">        this.issuerMandateRevocationService = issuerMandateRevocationService;</span>
+<span class="fc" id="L103">    }</span>
+
+    /**
+     * Processes an ISO 8583 message based on its type and scheme.
+     *
+     * @param fields Map of ISO 8583 field numbers to their values
+     * @param scheme The payment scheme (e.g., RUPAY, VISA)
+     * @param mti Message Type Indicator
+     * @return Processed message fields with response codes
+     */
+    public Map&lt;Integer, String&gt; processMessage(RequestContext requestContext) {
+        try {
+<span class="fc" id="L115">            Map&lt;Integer, String&gt; fields = requestContext.getFields();</span>
+<span class="fc" id="L116">            Scheme scheme = requestContext.getScheme();</span>
+<span class="fc" id="L117">            String mti = requestContext.getMti();</span>
+<span class="fc" id="L118">            String uniqueTransactionId = requestContext.getUniqueTransactionId();</span>
+<span class="fc" id="L119">            MessageType messageType = MessageType.fromMti(mti);</span>
+<span class="fc" id="L120">            log.info(&quot;Processing message type: {}&quot;, messageType);</span>
+<span class="fc" id="L121">            identifyTransactionTypeForPersistence(requestContext, messageType);</span>
+<span class="fc" id="L122">            requestContext.setChannel(resolveTransactionChannel(requestContext));</span>
+            // Save transaction request details
+<span class="fc" id="L124">            String transactionId = transactionIdGeneratorService.nextTransactionId();</span>
+<span class="fc" id="L125">            Transaction transaction = mapTransaction(requestContext, transactionId);</span>
+<span class="fc" id="L126">            transaction.setMti(mti);</span>
+<span class="fc" id="L127">            log.info(&quot;Transaction ID: {}&quot;, transaction.getTransactionId());</span>
+<span class="fc bfc" id="L128" title="All 2 branches covered.">            if (duplicateCheckService.isDuplicate(requestContext)) {</span>
+<span class="fc" id="L129">                return fields;</span>
+            }
+            // Save both entities
+<span class="fc" id="L132">            Transaction savedTxn = transactionRepository.save(transaction);</span>
+<span class="fc bfc" id="L133" title="All 2 branches covered.">            if (savedTxn == null) {</span>
+<span class="fc" id="L134">                log.error(&quot;Failed to save transaction&quot;);</span>
+<span class="fc" id="L135">                return fields;</span>
+            }
+<span class="fc" id="L137">            log.info(&quot;Saved transaction reg with ID: {}&quot;, savedTxn.getTransactionId());</span>
+<span class="fc bfc" id="L138" title="All 5 branches covered.">            switch (messageType) {</span>
+                case FINANCIAL_REQUEST:
+<span class="fc" id="L140">                    Map&lt;Integer, String&gt; respFields = null;</span>
+<span class="pc bpc" id="L141" title="3 of 8 branches missed.">                    if (scheme == Scheme.RUPAY &amp;&amp; macValidationEnabled &amp;&amp; (&quot;0100&quot;.equals(mti) || &quot;0200&quot;.equals(mti))) {</span>
+<span class="fc" id="L142">                        log.info(&quot;MAC validation enabled for Scheme: {} and MTI: {}&quot;, scheme, mti);</span>
+<span class="fc" id="L143">                        boolean macValid = validateMAC(requestContext);</span>
+<span class="fc bfc" id="L144" title="All 2 branches covered.">                        if (!macValid) {</span>
+<span class="fc" id="L145">                            log.warn(&quot;MAC validation failed for Scheme: {} and MTI: {}&quot;, scheme, mti);</span>
+<span class="fc" id="L146">                            responseAssembler.setResponseMti(requestContext);</span>
+<span class="fc" id="L147">                            responseAssembler.applyResponseCode(requestContext, InternalResCode.MAC_FAIL);</span>
+<span class="pc bpc" id="L148" title="1 of 2 branches missed.">                            String tlvString = genMacAndUpdateTlv(requestContext, fields.get(0) + fields.get(2) + fields.get(3) + fields.get(4) + fields.get(11) + fields.get(12) + fields.get(37) + (fields.get(38) == null ? &quot;&quot; : fields.get(38)) + fields.get(39));</span>
+<span class="fc" id="L149">                            fields.put(48, tlvString);</span>
+<span class="fc" id="L150">                            return fields;</span>
+                        }
+<span class="fc" id="L152">                        log.info(&quot;MAC validation successful for Scheme: {} and MTI: {}&quot;, scheme, mti);</span>
+<span class="fc" id="L153">                        respFields = financialRequestProcessor.process(requestContext);</span>
+<span class="fc" id="L154">                    } else {</span>
+<span class="fc" id="L155">                        log.info(&quot;MAC validation disabled for Scheme: {} and MTI: {}&quot;, scheme, mti);</span>
+<span class="fc" id="L156">                        respFields = financialRequestProcessor.process(requestContext);</span>
+                    }
+<span class="pc bpc" id="L158" title="3 of 8 branches missed.">                    if (scheme == Scheme.RUPAY &amp;&amp; macValidationEnabled &amp;&amp; (&quot;0100&quot;.equals(mti) || &quot;0200&quot;.equals(mti))) {</span>
+<span class="pc bpc" id="L159" title="1 of 2 branches missed.">                        String tlvString = genMacAndUpdateTlv(requestContext, fields.get(0) + fields.get(2) + fields.get(3) + fields.get(4) + fields.get(11) + fields.get(12) + fields.get(37) +( fields.get(38) == null ? &quot;&quot; : fields.get(38)) + fields.get(39));</span>
+<span class="fc" id="L160">                        respFields.put(48, tlvString);</span>
+                    }
+<span class="fc" id="L162">                    persistApprovalData(savedTxn, respFields);</span>
+<span class="fc" id="L163">                    return respFields;</span>
+                case REVERSAL_REQUEST:
+<span class="fc" id="L165">                    requestContext.setTransactionType(TransactionType.REVERSAL);</span>
+<span class="fc" id="L166">                    return processReversalRequest(requestContext);</span>
+                case NETWORK_MANAGEMENT_REQUEST:
+<span class="fc" id="L168">                    requestContext.setTransactionType(TransactionType.UNKNOWN);</span>
+<span class="fc" id="L169">                    return processNetworkRequest(requestContext);</span>
+                case ACTION_RESPONSE:
+<span class="fc" id="L171">                    issuerMandateRevocationService.reconcile(scheme, toIso8583Message(requestContext));</span>
+<span class="fc" id="L172">                    fields.put(0, mti);</span>
+<span class="fc" id="L173">                    return fields;</span>
+                default:
+<span class="fc" id="L175">                    log.warn(&quot;Unsupported message type: {}&quot;, messageType);</span>
+<span class="fc" id="L176">                    return fields;</span>
+            }
+<span class="fc" id="L178">        } catch (Exception e) {</span>
+<span class="fc" id="L179">            log.error(&quot;Error processing message&quot;, e);</span>
+<span class="fc" id="L180">            throw new RuntimeException(&quot;Failed to process message&quot;, e);</span>
+        }
+    }
+
+    private void persistApprovalData(Transaction transaction, Map&lt;Integer, String&gt; fields) {
+<span class="pc bpc" id="L185" title="2 of 6 branches missed.">        if (transaction == null || fields == null || !&quot;00&quot;.equals(fields.get(39))) {</span>
+<span class="fc" id="L186">            return;</span>
+        }
+
+<span class="fc" id="L189">        String authCode = fields.get(38);</span>
+<span class="pc bpc" id="L190" title="2 of 4 branches missed.">        if (authCode == null || authCode.isBlank()) {</span>
+<span class="nc" id="L191">            return;</span>
+        }
+
+<span class="fc" id="L194">        transaction.setDe38AuthApprovalCode(authCode);</span>
+<span class="fc" id="L195">        transaction.setStatus(Transaction.Status.SUCCESS);</span>
+<span class="fc" id="L196">        transactionRepository.save(transaction);</span>
+<span class="fc" id="L197">    }</span>
+
+    private Iso8583Message toIso8583Message(RequestContext requestContext) {
+<span class="fc" id="L200">        Iso8583Message message = new Iso8583Message();</span>
+<span class="fc" id="L201">        message.setScheme(requestContext.getScheme());</span>
+<span class="fc" id="L202">        message.setMti(requestContext.getMti());</span>
+<span class="fc" id="L203">        message.setUniqueTransactionId(requestContext.getUniqueTransactionId());</span>
+<span class="fc" id="L204">        message.setFields(new HashMap&lt;&gt;(requestContext.getFields()));</span>
+<span class="fc" id="L205">        return message;</span>
+    }
+
+    private String genMacAndUpdateTlv(RequestContext requestContext, String inputStr) {
+<span class="fc" id="L209">        RawDataLogging.value(&quot;Response MAC input&quot;, inputStr);</span>
+<span class="fc" id="L210">        RawDataLogging.value(&quot;Response DE48&quot;, requestContext.getFields().get(48));</span>
+        //String genMac = nettyHsmService.generateMac(inputStr, &quot;RUPAY&quot;);
+<span class="fc" id="L212">        String mac = nettyHsmService.generateMac(inputStr, &quot;RUPAY&quot;);//MacGeneration.generateMACvalue(getMacKey(), inputStr);</span>
+        //String mac = &quot;E62C83E14A0CA802&quot;; // to simulate 
+<span class="pc bpc" id="L214" title="1 of 2 branches missed.">        if(macProcess.equalsIgnoreCase(&quot;invalid&quot;)) {</span>
+<span class="nc" id="L215">            String shuffledMac = &quot;&quot;;</span>
+<span class="nc bnc" id="L216" title="All 2 branches missed.">            while (mac.length() != 0)</span>
+            {
+<span class="nc" id="L218">                int index = (int) Math.floor(Math.random() * mac.length());</span>
+<span class="nc" id="L219">                char c = mac.charAt(index);</span>
+<span class="nc" id="L220">                mac = mac.substring(0,index)+mac.substring(index+1);</span>
+<span class="nc" id="L221">                shuffledMac += c;</span>
+<span class="nc" id="L222">            }</span>
+<span class="nc" id="L223">            mac = shuffledMac;</span>
+        }
+<span class="fc" id="L225">        Map&lt;String, String&gt; tlvMap = new HashMap&lt;&gt;(requestContext.getParsedTlv(48));</span>
+<span class="fc" id="L226">        tlvMap.remove(&quot;099&quot;);</span>
+<span class="fc bfc" id="L227" title="All 2 branches covered.">       if(!macProcess.equalsIgnoreCase(&quot;omit&quot;)) {</span>
+<span class="fc" id="L228">        tlvMap.put(&quot;099&quot;, mac);</span>
+       }
+<span class="fc bfc" id="L230" title="All 2 branches covered.">        if(tlvMap.containsKey(&quot;058&quot;))  tlvMap.remove(&quot;058&quot;); // remove 058 tag from the tlv map in response</span>
+<span class="pc bpc" id="L231" title="1 of 2 branches missed.">        if(!tlvMap.containsKey(&quot;054&quot;))  tlvMap.put(&quot;054&quot;, &quot;N&quot;);  // add 054 tag value with 'N' for mac failed scenario</span>
+<span class="fc" id="L232">        RawDataLogging.value(&quot;Response MAC input string&quot;, inputStr);</span>
+<span class="fc" id="L233">        RawDataLogging.value(&quot;Response TLV map after MAC update&quot;, tlvMap);</span>
+<span class="fc" id="L234">        String tlvString = packTlv(tlvMap);</span>
+<span class="fc" id="L235">        RawDataLogging.value(&quot;Response MAC&quot;, mac);</span>
+<span class="fc" id="L236">        RawDataLogging.value(&quot;Response TLV string&quot;, tlvString);</span>
+<span class="fc" id="L237">        return packTlv(tlvMap);</span>
+
+    }
+
+    /**
+     * Helper to get MAC key from properties or config.
+     */
+    private String getMacKey() {
+        // Ideally inject via @Value or config class, fallback to default
+<span class="fc" id="L246">        return System.getenv().getOrDefault(&quot;MAC_KEY&quot;, &quot;3EBF5B2F98FD3886BA4F34857504A7C8&quot;);</span>
+    }
+
+    /**
+     * Packs a map of tag-value pairs into TLV string format.
+     *
+     * @param tlvMap Map of tag-value pairs
+     * @return TLV formatted string
+     */
+    private String packTlv(Map&lt;String, String&gt; tlvMap) {
+<span class="fc" id="L256">        StringBuilder sb = new StringBuilder();</span>
+<span class="fc bfc" id="L257" title="All 2 branches covered.">        for (Map.Entry&lt;String, String&gt; entry : tlvMap.entrySet()) {</span>
+<span class="fc" id="L258">            String tag = entry.getKey();</span>
+<span class="fc" id="L259">            String value = entry.getValue();</span>
+<span class="fc" id="L260">            sb.append(String.format(&quot;%03d%03d%s&quot;, Integer.parseInt(tag), value.length(), value));</span>
+<span class="fc" id="L261">        }</span>
+<span class="fc" id="L262">        return sb.toString();</span>
+    }
+
+    /**
+     * Maps ISO 8583 fields to a Transaction entity.
+     *
+     * @param requestContext request-scoped transaction context
+     * @return Mapped Transaction entity
+     */
+    private Transaction mapTransaction(RequestContext requestContext, String transactionId) {
+<span class="fc" id="L272">        Map&lt;Integer, String&gt; fields = requestContext.getFields();</span>
+<span class="fc" id="L273">        Transaction transaction = new Transaction();</span>
+
+        try {
+<span class="fc" id="L276">            transaction.setTransactionId(transactionId);</span>
+<span class="pc bpc" id="L277" title="2 of 4 branches missed.">            if (requestContext.getInstitutionId() != null &amp;&amp; !requestContext.getInstitutionId().isBlank()) {</span>
+                try {
+<span class="fc" id="L279">                    transaction.setInstitutionId(Integer.valueOf(requestContext.getInstitutionId()));</span>
+<span class="nc" id="L280">                } catch (NumberFormatException ex) {</span>
+<span class="nc" id="L281">                    log.warn(&quot;Unable to parse institution id {} for transaction {}&quot;, requestContext.getInstitutionId(), requestContext.getUniqueTransactionId());</span>
+<span class="fc" id="L282">                }</span>
+            }
+<span class="pc bpc" id="L284" title="1 of 2 branches missed.">            if (fields.containsKey(2)) {</span>
+<span class="fc" id="L285">                String pan = fields.get(2);</span>
+<span class="fc" id="L286">                transaction.setDe2Pan(pan);</span>
+                // Masked PAN remains the same
+<span class="fc" id="L288">                String maskedPan = pan.substring(0, 6) + &quot;******&quot; + pan.substring(pan.length() - 4);</span>
+<span class="fc" id="L289">                transaction.setDe2PanMasked(maskedPan);</span>
+            }
+
+<span class="pc bpc" id="L292" title="1 of 2 branches missed.">            if (fields.containsKey(14)) {</span>
+                // Intentionally not persisted in transaction history; PAN is the only encrypted CHD field retained.
+            }
+
+<span class="pc bpc" id="L296" title="1 of 2 branches missed.">            if (fields.containsKey(35)) {</span>
+                // Intentionally not persisted in transaction history.
+            }
+
+<span class="pc bpc" id="L300" title="1 of 2 branches missed.">            if (fields.containsKey(45)) {</span>
+                // Intentionally not persisted in transaction history.
+            }
+
+<span class="pc bpc" id="L304" title="1 of 2 branches missed.">            if (fields.containsKey(3)) {</span>
+<span class="fc" id="L305">                transaction.setDe3ProcessingCode(fields.get(3));</span>
+            }
+
+<span class="pc bpc" id="L308" title="1 of 2 branches missed.">            if (fields.containsKey(4)) {</span>
+<span class="fc" id="L309">                transaction.setDe4AmountTransaction(new BigDecimal(Long.parseLong(fields.get(4)) / 100.0));</span>
+            }
+
+<span class="pc bpc" id="L312" title="1 of 2 branches missed.">            if (fields.containsKey(7)) {</span>
+                // Parse transmission datetime from field 7 (MMDDhhmmss)
+<span class="fc" id="L314">                String f7 = fields.get(7);</span>
+<span class="fc" id="L315">                transaction.setDe7TransmissionDatetime(f7); // Set actual parsed datetime</span>
+            }
+
+<span class="pc bpc" id="L318" title="1 of 2 branches missed.">            if (fields.containsKey(11)) {</span>
+<span class="fc" id="L319">                transaction.setDe11Stan(fields.get(11));</span>
+            }
+
+<span class="pc bpc" id="L322" title="1 of 2 branches missed.">            if (fields.containsKey(12)) {</span>
+<span class="fc" id="L323">                transaction.setDe12LocalTime(fields.get(12));</span>
+            }
+
+<span class="pc bpc" id="L326" title="1 of 2 branches missed.">            if (fields.containsKey(13)) {</span>
+<span class="fc" id="L327">                transaction.setDe13LocalDate(fields.get(13));</span>
+            }
+            
+<span class="pc bpc" id="L330" title="1 of 2 branches missed.">            if (fields.containsKey(18)) {</span>
+<span class="fc" id="L331">                transaction.setDe18MerchantType(fields.get(18));</span>
+            }
+
+<span class="pc bpc" id="L334" title="1 of 2 branches missed.">            if (fields.containsKey(19)) {</span>
+<span class="fc" id="L335">                transaction.setDe19AcquiringCountryCode(fields.get(19));</span>
+            }
+
+<span class="pc bpc" id="L338" title="1 of 2 branches missed.">            if (fields.containsKey(22)) {</span>
+<span class="fc" id="L339">                transaction.setDe22PosEntryMode(fields.get(22));</span>
+            }
+
+<span class="pc bpc" id="L342" title="1 of 2 branches missed.">            if (fields.containsKey(25)) {</span>
+<span class="fc" id="L343">                transaction.setDe25PosConditionCode(fields.get(25));</span>
+            }
+
+<span class="pc bpc" id="L346" title="1 of 2 branches missed.">            if (fields.containsKey(32)) {</span>
+<span class="fc" id="L347">                transaction.setDe32AcquiringInstitutionId(fields.get(32));</span>
+            }
+
+<span class="pc bpc" id="L350" title="1 of 2 branches missed.">            if (fields.containsKey(37)) {</span>
+<span class="fc" id="L351">                transaction.setDe37Rrn(fields.get(37));</span>
+            }
+
+<span class="pc bpc" id="L354" title="1 of 2 branches missed.">            if (fields.containsKey(41)) {</span>
+<span class="fc" id="L355">                transaction.setDe41TerminalId(fields.get(41));</span>
+            }
+
+<span class="pc bpc" id="L358" title="1 of 2 branches missed.">            if (fields.containsKey(42)) {</span>
+<span class="fc" id="L359">                transaction.setDe42CardAcceptorId(fields.get(42));</span>
+            }
+
+<span class="pc bpc" id="L362" title="1 of 2 branches missed.">            if (fields.containsKey(48)) {</span>
+<span class="fc" id="L363">                transaction.setDe48AdditionalDataPrivate(fields.get(48));</span>
+            }
+
+<span class="pc bpc" id="L366" title="1 of 2 branches missed.">            if (fields.containsKey(49)) {</span>
+<span class="fc" id="L367">                transaction.setDe49CurrencyCodeTransaction(fields.get(49));</span>
+            }
+<span class="pc bpc" id="L369" title="1 of 2 branches missed.">            if (fields.containsKey(54)) {</span>
+<span class="fc" id="L370">                transaction.setDe54AdditionalAmounts(fields.get(54));</span>
+            }
+<span class="pc bpc" id="L372" title="1 of 2 branches missed.">            if (fields.containsKey(60)) {</span>
+<span class="fc" id="L373">                transaction.setDe60TerminalData(fields.get(60));</span>
+            }
+<span class="pc bpc" id="L375" title="1 of 2 branches missed.">            if (fields.containsKey(61)) {</span>
+<span class="fc" id="L376">                transaction.setDe61PosData(fields.get(61));</span>
+            }
+<span class="pc bpc" id="L378" title="1 of 2 branches missed.">            if (fields.containsKey(90)) {</span>
+<span class="fc" id="L379">                transaction.setDe90OriginalDataElements(fields.get(90));</span>
+            }
+
+<span class="fc" id="L382">            transaction.setCreatedAt(LocalDateTime.now());</span>
+<span class="fc" id="L383">            transaction.setStatus(Transaction.Status.PENDING);</span>
+<span class="fc" id="L384">            transaction.setTransactionType(requestContext.getTransactionType());</span>
+<span class="fc" id="L385">            transaction.setSourceChannel(requestContext.getChannel().name());</span>
+<span class="fc" id="L386">            transaction.setPanLookupHmac(null);</span>
+<span class="fc" id="L387">            transaction.setDe52PinBlock(null);</span>
+<span class="fc" id="L388">            transactionChdEncryptionService.applyOnWrite(transaction, requestContext);</span>
+
+<span class="fc" id="L390">        } catch (Exception e) {</span>
+<span class="fc" id="L391">            log.error(&quot;Encryption failed&quot;, e);</span>
+<span class="fc" id="L392">            throw new RuntimeException(&quot;Failed to encrypt sensitive data&quot;);</span>
+<span class="fc" id="L393">        }</span>
+
+<span class="fc" id="L395">        return transaction;</span>
+    }
+
+    private void identifyTransactionTypeForPersistence(
+            RequestContext requestContext,
+            MessageType messageType) {
+        try {
+<span class="fc bfc" id="L402" title="All 3 branches covered.">            TransactionType transactionType = switch (messageType) {</span>
+<span class="fc" id="L403">                case FINANCIAL_REQUEST -&gt; financialRequestProcessor.identifyTransactionType(requestContext);</span>
+<span class="fc" id="L404">                case REVERSAL_REQUEST -&gt; TransactionType.REVERSAL;</span>
+<span class="fc" id="L405">                default -&gt; TransactionType.UNKNOWN;</span>
+            };
+<span class="fc" id="L407">            requestContext.setTransactionType(transactionType);</span>
+<span class="fc" id="L408">        } catch (Exception ex) {</span>
+<span class="fc" id="L409">            requestContext.setTransactionType(TransactionType.UNKNOWN);</span>
+<span class="fc" id="L410">            log.warn(&quot;Transaction type identification failed before persistence; storing as UNKNOWN: {}&quot;,</span>
+<span class="fc" id="L411">                    ex.getMessage());</span>
+<span class="fc" id="L412">        }</span>
+<span class="fc" id="L413">    }</span>
+
+    private TransactionChannel resolveTransactionChannel(RequestContext requestContext) {
+<span class="fc" id="L416">        TransactionType type = requestContext.getTransactionType();</span>
+<span class="pc bpc" id="L417" title="2 of 4 branches missed.">        if (type != null &amp;&amp; ATM_TRANSACTION_TYPES.contains(type)) {</span>
+<span class="nc" id="L418">            return TransactionChannel.ATM;</span>
+        }
+<span class="pc bpc" id="L420" title="1 of 4 branches missed.">        if (type != null &amp;&amp; ECOMMERCE_TRANSACTION_TYPES.contains(type)) {</span>
+<span class="fc" id="L421">            return TransactionChannel.ECOMMERCE;</span>
+        }
+
+<span class="fc" id="L424">        String entryMode = requestContext.getFields().get(22);</span>
+<span class="fc" id="L425">        String conditionCode = requestContext.getFields().get(25);</span>
+<span class="fc" id="L426">        String processingCode = requestContext.getFields().get(3);</span>
+<span class="pc bpc" id="L427" title="1 of 2 branches missed.">        if (startsWithAny(entryMode, &quot;001&quot;, &quot;011&quot;, &quot;061&quot;, &quot;810&quot;, &quot;811&quot;)</span>
+<span class="pc bpc" id="L428" title="2 of 4 branches missed.">                || &quot;59&quot;.equals(conditionCode) || &quot;08&quot;.equals(conditionCode)</span>
+<span class="pc bpc" id="L429" title="2 of 4 branches missed.">                || &quot;06&quot;.equals(conditionCode) || &quot;07&quot;.equals(conditionCode)) {</span>
+<span class="nc" id="L430">            return TransactionChannel.ECOMMERCE;</span>
+        }
+<span class="fc bfc" id="L432" title="All 2 branches covered.">        if (startsWithAny(processingCode, &quot;01&quot;, &quot;30&quot;, &quot;31&quot;, &quot;38&quot;, &quot;40&quot;, &quot;91&quot;)</span>
+<span class="pc bpc" id="L433" title="1 of 2 branches missed.">                || startsWithAny(entryMode, &quot;010&quot;, &quot;020&quot;)</span>
+<span class="pc bpc" id="L434" title="2 of 4 branches missed.">                || &quot;51&quot;.equals(conditionCode) || &quot;52&quot;.equals(conditionCode)) {</span>
+<span class="fc" id="L435">            return TransactionChannel.ATM;</span>
+        }
+<span class="fc" id="L437">        return TransactionChannel.POS;</span>
+    }
+
+    private boolean startsWithAny(String value, String... prefixes) {
+<span class="pc bpc" id="L441" title="2 of 4 branches missed.">        if (value == null || value.isBlank()) {</span>
+<span class="nc" id="L442">            return false;</span>
+        }
+<span class="fc bfc" id="L444" title="All 2 branches covered.">        for (String prefix : prefixes) {</span>
+<span class="fc bfc" id="L445" title="All 2 branches covered.">            if (value.startsWith(prefix)) {</span>
+<span class="fc" id="L446">                return true;</span>
+            }
+        }
+<span class="fc" id="L449">        return false;</span>
+    }
+
+    /**
+     * Processes a reversal request.
+     *
+     * @param fields Map of ISO 8583 field numbers to their values
+     * @param scheme The payment scheme
+     * @return Processed message fields with response codes
+     */
+    private Map&lt;Integer, String&gt; processReversalRequest(RequestContext requestContext) {
+<span class="fc" id="L460">        Map&lt;Integer, String&gt; fields = requestContext.getFields();</span>
+
+        // Call the reversalProcessService to process the transaction
+<span class="pc bpc" id="L463" title="1 of 2 branches missed.">        if (reversalProcessService != null) {</span>
+            try {
+<span class="fc" id="L465">                Map&lt;Integer, String&gt; processedFields = reversalProcessService.processReversalRequest(requestContext); //processReversal(fields, scheme);</span>
+<span class="pc bpc" id="L466" title="1 of 2 branches missed.">                if (processedFields != null) {</span>
+<span class="fc" id="L467">                    fields.putAll(processedFields);</span>
+<span class="fc" id="L468">                    responseAssembler.setResponseMti(requestContext);</span>
+<span class="fc" id="L469">                    log.info(&quot;Reversal processed successfully by reversalProcessService.&quot;);</span>
+                } else {
+<span class="nc" id="L471">                    log.warn(&quot;reversalProcessService returned null for reversal processing.&quot;);</span>
+                }
+<span class="fc" id="L473">            } catch (Exception ex) {</span>
+<span class="fc" id="L474">                log.error(&quot;Error processing reversal via reversalProcessService&quot;, ex);</span>
+<span class="fc" id="L475">                responseAssembler.applyResponseCode(requestContext, InternalResCode.SYSTEM_ERROR);</span>
+<span class="fc" id="L476">                return fields;</span>
+<span class="fc" id="L477">            }</span>
+        } else {
+<span class="nc" id="L479">            log.warn(&quot;reversalProcessService bean is not available. Skipping external reversal processing.&quot;);</span>
+<span class="nc" id="L480">            responseAssembler.applyResponseCode(requestContext, InternalResCode.SYSTEM_ERROR);</span>
+<span class="nc" id="L481">            return fields;</span>
+        }
+<span class="fc" id="L483">        return fields;</span>
+    }
+
+    /**
+     * Validates MAC for the transaction.
+     *
+     * @param fields Map of ISO 8583 field numbers to their values
+     * @param mti Message Type Indicator
+     * @return true if MAC is valid, false otherwise
+     */
+    private boolean validateMAC(RequestContext requestContext) {
+<span class="fc" id="L494">        Map&lt;Integer, String&gt; fields = requestContext.getFields();</span>
+<span class="fc" id="L495">        String mti = requestContext.getMti();</span>
+        // get the MAC from the fields
+<span class="fc" id="L497">        String key = getMacKey();</span>
+<span class="fc" id="L498">        String inputString = mti + fields.get(2) + fields.get(3) + fields.get(4) + fields.get(11) + fields.get(12) + fields.get(37);</span>
+<span class="fc" id="L499">        Map&lt;String, String&gt; tlvMap = requestContext.getParsedTlv(48);</span>
+
+<span class="fc" id="L501">        String reqMac = tlvMap.get(&quot;099&quot;);</span>
+<span class="fc bfc" id="L502" title="All 2 branches covered.">        if (reqMac != null) {</span>
+<span class="fc" id="L503">            RawDataLogging.value(&quot;MAC key&quot;, key);</span>
+<span class="fc" id="L504">            RawDataLogging.value(&quot;Request MAC input&quot;, inputString);</span>
+<span class="fc" id="L505">            RawDataLogging.value(&quot;Request MAC&quot;, reqMac);</span>
+<span class="fc" id="L506">            boolean macValid = nettyHsmService.verifyMac(inputString, reqMac, &quot;RUPAY&quot;);</span>
+<span class="fc" id="L507">            log.debug(&quot;MAC validation result: {}&quot;, macValid);</span>
+<span class="fc" id="L508">            return macValid;</span>
+           /* String genMac = MacGeneration.generateMACvalue(key, inputString);
+           
+            RawDataLogging.value(&quot;Generated MAC&quot;, genMac);
+            if (genMac != null &amp;&amp; genMac.equals(reqMac)) {
+                return true;
+            } else {
+                return false;
+            } */
+        } else {
+<span class="fc" id="L518">            return false;</span>
+        }
+    }
+
+    /**
+     * Processes a network management request.
+     *
+     * @param fields Map of ISO 8583 field numbers to their values
+     * @return Processed message fields with response codes
+     */
+    private Map&lt;Integer, String&gt; processNetworkRequest(RequestContext requestContext) {
+<span class="fc" id="L529">        log.info(&quot;Processing network management request&quot;);</span>
+<span class="fc" id="L530">        responseAssembler.setResponseMti(requestContext);</span>
+<span class="fc" id="L531">        responseAssembler.applyResponseCode(requestContext, InternalResCode.APPROVED);</span>
+<span class="fc" id="L532">        return requestContext.getFields();</span>
+    }
+
+    /**
+     * Builds a composite key for transaction identification.
+     *
+     * @param processingCode Processing code
+     * @param entryMode Entry mode
+     * @param posConditionCode POS condition code
+     * @return Composite key string
+     */
+    protected String buildCompositeKey(String processingCode, String entryMode, String posConditionCode) {
+<span class="fc" id="L544">        return String.format(&quot;%s|%s|%s&quot;,</span>
+<span class="fc" id="L545">                Objects.requireNonNull(processingCode, &quot;Processing code cannot be null&quot;),</span>
+<span class="fc" id="L546">                Objects.requireNonNull(entryMode, &quot;Entry mode cannot be null&quot;),</span>
+<span class="fc" id="L547">                Objects.requireNonNull(posConditionCode, &quot;POS condition code cannot be null&quot;)</span>
+        );
+    }
+
+    /**
+     * Exception for unknown transaction types.
+     */
+    public static class UnknownTransactionException extends RuntimeException {
+
+        public UnknownTransactionException(String message) {
+<span class="fc" id="L557">            super(message);</span>
+<span class="fc" id="L558">        }</span>
+
+        public UnknownTransactionException(String message, Throwable cause) {
+<span class="fc" id="L561">            super(message, cause);</span>
+<span class="fc" id="L562">        }</span>
+    }
+
+    /**
+     * Exception for invalid transactions.
+     */
+    public static class InvalidTransactionException extends RuntimeException {
+
+        public InvalidTransactionException(String message) {
+<span class="fc" id="L571">            super(message);</span>
+<span class="fc" id="L572">        }</span>
+
+        public InvalidTransactionException(String message, Throwable cause) {
+<span class="fc" id="L575">            super(message, cause);</span>
+<span class="fc" id="L576">        }</span>
+    }
+
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.14.202510111229</span></div></body></html>

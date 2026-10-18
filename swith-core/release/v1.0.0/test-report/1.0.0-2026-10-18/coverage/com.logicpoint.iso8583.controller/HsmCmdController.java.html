@@ -1,0 +1,185 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>HsmCmdController.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">iso8583-processor</a> &gt; <a href="index.source.html" class="el_package">com.logicpoint.iso8583.controller</a> &gt; <span class="el_source">HsmCmdController.java</span></div><h1>HsmCmdController.java</h1><pre class="source lang-java linenums">package com.logicpoint.iso8583.controller;
+
+import java.util.Map;
+import java.util.HashMap;
+
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.web.bind.annotation.RestController;
+import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.RequestParam;
+
+import com.logicpoint.iso8583.service.ChdKeyProvisioningService;
+import com.logicpoint.iso8583.service.ChdKeyCacheService;
+import com.logicpoint.iso8583.service.NettyHsmService;
+import com.logicpoint.iso8583.service.HsmKeepAliveServiceInterface;
+import com.logicpoint.iso8583.service.CardDataEncryptionService;
+import com.logicpoint.iso8583.service.CacheInitializationService;
+import com.logicpoint.iso8583.service.EncryptedFieldValue;
+import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.RequestBody;
+import org.springframework.beans.factory.annotation.Value;
+import org.springframework.http.HttpStatus;
+import org.springframework.web.server.ResponseStatusException;
+
+
+
+@RestController
+<span class="fc" id="L27">public class HsmCmdController {</span>
+
+  @Value(&quot;${security.administrative-api.raw-hsm-command-enabled:false}&quot;)
+  private boolean rawHsmCommandEnabled;
+
+  @Autowired
+  private NettyHsmService nettyHsmService;
+
+    @Autowired
+    private ChdKeyProvisioningService chdKeyProvisioningService;
+
+    @Autowired
+    private ChdKeyCacheService chdKeyCacheService;
+
+    @Autowired
+    private CardDataEncryptionService cardDataEncryptionService;
+
+    @Autowired
+    private CacheInitializationService cacheInitializationService;
+  
+    @Autowired
+    private HsmKeepAliveServiceInterface keepAliveService;
+
+    @GetMapping(&quot;/hsm/cmd/echo&quot;)
+    public String getHsmCmd(@RequestParam String cmd) { //@RequestParam is used to get the value of the parameter from the request
+      //  FuturexHsmCmd futurexHsmCmd = new FuturexHsmCmd()
+      // nettyHsmService = new NettyHsmService(new SimpleNettyHsmClient());
+<span class="fc" id="L54">      boolean isConnected = nettyHsmService.testConnection();</span>
+<span class="fc bfc" id="L55" title="All 2 branches covered.">      if(isConnected){</span>
+<span class="fc" id="L56">        return &quot;HSM is connected&quot;;</span>
+      }else{
+<span class="fc" id="L58">        return &quot;HSM is not connected&quot;;</span>
+      }
+    }
+
+    @PostMapping(&quot;hsm/cmd/execute&quot;)
+    public String exeCmd(@RequestBody String entity) {
+<span class="fc bfc" id="L64" title="All 2 branches covered.">      if (!rawHsmCommandEnabled) {</span>
+<span class="fc" id="L65">        throw new ResponseStatusException(HttpStatus.NOT_FOUND);</span>
+      }
+        //TODO: process POST request
+    try {
+<span class="fc" id="L69">        String response = nettyHsmService.sendMessage(entity);</span>
+<span class="fc" id="L70">        return response;</span>
+<span class="fc" id="L71">    } catch (Exception e) {</span>
+<span class="fc" id="L72">        return &quot;Error: &quot; + e.getMessage();</span>
+    }
+    }
+   
+    
+    @GetMapping(&quot;/hsm/cmd/poolstatus&quot;)
+    public String getPoolStatus() {
+<span class="fc" id="L79">      return nettyHsmService.getPoolStats();</span>
+    }
+
+    @GetMapping(&quot;/hsm/cmd/keepalive/status&quot;)
+    public String getKeepAliveStatus() {
+<span class="fc" id="L84">      return keepAliveService.getKeepAliveStats();</span>
+    }
+
+    @GetMapping(&quot;/hsm/cmd/keepalive/healthcheck&quot;)
+    public String forceHealthCheck() {
+<span class="fc" id="L89">      keepAliveService.forceHealthCheck();</span>
+<span class="fc" id="L90">      return &quot;Health check initiated&quot;;</span>
+    }
+
+    @GetMapping(&quot;/hsm/cmd/keepalive/stats&quot;)
+    public String getDetailedKeepAliveStats() {
+<span class="fc" id="L95">      StringBuilder stats = new StringBuilder();</span>
+<span class="fc" id="L96">      stats.append(&quot;Keep-alive Service Status:\n&quot;);</span>
+<span class="fc" id="L97">      stats.append(&quot;- Running: &quot;).append(keepAliveService.isRunning()).append(&quot;\n&quot;);</span>
+<span class="fc" id="L98">      stats.append(&quot;- Last Activity: &quot;).append(keepAliveService.getLastActivityTime()).append(&quot;\n&quot;);</span>
+<span class="fc" id="L99">      stats.append(&quot;- Time Since Last Activity: &quot;).append(keepAliveService.getTimeSinceLastActivity()).append(&quot; ms\n&quot;);</span>
+<span class="fc" id="L100">      stats.append(&quot;- Total Connections: &quot;).append(keepAliveService.getTotalConnectionCount()).append(&quot;\n&quot;);</span>
+<span class="fc" id="L101">      stats.append(&quot;- Healthy Connections: &quot;).append(keepAliveService.getHealthyConnectionCount()).append(&quot;\n&quot;);</span>
+<span class="fc" id="L102">      stats.append(&quot;- Unhealthy Connections: &quot;).append(keepAliveService.getUnhealthyConnectionCount()).append(&quot;\n&quot;);</span>
+<span class="fc" id="L103">      stats.append(&quot;\n&quot;).append(keepAliveService.getKeepAliveStats());</span>
+<span class="fc" id="L104">      return stats.toString();</span>
+    }
+
+    @PostMapping(&quot;/hsm/chd-keys/provision&quot;)
+    public Map&lt;String, String&gt; provisionChdKeys(@RequestParam Integer institutionId) {
+<span class="fc" id="L109">      return chdKeyProvisioningService.provisionDefaultKeys(institutionId);</span>
+    }
+
+    @GetMapping(&quot;/hsm/chd-keys/status&quot;)
+    public Map&lt;String, Object&gt; getChdKeyStatus(@RequestParam(required = false) Integer institutionId) {
+<span class="fc" id="L114">      return chdKeyCacheService.getStatus(institutionId);</span>
+    }
+
+    @PostMapping(&quot;/hsm/chd-pan/encrypt&quot;)
+    public Map&lt;String, Object&gt; encryptPan(@RequestBody PanEncryptionRequest request) {
+<span class="fc" id="L119">      Map&lt;String, Object&gt; response = new HashMap&lt;&gt;();</span>
+
+<span class="pc bpc" id="L121" title="1 of 6 branches missed.">      if (request == null || request.getPan() == null || request.getPan().isBlank()) {</span>
+<span class="fc" id="L122">        response.put(&quot;success&quot;, false);</span>
+<span class="fc" id="L123">        response.put(&quot;message&quot;, &quot;PAN is required&quot;);</span>
+<span class="fc" id="L124">        return response;</span>
+      }
+
+<span class="fc" id="L127">      String pan = request.getPan().trim();</span>
+<span class="fc bfc" id="L128" title="All 2 branches covered.">      if (pan.length() &lt; 6) {</span>
+<span class="fc" id="L129">        response.put(&quot;success&quot;, false);</span>
+<span class="fc" id="L130">        response.put(&quot;message&quot;, &quot;PAN must contain at least 6 digits&quot;);</span>
+<span class="fc" id="L131">        return response;</span>
+      }
+
+<span class="fc" id="L134">      Integer institutionId = resolveInstitutionId(pan);</span>
+<span class="fc bfc" id="L135" title="All 2 branches covered.">      if (institutionId == null) {</span>
+<span class="fc" id="L136">        response.put(&quot;success&quot;, false);</span>
+<span class="fc" id="L137">        response.put(&quot;message&quot;, &quot;Institution could not be resolved from PAN BIN&quot;);</span>
+<span class="fc" id="L138">        return response;</span>
+      }
+
+<span class="fc" id="L141">      EncryptedFieldValue encryptedPan = cardDataEncryptionService.encryptPan(</span>
+              pan,
+              institutionId,
+              &quot;api|pan|&quot; + institutionId);
+<span class="fc bfc" id="L145" title="All 2 branches covered.">      if (encryptedPan == null) {</span>
+<span class="fc" id="L146">        response.put(&quot;success&quot;, false);</span>
+<span class="fc" id="L147">        response.put(&quot;message&quot;, &quot;PAN encryption could not be completed&quot;);</span>
+<span class="fc" id="L148">        return response;</span>
+      }
+
+<span class="fc" id="L151">      response.put(&quot;success&quot;, true);</span>
+<span class="fc" id="L152">      response.put(&quot;institutionId&quot;, institutionId);</span>
+<span class="fc" id="L153">      response.put(&quot;maskedPan&quot;, cardDataEncryptionService.maskPanForDisplay(pan));</span>
+<span class="fc" id="L154">      response.put(&quot;panLookupHmac&quot;, cardDataEncryptionService.computePanLookupHmac(pan, institutionId));</span>
+<span class="fc" id="L155">      response.put(&quot;panCt&quot;, encryptedPan.getCiphertext());</span>
+<span class="fc" id="L156">      response.put(&quot;panIv&quot;, encryptedPan.getIv());</span>
+<span class="fc" id="L157">      response.put(&quot;panTag&quot;, encryptedPan.getTag());</span>
+<span class="fc" id="L158">      response.put(&quot;panKeyVersion&quot;, encryptedPan.getKeyVersion());</span>
+<span class="fc" id="L159">      return response;</span>
+    }
+
+    private Integer resolveInstitutionId(String pan) {
+<span class="fc" id="L163">      CacheInitializationService.BinInstitutionData binData = cacheInitializationService</span>
+<span class="fc" id="L164">              .loadBinInstitutionCache()</span>
+<span class="fc" id="L165">              .get(pan.substring(0, 6));</span>
+<span class="fc bfc" id="L166" title="All 4 branches covered.">      if (binData == null || binData.getBinDetails() == null) {</span>
+<span class="fc" id="L167">        return null;</span>
+      }
+<span class="fc" id="L169">      return binData.getBinDetails().getInstitution_id();</span>
+    }
+
+<span class="fc" id="L172">    public static class PanEncryptionRequest {</span>
+      private String pan;
+
+      public String getPan() {
+<span class="fc" id="L176">        return pan;</span>
+      }
+
+      public void setPan(String pan) {
+<span class="fc" id="L180">        this.pan = pan;</span>
+<span class="fc" id="L181">      }</span>
+    }
+
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.14.202510111229</span></div></body></html>

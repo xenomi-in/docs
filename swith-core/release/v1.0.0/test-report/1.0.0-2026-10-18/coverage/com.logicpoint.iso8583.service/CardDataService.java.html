@@ -1,0 +1,336 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>CardDataService.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">iso8583-processor</a> &gt; <a href="index.source.html" class="el_package">com.logicpoint.iso8583.service</a> &gt; <span class="el_source">CardDataService.java</span></div><h1>CardDataService.java</h1><pre class="source lang-java linenums">package com.logicpoint.iso8583.service;
+
+import com.logicpoint.iso8583.context.RequestContext;
+import com.logicpoint.iso8583.entity.CardData;
+import com.logicpoint.iso8583.repository.CardDataRepository;
+import com.logicpoint.iso8583.validation.orchestrator.CardDataContext;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.stereotype.Service;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
+/**
+ * Service for fetching and managing card data.
+ * Provides centralized access to card information with caching support.
+ * 
+ * @author LogicPoint Systems
+ * @version 1.0
+ * @since 2025-01-27
+ */
+@Service
+public class CardDataService {
+    @Autowired
+    private com.logicpoint.iso8583.cmsintegration.CmsAuthorizationLookup cmsLookup;
+    
+<span class="fc" id="L25">    private static final Logger logger = LoggerFactory.getLogger(CardDataService.class);</span>
+    
+    private final CardDataRepository cardDataRepository;
+    private final CardDataEncryptionService cardDataEncryptionService;
+    private final CacheInitializationService cacheInitializationService;
+    
+    @Autowired
+    public CardDataService(CardDataRepository cardDataRepository,
+                           CardDataEncryptionService cardDataEncryptionService,
+<span class="fc" id="L34">                           CacheInitializationService cacheInitializationService) {</span>
+<span class="fc" id="L35">        this.cardDataRepository = cardDataRepository;</span>
+<span class="fc" id="L36">        this.cardDataEncryptionService = cardDataEncryptionService;</span>
+<span class="fc" id="L37">        this.cacheInitializationService = cacheInitializationService;</span>
+<span class="fc" id="L38">    }</span>
+    
+    /**
+     * Fetches card data by PAN (Primary Account Number).
+     * Uses Spring Cache for performance optimization.
+     * 
+     * @param pan The card number (PAN)
+     * @return CardDataContext containing the card data or error information
+     */
+    //@Cacheable(value = &quot;cardData&quot;, key = &quot;#pan&quot;, unless = &quot;#result == null&quot;)
+    public CardDataContext fetchCardData(String pan) {
+        try {
+<span class="fc" id="L50">            logger.debug(&quot;Fetching card data for PAN: {}&quot;, maskPan(pan));</span>
+            
+<span class="fc bfc" id="L52" title="All 4 branches covered.">            if (pan == null || pan.trim().isEmpty()) {</span>
+<span class="fc" id="L53">                logger.warn(&quot;Invalid PAN provided: {}&quot;, pan);</span>
+<span class="fc" id="L54">                return CardDataContext.failure(&quot;INVALID_PAN: PAN is required&quot;);</span>
+            }
+            
+<span class="fc" id="L57">            Integer institutionId = resolveInstitutionId(pan);</span>
+<span class="fc" id="L58">            CardData cardData = findCardData(pan, institutionId);</span>
+            
+<span class="fc bfc" id="L60" title="All 2 branches covered.">            if (cardData == null) {</span>
+<span class="fc" id="L61">                logger.warn(&quot;Card not found in database for PAN: {}&quot;, maskPan(pan));</span>
+<span class="fc" id="L62">                return CardDataContext.failure(&quot;CARD_NOT_FOUND: Card not found in database&quot;);</span>
+            }
+
+<span class="fc" id="L65">            cardDataEncryptionService.hydrateDecryptedFields(cardData, institutionId);</span>
+            
+<span class="fc" id="L67">            logger.debug(&quot;Successfully fetched card data for PAN: {}, Status: {}&quot;, </span>
+<span class="fc" id="L68">                        maskPan(pan), cardData.getStatus());</span>
+            
+<span class="fc" id="L70">            return CardDataContext.success(cardData);</span>
+            
+<span class="fc" id="L72">        } catch (Exception e) {</span>
+<span class="fc" id="L73">            logger.error(&quot;Error fetching card data for PAN: {}: {}&quot;, maskPan(pan), e.getMessage(), e);</span>
+<span class="fc" id="L74">            return CardDataContext.failure(&quot;DATABASE_ERROR: &quot; + e.getMessage());</span>
+        }
+    }
+
+    public CardDataContext fetchCardData(RequestContext requestContext) {
+        try {
+<span class="fc bfc" id="L80" title="All 2 branches covered.">            if (requestContext == null) {</span>
+<span class="fc" id="L81">                return CardDataContext.failure(&quot;INVALID_REQUEST_CONTEXT: Request context is required&quot;);</span>
+            }
+
+<span class="fc" id="L84">            String pan = requestContext.getCardNumber();</span>
+<span class="fc" id="L85">            logger.debug(&quot;Fetching card data using protected PAN lookup for PAN: {}&quot;, maskPan(pan));</span>
+
+<span class="pc bpc" id="L87" title="1 of 4 branches missed.">            if (pan == null || pan.trim().isEmpty()) {</span>
+<span class="fc" id="L88">                logger.warn(&quot;Invalid PAN provided in request context&quot;);</span>
+<span class="fc" id="L89">                return CardDataContext.failure(&quot;INVALID_PAN: PAN is required&quot;);</span>
+            }
+
+<span class="fc" id="L92">            Integer institutionId = parseInstitutionId(requestContext.getInstitutionId());</span>
+<span class="fc" id="L93">            String panLookupHmac = requestContext.getPanHash();</span>
+<span class="pc bpc" id="L94" title="1 of 6 branches missed.">            if ((panLookupHmac == null || panLookupHmac.isBlank()) &amp;&amp; institutionId != null) {</span>
+<span class="fc" id="L95">                panLookupHmac = cardDataEncryptionService.computePanLookupHmac(pan, institutionId);</span>
+<span class="fc" id="L96">                requestContext.setPanHash(panLookupHmac);</span>
+            }
+
+<span class="pc bpc" id="L99" title="1 of 4 branches missed.">            if (panLookupHmac == null || panLookupHmac.isBlank()) {</span>
+<span class="fc" id="L100">                logger.warn(&quot;PAN lookup HMAC could not be resolved for PAN: {}&quot;, maskPan(pan));</span>
+<span class="fc" id="L101">                return CardDataContext.failure(&quot;CARD_LOOKUP_UNAVAILABLE: PAN lookup hash is not available&quot;);</span>
+            }
+
+<span class="fc" id="L104">            CardData managed = cmsLookup.lookup(requestContext, panLookupHmac, institutionId);</span>
+<span class="fc bfc" id="L105" title="All 2 branches covered.">            if (managed != null) return CardDataContext.success(managed);</span>
+<span class="fc" id="L106">            CardData cardData = cardDataRepository.findByPanLookupHmac(panLookupHmac);</span>
+<span class="pc bpc" id="L107" title="1 of 2 branches missed.">            if (cardData == null) {</span>
+<span class="nc" id="L108">                logger.warn(&quot;Card not found in database for PAN: {}&quot;, maskPan(pan));</span>
+<span class="nc" id="L109">                return CardDataContext.failure(&quot;CARD_NOT_FOUND: Card not found in database&quot;);</span>
+            }
+
+<span class="fc" id="L112">            cardDataEncryptionService.hydrateDecryptedFields(cardData, institutionId);</span>
+<span class="fc" id="L113">            logger.debug(&quot;Successfully fetched card data for PAN: {}, Status: {}&quot;, maskPan(pan), cardData.getStatus());</span>
+<span class="fc" id="L114">            return CardDataContext.success(cardData);</span>
+<span class="fc" id="L115">        } catch (Exception e) {</span>
+<span class="fc" id="L116">            requestContext.setInternalResponseCode(com.logicpoint.iso8583.responsecode.InternalResCode.RESTRICTED_CARD);</span>
+<span class="fc" id="L117">            logger.warn(&quot;Protected card lookup rejected: {}&quot;, e.getClass().getSimpleName());</span>
+<span class="fc" id="L118">            return CardDataContext.failure(&quot;CARD_RESTRICTED: Card lookup or authorization policy failed&quot;);</span>
+        }
+    }
+    
+    /**
+     * Fetches card data by PAN without caching (for real-time data).
+     * 
+     * @param pan The card number (PAN)
+     * @return CardDataContext containing the card data or error information
+     */
+    public CardDataContext fetchCardDataRealTime(String pan) {
+        try {
+<span class="fc" id="L130">            logger.debug(&quot;Fetching real-time card data for PAN: {}&quot;, maskPan(pan));</span>
+            
+<span class="pc bpc" id="L132" title="1 of 4 branches missed.">            if (pan == null || pan.trim().isEmpty()) {</span>
+<span class="fc" id="L133">                logger.warn(&quot;Invalid PAN provided: {}&quot;, pan);</span>
+<span class="fc" id="L134">                return CardDataContext.failure(&quot;INVALID_PAN: PAN is required&quot;);</span>
+            }
+            
+<span class="fc" id="L137">            Integer institutionId = resolveInstitutionId(pan);</span>
+<span class="fc" id="L138">            CardData cardData = findCardData(pan, institutionId);</span>
+            
+<span class="pc bpc" id="L140" title="1 of 2 branches missed.">            if (cardData == null) {</span>
+<span class="nc" id="L141">                logger.warn(&quot;Card not found in database for PAN: {}&quot;, maskPan(pan));</span>
+<span class="nc" id="L142">                return CardDataContext.failure(&quot;CARD_NOT_FOUND: Card not found in database&quot;);</span>
+            }
+
+<span class="fc" id="L145">            cardDataEncryptionService.hydrateDecryptedFields(cardData, institutionId);</span>
+            
+<span class="fc" id="L147">            logger.debug(&quot;Successfully fetched real-time card data for PAN: {}, Status: {}&quot;, </span>
+<span class="fc" id="L148">                        maskPan(pan), cardData.getStatus());</span>
+            
+<span class="fc" id="L150">            return CardDataContext.success(cardData);</span>
+            
+<span class="fc" id="L152">        } catch (Exception e) {</span>
+<span class="fc" id="L153">            logger.error(&quot;Error fetching real-time card data for PAN: {}: {}&quot;, maskPan(pan), e.getMessage(), e);</span>
+<span class="fc" id="L154">            return CardDataContext.failure(&quot;DATABASE_ERROR: &quot; + e.getMessage());</span>
+        }
+    }
+    
+    /**
+     * Validates if the fetched card data is suitable for transaction processing.
+     * 
+     * @param cardContext The card data context to validate
+     * @return true if card data is valid for transactions, false otherwise
+     */
+    public boolean isCardDataValidForTransaction(CardDataContext cardContext) {
+<span class="fc bfc" id="L165" title="All 2 branches covered.">        if (!cardContext.isValid()) {</span>
+<span class="fc" id="L166">            logger.warn(&quot;Card data context is invalid: {}&quot;, cardContext.getFetchError());</span>
+<span class="fc" id="L167">            return false;</span>
+        }
+        
+<span class="fc" id="L170">        CardData cardData = cardContext.getCardData();</span>
+        
+        // Check if card status is active
+<span class="fc bfc" id="L173" title="All 2 branches covered.">        if (!&quot;ACTIVE&quot;.equalsIgnoreCase(cardData.getStatus())) {</span>
+<span class="fc" id="L174">            logger.warn(&quot;Card is not active. Status: {}&quot;, cardData.getStatus());</span>
+<span class="fc" id="L175">            return false;</span>
+        }
+        
+        // Check if card is not expired
+<span class="fc bfc" id="L179" title="All 2 branches covered.">        if (isCardExpired(cardData.getExpiryDate())) {</span>
+<span class="fc" id="L180">            logger.warn(&quot;Card has expired. Expiry date: {}&quot;, cardData.getExpiryDate());</span>
+<span class="fc" id="L181">            return false;</span>
+        }
+        
+        // Check if PIN is not blocked - using reflection to access the field
+        try {
+<span class="fc" id="L186">            java.lang.reflect.Field pinBlockedField = CardData.class.getDeclaredField(&quot;pin_blocked&quot;);</span>
+<span class="fc" id="L187">            pinBlockedField.setAccessible(true);</span>
+<span class="fc" id="L188">            Boolean pinBlocked = (Boolean) pinBlockedField.get(cardData);</span>
+            
+<span class="fc bfc" id="L190" title="All 2 branches covered.">            if (Boolean.TRUE.equals(pinBlocked)) {</span>
+<span class="fc" id="L191">                logger.warn(&quot;Card PIN is blocked&quot;);</span>
+<span class="fc" id="L192">                return false;</span>
+            }
+<span class="nc" id="L194">        } catch (Exception e) {</span>
+<span class="nc" id="L195">            logger.warn(&quot;Could not check PIN blocked status: {}&quot;, e.getMessage());</span>
+<span class="fc" id="L196">        }</span>
+        
+<span class="fc" id="L198">        logger.debug(&quot;Card data validation successful for transaction processing&quot;);</span>
+<span class="fc" id="L199">        return true;</span>
+    }
+    
+    /**
+     * Checks if a card has expired.
+     * 
+     * @param expiryDate The expiry date in MMYY format
+     * @return true if expired, false otherwise
+     */
+    private boolean isCardExpired(String expiryDate) {
+        try {
+<span class="pc bpc" id="L210" title="2 of 4 branches missed.">            if (expiryDate == null || expiryDate.length() != 4) {</span>
+<span class="nc" id="L211">                return true; // Consider invalid format as expired</span>
+            }
+            
+<span class="fc" id="L214">            String year = expiryDate.substring(0, 2);</span>
+<span class="fc" id="L215">            String month = expiryDate.substring(2);</span>
+            
+<span class="fc" id="L217">            int expMonth = Integer.parseInt(month);</span>
+<span class="fc" id="L218">            int expYear = Integer.parseInt(year);</span>
+            
+<span class="pc bpc" id="L220" title="1 of 4 branches missed.">            if (expMonth &lt; 1 || expMonth &gt; 12) {</span>
+<span class="fc" id="L221">                return true; // Invalid month</span>
+            }
+            
+            // Get current date
+<span class="fc" id="L225">            java.time.LocalDate currentDate = java.time.LocalDate.now();</span>
+<span class="fc" id="L226">            int currentYear = currentDate.getYear() % 100; // Last 2 digits</span>
+<span class="fc" id="L227">            int currentMonth = currentDate.getMonthValue();</span>
+            
+            // Compare year first, then month
+<span class="pc bpc" id="L230" title="2 of 6 branches missed.">            if (expYear &lt; currentYear || (expYear == currentYear &amp;&amp; expMonth &lt; currentMonth)) {</span>
+<span class="fc" id="L231">                return true;</span>
+            }
+            
+<span class="fc" id="L234">            return false;</span>
+            
+<span class="nc" id="L236">        } catch (Exception e) {</span>
+<span class="nc" id="L237">            logger.error(&quot;Error checking card expiry: {}&quot;, e.getMessage());</span>
+<span class="nc" id="L238">            return true; // Consider as expired if error occurs</span>
+        }
+    }
+    
+    /**
+     * Masks PAN for logging purposes.
+     * 
+     * @param pan The PAN to mask
+     * @return Masked PAN
+     */
+    private String maskPan(String pan) {
+<span class="fc bfc" id="L249" title="All 4 branches covered.">        if (pan == null || pan.length() &lt; 8) {</span>
+<span class="fc" id="L250">            return &quot;****&quot;;</span>
+        }
+<span class="fc" id="L252">        return pan.substring(0, 4) + &quot;****&quot; + pan.substring(pan.length() - 4);</span>
+    }
+
+    private CardData findCardData(String pan, Integer institutionId) {
+<span class="fc" id="L256">        String lookup = cardDataEncryptionService.computePanLookupHmac(pan, institutionId);</span>
+<span class="fc bfc" id="L257" title="All 4 branches covered.">        if (lookup != null &amp;&amp; cmsLookup.isManaged(lookup)) {</span>
+<span class="fc" id="L258">            throw new IllegalStateException(&quot;CMS cards require transaction evidence lookup&quot;);</span>
+        }
+<span class="fc" id="L260">        CardData cardData = cardDataRepository.findByPan(pan);</span>
+<span class="fc bfc" id="L261" title="All 2 branches covered.">        if (cardData != null) {</span>
+<span class="fc" id="L262">            return cardData;</span>
+        }
+
+<span class="fc" id="L265">        String panLookupHmac = cardDataEncryptionService.computePanLookupHmac(pan, institutionId);</span>
+<span class="fc bfc" id="L266" title="All 2 branches covered.">        if (panLookupHmac == null) {</span>
+<span class="fc" id="L267">            return null;</span>
+        }
+
+<span class="fc" id="L270">        return cardDataRepository.findByPanLookupHmac(panLookupHmac);</span>
+    }
+
+    private Integer resolveInstitutionId(String pan) {
+<span class="pc bpc" id="L274" title="2 of 4 branches missed.">        if (pan == null || pan.length() &lt; 6) {</span>
+<span class="nc" id="L275">            return null;</span>
+        }
+<span class="fc" id="L277">        CacheInitializationService.BinInstitutionData binData = cacheInitializationService</span>
+<span class="fc" id="L278">                .loadBinInstitutionCache()</span>
+<span class="fc" id="L279">                .get(pan.substring(0, 6));</span>
+<span class="pc bpc" id="L280" title="3 of 4 branches missed.">        if (binData == null || binData.getBinDetails() == null) {</span>
+<span class="fc" id="L281">            return null;</span>
+        }
+<span class="nc" id="L283">        return binData.getBinDetails().getInstitution_id();</span>
+    }
+
+    private Integer parseInstitutionId(String institutionId) {
+<span class="pc bpc" id="L287" title="2 of 4 branches missed.">        if (institutionId == null || institutionId.isBlank()) {</span>
+<span class="nc" id="L288">            return null;</span>
+        }
+        try {
+<span class="fc" id="L291">            return Integer.valueOf(institutionId);</span>
+<span class="fc" id="L292">        } catch (NumberFormatException ex) {</span>
+<span class="fc" id="L293">            return null;</span>
+        }
+    }
+
+    /**
+     * Updates the card data in the data store.
+     * This method should be called when card attributes (e.g., PIN retry count, block status, expiry, etc.)
+     * need to be updated after a transaction or administrative action.
+     *
+     * @param cardData The CardData object containing updated card information
+     * @return true if update was successful, false otherwise
+     */
+    public boolean updateCardData(CardData cardData) {
+        try {
+<span class="fc bfc" id="L307" title="All 2 branches covered.">            if (cardData == null) {</span>
+<span class="fc" id="L308">                logger.warn(&quot;Cannot update card data: CardData is null&quot;);</span>
+<span class="fc" id="L309">                return false;</span>
+            }
+            // Example: If using Spring Data JPA repository
+            // cardDataRepository.save(cardData);
+
+            // If using a custom DAO or another persistence mechanism, implement accordingly.
+            // For demonstration, assume a repository exists:
+<span class="pc bpc" id="L316" title="1 of 2 branches missed.">            if (cardDataRepository != null) {</span>
+<span class="fc bfc" id="L317" title="All 2 branches covered.">                if (cmsLookup.isManaged(cardData.getAuth_id())) {</span>
+<span class="fc" id="L318">                    cmsLookup.updatePinCounters(cardData);</span>
+<span class="fc" id="L319">                    return true;</span>
+                }
+<span class="fc" id="L321">                cardDataEncryptionService.prepareForPersistence(cardData, resolveInstitutionId(cardData.getPan()));</span>
+<span class="fc" id="L322">                cardDataRepository.save(cardData);</span>
+<span class="fc" id="L323">                logger.info(&quot;Card data updated successfully for PAN: {}&quot;, maskPan(cardData.getPan()));</span>
+<span class="fc" id="L324">                return true;</span>
+            } else {
+<span class="nc" id="L326">                logger.error(&quot;CardDataRepository is not initialized. Cannot update card data for PAN: {}&quot;, maskPan(cardData.getPan()));</span>
+<span class="nc" id="L327">                return false;</span>
+            }
+<span class="fc" id="L329">        } catch (Exception e) {</span>
+<span class="fc" id="L330">            logger.error(&quot;Error updating card data for PAN {}: {}&quot;, </span>
+<span class="pc bpc" id="L331" title="1 of 2 branches missed.">                cardData != null ? maskPan(cardData.getPan()) : &quot;null&quot;, e.getMessage());</span>
+<span class="fc" id="L332">            return false;</span>
+        }
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.14.202510111229</span></div></body></html>

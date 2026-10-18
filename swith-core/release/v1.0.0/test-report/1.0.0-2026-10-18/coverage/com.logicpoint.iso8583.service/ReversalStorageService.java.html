@@ -1,0 +1,252 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>ReversalStorageService.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">iso8583-processor</a> &gt; <a href="index.source.html" class="el_package">com.logicpoint.iso8583.service</a> &gt; <span class="el_source">ReversalStorageService.java</span></div><h1>ReversalStorageService.java</h1><pre class="source lang-java linenums">package com.logicpoint.iso8583.service;
+
+import tools.jackson.databind.json.JsonMapper;
+import com.logicpoint.iso8583.entity.ReversalRequest;
+import com.logicpoint.iso8583.repository.ReversalRequestRepository;
+import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
+
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.beans.factory.annotation.Value;
+import org.springframework.dao.DataAccessException;
+import org.springframework.scheduling.annotation.Async;
+import org.springframework.stereotype.Service;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+import jakarta.annotation.PostConstruct;
+import jakarta.annotation.PreDestroy;
+
+import java.io.*;
+import java.nio.ByteBuffer;
+import java.nio.channels.AsynchronousFileChannel;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.nio.file.Paths;
+import java.nio.file.StandardOpenOption;
+import java.time.LocalDateTime;
+import java.time.format.DateTimeFormatter;
+import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.ConcurrentLinkedQueue;
+import java.util.concurrent.Executors;
+import java.util.concurrent.ScheduledExecutorService;
+import java.util.concurrent.TimeUnit;
+import java.util.concurrent.locks.ReentrantLock;
+
+@Slf4j
+@Service
+
+public class ReversalStorageService {
+
+<span class="fc" id="L40">    private static final Logger log = LoggerFactory.getLogger(ReversalStorageService.class);</span>
+    private final ReversalRequestRepository reversalRequestRepository;
+    private final JsonMapper objectMapper;
+<span class="fc" id="L43">    private final ReentrantLock fileLock = new ReentrantLock();</span>
+
+    @Autowired
+<span class="fc" id="L46">    public ReversalStorageService(ReversalRequestRepository reversalRequestRepository, JsonMapper objectMapper) {</span>
+<span class="fc" id="L47">        this.reversalRequestRepository = reversalRequestRepository;</span>
+<span class="fc" id="L48">        this.objectMapper = objectMapper;</span>
+<span class="fc" id="L49">    }</span>
+    // Buffered file writes for better performance
+<span class="fc" id="L51">    private final ConcurrentLinkedQueue&lt;ReversalRequest&gt; fileWriteQueue = new ConcurrentLinkedQueue&lt;&gt;();</span>
+<span class="fc" id="L52">    private final ScheduledExecutorService fileWriterExecutor = Executors.newSingleThreadScheduledExecutor(</span>
+            r -&gt; {
+<span class="fc" id="L54">                Thread t = new Thread(r, &quot;reversal-file-writer&quot;);</span>
+<span class="fc" id="L55">                t.setDaemon(true);</span>
+<span class="fc" id="L56">                return t;</span>
+            });
+
+    @Value(&quot;${reversal.file-storage.path:./reversals/pending}&quot;)
+    private String fileStoragePath;
+
+    @Value(&quot;${reversal.file-storage.enabled:true}&quot;)
+    private boolean fileStorageEnabled;
+
+    @Value(&quot;${reversal.file-storage.batch-size:10}&quot;)
+    private int batchSize;
+
+    @Value(&quot;${reversal.file-storage.flush-interval:5000}&quot;)
+    private long flushIntervalMs;
+
+    // Initialize batch writer
+    // {
+    //     fileWriterExecutor.scheduleWithFixedDelay(
+    //         this::flushFileQueue, 
+    //         flushIntervalMs, 
+    //         flushIntervalMs, 
+    //         TimeUnit.MILLISECONDS
+    //     );
+    // }
+    @PostConstruct
+    void startFileWriter() {
+<span class="fc bfc" id="L82" title="All 2 branches covered.">        long interval = (flushIntervalMs &gt; 0) ? flushIntervalMs : 5000L;</span>
+<span class="fc bfc" id="L83" title="All 2 branches covered.">        if (flushIntervalMs &lt;= 0) {</span>
+<span class="fc" id="L84">            log.warn(&quot;Invalid reversal.file-storage.flush-interval={}ms. Falling back to 5000ms&quot;, flushIntervalMs);</span>
+        }
+
+<span class="fc" id="L87">        fileWriterExecutor.scheduleWithFixedDelay(</span>
+                this::flushFileQueue,
+                interval,
+                interval,
+                TimeUnit.MILLISECONDS
+        );
+<span class="fc" id="L93">    }</span>
+
+    @PreDestroy
+    void stopFileWriter() {
+<span class="fc" id="L97">        fileWriterExecutor.shutdown();</span>
+<span class="fc" id="L98">    }</span>
+
+    /**
+     * Fast path: Try DB first (synchronous for immediate feedback) Slow path:
+     * Queue for file write if DB fails (async, non-blocking)
+     */
+    public ReversalRequest saveReversalRequest(ReversalRequest request) {
+        // Fast path: Try database first (most common case)
+<span class="fc" id="L106">        ReversalRequest saved = trySaveToDatabase(request);</span>
+<span class="fc bfc" id="L107" title="All 2 branches covered.">        if (saved != null) {</span>
+<span class="fc" id="L108">            return saved;</span>
+        }
+
+        // Fallback: Queue for async file write (non-blocking)
+<span class="fc bfc" id="L112" title="All 2 branches covered.">        if (fileStorageEnabled) {</span>
+<span class="fc" id="L113">            fileWriteQueue.offer(request);</span>
+<span class="fc" id="L114">            log.warn(&quot;Reversal queued for file storage (DB unavailable): {}&quot;, request.getTransactionId());</span>
+            // Return immediately - file write happens async
+<span class="fc" id="L116">            return request;</span>
+        }
+
+<span class="fc" id="L119">        log.error(&quot;CRITICAL: Failed to save reversal - both DB and file storage unavailable&quot;);</span>
+<span class="fc" id="L120">        return request;</span>
+    }
+
+    /**
+     * Optimized database save with connection pool
+     */
+    private ReversalRequest trySaveToDatabase(ReversalRequest request) {
+        try {
+            // Use saveAndFlush for immediate persistence
+<span class="fc" id="L129">            return reversalRequestRepository.saveAndFlush(request);</span>
+            //return null;
+<span class="fc" id="L131">        } catch (DataAccessException e) {</span>
+            // Log only at debug level to avoid log spam
+<span class="pc bpc" id="L133" title="1 of 2 branches missed.">            if (log.isDebugEnabled()) {</span>
+<span class="fc" id="L134">                log.debug(&quot;Database save failed: {}&quot;, e.getMessage());</span>
+            }
+<span class="fc" id="L136">            return null;</span>
+<span class="fc" id="L137">        } catch (Exception e) {</span>
+<span class="fc" id="L138">            log.error(&quot;Unexpected error saving to database&quot;, e);</span>
+<span class="fc" id="L139">            return null;</span>
+        }
+    }
+
+    /**
+     * Batch file writes for better I/O performance
+     */
+    private void flushFileQueue() {
+<span class="pc bpc" id="L147" title="1 of 2 branches missed.">        if (fileWriteQueue.isEmpty()) {</span>
+<span class="nc" id="L148">            return;</span>
+        }
+
+<span class="fc" id="L151">        fileLock.lock();</span>
+        try {
+<span class="fc" id="L153">            Path dir = Paths.get(fileStoragePath);</span>
+<span class="pc bpc" id="L154" title="1 of 2 branches missed.">            if (!Files.exists(dir)) {</span>
+<span class="nc" id="L155">                Files.createDirectories(dir);</span>
+            }
+
+            // Process batch
+<span class="fc" id="L159">            int processed = 0;</span>
+<span class="pc bpc" id="L160" title="1 of 4 branches missed.">            while (!fileWriteQueue.isEmpty() &amp;&amp; processed &lt; batchSize) {</span>
+<span class="fc" id="L161">                ReversalRequest request = fileWriteQueue.poll();</span>
+<span class="pc bpc" id="L162" title="1 of 2 branches missed.">                if (request != null) {</span>
+<span class="fc" id="L163">                    writeToFile(request, dir);</span>
+<span class="fc" id="L164">                    processed++;</span>
+                }
+<span class="fc" id="L166">            }</span>
+
+<span class="pc bpc" id="L168" title="1 of 2 branches missed.">            if (processed &gt; 0) {</span>
+<span class="fc" id="L169">                log.debug(&quot;Flushed {} reversal requests to file&quot;, processed);</span>
+            }
+
+<span class="nc" id="L172">        } catch (Exception e) {</span>
+<span class="nc" id="L173">            log.error(&quot;Error flushing file queue&quot;, e);</span>
+        } finally {
+<span class="fc" id="L175">            fileLock.unlock();</span>
+        }
+<span class="fc" id="L177">    }</span>
+
+    /**
+     * Optimized file write using NIO
+     */
+    private void writeToFile(ReversalRequest request, Path dir) {
+        try {
+<span class="fc" id="L184">            String filename = String.format(&quot;reversal_%s_%s.json&quot;,</span>
+<span class="fc" id="L185">                    request.getTransactionId(),</span>
+<span class="fc" id="L186">                    LocalDateTime.now().format(DateTimeFormatter.ofPattern(&quot;yyyyMMddHHmmss&quot;)));</span>
+
+<span class="fc" id="L188">            Path filePath = dir.resolve(filename);</span>
+
+            // Use async file channel for non-blocking I/O
+<span class="fc" id="L191">            String json = objectMapper.writeValueAsString(request);</span>
+<span class="fc" id="L192">            byte[] bytes = json.getBytes();</span>
+
+            // Write synchronously but in separate thread pool
+<span class="fc" id="L195">            Files.write(filePath, bytes,</span>
+                    StandardOpenOption.CREATE,
+                    StandardOpenOption.WRITE);
+
+<span class="pc bpc" id="L199" title="1 of 2 branches missed.">            if (request.getId() == null) {</span>
+<span class="fc" id="L200">                request.setId(-1L);</span>
+            }
+
+<span class="nc" id="L203">        } catch (Exception e) {</span>
+<span class="nc" id="L204">            log.error(&quot;Failed to write reversal to file&quot;, e);</span>
+            // Re-queue for retry
+<span class="nc" id="L206">            fileWriteQueue.offer(request);</span>
+<span class="fc" id="L207">        }</span>
+<span class="fc" id="L208">    }</span>
+
+    /**
+     * Load pending reversals from files (called on startup/recovery)
+     */
+    @Async
+    public CompletableFuture&lt;Void&gt; loadPendingReversalsFromFiles() {
+<span class="fc bfc" id="L215" title="All 2 branches covered.">        if (!fileStorageEnabled) {</span>
+<span class="fc" id="L216">            return CompletableFuture.completedFuture(null);</span>
+        }
+
+<span class="fc" id="L219">        return CompletableFuture.runAsync(() -&gt; {</span>
+<span class="fc" id="L220">            fileLock.lock();</span>
+            try {
+<span class="fc" id="L222">                Path dir = Paths.get(fileStoragePath);</span>
+<span class="fc bfc" id="L223" title="All 2 branches covered.">                if (!Files.exists(dir)) {</span>
+<span class="fc" id="L224">                    return;</span>
+                }
+
+<span class="fc" id="L227">                Files.list(dir)</span>
+<span class="fc" id="L228">                        .filter(path -&gt; path.toString().endsWith(&quot;.json&quot;))</span>
+<span class="fc" id="L229">                        .limit(100) // Process in batches</span>
+<span class="fc" id="L230">                        .forEach(filePath -&gt; {</span>
+                            try {
+<span class="fc" id="L232">                                String json = new String(Files.readAllBytes(filePath));</span>
+<span class="fc" id="L233">                                ReversalRequest request = objectMapper.readValue(json, ReversalRequest.class);</span>
+
+<span class="pc bpc" id="L235" title="1 of 2 branches missed.">                                if (trySaveToDatabase(request) != null) {</span>
+<span class="fc" id="L236">                                    Files.delete(filePath);</span>
+<span class="fc" id="L237">                                    log.info(&quot;Migrated reversal from file to DB: {}&quot;, filePath);</span>
+                                }
+<span class="nc" id="L239">                            } catch (Exception e) {</span>
+<span class="nc" id="L240">                                log.error(&quot;Error loading reversal from file {}&quot;, filePath, e);</span>
+<span class="fc" id="L241">                            }</span>
+<span class="fc" id="L242">                        });</span>
+
+<span class="nc" id="L244">            } catch (Exception e) {</span>
+<span class="nc" id="L245">                log.error(&quot;Error loading pending reversals&quot;, e);</span>
+            } finally {
+<span class="fc" id="L247">                fileLock.unlock();</span>
+            }
+<span class="fc" id="L249">        });</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.14.202510111229</span></div></body></html>

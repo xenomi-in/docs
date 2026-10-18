@@ -1,0 +1,54 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>CmsAuthorizationPolicy.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">iso8583-processor</a> &gt; <a href="index.source.html" class="el_package">com.logicpoint.iso8583.cmsintegration</a> &gt; <span class="el_source">CmsAuthorizationPolicy.java</span></div><h1>CmsAuthorizationPolicy.java</h1><pre class="source lang-java linenums">package com.logicpoint.iso8583.cmsintegration;
+
+import static com.logicpoint.iso8583.cmsintegration.CmsContracts.*;
+import com.logicpoint.iso8583.context.RequestContext;
+import java.util.Map;
+
+public final class CmsAuthorizationPolicy {
+    private CmsAuthorizationPolicy() {}
+    public static void enforce(Profile profile, RequestContext request, String homeCountry, boolean familyBlocked) {
+<span class="fc" id="L10">        CmsProfileRules.validate(profile);</span>
+<span class="pc bfc" id="L11" title="All 4 branches covered.">        if(familyBlocked || profile.effectiveStatus()!=Status.ACTIVE) deny(&quot;Card is restricted&quot;);</span>
+<span class="fc" id="L12">        Map&lt;Integer,String&gt; fields=request.getFields();</span>
+<span class="fc" id="L13">        String country=fields.get(19);</span>
+<span class="pc bpc" id="L14" title="1 of 4 branches missed.">        if(country==null || !country.matches(&quot;[0-9]{3}&quot;)) deny(&quot;Acquirer country is required&quot;);</span>
+<span class="fc bfc" id="L15" title="All 2 branches covered.">        Geography geography=homeCountry.equals(country)?Geography.DOMESTIC:Geography.INTERNATIONAL;</span>
+<span class="pc bpc" id="L16" title="3 of 4 branches missed.">        if(geography==Geography.INTERNATIONAL &amp;&amp; !profile.internationalEnabled()) deny(&quot;International use disabled&quot;);</span>
+<span class="fc" id="L17">        Channel channel=channel(request);</span>
+<span class="pc bpc" id="L18" title="1 of 6 branches missed.">        boolean physical=channel==Channel.ATM || channel==Channel.POS_CONTACT || channel==Channel.CONTACTLESS_POS;</span>
+<span class="pc bpc" id="L19" title="1 of 8 branches missed.">        if(physical &amp;&amp; !profile.physicalEnabled() || !physical &amp;&amp; !profile.digitalEnabled()) deny(&quot;Card representation is not ready&quot;);</span>
+<span class="pc bpc" id="L20" title="1 of 4 branches missed.">        Control control=profile.controls().stream().filter(c-&gt;c.geography()==geography &amp;&amp; c.channel()==channel)</span>
+<span class="pc" id="L21">                .findFirst().orElseThrow(()-&gt;CmsIntegrationException.bad(&quot;Control dimension missing&quot;));</span>
+<span class="pc bpc" id="L22" title="1 of 2 branches missed.">        if(!control.enabled()) deny(&quot;Channel disabled&quot;);</span>
+<span class="fc" id="L23">        String amount=fields.get(4);</span>
+<span class="pc bpc" id="L24" title="2 of 6 branches missed.">        if(amount==null || !amount.matches(&quot;[0-9]{1,12}&quot;) || !profile.currencyCode().equals(fields.get(49)))</span>
+<span class="nc" id="L25">            deny(&quot;Amount or limit currency unsupported&quot;);</span>
+        // ISO DE4 is already in currency minor units; never round through a floating-point value.
+<span class="fc" id="L27">        long minor=Long.parseLong(amount);</span>
+<span class="pc bpc" id="L28" title="1 of 2 branches missed.">        if(minor&gt;control.perTransactionLimitMinor()) deny(&quot;Per-transaction limit exceeded&quot;);</span>
+<span class="fc" id="L29">        String entry=fields.get(22);</span>
+<span class="pc bpc" id="L30" title="2 of 6 branches missed.">        if(physical &amp;&amp; (entry==null || entry.length()&lt;2)) deny(&quot;POS entry mode required&quot;);</span>
+<span class="pc bpc" id="L31" title="2 of 6 branches missed.">        boolean contactless=entry!=null &amp;&amp; (entry.startsWith(&quot;07&quot;) || entry.startsWith(&quot;91&quot;));</span>
+<span class="pc bpc" id="L32" title="2 of 6 branches missed.">        if(contactless &amp;&amp; (!control.contactlessEnabled() || minor&gt;control.contactlessLimitMinor()))</span>
+<span class="nc" id="L33">            deny(&quot;Contactless disabled or limit exceeded&quot;);</span>
+<span class="fc" id="L34">    }</span>
+    static Channel channel(RequestContext request) {
+<span class="fc" id="L36">        String type=request.getTransactionType().name();</span>
+<span class="pc bpc" id="L37" title="2 of 4 branches missed.">        if(type.equals(&quot;MOTO&quot;) || type.equals(&quot;IVR_PURCHASE&quot;)) return Channel.MOTO;</span>
+<span class="pc bpc" id="L38" title="3 of 8 branches missed.">        if(type.startsWith(&quot;SI_&quot;) || type.equals(&quot;ECOMMERCE&quot;) || type.equals(&quot;EMI_PURCHASE&quot;) || type.equals(&quot;CARD_EMI_PURCHASE&quot;)) return Channel.ECOM;</span>
+<span class="pc bpc" id="L39" title="1 of 2 branches missed.">        if(type.startsWith(&quot;CASH_WITHDRAWAL&quot;)) return Channel.ATM;</span>
+<span class="pc bpc" id="L40" title="5 of 6 branches missed.">        if(type.startsWith(&quot;PURCHASE&quot;) || type.startsWith(&quot;CASH_AT_POS&quot;) || type.equals(&quot;PREAUTH&quot;)) return pos(request);</span>
+<span class="nc bnc" id="L41" title="All 4 branches missed.">        return switch(request.getChannel()) {</span>
+<span class="nc" id="L42">            case ATM -&gt; Channel.ATM;</span>
+<span class="nc" id="L43">            case POS -&gt; pos(request);</span>
+<span class="nc" id="L44">            case ECOMMERCE -&gt; Channel.ECOM;</span>
+<span class="nc" id="L45">            default -&gt; throw CmsIntegrationException.bad(&quot;Unsupported authorization channel&quot;);</span>
+        };
+    }
+    private static Channel pos(RequestContext request) {
+<span class="fc" id="L49">        String entry=request.getFields().get(22);</span>
+<span class="pc bpc" id="L50" title="2 of 6 branches missed.">        return entry!=null &amp;&amp; (entry.startsWith(&quot;07&quot;) || entry.startsWith(&quot;91&quot;)) ? Channel.CONTACTLESS_POS : Channel.POS_CONTACT;</span>
+    }
+<span class="fc" id="L52">    private static void deny(String message) { throw CmsIntegrationException.bad(message); }</span>
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.14.202510111229</span></div></body></html>

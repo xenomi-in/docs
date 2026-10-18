@@ -1,0 +1,245 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>CmsCardIntegrationService.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">iso8583-processor</a> &gt; <a href="index.source.html" class="el_package">com.logicpoint.iso8583.cmsintegration</a> &gt; <span class="el_source">CmsCardIntegrationService.java</span></div><h1>CmsCardIntegrationService.java</h1><pre class="source lang-java linenums">package com.logicpoint.iso8583.cmsintegration;
+
+import static com.logicpoint.iso8583.cmsintegration.CmsContracts.*;
+import tools.jackson.databind.JsonNode;
+import tools.jackson.databind.json.JsonMapper;
+import com.logicpoint.iso8583.entity.CardData;
+import com.logicpoint.iso8583.repository.CardDataRepository;
+import com.logicpoint.iso8583.service.CardDataEncryptionService;
+import org.springframework.jdbc.core.JdbcTemplate;
+import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
+import java.nio.charset.StandardCharsets;
+import java.security.MessageDigest;
+import java.time.LocalDateTime;
+import java.util.*;
+
+@Service
+public class CmsCardIntegrationService {
+    private final JdbcTemplate db;
+    private final JsonMapper json;
+    private final CardDataRepository cards;
+    private final CardDataEncryptionService crypto;
+    private final CmsMaterialDecoder materials;
+    public CmsCardIntegrationService(JdbcTemplate db, JsonMapper json, CardDataRepository cards,
+<span class="fc" id="L25">            CardDataEncryptionService crypto, CmsMaterialDecoder materials) {</span>
+<span class="fc" id="L26">        this.db=db; this.json=json; this.cards=cards; this.crypto=crypto; this.materials=materials;</span>
+<span class="fc" id="L27">    }</span>
+    @Transactional
+    public JsonNode register(UUID tenant, UUID cardId, Registration request) {
+<span class="fc" id="L30">        String hash=hash(&quot;REGISTER:&quot;+cardId+&quot;:&quot;+encode(request));</span>
+<span class="fc" id="L31">        JsonNode replay=replay(tenant,request.commandId(),hash);</span>
+<span class="pc bpc" id="L32" title="1 of 2 branches missed.">        if(replay!=null) return replay;</span>
+        // Tenant-level serialization also orders registration, family blocks and multi-card cutover.
+<span class="fc" id="L34">        lock(tenant);</span>
+<span class="fc" id="L35">        db.queryForList(&quot;select pg_advisory_xact_lock(hashtextextended(?,0))&quot;,&quot;cms-pin-family:&quot;+tenant+&quot;:&quot;+request.panFamilyId());</span>
+<span class="fc" id="L36">        CmsProfileRules.validate(request.profile());</span>
+<span class="pc bpc" id="L37" title="2 of 4 branches missed.">        if(request.profile().effectiveStatus()!=Status.PENDING || request.profile().physicalEnabled()</span>
+<span class="pc bpc" id="L38" title="1 of 2 branches missed.">                || request.profile().digitalEnabled()) throw CmsIntegrationException.bad(&quot;Register as PENDING with use disabled&quot;);</span>
+<span class="pc bpc" id="L39" title="1 of 2 branches missed.">        if(!db.queryForList(&quot;select 1 from cms_card_profile where cms_institution_id=? and cms_card_id=?&quot;,tenant,cardId).isEmpty())</span>
+<span class="nc" id="L40">            throw CmsIntegrationException.conflict(&quot;Card already registered under another command&quot;);</span>
+<span class="fc" id="L41">        JsonNode material=materials.decode(request.protectedMaterial(),tenant,cardId,request.commandId());</span>
+<span class="fc" id="L42">        String pan=material.path(&quot;pan&quot;).asText();</span>
+        // Match the longest configured BIN prefix; only prefixes are sent to SQL, never full PAN.
+<span class="fc" id="L44">        List&lt;Integer&gt; owners=db.query(&quot;select institution_id from bin_details where bin_number in (?,?) order by length(bin_number) desc limit 1&quot;,</span>
+<span class="pc" id="L45">                (rs,n)-&gt;rs.getInt(1),pan.substring(0,6),pan.substring(0,8));</span>
+<span class="pc bpc" id="L46" title="1 of 2 branches missed.">        if(owners.size()!=1) throw CmsIntegrationException.bad(&quot;PAN BIN does not belong to the mapped institution&quot;);</span>
+<span class="fc" id="L47">        Map&lt;String,Object&gt; mapping=ensureInstitutionMapping(tenant, request.profile().currencyCode(), owners.getFirst());</span>
+<span class="fc" id="L48">        int institution=((Number)mapping.get(&quot;switch_institution_id&quot;)).intValue();</span>
+<span class="fc" id="L49">        List&lt;Long&gt; accounts=db.query(&quot;select switch_account_id from cms_account_mapping where cms_institution_id=? and cms_account_reference_id=?&quot;,</span>
+<span class="pc" id="L50">                (rs,n)-&gt;rs.getLong(1),tenant,request.accountReferenceId());</span>
+<span class="pc bpc" id="L51" title="1 of 2 branches missed.">        if(accounts.isEmpty()) {</span>
+<span class="nc" id="L52">            db.update(&quot;insert into cms_account_mapping(cms_institution_id,cms_account_reference_id,switch_account_id) values(?,?,nextval('cms_switch_account_id_seq'))&quot;,</span>
+<span class="nc" id="L53">                    tenant, request.accountReferenceId());</span>
+<span class="nc" id="L54">            accounts=db.query(&quot;select switch_account_id from cms_account_mapping where cms_institution_id=? and cms_account_reference_id=?&quot;,</span>
+<span class="nc" id="L55">                    (rs,n)-&gt;rs.getLong(1),tenant,request.accountReferenceId());</span>
+        }
+<span class="pc bpc" id="L57" title="1 of 2 branches missed.">        if(accounts.size()!=1) throw CmsIntegrationException.bad(&quot;Account mapping could not be created&quot;);</span>
+<span class="pc bpc" id="L58" title="1 of 2 branches missed.">        if(request.predecessorCardId()!=null) {</span>
+<span class="nc" id="L59">            Map&lt;String,Object&gt; source=row(tenant,request.predecessorCardId());</span>
+<span class="nc" id="L60">            Long account=db.queryForObject(&quot;select account_id from card_data where auth_id=?&quot;,Long.class,source.get(&quot;auth_id&quot;));</span>
+<span class="nc bnc" id="L61" title="All 2 branches missed.">            if(!accounts.getFirst().equals(account)) throw CmsIntegrationException.bad(&quot;Predecessor account mismatch&quot;);</span>
+        }
+<span class="pc bpc" id="L63" title="1 of 2 branches missed.">        if(!mapping.get(&quot;currency_code&quot;).toString().equals(request.profile().currencyCode()))</span>
+<span class="nc" id="L64">            throw CmsIntegrationException.bad(&quot;Profile currency differs from institution currency&quot;);</span>
+<span class="pc bpc" id="L65" title="1 of 2 branches missed.">        if(owners.getFirst()!=institution) throw CmsIntegrationException.bad(&quot;PAN BIN does not belong to the mapped institution&quot;);</span>
+<span class="fc" id="L66">        String hmac=crypto.computePanLookupHmac(pan,institution);</span>
+<span class="pc bpc" id="L67" title="1 of 2 branches missed.">        if(hmac==null) throw CmsIntegrationException.unavailable(&quot;Institution PAN lookup key is unavailable&quot;);</span>
+<span class="fc" id="L68">        List&lt;UUID&gt; families=db.query(&quot;select distinct pan_family_id from cms_card_profile where cms_institution_id=? and pan_lookup_hmac=?&quot;,</span>
+<span class="nc" id="L69">                (rs,n)-&gt;rs.getObject(1,UUID.class),tenant,hmac);</span>
+<span class="pc bpc" id="L70" title="3 of 4 branches missed.">        if(!families.isEmpty() &amp;&amp; !families.equals(List.of(request.panFamilyId())))</span>
+<span class="nc" id="L71">            throw CmsIntegrationException.conflict(&quot;Same PAN must retain its family identity&quot;);</span>
+<span class="fc" id="L72">        if(!db.queryForList(&quot;select 1 from cms_card_profile where cms_institution_id=? and pan_family_id=? and pan_lookup_hmac&lt;&gt;?&quot;,</span>
+<span class="pc bpc" id="L73" title="1 of 2 branches missed.">                tenant,request.panFamilyId(),hmac).isEmpty()) throw CmsIntegrationException.conflict(&quot;New PAN requires a new PAN family&quot;);</span>
+<span class="pc bpc" id="L74" title="1 of 2 branches missed.">        if(!db.queryForList(&quot;select 1 from card_data d where d.pan_lookup_hmac=? and not exists(select 1 from cms_card_profile p where p.auth_id=d.auth_id)&quot;,hmac).isEmpty())</span>
+<span class="nc" id="L75">            throw CmsIntegrationException.conflict(&quot;Legacy PAN requires explicit enrollment before CMS registration&quot;);</span>
+        // Reserve the identity before the first INSERT; card_id is NOT NULL in the deployed schema.
+        // No PAN or PIN material is included in this uncommitted seed row.
+<span class="fc" id="L78">        Long authId=db.queryForObject(&quot;&quot;&quot;</span>
+            with identity_value as (
+                select nextval(pg_get_serial_sequence('card_data','auth_id')) as id
+            )
+            insert into card_data(auth_id,card_id,pan,expiry_date,status,account_id,card_type,card_scheme,
+                created_at,updated_at,pin_retry_count,max_pin_retry,pin_blocked,atc,arqc_validation_required)
+            overriding system value
+            select id,cast(id as integer),'','','PENDING',?,?,?,now(),now(),0,3,false,0,true
+            from identity_value returning auth_id
+<span class="fc" id="L87">            &quot;&quot;&quot;,Long.class,accounts.getFirst(),material.path(&quot;cardType&quot;).asText(),material.path(&quot;cardScheme&quot;).asText());</span>
+<span class="fc" id="L88">        CardData card=cards.findById(authId).orElseThrow();</span>
+<span class="fc" id="L89">        card.setPan(pan); card.setExpiryDate(material.path(&quot;expiryYYMM&quot;).asText());</span>
+        // PIN establishment is a separate family-level operation. Registration
+        // must not import a CMS-computed verification value.
+<span class="fc" id="L92">        card.setPvv_offest(null);</span>
+        // Switch resolves PVK/CVK selection from its own shared HSM catalogue.
+        // Ignore legacy CMS aliases instead of persisting foreign identifiers.
+<span class="fc" id="L95">        card.setKey_ref(null); card.setCvv_key_ref(null);</span>
+<span class="fc" id="L96">        crypto.prepareProtectedForPersistence(card,institution);</span>
+<span class="fc" id="L97">        cards.saveAndFlush(card);</span>
+<span class="fc" id="L98">        db.update(&quot;insert into cms_card_profile(cms_institution_id,cms_card_id,auth_id,pan_lookup_hmac,pan_family_id,expiry_yymm,physical_sequence,authorization_revision,profile,predecessor_card_id) values(?,?,?,?,?,?,?,1,?::jsonb,?)&quot;,</span>
+<span class="fc" id="L99">                tenant,cardId,card.getAuth_id(),hmac,request.panFamilyId(),material.path(&quot;expiryYYMM&quot;).asText(),</span>
+<span class="fc" id="L100">                request.physicalSequence(),encode(request.profile()),request.predecessorCardId());</span>
+<span class="fc" id="L101">        return finish(tenant,request.commandId(),hash,new Receipt(request.commandId(),cardId,true,1,Status.PENDING));</span>
+    }
+    @Transactional
+    public JsonNode update(UUID tenant, UUID cardId, Update request) {
+<span class="fc" id="L105">        String hash=hash(&quot;UPDATE:&quot;+cardId+&quot;:&quot;+encode(request));</span>
+<span class="fc" id="L106">        JsonNode replay=replay(tenant,request.commandId(),hash);</span>
+<span class="pc bpc" id="L107" title="1 of 2 branches missed.">        if(replay!=null) return replay;</span>
+<span class="fc" id="L108">        lock(tenant);</span>
+<span class="fc bfc" id="L109" title="All 2 branches covered.">        if(request.physicalSequence()!=null) {</span>
+<span class="fc" id="L110">            Map&lt;String,Object&gt; source=row(tenant,cardId);</span>
+<span class="fc" id="L111">            Object sequence=source.get(&quot;physical_sequence&quot;);</span>
+<span class="pc bpc" id="L112" title="2 of 4 branches missed.">            if(sequence!=null &amp;&amp; !sequence.equals(request.physicalSequence()))</span>
+<span class="fc" id="L113">                throw CmsIntegrationException.conflict(&quot;Existing physical sequence is immutable; register a successor&quot;);</span>
+<span class="nc bnc" id="L114" title="All 2 branches missed.">            if(sequence==null) {</span>
+<span class="nc" id="L115">                Profile prior=read(source.get(&quot;profile&quot;).toString());</span>
+<span class="nc bnc" id="L116" title="All 2 branches missed.">                if(request.profile().lifecycleVersion()&lt;=prior.lifecycleVersion())</span>
+<span class="nc" id="L117">                    throw CmsIntegrationException.conflict(&quot;Assigning physical sequence requires a new lifecycle version&quot;);</span>
+<span class="nc" id="L118">                db.update(&quot;update cms_card_profile set physical_sequence=? where cms_institution_id=? and cms_card_id=?&quot;,request.physicalSequence(),tenant,cardId);</span>
+            }
+        }
+<span class="fc" id="L121">        apply(tenant,cardId,request.expectedRevision(),request.authorizationRevision(),request.profile(),request.commandId());</span>
+<span class="fc" id="L122">        return finish(tenant,request.commandId(),hash,new Receipt(request.commandId(),cardId,true,</span>
+<span class="fc" id="L123">                request.authorizationRevision(),request.profile().effectiveStatus()));</span>
+    }
+    @Transactional
+    public JsonNode cutover(UUID tenant, Cutover request) {
+<span class="fc" id="L127">        String hash=hash(&quot;CUTOVER:&quot;+encode(request));</span>
+<span class="fc" id="L128">        JsonNode replay=replay(tenant,request.commandId(),hash);</span>
+<span class="pc bpc" id="L129" title="1 of 2 branches missed.">        if(replay!=null) return replay;</span>
+<span class="fc" id="L130">        lock(tenant);</span>
+<span class="fc bfc" id="L131" title="All 2 branches covered.">        if(request.predecessorCardId().equals(request.successorCardId())</span>
+<span class="pc bpc" id="L132" title="1 of 2 branches missed.">                || request.predecessor().effectiveStatus()!=Status.REPLACED)</span>
+<span class="fc" id="L133">            throw CmsIntegrationException.bad(&quot;Cutover requires distinct cards and REPLACED predecessor&quot;);</span>
+<span class="fc" id="L134">        Map&lt;String,Object&gt; old=row(tenant,request.predecessorCardId());</span>
+<span class="fc" id="L135">        Map&lt;String,Object&gt; next=row(tenant,request.successorCardId());</span>
+<span class="pc bpc" id="L136" title="1 of 2 branches missed.">        if(!request.predecessorCardId().equals(next.get(&quot;predecessor_card_id&quot;))</span>
+<span class="pc bpc" id="L137" title="1 of 2 branches missed.">                || CmsProfileRules.terminal(read(old.get(&quot;profile&quot;).toString()).effectiveStatus()))</span>
+<span class="nc" id="L138">            throw CmsIntegrationException.conflict(&quot;Invalid predecessor relationship or already retired source&quot;);</span>
+<span class="fc" id="L139">        List&lt;Long&gt; accountIds=db.query(&quot;select account_id from card_data where auth_id in (?,?)&quot;,</span>
+<span class="pc" id="L140">                (rs,n)-&gt;rs.getLong(1),old.get(&quot;auth_id&quot;),next.get(&quot;auth_id&quot;));</span>
+<span class="pc bpc" id="L141" title="2 of 4 branches missed.">        if(accountIds.size()!=2 || !accountIds.get(0).equals(accountIds.get(1)))</span>
+<span class="fc" id="L142">            throw CmsIntegrationException.conflict(&quot;Cutover cards must belong to the same mapped account&quot;);</span>
+<span class="nc" id="L143">        apply(tenant,request.predecessorCardId(),request.predecessorExpectedRevision(),</span>
+<span class="nc" id="L144">                Math.addExact(request.predecessorExpectedRevision(),1),request.predecessor(),request.commandId());</span>
+<span class="nc" id="L145">        apply(tenant,request.successorCardId(),request.successorExpectedRevision(),</span>
+<span class="nc" id="L146">                Math.addExact(request.successorExpectedRevision(),1),request.successor(),request.commandId());</span>
+<span class="nc" id="L147">        return finish(tenant,request.commandId(),hash,Map.of(&quot;commandId&quot;,request.commandId(),&quot;applied&quot;,true,</span>
+<span class="nc" id="L148">                &quot;predecessorAppliedRevision&quot;,request.predecessorExpectedRevision()+1,</span>
+<span class="nc" id="L149">                &quot;successorAppliedRevision&quot;,request.successorExpectedRevision()+1));</span>
+    }
+    private void apply(UUID tenant, UUID card, long expected, long revision, Profile next, UUID command) {
+<span class="fc" id="L152">        Map&lt;String,Object&gt; existing=row(tenant,card);</span>
+<span class="fc" id="L153">        Profile old=read(existing.get(&quot;profile&quot;).toString());</span>
+<span class="pc bpc" id="L154" title="2 of 4 branches missed.">        if(next.physicalEnabled() &amp;&amp; existing.get(&quot;physical_sequence&quot;)==null)</span>
+<span class="nc" id="L155">            throw CmsIntegrationException.bad(&quot;Physical enablement requires a sequence&quot;);</span>
+<span class="fc" id="L156">        CmsProfileRules.transition(old,next,((Number)existing.get(&quot;authorization_revision&quot;)).longValue(),expected,revision);</span>
+<span class="pc bpc" id="L157" title="1 of 2 branches missed.">        if(!old.currencyCode().equals(next.currencyCode())) throw CmsIntegrationException.bad(&quot;Card currency is immutable&quot;);</span>
+<span class="fc" id="L158">        UUID family=(UUID)existing.get(&quot;pan_family_id&quot;);</span>
+<span class="pc bpc" id="L159" title="3 of 4 branches missed.">        if(next.effectiveStatus()==Status.ACTIVE &amp;&amp; blocked(tenant,family))</span>
+<span class="nc" id="L160">            throw CmsIntegrationException.conflict(&quot;PAN family has a permanent security block&quot;);</span>
+<span class="pc bpc" id="L161" title="1 of 2 branches missed.">        if(CmsProfileRules.permanent(next.statusReason())) {</span>
+<span class="nc" id="L162">            db.update(&quot;insert into cms_pan_family_block(cms_institution_id,pan_family_id,reason,command_id) values(?,?,?,?) on conflict(cms_institution_id,pan_family_id) do nothing&quot;,</span>
+<span class="nc" id="L163">                    tenant,family,next.statusReason(),command);</span>
+        }
+<span class="fc" id="L165">        db.update(&quot;update cms_card_profile set profile=?::jsonb,authorization_revision=?,updated_at=now() where cms_institution_id=? and cms_card_id=?&quot;,</span>
+<span class="fc" id="L166">                encode(next),revision,tenant,card);</span>
+        // Only lifecycle status is updated: do not overwrite PIN retries, ATC or Switch-owned counters.
+<span class="fc" id="L168">        db.update(&quot;update card_data set status=?,updated_at=now() where auth_id=?&quot;,next.effectiveStatus().name(),existing.get(&quot;auth_id&quot;));</span>
+<span class="fc" id="L169">    }</span>
+    @Transactional(readOnly=true)
+    public JsonNode get(UUID tenant, UUID card) {
+<span class="fc" id="L172">        Map&lt;String,Object&gt; row=row(tenant,card);</span>
+<span class="fc" id="L173">        return json.valueToTree(Map.of(&quot;cardId&quot;,card,&quot;authorizationRevision&quot;,row.get(&quot;authorization_revision&quot;),</span>
+<span class="fc" id="L174">                &quot;profile&quot;,read(row.get(&quot;profile&quot;).toString()),&quot;familyBlocked&quot;,blocked(tenant,(UUID)row.get(&quot;pan_family_id&quot;))));</span>
+    }
+    @Transactional(readOnly=true)
+    public JsonNode command(UUID tenant, UUID command) {
+<span class="fc" id="L178">        List&lt;String&gt; rows=db.query(&quot;select receipt::text from cms_card_command where cms_institution_id=? and command_id=?&quot;,</span>
+<span class="nc" id="L179">                (rs,n)-&gt;rs.getString(1),tenant,command);</span>
+<span class="fc bfc" id="L180" title="All 2 branches covered.">        if(rows.isEmpty()) throw new CmsIntegrationException(404,&quot;Command not found&quot;);</span>
+<span class="fc" id="L181">        return tree(rows.getFirst());</span>
+    }
+    private JsonNode replay(UUID tenant, UUID command, String hash) {
+<span class="fc" id="L184">        db.queryForList(&quot;select pg_advisory_xact_lock(hashtextextended(?,0))&quot;,&quot;cms-command:&quot;+tenant+&quot;:&quot;+command);</span>
+<span class="fc" id="L185">        List&lt;Map&lt;String,Object&gt;&gt; prior=db.queryForList(&quot;select request_hash,receipt::text from cms_card_command where cms_institution_id=? and command_id=?&quot;,tenant,command);</span>
+<span class="fc bfc" id="L186" title="All 2 branches covered.">        if(prior.isEmpty()) return null;</span>
+<span class="pc bpc" id="L187" title="1 of 2 branches missed.">        if(!hash.equals(prior.getFirst().get(&quot;request_hash&quot;))) throw CmsIntegrationException.conflict(&quot;Command ID payload conflict&quot;);</span>
+<span class="nc" id="L188">        return tree(prior.getFirst().get(&quot;receipt&quot;).toString());</span>
+    }
+    private JsonNode finish(UUID tenant, UUID command, String hash, Object receipt) {
+<span class="fc" id="L191">        String body=encode(receipt);</span>
+<span class="fc" id="L192">        db.update(&quot;insert into cms_card_command(cms_institution_id,command_id,request_hash,receipt) values(?,?,?,?::jsonb)&quot;,tenant,command,hash,body);</span>
+<span class="fc" id="L193">        return tree(body);</span>
+    }
+<span class="fc" id="L195">    private void lock(UUID tenant) { db.queryForList(&quot;select pg_advisory_xact_lock(hashtextextended(?,0))&quot;,&quot;cms-tenant:&quot;+tenant); }</span>
+    private Map&lt;String,Object&gt; row(UUID tenant, UUID card) {
+<span class="fc" id="L197">        List&lt;Map&lt;String,Object&gt;&gt; rows=db.queryForList(&quot;select * from cms_card_profile where cms_institution_id=? and cms_card_id=?&quot;,tenant,card);</span>
+<span class="fc bfc" id="L198" title="All 2 branches covered.">        if(rows.isEmpty()) throw new CmsIntegrationException(404,&quot;Card not registered&quot;);</span>
+<span class="fc" id="L199">        return rows.getFirst();</span>
+    }
+    private Map&lt;String,Object&gt; mapping(UUID tenant) {
+<span class="nc" id="L202">        List&lt;Map&lt;String,Object&gt;&gt; rows=db.queryForList(&quot;select * from cms_institution_mapping where cms_institution_id=?&quot;,tenant);</span>
+<span class="nc bnc" id="L203" title="All 2 branches missed.">        if(rows.isEmpty()) throw CmsIntegrationException.bad(&quot;Institution mapping is required&quot;);</span>
+<span class="nc" id="L204">        return rows.getFirst();</span>
+    }
+    private Map&lt;String,Object&gt; ensureInstitutionMapping(UUID tenant, String currency, int binOwner) {
+<span class="fc" id="L207">        List&lt;Map&lt;String,Object&gt;&gt; rows=db.queryForList(&quot;select * from cms_institution_mapping where cms_institution_id=?&quot;,tenant);</span>
+<span class="pc bpc" id="L208" title="2 of 4 branches missed.">        if(!rows.isEmpty() &amp;&amp; ((Number)rows.getFirst().get(&quot;switch_institution_id&quot;)).intValue()!=binOwner) {</span>
+<span class="nc bnc" id="L209" title="All 2 branches missed.">            if(!db.queryForList(&quot;select 1 from cms_card_profile where cms_institution_id=? limit 1&quot;,tenant).isEmpty())</span>
+<span class="nc" id="L210">                throw CmsIntegrationException.conflict(&quot;Existing card institution mapping differs from PAN BIN owner&quot;);</span>
+<span class="nc bnc" id="L211" title="All 2 branches missed.">            if(!db.queryForList(&quot;select 1 from cms_institution_mapping where switch_institution_id=? and cms_institution_id&lt;&gt;?&quot;,binOwner,tenant).isEmpty())</span>
+<span class="nc" id="L212">                throw CmsIntegrationException.conflict(&quot;PAN BIN owner is already mapped to another CMS institution&quot;);</span>
+<span class="nc" id="L213">            Map&lt;String,Object&gt; configured=configuredInstitution(binOwner,currency);</span>
+<span class="nc" id="L214">            db.update(&quot;update cms_institution_mapping set switch_institution_id=?,home_country_code=?,currency_code=? where cms_institution_id=?&quot;,</span>
+<span class="nc" id="L215">                    binOwner, configured.get(&quot;country&quot;), currency, tenant);</span>
+<span class="nc" id="L216">            rows=db.queryForList(&quot;select * from cms_institution_mapping where cms_institution_id=?&quot;,tenant);</span>
+<span class="pc bpc" id="L217" title="1 of 2 branches missed.">        } else if(rows.isEmpty()) {</span>
+<span class="nc" id="L218">            Map&lt;String,Object&gt; configured=configuredInstitution(binOwner,currency);</span>
+<span class="nc bnc" id="L219" title="All 2 branches missed.">            if(!db.queryForList(&quot;select 1 from cms_institution_mapping where switch_institution_id=?&quot;,binOwner).isEmpty())</span>
+<span class="nc" id="L220">                throw CmsIntegrationException.conflict(&quot;PAN BIN owner is already mapped to another CMS institution&quot;);</span>
+<span class="nc" id="L221">            db.update(&quot;insert into cms_institution_mapping(cms_institution_id,switch_institution_id,home_country_code,currency_code) values(?,?,?,?)&quot;,</span>
+<span class="nc" id="L222">                    tenant, binOwner, configured.get(&quot;country&quot;), currency);</span>
+<span class="nc" id="L223">            rows=db.queryForList(&quot;select * from cms_institution_mapping where cms_institution_id=?&quot;,tenant);</span>
+        }
+<span class="fc" id="L225">        return rows.getFirst();</span>
+    }
+    private Map&lt;String,Object&gt; configuredInstitution(int binOwner, String currency) {
+<span class="nc" id="L228">        var institutions=db.queryForList(&quot;select institution_country,currency from institutions where institution_id=?&quot;,binOwner);</span>
+<span class="nc bnc" id="L229" title="All 2 branches missed.">        if(institutions.size()!=1) throw CmsIntegrationException.bad(&quot;BIN owner institution is not configured&quot;);</span>
+<span class="nc" id="L230">        var configured=institutions.getFirst();</span>
+<span class="nc bnc" id="L231" title="All 2 branches missed.">        if(!currency.equals(Objects.toString(configured.get(&quot;currency&quot;), &quot;&quot;).trim()))</span>
+<span class="nc" id="L232">            throw CmsIntegrationException.bad(&quot;Profile currency differs from BIN owner institution currency&quot;);</span>
+<span class="nc" id="L233">        String country=Objects.toString(configured.get(&quot;institution_country&quot;), &quot;&quot;).trim();</span>
+<span class="nc bnc" id="L234" title="All 2 branches missed.">        if(country.length()!=3) throw CmsIntegrationException.bad(&quot;BIN owner institution requires a three-character country code&quot;);</span>
+<span class="nc" id="L235">        return Map.of(&quot;country&quot;,country);</span>
+    }
+    private boolean blocked(UUID tenant, UUID family) {
+<span class="pc bpc" id="L238" title="1 of 2 branches missed.">        return !db.queryForList(&quot;select 1 from cms_pan_family_block where cms_institution_id=? and pan_family_id=?&quot;,tenant,family).isEmpty();</span>
+    }
+<span class="pc" id="L240">    private String encode(Object value) { try { return json.writeValueAsString(value); } catch(Exception e) { throw CmsIntegrationException.bad(&quot;Invalid payload&quot;); } }</span>
+<span class="pc" id="L241">    private JsonNode tree(String value) { try { return json.readTree(value); } catch(Exception e) { throw CmsIntegrationException.unavailable(&quot;Invalid stored receipt&quot;); } }</span>
+<span class="pc" id="L242">    private Profile read(String value) { try { return json.readValue(value,Profile.class); } catch(Exception e) { throw CmsIntegrationException.unavailable(&quot;Invalid stored profile&quot;); } }</span>
+<span class="pc" id="L243">    private static String hash(String value) { try { return HexFormat.of().formatHex(MessageDigest.getInstance(&quot;SHA-256&quot;).digest(value.getBytes(StandardCharsets.UTF_8))); } catch(Exception e) { throw new IllegalStateException(e); } }</span>
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.14.202510111229</span></div></body></html>

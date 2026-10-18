@@ -1,0 +1,175 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>CardValidatorImpl.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">iso8583-processor</a> &gt; <a href="index.source.html" class="el_package">com.logicpoint.iso8583.validation.card.impl</a> &gt; <span class="el_source">CardValidatorImpl.java</span></div><h1>CardValidatorImpl.java</h1><pre class="source lang-java linenums">package com.logicpoint.iso8583.validation.card.impl;
+
+import com.logicpoint.iso8583.validation.card.CardValidator;
+import com.logicpoint.iso8583.validation.ValidationResult;
+import com.logicpoint.iso8583.validation.orchestrator.CardDataContext;
+
+import org.springframework.stereotype.Service;
+
+import com.logicpoint.iso8583.entity.CardData;
+import com.logicpoint.iso8583.service.CardDataService;
+
+import org.springframework.beans.factory.annotation.Autowired;
+
+import java.util.ArrayList;
+import java.util.List;
+import java.time.LocalDate;
+
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
+/**
+ * @author LogicPoint Systems   
+ * @version 1.0
+ * @since 2025-07-16
+ * 
+ * This class implements the CardValidator interface and provides comprehensive card validation logic.
+ * It includes methods for validating card numbers, expiry dates, Luhn algorithm for card number validation and checks if the card number is present in the database and status is active.
+
+ */
+@Service
+<span class="fc" id="L31">public class CardValidatorImpl implements CardValidator {</span>
+
+<span class="fc" id="L33">    private static final Logger log = LoggerFactory.getLogger(CardValidatorImpl.class);</span>
+
+    @Autowired
+    private CardDataService cardDataService;
+
+    @Override
+    public ValidationResult validate(String cardData) {
+<span class="fc" id="L40">        List&lt;String&gt; errors = new ArrayList&lt;&gt;();</span>
+
+        // Basic card number validation
+<span class="fc" id="L43">        ValidationResult cardNumberResult = validateCardNumber(cardData);</span>
+<span class="fc bfc" id="L44" title="All 2 branches covered.">        if (!cardNumberResult.isValid()) {</span>
+<span class="fc" id="L45">            errors.addAll(cardNumberResult.getErrors());</span>
+        }
+
+<span class="fc" id="L48">        return new ValidationResult(errors, new ArrayList&lt;&gt;());</span>
+    }
+
+    @Override
+    public ValidationResult validateCardNumber(String cardNumber) {
+<span class="fc" id="L53">        List&lt;String&gt; errors = new ArrayList&lt;&gt;();</span>
+
+<span class="fc bfc" id="L55" title="All 4 branches covered.">        if (cardNumber == null || cardNumber.trim().isEmpty()) {</span>
+<span class="fc" id="L56">            errors.add(&quot;INVALID_CARD: Card number is required&quot;);</span>
+<span class="fc" id="L57">            return new ValidationResult(errors, new ArrayList&lt;&gt;());</span>
+        }
+
+        // Remove spaces and dashes
+<span class="fc" id="L61">        String cleanCardNumber = cardNumber.replaceAll(&quot;[\\s-]&quot;, &quot;&quot;);</span>
+
+        // Check length (13-19 digits)
+<span class="fc bfc" id="L64" title="All 4 branches covered.">        if (cleanCardNumber.length() &lt; 13 || cleanCardNumber.length() &gt; 19) {</span>
+<span class="fc" id="L65">            errors.add(&quot;INVALID_CARD: Card number must be 13-19 digits&quot;);</span>
+<span class="fc" id="L66">            return new ValidationResult(errors, new ArrayList&lt;&gt;());</span>
+        }
+
+        // Check if all characters are digits
+<span class="fc bfc" id="L70" title="All 2 branches covered.">        if (!cleanCardNumber.matches(&quot;\\d+&quot;)) {</span>
+<span class="fc" id="L71">            errors.add(&quot;INVALID_CARD: Card number must contain only digits&quot;);</span>
+<span class="fc" id="L72">            return new ValidationResult(errors, new ArrayList&lt;&gt;());</span>
+        }
+
+        // Luhn algorithm validation
+<span class="fc bfc" id="L76" title="All 2 branches covered.">        if (!isValidLuhn(cleanCardNumber)) {</span>
+<span class="fc" id="L77">            errors.add(&quot;INVALID_CARD: Card number failed checksum validation&quot;);</span>
+<span class="fc" id="L78">            return new ValidationResult(errors, new ArrayList&lt;&gt;());</span>
+        }
+       
+
+       
+<span class="fc" id="L83">        return new ValidationResult(errors, new ArrayList&lt;&gt;());</span>
+    }
+
+    @Override
+    public ValidationResult validateExpiryDate(String expiryDate,String cardNumber) {
+<span class="fc" id="L88">        List&lt;String&gt; errors = new ArrayList&lt;&gt;();</span>
+
+<span class="fc bfc" id="L90" title="All 4 branches covered.">        if (expiryDate == null || expiryDate.trim().isEmpty()) {</span>
+<span class="fc" id="L91">            errors.add(&quot;INVALID_CARD: Expiry date is required&quot;);</span>
+<span class="fc" id="L92">            return new ValidationResult(errors, new ArrayList&lt;&gt;());</span>
+        }
+
+<span class="fc bfc" id="L95" title="All 2 branches covered.">        if (!expiryDate.matches(&quot;\\d{4}&quot;)) {</span>
+<span class="fc" id="L96">            errors.add(&quot;INVALID_CARD: Expiry date must be in MMYY format&quot;);</span>
+<span class="fc" id="L97">            return new ValidationResult(errors, new ArrayList&lt;&gt;());</span>
+        }
+
+        try {
+<span class="fc" id="L101">            String expDate = &quot;20&quot; + expiryDate.substring(0, 2) + &quot;-&quot; + expiryDate.substring(2) + &quot;-01&quot;;</span>
+<span class="fc" id="L102">            log.debug(&quot;Expiry date: {}&quot;, expDate);</span>
+<span class="fc" id="L103">            LocalDate expiry = LocalDate.parse(expDate);</span>
+<span class="fc" id="L104">            LocalDate now = LocalDate.now();</span>
+
+<span class="fc bfc" id="L106" title="All 2 branches covered.">            if (expiry.isBefore(now)) {</span>
+<span class="fc" id="L107">                errors.add(&quot;EXPIRED_CARD: Card has expired&quot;);</span>
+<span class="fc" id="L108">                return new ValidationResult(errors, new ArrayList&lt;&gt;());</span>
+            }
+<span class="fc" id="L110">        } catch (Exception e) {</span>
+<span class="fc" id="L111">            errors.add(&quot;INVALID_CARD: Invalid expiry date format&quot;);</span>
+<span class="fc" id="L112">            e.printStackTrace();</span>
+<span class="fc" id="L113">            return new ValidationResult(errors, new ArrayList&lt;&gt;());</span>
+<span class="fc" id="L114">        }</span>
+        // Check if card number is present in the database and status is active
+<span class="fc" id="L116">        CardDataContext cardDataContext = cardDataService.fetchCardData(cardNumber);</span>
+<span class="fc bfc" id="L117" title="All 2 branches covered.">        CardData cardData = cardDataContext.isValid() ? cardDataContext.getCardData() : null;</span>
+
+<span class="fc bfc" id="L119" title="All 2 branches covered.">        if (cardData == null) {</span>
+<span class="fc" id="L120">            errors.add(&quot;INVALID_CARD: Card not found in DB&quot;);</span>
+<span class="fc" id="L121">            return new ValidationResult(errors, new ArrayList&lt;&gt;());</span>
+<span class="fc bfc" id="L122" title="All 2 branches covered.">        } else if (!cardData.getStatus().equalsIgnoreCase(&quot;ACTIVE&quot;)) {</span>
+<span class="fc" id="L123">            errors.add(&quot;INVALID_CARD: Card is not active&quot;);</span>
+<span class="fc" id="L124">            return new ValidationResult(errors, new ArrayList&lt;&gt;());</span>
+<span class="fc bfc" id="L125" title="All 2 branches covered.">        } else if (!cardData.getExpiryDate().equals(expiryDate)) {</span>
+<span class="fc" id="L126">            errors.add(&quot;INVALID_CARD: Card expiry date does not match&quot;);</span>
+<span class="fc" id="L127">            return new ValidationResult(errors, new ArrayList&lt;&gt;());</span>
+        }
+<span class="fc" id="L129">        return new ValidationResult(errors, new ArrayList&lt;&gt;());</span>
+    }
+
+    @Override
+    public ValidationResult validateCvv(String cvv) {
+<span class="fc" id="L134">        List&lt;String&gt; errors = new ArrayList&lt;&gt;();</span>
+
+<span class="fc bfc" id="L136" title="All 4 branches covered.">        if (cvv == null || cvv.trim().isEmpty()) {</span>
+<span class="fc" id="L137">            errors.add(&quot;INVALID_CARD: CVV is required&quot;);</span>
+<span class="fc" id="L138">            return new ValidationResult(errors, new ArrayList&lt;&gt;());</span>
+        }
+
+<span class="fc bfc" id="L141" title="All 2 branches covered.">        if (!cvv.matches(&quot;\\d{3,4}&quot;)) {</span>
+<span class="fc" id="L142">            errors.add(&quot;INVALID_CARD: CVV must be 3-4 digits&quot;);</span>
+        }
+
+<span class="fc" id="L145">        return new ValidationResult(errors, new ArrayList&lt;&gt;());</span>
+    }
+
+    @Override
+    public String getValidatorType() {
+<span class="fc" id="L150">        return &quot;CARD_VALIDATOR&quot;;</span>
+    }
+
+    /**
+     * Implements Luhn algorithm for card number validation.
+     */
+    private boolean isValidLuhn(String cardNumber) {
+<span class="fc" id="L157">        int sum = 0;</span>
+<span class="fc" id="L158">        boolean alternate = false;</span>
+
+<span class="fc bfc" id="L160" title="All 2 branches covered.">        for (int i = cardNumber.length() - 1; i &gt;= 0; i--) {</span>
+<span class="fc" id="L161">            int n = Integer.parseInt(cardNumber.substring(i, i + 1));</span>
+<span class="fc bfc" id="L162" title="All 2 branches covered.">            if (alternate) {</span>
+<span class="fc" id="L163">                n *= 2;</span>
+<span class="pc bpc" id="L164" title="1 of 2 branches missed.">                if (n &gt; 9) {</span>
+<span class="nc" id="L165">                    n = (n % 10) + 1;</span>
+                }
+            }
+<span class="fc" id="L168">            sum += n;</span>
+<span class="fc bfc" id="L169" title="All 2 branches covered.">            alternate = !alternate;</span>
+        }
+
+<span class="fc bfc" id="L172" title="All 2 branches covered.">        return (sum % 10 == 0);</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.14.202510111229</span></div></body></html>

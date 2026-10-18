@@ -1,0 +1,45 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>CmsRequestLogFilter.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">iso8583-processor</a> &gt; <a href="index.source.html" class="el_package">com.logicpoint.iso8583.cmsintegration</a> &gt; <span class="el_source">CmsRequestLogFilter.java</span></div><h1>CmsRequestLogFilter.java</h1><pre class="source lang-java linenums">package com.logicpoint.iso8583.cmsintegration;
+
+import jakarta.servlet.FilterChain;
+import jakarta.servlet.ServletException;
+import jakarta.servlet.http.HttpServletRequest;
+import jakarta.servlet.http.HttpServletResponse;
+import org.springframework.stereotype.Component;
+import org.springframework.core.annotation.Order;
+import org.springframework.web.filter.OncePerRequestFilter;
+import java.io.IOException;
+import java.util.UUID;
+
+/** Metadata-only logging; never reads bodies, bearer tokens or protected material. */
+@Component
+@Order(org.springframework.core.Ordered.HIGHEST_PRECEDENCE + 20)
+<span class="fc" id="L16">public class CmsRequestLogFilter extends OncePerRequestFilter {</span>
+<span class="fc" id="L17">    private static final org.slf4j.Logger log = org.slf4j.LoggerFactory.getLogger(CmsRequestLogFilter.class);</span>
+    @Override protected boolean shouldNotFilter(HttpServletRequest request) {
+<span class="fc bfc" id="L19" title="All 2 branches covered.">        return !request.getRequestURI().startsWith(request.getContextPath() + &quot;/internal/v1/&quot;);</span>
+    }
+    @Override protected void doFilterInternal(HttpServletRequest request, HttpServletResponse response,
+            FilterChain chain) throws ServletException, IOException {
+<span class="fc" id="L23">        String command = &quot;none&quot;;</span>
+<span class="fc" id="L24">        try { command = UUID.fromString(request.getHeader(&quot;Idempotency-Key&quot;)).toString(); }</span>
+<span class="fc" id="L25">        catch (IllegalArgumentException | NullPointerException ignored) { }</span>
+<span class="fc" id="L26">        String path = request.getRequestURI().replaceAll(&quot;[^a-zA-Z0-9/_.-]&quot;, &quot;_&quot;);</span>
+<span class="pc bpc" id="L27" title="1 of 2 branches missed.">        if (path.length() &gt; 300) path = path.substring(0, 300);</span>
+<span class="fc" id="L28">        long start = System.nanoTime();</span>
+<span class="fc" id="L29">        log.info(&quot;CMS integration request method={} path={} commandId={}&quot;, request.getMethod(), path, command);</span>
+<span class="fc" id="L30">        boolean completed = false;</span>
+        try {
+<span class="fc" id="L32">            chain.doFilter(request, response);</span>
+<span class="fc" id="L33">            completed = true;</span>
+<span class="nc" id="L34">        } catch (IOException | ServletException | RuntimeException ex) {</span>
+<span class="nc" id="L35">            log.warn(&quot;CMS integration request aborted method={} path={} commandId={} exceptionType={}&quot;,</span>
+<span class="nc" id="L36">                    request.getMethod(), path, command, ex.getClass().getSimpleName());</span>
+<span class="nc" id="L37">            throw ex;</span>
+        } finally {
+<span class="pc bpc" id="L39" title="1 of 2 branches missed.">            if (completed)</span>
+<span class="fc" id="L40">            log.info(&quot;CMS integration response method={} path={} commandId={} status={} elapsedMs={}&quot;,</span>
+<span class="fc" id="L41">                    request.getMethod(), path, command, response.getStatus(), (System.nanoTime()-start)/1_000_000);</span>
+        }
+<span class="fc" id="L43">    }</span>
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.14.202510111229</span></div></body></html>

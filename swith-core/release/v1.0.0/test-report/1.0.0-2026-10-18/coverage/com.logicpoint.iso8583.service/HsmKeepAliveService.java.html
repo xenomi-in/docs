@@ -1,0 +1,375 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>HsmKeepAliveService.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">iso8583-processor</a> &gt; <a href="index.source.html" class="el_package">com.logicpoint.iso8583.service</a> &gt; <span class="el_source">HsmKeepAliveService.java</span></div><h1>HsmKeepAliveService.java</h1><pre class="source lang-java linenums">package com.logicpoint.iso8583.service;
+
+import com.logicpoint.iso8583.hsm.FuturexHsmCmd;
+import com.logicpoint.iso8583.hsm.SimpleNettyHsmClient;
+import io.netty.channel.Channel;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
+import org.springframework.beans.factory.annotation.Value;
+import org.springframework.beans.factory.ObjectProvider;
+import org.springframework.scheduling.annotation.Async;
+import org.springframework.scheduling.annotation.Scheduled;
+import org.springframework.stereotype.Service;
+
+// Removed imports to avoid circular dependency
+
+import jakarta.annotation.PostConstruct;
+import jakarta.annotation.PreDestroy;
+
+import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.ConcurrentLinkedQueue;
+import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.concurrent.atomic.AtomicLong;
+import java.util.concurrent.TimeUnit;
+
+
+/**
+ * Service responsible for maintaining HSM connection health through keep-alive mechanism.
+ * Sends periodic echo commands to prevent connections from becoming stale.
+ * 
+ * @author LogicPoint Systems
+ * @version 1.0
+ */
+@Service
+public class HsmKeepAliveService implements HsmKeepAliveServiceInterface {
+
+<span class="fc" id="L37">    private static final Logger logger = LoggerFactory.getLogger(HsmKeepAliveService.class);</span>
+    private static final String HEALTH_CHECK_COMMAND = &quot;[AOECHO;BJ0;AGEcho Test connection.;]&quot;;
+    
+    private final ObjectProvider&lt;SimpleNettyHsmClient&gt; hsmClientProvider;
+    
+    // Keep-alive configuration
+    @Value(&quot;${hsm.futurex.keep-alive-enabled:true}&quot;)
+    private boolean keepAliveEnabled;
+    
+    @Value(&quot;${hsm.futurex.keep-alive-interval:30000}&quot;)
+    private long keepAliveInterval; // milliseconds
+    
+    @Value(&quot;${hsm.futurex.keep-alive-idle-timeout:60000}&quot;)
+    private long idleTimeout; // milliseconds
+    
+    @Value(&quot;${hsm.futurex.keep-alive-echo-timeout:5000}&quot;)
+    private long echoTimeout; // milliseconds
+    
+    // Connection tracking
+<span class="fc" id="L56">    private final ConcurrentHashMap&lt;Channel, ConnectionHealth&gt; connectionHealthMap = new ConcurrentHashMap&lt;&gt;();</span>
+<span class="fc" id="L57">    private final ConcurrentLinkedQueue&lt;Channel&gt; connectionsToCheck = new ConcurrentLinkedQueue&lt;&gt;();</span>
+<span class="fc" id="L58">    private final AtomicBoolean isRunning = new AtomicBoolean(false);</span>
+<span class="fc" id="L59">    private final AtomicLong lastActivityTime = new AtomicLong(System.currentTimeMillis());</span>
+
+<span class="fc" id="L61">    public HsmKeepAliveService(ObjectProvider&lt;SimpleNettyHsmClient&gt; hsmClientProvider) {</span>
+<span class="fc" id="L62">        this.hsmClientProvider = hsmClientProvider;</span>
+<span class="fc" id="L63">    }</span>
+    
+    /**
+     * Tracks the health status of a connection.
+     */
+<span class="fc" id="L68">    private static class ConnectionHealth {</span>
+<span class="fc" id="L69">        private final AtomicLong lastActivityTime = new AtomicLong(System.currentTimeMillis());</span>
+<span class="fc" id="L70">        private final AtomicLong lastEchoTime = new AtomicLong(0);</span>
+<span class="fc" id="L71">        private final AtomicBoolean isHealthy = new AtomicBoolean(true);</span>
+<span class="fc" id="L72">        private volatile int consecutiveFailures = 0;</span>
+<span class="fc" id="L73">        private volatile int maxConsecutiveFailures = 3;</span>
+        
+        public long getLastActivityTime() {
+<span class="nc" id="L76">            return lastActivityTime.get();</span>
+        }
+        
+        public void updateActivityTime() {
+<span class="fc" id="L80">            lastActivityTime.set(System.currentTimeMillis());</span>
+<span class="fc" id="L81">        }</span>
+        
+        public long getLastEchoTime() {
+<span class="nc" id="L84">            return lastEchoTime.get();</span>
+        }
+        
+        public void updateEchoTime() {
+<span class="fc" id="L88">            lastEchoTime.set(System.currentTimeMillis());</span>
+<span class="fc" id="L89">            consecutiveFailures = 0;</span>
+<span class="fc" id="L90">            isHealthy.set(true);</span>
+<span class="fc" id="L91">        }</span>
+        
+        public boolean isHealthy() {
+<span class="fc" id="L94">            return isHealthy.get();</span>
+        }
+        
+        public void markUnhealthy() {
+<span class="fc" id="L98">            consecutiveFailures++;</span>
+<span class="fc bfc" id="L99" title="All 2 branches covered.">            if (consecutiveFailures &gt;= maxConsecutiveFailures) {</span>
+<span class="fc" id="L100">                isHealthy.set(false);</span>
+            }
+<span class="fc" id="L102">        }</span>
+        
+        public void markHealthy() {
+<span class="nc" id="L105">            consecutiveFailures = 0;</span>
+<span class="nc" id="L106">            isHealthy.set(true);</span>
+<span class="nc" id="L107">        }</span>
+        
+        public int getConsecutiveFailures() {
+<span class="fc" id="L110">            return consecutiveFailures;</span>
+        }
+        
+        public boolean needsEchoCheck(long currentTime, long interval, long idleTimeout) {
+<span class="nc" id="L114">            long timeSinceLastActivity = currentTime - getLastActivityTime();</span>
+<span class="nc" id="L115">            long timeSinceLastEcho = currentTime - getLastEchoTime();</span>
+            
+            // Check if connection has been idle for too long or echo is overdue
+<span class="nc bnc" id="L118" title="All 6 branches missed.">            return (timeSinceLastActivity &gt; idleTimeout &amp;&amp; timeSinceLastEcho &gt; interval) || </span>
+<span class="nc bnc" id="L119" title="All 2 branches missed.">                   (timeSinceLastEcho &gt; interval &amp;&amp; isHealthy());</span>
+        }
+    }
+
+    @PostConstruct
+    public void initialize() {
+<span class="fc bfc" id="L125" title="All 2 branches covered.">        if (keepAliveEnabled) {</span>
+<span class="fc" id="L126">            logger.info(&quot;HSM Keep-alive service initialized with interval: {}ms, idle timeout: {}ms&quot;, </span>
+<span class="fc" id="L127">                       keepAliveInterval, idleTimeout);</span>
+<span class="fc" id="L128">            isRunning.set(true);</span>
+        } else {
+<span class="fc" id="L130">            logger.info(&quot;HSM Keep-alive service is disabled&quot;);</span>
+        }
+<span class="fc" id="L132">    }</span>
+
+    @PreDestroy
+    public void shutdown() {
+<span class="fc" id="L136">        logger.info(&quot;Shutting down HSM Keep-alive service&quot;);</span>
+<span class="fc" id="L137">        isRunning.set(false);</span>
+<span class="fc" id="L138">        connectionHealthMap.clear();</span>
+<span class="fc" id="L139">        connectionsToCheck.clear();</span>
+<span class="fc" id="L140">    }</span>
+
+    /**
+     * Scheduled task that runs periodically to check connection health.
+     * This method is called by Spring's scheduler.
+     */
+    @Scheduled(fixedDelayString = &quot;${hsm.futurex.keep-alive-interval:30000}&quot;)
+    public void performKeepAliveCheck() {
+<span class="nc bnc" id="L148" title="All 4 branches missed.">        if (!keepAliveEnabled || !isRunning.get()) {</span>
+<span class="nc" id="L149">            return;</span>
+        }
+        
+        try {
+<span class="nc" id="L153">            long currentTime = System.currentTimeMillis();</span>
+<span class="nc" id="L154">            updateActivityTime();</span>
+            
+            // Get current pool statistics for monitoring (simplified for keep-alive)
+<span class="nc" id="L157">            logger.debug(&quot;Keep-alive check - Performing health verification&quot;);</span>
+            
+            // Perform health check on HSM
+<span class="nc" id="L160">            performHsmHealthCheck();</span>
+            
+<span class="nc" id="L162">        } catch (Exception e) {</span>
+<span class="nc" id="L163">            logger.error(&quot;Error during keep-alive check: {}&quot;, e.getMessage(), e);</span>
+<span class="nc" id="L164">        }</span>
+<span class="nc" id="L165">    }</span>
+
+    /**
+     * Performs a health check on the HSM by sending an echo command.
+     */
+    @Async
+    public void performHsmHealthCheck() {
+<span class="pc bpc" id="L172" title="1 of 2 branches missed.">        if (!isRunning.get()) {</span>
+<span class="nc" id="L173">            return;</span>
+        }
+        
+        try {
+<span class="fc" id="L177">            logger.debug(&quot;Performing HSM health check with echo command&quot;);</span>
+
+<span class="fc" id="L179">            SimpleNettyHsmClient hsmClient = hsmClientProvider.getIfAvailable();</span>
+<span class="pc bpc" id="L180" title="1 of 2 branches missed.">            if (hsmClient == null) {</span>
+<span class="nc" id="L181">                logger.warn(&quot;HSM health check could not be performed: HSM client is unavailable&quot;);</span>
+<span class="nc" id="L182">                updateAllConnectionHealth(false);</span>
+<span class="nc" id="L183">                return;</span>
+            }
+
+<span class="fc" id="L186">            String response = hsmClient.sendMessage(HEALTH_CHECK_COMMAND);</span>
+<span class="fc bfc" id="L187" title="All 4 branches covered.">            if (response == null || response.trim().isEmpty()) {</span>
+<span class="fc" id="L188">                logger.warn(&quot;HSM health check failed: no response received&quot;);</span>
+<span class="fc" id="L189">                updateAllConnectionHealth(false);</span>
+<span class="fc" id="L190">                return;</span>
+            }
+
+<span class="fc" id="L193">            FuturexHsmCmd responseCmd = FuturexHsmCmd.parse(response);</span>
+<span class="pc bpc" id="L194" title="1 of 2 branches missed.">            if (responseCmd.isSuccess()) {</span>
+<span class="fc" id="L195">                logger.debug(&quot;HSM health check successful: {}&quot;, responseCmd.getField(&quot;AG&quot;));</span>
+<span class="fc" id="L196">                updateAllConnectionHealth(true);</span>
+            } else {
+<span class="nc" id="L198">                logger.warn(&quot;HSM health check failed: {}&quot;, responseCmd.getErroMsg());</span>
+<span class="nc" id="L199">                updateAllConnectionHealth(false);</span>
+            }
+            
+<span class="nc" id="L202">        } catch (Exception e) {</span>
+<span class="nc" id="L203">            logger.error(&quot;HSM health check failed: {}&quot;, e.getMessage());</span>
+<span class="nc" id="L204">            updateAllConnectionHealth(false);</span>
+<span class="fc" id="L205">        }</span>
+<span class="fc" id="L206">    }</span>
+
+    /**
+     * Updates the health status of all tracked connections.
+     * 
+     * @param isHealthy true if the health check was successful
+     */
+    private void updateAllConnectionHealth(boolean isHealthy) {
+<span class="fc" id="L214">        long currentTime = System.currentTimeMillis();</span>
+        
+<span class="fc" id="L216">        connectionHealthMap.forEach((channel, health) -&gt; {</span>
+<span class="fc bfc" id="L217" title="All 2 branches covered.">            if (isHealthy) {</span>
+<span class="fc" id="L218">                health.updateEchoTime();</span>
+<span class="fc" id="L219">                logger.debug(&quot;Connection {} marked as healthy&quot;, channel.remoteAddress());</span>
+            } else {
+<span class="fc" id="L221">                health.markUnhealthy();</span>
+<span class="fc" id="L222">                logger.warn(&quot;Connection {} marked as unhealthy (failures: {})&quot;, </span>
+<span class="fc" id="L223">                           channel.remoteAddress(), health.getConsecutiveFailures());</span>
+                
+                // If connection is consistently unhealthy, consider removing it
+<span class="fc bfc" id="L226" title="All 2 branches covered.">                if (!health.isHealthy()) {</span>
+<span class="fc" id="L227">                    logger.warn(&quot;Connection {} is consistently unhealthy, may need replacement&quot;, </span>
+<span class="fc" id="L228">                               channel.remoteAddress());</span>
+                }
+            }
+<span class="fc" id="L231">        });</span>
+<span class="fc" id="L232">    }</span>
+
+    /**
+     * Updates the last activity time for the service.
+     * This should be called whenever any HSM operation is performed.
+     */
+    public void updateActivityTime() {
+<span class="fc" id="L239">        lastActivityTime.set(System.currentTimeMillis());</span>
+<span class="fc" id="L240">    }</span>
+
+    /**
+     * Registers a connection for health monitoring.
+     * 
+     * @param channel The connection channel to monitor
+     */
+    public void registerConnection(Channel channel) {
+<span class="pc bpc" id="L248" title="1 of 2 branches missed.">        if (!keepAliveEnabled) {</span>
+<span class="nc" id="L249">            return;</span>
+        }
+        
+<span class="fc" id="L252">        ConnectionHealth health = new ConnectionHealth();</span>
+<span class="fc" id="L253">        connectionHealthMap.put(channel, health);</span>
+<span class="fc" id="L254">        logger.debug(&quot;Registered connection {} for health monitoring&quot;, channel.remoteAddress());</span>
+<span class="fc" id="L255">    }</span>
+
+    /**
+     * Unregisters a connection from health monitoring.
+     * 
+     * @param channel The connection channel to stop monitoring
+     */
+    public void unregisterConnection(Channel channel) {
+<span class="fc" id="L263">        ConnectionHealth health = connectionHealthMap.remove(channel);</span>
+<span class="pc bpc" id="L264" title="1 of 2 branches missed.">        if (health != null) {</span>
+<span class="fc" id="L265">            logger.debug(&quot;Unregistered connection {} from health monitoring&quot;, channel.remoteAddress());</span>
+        }
+<span class="fc" id="L267">    }</span>
+
+    /**
+     * Updates the activity time for a specific connection.
+     * This should be called whenever a connection is used.
+     * 
+     * @param channel The connection that was used
+     */
+    public void updateConnectionActivity(Channel channel) {
+<span class="fc" id="L276">        ConnectionHealth health = connectionHealthMap.get(channel);</span>
+<span class="pc bpc" id="L277" title="1 of 2 branches missed.">        if (health != null) {</span>
+<span class="fc" id="L278">            health.updateActivityTime();</span>
+        }
+<span class="fc" id="L280">        updateActivityTime();</span>
+<span class="fc" id="L281">    }</span>
+
+    /**
+     * Gets the health status of all connections.
+     * 
+     * @return A map of connection health status
+     */
+    public ConcurrentHashMap&lt;Channel, ConnectionHealth&gt; getConnectionHealthMap() {
+<span class="fc" id="L289">        return new ConcurrentHashMap&lt;&gt;(connectionHealthMap);</span>
+    }
+
+    /**
+     * Gets the number of healthy connections.
+     * 
+     * @return Number of healthy connections
+     */
+    public int getHealthyConnectionCount() {
+<span class="fc" id="L298">        return (int) connectionHealthMap.values().stream()</span>
+<span class="fc" id="L299">                .filter(ConnectionHealth::isHealthy)</span>
+<span class="fc" id="L300">                .count();</span>
+    }
+
+    /**
+     * Gets the number of unhealthy connections.
+     * 
+     * @return Number of unhealthy connections
+     */
+    public int getUnhealthyConnectionCount() {
+<span class="fc" id="L309">        return (int) connectionHealthMap.values().stream()</span>
+<span class="fc bfc" id="L310" title="All 2 branches covered.">                .filter(health -&gt; !health.isHealthy())</span>
+<span class="fc" id="L311">                .count();</span>
+    }
+
+    /**
+     * Gets the total number of monitored connections.
+     * 
+     * @return Total number of monitored connections
+     */
+    public int getTotalConnectionCount() {
+<span class="fc" id="L320">        return connectionHealthMap.size();</span>
+    }
+
+    /**
+     * Gets keep-alive statistics as a formatted string.
+     * 
+     * @return Keep-alive statistics
+     */
+    public String getKeepAliveStats() {
+<span class="fc" id="L329">        int total = getTotalConnectionCount();</span>
+<span class="fc" id="L330">        int healthy = getHealthyConnectionCount();</span>
+<span class="fc" id="L331">        int unhealthy = getUnhealthyConnectionCount();</span>
+        
+<span class="fc" id="L333">        return String.format(&quot;Keep-alive stats - Total: %d, Healthy: %d, Unhealthy: %d, Enabled: %s&quot;, </span>
+<span class="fc" id="L334">                           total, healthy, unhealthy, keepAliveEnabled);</span>
+    }
+
+    /**
+     * Forces a health check on all connections.
+     * This can be called manually for immediate health verification.
+     */
+    public void forceHealthCheck() {
+<span class="pc bpc" id="L342" title="1 of 4 branches missed.">        if (keepAliveEnabled &amp;&amp; isRunning.get()) {</span>
+<span class="fc" id="L343">            logger.info(&quot;Forcing immediate HSM health check&quot;);</span>
+<span class="fc" id="L344">            performHsmHealthCheck();</span>
+        }
+<span class="fc" id="L346">    }</span>
+
+    /**
+     * Checks if the keep-alive service is running.
+     * 
+     * @return true if the service is running
+     */
+    public boolean isRunning() {
+<span class="pc bpc" id="L354" title="1 of 4 branches missed.">        return isRunning.get() &amp;&amp; keepAliveEnabled;</span>
+    }
+
+    /**
+     * Gets the last activity time of the service.
+     * 
+     * @return Last activity time in milliseconds
+     */
+    public long getLastActivityTime() {
+<span class="fc" id="L363">        return lastActivityTime.get();</span>
+    }
+
+    /**
+     * Gets the time since last activity.
+     * 
+     * @return Time since last activity in milliseconds
+     */
+    public long getTimeSinceLastActivity() {
+<span class="fc" id="L372">        return System.currentTimeMillis() - lastActivityTime.get();</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.14.202510111229</span></div></body></html>

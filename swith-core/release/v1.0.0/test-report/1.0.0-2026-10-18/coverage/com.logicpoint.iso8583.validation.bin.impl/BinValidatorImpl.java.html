@@ -1,0 +1,53 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>BinValidatorImpl.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">iso8583-processor</a> &gt; <a href="index.source.html" class="el_package">com.logicpoint.iso8583.validation.bin.impl</a> &gt; <span class="el_source">BinValidatorImpl.java</span></div><h1>BinValidatorImpl.java</h1><pre class="source lang-java linenums">package com.logicpoint.iso8583.validation.bin.impl;
+
+import com.logicpoint.iso8583.validation.bin.BinValidator;
+import com.logicpoint.iso8583.validation.ValidationResult;
+import com.logicpoint.iso8583.service.CacheInitializationService;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.stereotype.Service;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+import java.util.ArrayList;
+import java.util.List;
+import java.util.Map;
+
+/**
+ * Concrete implementation of BinValidator with comprehensive BIN validation logic.
+ */
+@Service
+<span class="nc" id="L18">public class BinValidatorImpl implements BinValidator {</span>
+    
+<span class="nc" id="L20">    Logger log = LoggerFactory.getLogger(BinValidatorImpl.class);</span>
+
+    @Autowired
+    private CacheInitializationService cacheService;
+    
+    @Override
+    public ValidationResult validate(String bin) {
+<span class="nc" id="L27">        List&lt;String&gt; errors = new ArrayList&lt;&gt;();</span>
+        
+<span class="nc" id="L29">        Map&lt;String, CacheInitializationService.BinInstitutionData&gt; binCache = cacheService.loadBinInstitutionCache();</span>
+<span class="nc" id="L30">        CacheInitializationService.BinInstitutionData binData = binCache.get(bin);</span>
+<span class="nc" id="L31">        log.debug(&quot; BIN Data: {}&quot;, binCache.keySet());</span>
+<span class="nc bnc" id="L32" title="All 2 branches missed.">        if (binData == null) {</span>
+<span class="nc" id="L33">            errors.add(&quot;INVALID_BIN: BIN not found&quot;);</span>
+<span class="nc" id="L34">            return new ValidationResult(errors, new ArrayList&lt;&gt;());</span>
+        }
+
+<span class="nc bnc" id="L37" title="All 2 branches missed.">        if (!binData.isBinActive()) {</span>
+<span class="nc" id="L38">            errors.add(&quot;BLOCKED_BIN: BIN is blocked or suspended&quot;);</span>
+        }
+
+        // Additional BIN validations
+<span class="nc bnc" id="L42" title="All 2 branches missed.">        if (!bin.matches(&quot;\\d{6}&quot;)) {</span>
+<span class="nc" id="L43">            errors.add(&quot;INVALID_BIN: BIN must be exactly 6 digits&quot;);</span>
+        }
+<span class="nc" id="L45">        log.debug(&quot;BIN Validation Result: {}&quot;, errors);</span>
+<span class="nc" id="L46">        return new ValidationResult(errors, new ArrayList&lt;&gt;());</span>
+    }
+    @Override
+    public String getValidatorType() {
+<span class="nc" id="L50">        return &quot;BIN_VALIDATOR&quot;;</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.14.202510111229</span></div></body></html>

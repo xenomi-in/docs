@@ -1,0 +1,52 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>HsmResponseProcessor.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">iso8583-processor</a> &gt; <a href="index.source.html" class="el_package">com.logicpoint.iso8583.hsm</a> &gt; <span class="el_source">HsmResponseProcessor.java</span></div><h1>HsmResponseProcessor.java</h1><pre class="source lang-java linenums">package com.logicpoint.iso8583.hsm;
+
+import tools.jackson.databind.JsonNode;
+import tools.jackson.databind.json.JsonMapper;
+import java.io.IOException;
+
+/**
+ * Utility class for processing responses from Futurex HSM.
+ */
+<span class="nc" id="L10">public class HsmResponseProcessor {</span>
+
+<span class="fc" id="L12">    private static final JsonMapper mapper = JsonMapper.builderWithJackson2Defaults().build();</span>
+
+    /**
+     * Parses the HSM response and extracts the result code.
+     *
+     * @param responseJson The JSON response string
+     * @return The result code or null if parsing fails
+     * @throws IOException If JSON parsing fails
+     */
+    public static String getResultCode(String responseJson) throws IOException {
+<span class="fc" id="L22">        JsonNode root = mapper.readTree(responseJson);</span>
+<span class="fc" id="L23">        return root.path(&quot;resultCode&quot;).asText();</span>
+    }
+
+    // Add more processing methods, e.g., extract data fields, check for errors, etc.
+
+    /**
+     * Checks if the response indicates success.
+     *
+     * @param responseJson The JSON response string
+     * @return true if successful, false otherwise
+     * @throws IOException If JSON parsing fails
+     */
+    public static boolean isSuccess(String responseJson) throws IOException {
+<span class="fc" id="L36">        String code = getResultCode(responseJson);</span>
+<span class="fc" id="L37">        return &quot;00&quot;.equals(code); // Assuming '00' is success code</span>
+    }
+
+    /**
+     * Extracts the generated key from HSM response.
+     *
+     * @param responseJson The JSON response string
+     * @return The base64-encoded key or null if not found
+     * @throws IOException If JSON parsing fails
+     */
+    public static String extractGeneratedKey(String responseJson) throws IOException {
+<span class="fc" id="L48">        JsonNode root = mapper.readTree(responseJson);</span>
+<span class="fc" id="L49">        return root.path(&quot;data&quot;).path(&quot;key&quot;).asText();</span>
+    }
+} 
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.14.202510111229</span></div></body></html>

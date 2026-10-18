@@ -1,0 +1,84 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>CmsPinController.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">iso8583-processor</a> &gt; <a href="index.source.html" class="el_package">com.logicpoint.iso8583.cmsintegration</a> &gt; <span class="el_source">CmsPinController.java</span></div><h1>CmsPinController.java</h1><pre class="source lang-java linenums">package com.logicpoint.iso8583.cmsintegration;
+
+import tools.jackson.databind.json.JsonMapper;
+
+import tools.jackson.databind.*;
+import io.swagger.v3.oas.annotations.Operation;
+import io.swagger.v3.oas.annotations.Parameter;
+import io.swagger.v3.oas.annotations.media.Content;
+import io.swagger.v3.oas.annotations.media.ExampleObject;
+import io.swagger.v3.oas.annotations.media.Schema;
+import io.swagger.v3.oas.annotations.responses.ApiResponse;
+import io.swagger.v3.oas.annotations.tags.Tag;
+import io.swagger.v3.oas.annotations.security.SecurityRequirement;
+import jakarta.validation.Validator;
+import org.springframework.web.bind.annotation.*;
+import java.util.UUID;
+import static com.logicpoint.iso8583.cmsintegration.CmsPinContracts.*;
+
+@RestController
+@RequestMapping(&quot;/internal/v1/institutions/{institutionId}&quot;)
+@SecurityRequirement(name=&quot;cmsServiceBearer&quot;)
+@Tag(name=&quot;CMS PIN operations&quot;, description=&quot;Separate PIN establishment after committed card registration. Requires the CMS service JWT scope switch:card-authorization:write and mTLS when enabled.&quot;)
+public class CmsPinController {
+    private final CmsPinOperationService service; private final JsonMapper json; private final Validator validator;
+<span class="fc" id="L25">    public CmsPinController(CmsPinOperationService service,JsonMapper json,Validator validator){this.service=service;this.json=json.rebuild().enable(DeserializationFeature.FAIL_ON_UNKNOWN_PROPERTIES).build();this.validator=validator;}</span>
+    @PostMapping(&quot;/pan-families/{panFamilyReference}/pin-operations&quot;)
+    @Operation(summary=&quot;Submit a serialized, versioned PIN operation&quot;,
+            description=&quot;Supports CONFIGURE_PIN_PROFILE, INITIALIZE_SELECTED_PIN, GENERATE_INITIAL_PIN, CHANGE_PIN and RESET_PIN. &quot;
+                    + &quot;Path identities must match the body. Replay the identical request with the same operationId. &quot;
+                    + &quot;Configuration completes without changing the PIN version. Initialization, change and reset require &quot;
+                    + &quot;protectedPinMaterial: RSA-OAEP-256/A256GCM JWE with kid=cms-pin-v1 (configurable). &quot;
+                    + &quot;The envelope binds all command identities/versions and expires within five minutes. &quot;
+                    + &quot;Change requires currentPin and newPin; reset/initialization require only newPin. Each contains &quot;
+                    + &quot;encryptedPinBlock, format (ISO_0:16 hex digits, ISO_4:32), and keyBindingReference. &quot;
+                    + &quot;authorizationReference is required. Clear PINs are never accepted. Generation omits the envelope. &quot;
+                    + &quot;The Visa/ISO-0 adapter uses explicit PVK/PVKI and trusted one-use authorization grants. Disabled/unavailable HSM returns 503. IBM, ISO_4, TR-31 and generated mailers are not implemented. No automatic pending completion is implemented.&quot;,
+            requestBody=@io.swagger.v3.oas.annotations.parameters.RequestBody(required=true,
+                    content=@Content(mediaType=&quot;application/json&quot;, schema=@Schema(implementation=PinCommand.class),
+                    examples={@ExampleObject(name=&quot;CONFIGURE_SELECTED&quot;, description=&quot;Requires a registered family with no existing PIN profile. Key alias is illustrative.&quot;, value=CmsPinApiExamples.CONFIGURE_SELECTED_REQUEST),
+                    @ExampleObject(name=&quot;INITIALIZE_SELECTED&quot;, description=&quot;Requires a configured HSM executor; encrypted placeholders must be replaced with a real JWE where supplied.&quot;, value=CmsPinApiExamples.INITIALIZE_SELECTED_REQUEST),
+                    @ExampleObject(name=&quot;CONFIGURE_GENERATED&quot;, description=&quot;Requires a registered family with no existing PIN profile. Key alias is illustrative.&quot;, value=CmsPinApiExamples.CONFIGURE_GENERATED_REQUEST),
+                    @ExampleObject(name=&quot;GENERATE_INITIAL&quot;, description=&quot;Requires a configured HSM executor; encrypted placeholders must be replaced with a real JWE where supplied.&quot;, value=CmsPinApiExamples.GENERATE_INITIAL_REQUEST),
+                    @ExampleObject(name=&quot;CHANGE&quot;, description=&quot;Requires an already established active PIN version 1. Replace the encrypted placeholder with a bound JWE containing PIN blocks and authorization.&quot;, value=CmsPinApiExamples.CHANGE_REQUEST),
+                    @ExampleObject(name=&quot;RESET&quot;, description=&quot;Requires an already established active PIN version 2. Replace the encrypted placeholder with a bound JWE containing PIN blocks and authorization.&quot;, value=CmsPinApiExamples.RESET_REQUEST)})))
+    @ApiResponse(responseCode=&quot;200&quot;, description=&quot;Stored receipt. Execution success examples require configured HSM and authorization grants; they are not produced by the default deployment. Examples use ISO-8601 timestamps; timestamp-enabled Jackson configuration emits numeric Unix seconds.&quot;,
+            content=@Content(mediaType=&quot;application/json&quot;, schema=@Schema(implementation=PinOperationReceipt.class),
+                    examples={@ExampleObject(name=&quot;CONFIGURE_SELECTED&quot;, value=CmsPinApiExamples.CONFIGURE_SELECTED_RESPONSE),
+                    @ExampleObject(name=&quot;INITIALIZE_SELECTED&quot;, value=CmsPinApiExamples.INITIALIZE_SELECTED_RESPONSE),
+                    @ExampleObject(name=&quot;CONFIGURE_GENERATED&quot;, value=CmsPinApiExamples.CONFIGURE_GENERATED_RESPONSE),
+                    @ExampleObject(name=&quot;GENERATE_INITIAL&quot;, value=CmsPinApiExamples.GENERATE_INITIAL_RESPONSE),
+                    @ExampleObject(name=&quot;CHANGE&quot;, value=CmsPinApiExamples.CHANGE_RESPONSE),
+                    @ExampleObject(name=&quot;RESET&quot;, value=CmsPinApiExamples.RESET_RESPONSE)}))
+    @ApiResponse(responseCode=&quot;400&quot;, description=&quot;Invalid fields or encrypted PIN envelope&quot;)
+    @ApiResponse(responseCode=&quot;409&quot;, description=&quot;Stale version, replay conflict or invalid establishment state&quot;)
+    @ApiResponse(responseCode=&quot;503&quot;, description=&quot;PIN key, HSM or authorization integration unavailable; no success receipt is committed&quot;)
+    public JsonNode submit(
+            @Parameter(description=&quot;Registered CMS institution UUID&quot;, example=&quot;11111111-1111-4111-8111-111111111111&quot;) @PathVariable UUID institutionId,
+            @Parameter(description=&quot;Registered PAN family UUID; equals registration panFamilyId&quot;, example=&quot;55555555-5555-4555-8555-555555555555&quot;) @PathVariable UUID panFamilyReference,
+            @Parameter(description=&quot;Must equal operationId in the chosen request example&quot;, example=&quot;70000000-0000-4000-8000-000000000001&quot;) @RequestHeader(&quot;Idempotency-Key&quot;) UUID key,
+            @RequestBody JsonNode body) {
+        PinCommand command;
+        try {
+<span class="pc bpc" id="L63" title="2 of 4 branches missed.">            if(body==null || !body.isObject()</span>
+<span class="fc bfc" id="L64" title="All 2 branches covered.">                    || !body.path(&quot;expectedPinVersion&quot;).isIntegralNumber()</span>
+<span class="pc bpc" id="L65" title="1 of 2 branches missed.">                    || !body.path(&quot;expectedPinVersion&quot;).canConvertToLong()</span>
+<span class="pc bpc" id="L66" title="1 of 2 branches missed.">                    || !body.path(&quot;policyProfileVersion&quot;).isIntegralNumber()</span>
+<span class="pc bpc" id="L67" title="1 of 2 branches missed.">                    || !body.path(&quot;policyProfileVersion&quot;).canConvertToLong()) throw new IllegalArgumentException();</span>
+<span class="fc" id="L68">            command=json.treeToValue(body,PinCommand.class);</span>
+<span class="pc bpc" id="L69" title="2 of 4 branches missed.">            if(command==null || !validator.validate(command).isEmpty()) throw new IllegalArgumentException();</span>
+<span class="pc bpc" id="L70" title="1 of 2 branches missed.">            if(!key.equals(command.operationId())) throw CmsIntegrationException.bad(&quot;Idempotency-Key must equal operationId&quot;);</span>
+<span class="pc" id="L71">        } catch(CmsIntegrationException e){throw e;} catch(Exception e){throw CmsIntegrationException.bad(&quot;Invalid PIN command fields&quot;);}</span>
+<span class="fc" id="L72">        return service.submit(institutionId,panFamilyReference,command);</span>
+    }
+    @GetMapping(&quot;/pin-operations/{operationId}&quot;)
+    @Operation(summary=&quot;Read PIN operation status&quot;, description=&quot;Returns the stored receipt without invoking the HSM. No body or Idempotency-Key is required. Pending operations currently do not advance. Unknown operations return 404.&quot;)
+    @ApiResponse(responseCode=&quot;200&quot;, description=&quot;Stored receipt; no PIN or verification value is returned&quot;,
+            content=@Content(mediaType=&quot;application/json&quot;, schema=@Schema(implementation=PinOperationReceipt.class),
+                    examples={@ExampleObject(name=&quot;Completed generation (requires HSM adapter)&quot;, value=CmsPinApiExamples.GENERATE_INITIAL_RESPONSE),
+                            @ExampleObject(name=&quot;Completed configuration&quot;, value=CmsPinApiExamples.CONFIGURE_SELECTED_RESPONSE)}))
+    public JsonNode get(
+            @Parameter(example=&quot;11111111-1111-4111-8111-111111111111&quot;) @PathVariable UUID institutionId,
+<span class="fc" id="L82">            @Parameter(example=&quot;70000000-0000-4000-8000-000000000004&quot;) @PathVariable UUID operationId){return service.get(institutionId,operationId);}</span>
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.14.202510111229</span></div></body></html>

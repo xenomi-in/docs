@@ -1,0 +1,234 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>CardDataEncryptionService.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">iso8583-processor</a> &gt; <a href="index.source.html" class="el_package">com.logicpoint.iso8583.service</a> &gt; <span class="el_source">CardDataEncryptionService.java</span></div><h1>CardDataEncryptionService.java</h1><pre class="source lang-java linenums">package com.logicpoint.iso8583.service;
+
+import org.springframework.beans.factory.annotation.Value;
+import org.springframework.stereotype.Service;
+
+import com.logicpoint.iso8583.entity.CardData;
+
+@Service
+public class CardDataEncryptionService {
+
+    /** CMS onboarding must never silently fall back to plaintext persistence. */
+    public void prepareProtectedForPersistence(CardData cardData, Integer institutionId) {
+<span class="nc bnc" id="L13" title="All 6 branches missed.">        if (!encryptionEnabled || dualWritePlaintext || cardData.getAuth_id() == null) {</span>
+<span class="nc" id="L14">            throw new IllegalStateException(&quot;CMS registration requires encryption, stable identity and plaintext dual-write disabled&quot;);</span>
+        }
+<span class="nc" id="L16">        prepareForPersistence(cardData, institutionId);</span>
+<span class="nc bnc" id="L17" title="All 4 branches missed.">        if (cardData.getPan_lookup_hmac() == null || cardData.getPan() != null) {</span>
+<span class="nc" id="L18">            throw new IllegalStateException(&quot;Protected PAN lookup could not be created&quot;);</span>
+        }
+<span class="nc" id="L20">    }</span>
+
+    private final AesGcmCryptoService aesGcmCryptoService;
+    private final ChdKeyCacheService chdKeyCacheService;
+
+    @Value(&quot;${chd.encryption.enabled:false}&quot;)
+    private boolean encryptionEnabled;
+
+    @Value(&quot;${chd.encryption.dual-write-plaintext:true}&quot;)
+    private boolean dualWritePlaintext;
+
+    public CardDataEncryptionService(AesGcmCryptoService aesGcmCryptoService,
+<span class="fc" id="L32">                                     ChdKeyCacheService chdKeyCacheService) {</span>
+<span class="fc" id="L33">        this.aesGcmCryptoService = aesGcmCryptoService;</span>
+<span class="fc" id="L34">        this.chdKeyCacheService = chdKeyCacheService;</span>
+<span class="fc" id="L35">    }</span>
+
+    public void prepareForPersistence(CardData cardData) {
+<span class="fc" id="L38">        prepareForPersistence(cardData, null);</span>
+<span class="fc" id="L39">    }</span>
+
+    public void prepareForPersistence(CardData cardData, Integer institutionId) {
+<span class="pc bpc" id="L42" title="1 of 2 branches missed.">        if (cardData == null) {</span>
+<span class="nc" id="L43">            return;</span>
+        }
+
+<span class="pc bpc" id="L46" title="1 of 2 branches missed.">        if (cardData.getPan() != null) {</span>
+<span class="fc" id="L47">            cardData.setMasked_pan(maskPan(cardData.getPan()));</span>
+        }
+<span class="fc" id="L49">        cardData.setCvv(null);</span>
+
+<span class="pc bpc" id="L51" title="1 of 2 branches missed.">        if (!encryptionEnabled) {</span>
+<span class="nc" id="L52">            return;</span>
+        }
+
+<span class="pc bpc" id="L55" title="2 of 4 branches missed.">        if (cardData.getPan() != null &amp;&amp; !cardData.getPan().isBlank()) {</span>
+<span class="fc" id="L56">            EncryptedFieldValue encryptedPan = encryptCardValue(cardData.getPan(), institutionId, buildAad(cardData, &quot;pan&quot;));</span>
+<span class="pc bpc" id="L57" title="1 of 2 branches missed.">            if (encryptedPan == null) {</span>
+<span class="nc" id="L58">                throw new IllegalStateException(&quot;PAN encryption could not be completed&quot;);</span>
+            }
+<span class="fc" id="L60">            cardData.setPan_ct(encryptedPan.getCiphertext());</span>
+<span class="fc" id="L61">            cardData.setPan_iv(encryptedPan.getIv());</span>
+<span class="fc" id="L62">            cardData.setPan_tag(encryptedPan.getTag());</span>
+<span class="fc" id="L63">            cardData.setPan_key_version(encryptedPan.getKeyVersion());</span>
+<span class="fc" id="L64">            cardData.setPan_lookup_hmac(computePanLookupHmac(cardData.getPan(), institutionId));</span>
+<span class="pc bpc" id="L65" title="1 of 2 branches missed.">            if (!dualWritePlaintext) {</span>
+<span class="nc" id="L66">                cardData.setPan(null);</span>
+            }
+        }
+
+<span class="pc bpc" id="L70" title="3 of 4 branches missed.">        if (cardData.getExpiryDate() != null &amp;&amp; !cardData.getExpiryDate().isBlank()) {</span>
+<span class="nc" id="L71">            EncryptedFieldValue encryptedExpiry = encryptCardValue(cardData.getExpiryDate(), institutionId, buildAad(cardData, &quot;expiry&quot;));</span>
+<span class="nc bnc" id="L72" title="All 2 branches missed.">            if (encryptedExpiry == null) {</span>
+<span class="nc" id="L73">                throw new IllegalStateException(&quot;Expiry encryption could not be completed&quot;);</span>
+            }
+<span class="nc" id="L75">            cardData.setExpiry_ct(encryptedExpiry.getCiphertext());</span>
+<span class="nc" id="L76">            cardData.setExpiry_iv(encryptedExpiry.getIv());</span>
+<span class="nc" id="L77">            cardData.setExpiry_tag(encryptedExpiry.getTag());</span>
+<span class="nc" id="L78">            cardData.setExpiry_key_version(encryptedExpiry.getKeyVersion());</span>
+<span class="nc bnc" id="L79" title="All 2 branches missed.">            if (!dualWritePlaintext) {</span>
+<span class="nc" id="L80">                cardData.setExpiryDate(null);</span>
+            }
+        }
+
+<span class="pc bpc" id="L84" title="2 of 4 branches missed.">        if (cardData.getPvv_offest() != null &amp;&amp; !cardData.getPvv_offest().isBlank()) {</span>
+<span class="fc" id="L85">            EncryptedFieldValue encryptedPvv = encryptCardValue(cardData.getPvv_offest(), institutionId, buildAad(cardData, &quot;pvv&quot;));</span>
+<span class="pc bpc" id="L86" title="1 of 2 branches missed.">            if (encryptedPvv == null) {</span>
+<span class="nc" id="L87">                throw new IllegalStateException(&quot;PVV encryption could not be completed&quot;);</span>
+            }
+<span class="fc" id="L89">            cardData.setPvv_ct(encryptedPvv.getCiphertext());</span>
+<span class="fc" id="L90">            cardData.setPvv_iv(encryptedPvv.getIv());</span>
+<span class="fc" id="L91">            cardData.setPvv_tag(encryptedPvv.getTag());</span>
+<span class="fc" id="L92">            cardData.setPvv_key_version(encryptedPvv.getKeyVersion());</span>
+<span class="pc bpc" id="L93" title="1 of 2 branches missed.">            if (!dualWritePlaintext) {</span>
+<span class="nc" id="L94">                cardData.setPvv_offest(null);</span>
+            }
+        }
+
+<span class="pc bpc" id="L98" title="3 of 4 branches missed.">        if (cardData.getOld_pvv_offest() != null &amp;&amp; !cardData.getOld_pvv_offest().isBlank()) {</span>
+<span class="nc" id="L99">            EncryptedFieldValue encryptedOldPvv = encryptCardValue(cardData.getOld_pvv_offest(), institutionId, buildAad(cardData, &quot;old_pvv&quot;));</span>
+<span class="nc bnc" id="L100" title="All 2 branches missed.">            if (encryptedOldPvv == null) {</span>
+<span class="nc" id="L101">                throw new IllegalStateException(&quot;Old PVV encryption could not be completed&quot;);</span>
+            }
+<span class="nc" id="L103">            cardData.setOld_pvv_ct(encryptedOldPvv.getCiphertext());</span>
+<span class="nc" id="L104">            cardData.setOld_pvv_iv(encryptedOldPvv.getIv());</span>
+<span class="nc" id="L105">            cardData.setOld_pvv_tag(encryptedOldPvv.getTag());</span>
+<span class="nc" id="L106">            cardData.setOld_pvv_key_version(encryptedOldPvv.getKeyVersion());</span>
+<span class="nc bnc" id="L107" title="All 2 branches missed.">            if (!dualWritePlaintext) {</span>
+<span class="nc" id="L108">                cardData.setOld_pvv_offest(null);</span>
+            }
+        }
+<span class="fc" id="L111">    }</span>
+
+    public void hydrateDecryptedFields(CardData cardData) {
+<span class="nc" id="L114">        hydrateDecryptedFields(cardData, null);</span>
+<span class="nc" id="L115">    }</span>
+
+    public void hydrateDecryptedFields(CardData cardData, Integer institutionId) {
+<span class="nc bnc" id="L118" title="All 4 branches missed.">        if (cardData == null || !encryptionEnabled) {</span>
+<span class="nc" id="L119">            return;</span>
+        }
+
+<span class="nc bnc" id="L122" title="All 4 branches missed.">        if ((cardData.getPan() == null || cardData.getPan().isBlank())</span>
+<span class="nc bnc" id="L123" title="All 4 branches missed.">                &amp;&amp; cardData.getPan_ct() != null &amp;&amp; cardData.getPan_iv() != null</span>
+<span class="nc bnc" id="L124" title="All 4 branches missed.">                &amp;&amp; cardData.getPan_tag() != null &amp;&amp; cardData.getPan_key_version() != null) {</span>
+<span class="nc" id="L125">            String decryptedPan = decryptCardValue(cardData.getPan_ct(), cardData.getPan_iv(), cardData.getPan_tag(), institutionId, cardData.getPan_key_version(), buildAad(cardData, &quot;pan&quot;));</span>
+<span class="nc bnc" id="L126" title="All 2 branches missed.">            if (decryptedPan != null) {</span>
+<span class="nc" id="L127">                cardData.setPan(decryptedPan);</span>
+            }
+        }
+
+<span class="nc bnc" id="L131" title="All 4 branches missed.">        if ((cardData.getExpiryDate() == null || cardData.getExpiryDate().isBlank())</span>
+<span class="nc bnc" id="L132" title="All 4 branches missed.">                &amp;&amp; cardData.getExpiry_ct() != null &amp;&amp; cardData.getExpiry_iv() != null</span>
+<span class="nc bnc" id="L133" title="All 4 branches missed.">                &amp;&amp; cardData.getExpiry_tag() != null &amp;&amp; cardData.getExpiry_key_version() != null) {</span>
+<span class="nc" id="L134">            String decryptedExpiry = decryptCardValue(cardData.getExpiry_ct(), cardData.getExpiry_iv(), cardData.getExpiry_tag(), institutionId, cardData.getExpiry_key_version(), buildAad(cardData, &quot;expiry&quot;));</span>
+<span class="nc bnc" id="L135" title="All 2 branches missed.">            if (decryptedExpiry != null) {</span>
+<span class="nc" id="L136">                cardData.setExpiryDate(decryptedExpiry);</span>
+            }
+        }
+
+<span class="nc bnc" id="L140" title="All 4 branches missed.">        if ((cardData.getPvv_offest() == null || cardData.getPvv_offest().isBlank())</span>
+<span class="nc bnc" id="L141" title="All 4 branches missed.">                &amp;&amp; cardData.getPvv_ct() != null &amp;&amp; cardData.getPvv_iv() != null</span>
+<span class="nc bnc" id="L142" title="All 4 branches missed.">                &amp;&amp; cardData.getPvv_tag() != null &amp;&amp; cardData.getPvv_key_version() != null) {</span>
+<span class="nc" id="L143">            String decryptedPvv = decryptCardValue(cardData.getPvv_ct(), cardData.getPvv_iv(), cardData.getPvv_tag(), institutionId, cardData.getPvv_key_version(), buildAad(cardData, &quot;pvv&quot;));</span>
+<span class="nc bnc" id="L144" title="All 2 branches missed.">            if (decryptedPvv != null) {</span>
+<span class="nc" id="L145">                cardData.setPvv_offest(decryptedPvv);</span>
+            }
+        }
+
+<span class="nc bnc" id="L149" title="All 4 branches missed.">        if ((cardData.getOld_pvv_offest() == null || cardData.getOld_pvv_offest().isBlank())</span>
+<span class="nc bnc" id="L150" title="All 4 branches missed.">                &amp;&amp; cardData.getOld_pvv_ct() != null &amp;&amp; cardData.getOld_pvv_iv() != null</span>
+<span class="nc bnc" id="L151" title="All 4 branches missed.">                &amp;&amp; cardData.getOld_pvv_tag() != null &amp;&amp; cardData.getOld_pvv_key_version() != null) {</span>
+<span class="nc" id="L152">            String decryptedOldPvv = decryptCardValue(cardData.getOld_pvv_ct(), cardData.getOld_pvv_iv(), cardData.getOld_pvv_tag(), institutionId, cardData.getOld_pvv_key_version(), buildAad(cardData, &quot;old_pvv&quot;));</span>
+<span class="nc bnc" id="L153" title="All 2 branches missed.">            if (decryptedOldPvv != null) {</span>
+<span class="nc" id="L154">                cardData.setOld_pvv_offest(decryptedOldPvv);</span>
+            }
+        }
+<span class="nc" id="L157">    }</span>
+
+    public String computePanLookupHmac(String pan) {
+<span class="nc" id="L160">        return computePanLookupHmac(pan, null);</span>
+    }
+
+    public String computePanLookupHmac(String pan, Integer institutionId) {
+<span class="pc bpc" id="L164" title="2 of 4 branches missed.">        if (pan == null || !encryptionEnabled) {</span>
+<span class="nc" id="L165">            return null;</span>
+        }
+
+<span class="pc bpc" id="L168" title="1 of 2 branches missed.">        if (institutionId == null) {</span>
+<span class="pc bpc" id="L169" title="1 of 2 branches missed.">            if (!chdKeyCacheService.isPanLookupReady()) {</span>
+<span class="fc" id="L170">                return null;</span>
+            }
+<span class="nc" id="L172">            return aesGcmCryptoService.hmacHex(pan, chdKeyCacheService.getActivePanLookupKey());</span>
+        }
+
+<span class="nc" id="L175">        byte[] panLookupKey = chdKeyCacheService.getActiveKey(institutionId, ChdKeyCacheService.PAN_HMAC_KEY_TYPE);</span>
+<span class="nc bnc" id="L176" title="All 2 branches missed.">        if (panLookupKey == null) {</span>
+<span class="nc" id="L177">            return null;</span>
+        }
+<span class="nc" id="L179">        return aesGcmCryptoService.hmacHex(pan, panLookupKey);</span>
+    }
+
+    public EncryptedFieldValue encryptPan(String pan, Integer institutionId, String aad) {
+<span class="nc bnc" id="L183" title="All 4 branches missed.">        if (pan == null || pan.isBlank()) {</span>
+<span class="nc" id="L184">            return null;</span>
+        }
+<span class="nc" id="L186">        return encryptCardValue(pan, institutionId, aad);</span>
+    }
+
+    public String maskPanForDisplay(String pan) {
+<span class="nc" id="L190">        return maskPan(pan);</span>
+    }
+
+    private EncryptedFieldValue encryptCardValue(String value, Integer institutionId, String aad) {
+        byte[] key;
+        Integer keyVersion;
+
+<span class="pc bpc" id="L197" title="1 of 2 branches missed.">        if (institutionId == null) {</span>
+<span class="fc" id="L198">            key = chdKeyCacheService.getActiveCardKey();</span>
+<span class="fc" id="L199">            keyVersion = chdKeyCacheService.getActiveCardKeyVersion();</span>
+<span class="pc bpc" id="L200" title="2 of 4 branches missed.">            if (key == null || keyVersion == null) {</span>
+<span class="nc" id="L201">                return null;</span>
+            }
+        } else {
+<span class="nc" id="L204">            key = chdKeyCacheService.getActiveKey(institutionId, ChdKeyCacheService.CARD_KEY_TYPE);</span>
+<span class="nc" id="L205">            keyVersion = chdKeyCacheService.getActiveKeyVersion(institutionId, ChdKeyCacheService.CARD_KEY_TYPE);</span>
+<span class="nc bnc" id="L206" title="All 4 branches missed.">            if (key == null || keyVersion == null) {</span>
+<span class="nc" id="L207">                return null;</span>
+            }
+        }
+<span class="fc" id="L210">        return aesGcmCryptoService.encrypt(value, key, keyVersion, aad);</span>
+    }
+
+    private String decryptCardValue(byte[] ciphertext, byte[] iv, byte[] tag, Integer institutionId, Integer keyVersion, String aad) {
+<span class="nc bnc" id="L214" title="All 2 branches missed.">        byte[] key = institutionId == null</span>
+<span class="nc" id="L215">                ? chdKeyCacheService.getKeyByTypeAndVersion(ChdKeyCacheService.CARD_KEY_TYPE, keyVersion)</span>
+<span class="nc" id="L216">                : chdKeyCacheService.getKeyByInstitutionAndVersion(institutionId, ChdKeyCacheService.CARD_KEY_TYPE, keyVersion);</span>
+<span class="nc bnc" id="L217" title="All 2 branches missed.">        if (key == null) {</span>
+<span class="nc" id="L218">            return null;</span>
+        }
+<span class="nc" id="L220">        return aesGcmCryptoService.decrypt(ciphertext, iv, tag, key, aad);</span>
+    }
+
+    private String buildAad(CardData cardData, String fieldName) {
+<span class="pc bpc" id="L224" title="1 of 2 branches missed.">        return &quot;card_data|&quot; + (cardData.getAuth_id() == null ? &quot;new&quot; : cardData.getAuth_id()) + &quot;|&quot; + fieldName;</span>
+    }
+
+    private String maskPan(String pan) {
+<span class="pc bpc" id="L228" title="2 of 4 branches missed.">        if (pan == null || pan.length() &lt; 10) {</span>
+<span class="nc" id="L229">            return pan;</span>
+        }
+<span class="fc" id="L231">        return pan.substring(0, 6) + &quot;******&quot; + pan.substring(pan.length() - 4);</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.14.202510111229</span></div></body></html>
