@@ -1,0 +1,72 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>CardHotlistV2Controller.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">CMS Core Service</a> &gt; <a href="index.source.html" class="el_package">com.xenomi.cms.core.v2.card.lifecycle.controller</a> &gt; <span class="el_source">CardHotlistV2Controller.java</span></div><h1>CardHotlistV2Controller.java</h1><pre class="source lang-java linenums">package com.xenomi.cms.core.v2.card.lifecycle.controller;
+
+import java.util.UUID;
+
+import com.xenomi.cms.core.api.ApiResponseEnvelope;
+import com.xenomi.cms.core.api.ApiResponseHelper;
+import com.xenomi.cms.core.config.CmsPermissions;
+import com.xenomi.cms.core.v2.card.lifecycle.dto.HotlistCardV2Request;
+import com.xenomi.cms.core.v2.card.lifecycle.dto.HotlistCardV2Response;
+import com.xenomi.cms.core.v2.card.lifecycle.model.CardHotlistCallerType;
+import com.xenomi.cms.core.v2.card.lifecycle.service.CardHotlistV2Service;
+import io.swagger.v3.oas.annotations.Operation;
+import io.swagger.v3.oas.annotations.tags.Tag;
+import jakarta.validation.Valid;
+import jakarta.validation.constraints.NotBlank;
+import jakarta.validation.constraints.Size;
+import org.springframework.security.access.AccessDeniedException;
+import org.springframework.security.core.Authentication;
+import org.springframework.http.ResponseEntity;
+import org.springframework.validation.annotation.Validated;
+import org.springframework.web.bind.annotation.PathVariable;
+import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.RequestBody;
+import org.springframework.web.bind.annotation.RequestHeader;
+import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RestController;
+
+@Validated
+@RestController
+@RequestMapping(&quot;/cms/api/v2/institutions/{institutionId}/cards/{cardId}/hotlist&quot;)
+@Tag(name = &quot;V2 - Cards&quot;, description = &quot;Tenant-scoped card issuance and lifecycle&quot;)
+public class CardHotlistV2Controller {
+    private static final String ACTOR_HEADER = &quot;X-Actor-Id&quot;;
+    private final CardHotlistV2Service service;
+
+<span class="fc" id="L36">    public CardHotlistV2Controller(CardHotlistV2Service service) {</span>
+<span class="fc" id="L37">        this.service = service;</span>
+<span class="fc" id="L38">    }</span>
+
+    @PostMapping
+    @Operation(
+            operationId = &quot;hotlistCardV2&quot;,
+            summary = &quot;Immediately hot-list a card&quot;,
+            description = &quot;Available to separately authorized customer-channel and operations clients. The caller type is derived from the signed access-token permission, not accepted from the payload. The authorization switch must acknowledge BLOCKED before CMS commits the lifecycle status and immutable audit event.&quot;)
+    public ResponseEntity&lt;ApiResponseEnvelope&lt;HotlistCardV2Response&gt;&gt; hotlist(
+            @PathVariable UUID institutionId,
+            @PathVariable UUID cardId,
+            @Valid @RequestBody HotlistCardV2Request request,
+            @RequestHeader(&quot;Idempotency-Key&quot;) @NotBlank @Size(max = 128) String idempotencyKey,
+            @RequestHeader(value = &quot;X-Request-Id&quot;, required = false) @Size(max = 128) String requestId,
+            @RequestHeader(ACTOR_HEADER) @NotBlank @Size(max = 100) String actorId,
+            Authentication authentication) {
+<span class="fc" id="L53">        return ApiResponseHelper.ok(service.hotlist(institutionId, cardId, request,</span>
+<span class="fc" id="L54">                callerType(authentication), idempotencyKey, requestId, actorId));</span>
+    }
+
+    private static CardHotlistCallerType callerType(Authentication authentication) {
+<span class="fc bfc" id="L58" title="All 2 branches covered.">        if (has(authentication, CmsPermissions.CARD_HOTLIST_OPERATIONS)) {</span>
+<span class="fc" id="L59">            return CardHotlistCallerType.OPERATIONS;</span>
+        }
+<span class="fc bfc" id="L61" title="All 2 branches covered.">        if (has(authentication, CmsPermissions.CARD_HOTLIST_CUSTOMER)) {</span>
+<span class="fc" id="L62">            return CardHotlistCallerType.CUSTOMER;</span>
+        }
+<span class="fc" id="L64">        throw new AccessDeniedException(&quot;Card hot-listing permission is required&quot;);</span>
+    }
+
+    private static boolean has(Authentication authentication, String authority) {
+<span class="fc bfc" id="L68" title="All 2 branches covered.">        return authentication != null &amp;&amp; authentication.getAuthorities().stream()</span>
+<span class="fc bfc" id="L69" title="All 2 branches covered.">                .anyMatch(value -&gt; authority.equals(value.getAuthority()));</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.15.202606040825</span></div></body></html>

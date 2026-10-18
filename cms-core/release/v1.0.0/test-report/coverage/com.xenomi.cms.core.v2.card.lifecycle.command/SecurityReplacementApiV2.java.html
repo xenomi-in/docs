@@ -1,0 +1,75 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>SecurityReplacementApiV2.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">CMS Core Service</a> &gt; <a href="index.source.html" class="el_package">com.xenomi.cms.core.v2.card.lifecycle.command</a> &gt; <span class="el_source">SecurityReplacementApiV2.java</span></div><h1>SecurityReplacementApiV2.java</h1><pre class="source lang-java linenums">package com.xenomi.cms.core.v2.card.lifecycle.command;
+
+import com.fasterxml.jackson.databind.ObjectMapper;
+import com.xenomi.cms.core.v2.card.lifecycle.entity.CardLifecycleOperationV2;
+import com.xenomi.cms.core.v2.card.lifecycle.model.CardHotlistCallerType;
+import com.xenomi.cms.core.v2.card.replacement.dto.CardReplacementV2Response;
+import com.xenomi.cms.core.v2.card.replacement.dto.CreateCardReplacementV2Request;
+import com.xenomi.cms.core.v2.card.replacement.service.CardReplacementV2Service;
+import jakarta.persistence.EntityManager;
+import java.util.Map;
+import java.util.UUID;
+import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
+
+@Service
+public class SecurityReplacementApiV2 {
+    private final LifecycleCommandCoordinatorV2 coordinator;
+    private final SecurityReplacementWorkV2 work;
+    private final CardReplacementV2Service reads;
+    private final ObjectMapper mapper;
+    private final EntityManager entityManager;
+
+    public SecurityReplacementApiV2(LifecycleCommandCoordinatorV2 coordinator,
+            SecurityReplacementWorkV2 work, CardReplacementV2Service reads,
+<span class="fc" id="L25">            ObjectMapper mapper, EntityManager entityManager) {</span>
+<span class="fc" id="L26">        this.coordinator = coordinator;</span>
+<span class="fc" id="L27">        this.work = work;</span>
+<span class="fc" id="L28">        this.reads = reads;</span>
+<span class="fc" id="L29">        this.mapper = mapper;</span>
+<span class="fc" id="L30">        this.entityManager = entityManager;</span>
+<span class="fc" id="L31">    }</span>
+
+    public CardReplacementV2Response submit(UUID institutionId, UUID sourceCardId,
+            CreateCardReplacementV2Request input, String idempotencyKey,
+            CardHotlistCallerType callerType) {
+<span class="fc bfc" id="L36" title="All 2 branches covered.">        String kind = callerType == CardHotlistCallerType.CUSTOMER</span>
+<span class="fc" id="L37">                ? &quot;REPLACE_SECURITY_NEW_PAN_CUSTOMER&quot; : &quot;REPLACE_SECURITY_NEW_PAN&quot;;</span>
+<span class="fc" id="L38">        LifecycleCommandReceiptV2 receipt = coordinator.execute(kind,</span>
+                new LifecycleCommandRequestV2(institutionId,
+<span class="fc" id="L40">                        work.account(institutionId, sourceCardId), null, null, Map.of(),</span>
+                        idempotencyKey, null,
+<span class="fc" id="L42">                        mapper.valueToTree(new SecurityReplacementHandlerV2.Payload(</span>
+                                sourceCardId, input))));
+<span class="fc" id="L44">        CardReplacementV2Response response = reads.get(</span>
+<span class="fc" id="L45">                institutionId, sourceCardId, receipt.operationId());</span>
+<span class="fc" id="L46">        response.setOperationId(receipt.operationId());</span>
+<span class="fc" id="L47">        response.setOperationStatus(receipt.status());</span>
+<span class="fc" id="L48">        response.setFailureCode(failureCode(receipt.result()));</span>
+<span class="fc" id="L49">        response.setReplay(receipt.replay());</span>
+<span class="fc" id="L50">        return response;</span>
+    }
+
+    @Transactional(readOnly = true)
+    public CardReplacementV2Response get(UUID institutionId, UUID sourceCardId,
+            UUID replacementRequestId) {
+<span class="fc" id="L56">        CardReplacementV2Response response = reads.get(</span>
+                institutionId, sourceCardId, replacementRequestId);
+<span class="fc" id="L58">        CardLifecycleOperationV2 operation = entityManager.find(</span>
+                CardLifecycleOperationV2.class, replacementRequestId);
+<span class="pc bpc" id="L60" title="1 of 4 branches missed.">        if (operation != null &amp;&amp; operation.getInstitutionId().equals(institutionId)) {</span>
+<span class="fc" id="L61">            response.setOperationId(operation.getOperationId());</span>
+<span class="fc" id="L62">            response.setOperationStatus(operation.getOperationStatus());</span>
+<span class="fc" id="L63">            response.setFailureCode(failureCode(</span>
+<span class="fc" id="L64">                    mapper.valueToTree(operation.getResultPayload())));</span>
+        }
+<span class="fc" id="L66">        return response;</span>
+    }
+
+    private static String failureCode(com.fasterxml.jackson.databind.JsonNode result) {
+<span class="fc" id="L70">        com.fasterxml.jackson.databind.JsonNode value =</span>
+<span class="fc" id="L71">                result.path(&quot;failure&quot;).path(&quot;code&quot;);</span>
+<span class="pc bpc" id="L72" title="1 of 2 branches missed.">        return value.isTextual() ? value.asText() : null;</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.15.202606040825</span></div></body></html>

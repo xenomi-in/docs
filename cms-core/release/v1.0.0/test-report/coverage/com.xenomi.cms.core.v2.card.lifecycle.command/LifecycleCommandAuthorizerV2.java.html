@@ -1,0 +1,39 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>LifecycleCommandAuthorizerV2.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">CMS Core Service</a> &gt; <a href="index.source.html" class="el_package">com.xenomi.cms.core.v2.card.lifecycle.command</a> &gt; <span class="el_source">LifecycleCommandAuthorizerV2.java</span></div><h1>LifecycleCommandAuthorizerV2.java</h1><pre class="source lang-java linenums">package com.xenomi.cms.core.v2.card.lifecycle.command;
+
+import com.xenomi.cms.core.v2.card.model.LifecycleActorTypeV2;
+import org.springframework.security.access.AccessDeniedException;
+import org.springframework.security.core.context.SecurityContextHolder;
+import org.springframework.security.oauth2.server.resource.authentication.JwtAuthenticationToken;
+import org.springframework.stereotype.Component;
+import java.util.UUID;
+
+@Component
+<span class="fc" id="L11">public class LifecycleCommandAuthorizerV2 {</span>
+<span class="fc" id="L12">    public record Actor(String reference, LifecycleActorTypeV2 type) {}</span>
+
+    public Actor require(UUID institutionId, LifecycleCommandHandlerV2&lt;?&gt; handler) {
+<span class="fc" id="L15">        var authentication = SecurityContextHolder.getContext().getAuthentication();</span>
+<span class="pc bpc" id="L16" title="1 of 4 branches missed.">        if (!(authentication instanceof JwtAuthenticationToken jwt) || !jwt.isAuthenticated()) {</span>
+<span class="fc" id="L17">            throw new AccessDeniedException(&quot;Authenticated lifecycle context is required&quot;);</span>
+        }
+<span class="fc" id="L19">        String subject = jwt.getToken().getSubject();</span>
+<span class="pc bpc" id="L20" title="3 of 6 branches missed.">        if (subject == null || subject.isBlank() || subject.length() &gt; 120) {</span>
+<span class="nc" id="L21">            throw new AccessDeniedException(&quot;Invalid lifecycle actor subject&quot;);</span>
+        }
+<span class="fc" id="L23">        boolean platform = Boolean.TRUE.equals(jwt.getToken().getClaims().get(&quot;platform_access&quot;));</span>
+<span class="pc bpc" id="L24" title="1 of 4 branches missed.">        if (!platform &amp;&amp; !institutionId.toString().equals(jwt.getToken().getClaimAsString(&quot;institution_id&quot;))) {</span>
+<span class="fc" id="L25">            throw new AccessDeniedException(&quot;Lifecycle tenant access denied&quot;);</span>
+        }
+<span class="fc bfc" id="L27" title="All 2 branches covered.">        if (jwt.getAuthorities().stream().noneMatch(a -&gt; a.getAuthority().equals(&quot;PERM_&quot; + handler.permission()))) {</span>
+<span class="fc" id="L28">            throw new AccessDeniedException(&quot;Lifecycle permission denied&quot;);</span>
+        }
+        LifecycleActorTypeV2 actor;
+<span class="fc" id="L31">        try { actor = LifecycleActorTypeV2.valueOf(jwt.getToken().getClaimAsString(&quot;lifecycle_actor_type&quot;)); }</span>
+<span class="fc" id="L32">        catch (IllegalArgumentException | NullPointerException invalid) {</span>
+<span class="fc" id="L33">            throw new AccessDeniedException(&quot;A signed lifecycle_actor_type claim is required&quot;);</span>
+<span class="fc" id="L34">        }</span>
+<span class="fc bfc" id="L35" title="All 2 branches covered.">        if (!handler.actors().contains(actor)) throw new AccessDeniedException(&quot;Actor cannot perform this lifecycle command&quot;);</span>
+<span class="fc" id="L36">        return new Actor(subject, actor);</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.15.202606040825</span></div></body></html>

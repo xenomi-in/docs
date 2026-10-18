@@ -1,0 +1,55 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>OutboxEventV2Response.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">CMS Core Service</a> &gt; <a href="index.source.html" class="el_package">com.xenomi.cms.core.v2.event.admin</a> &gt; <span class="el_source">OutboxEventV2Response.java</span></div><h1>OutboxEventV2Response.java</h1><pre class="source lang-java linenums">package com.xenomi.cms.core.v2.event.admin;
+
+import java.time.OffsetDateTime;
+import java.util.Map;
+import java.util.UUID;
+
+import com.xenomi.cms.core.v2.event.entity.OutboxEventV2;
+import com.xenomi.cms.core.v2.event.model.OutboxPublicationStatus;
+import io.swagger.v3.oas.annotations.media.Schema;
+import lombok.AllArgsConstructor;
+import lombok.Builder;
+import lombok.Data;
+import lombok.NoArgsConstructor;
+
+@Data @Builder @NoArgsConstructor @AllArgsConstructor
+@Schema(description = &quot;Operator view of one outbox publication record&quot;)
+public class OutboxEventV2Response {
+    private UUID outboxEventId;
+    private UUID institutionId;
+    private String aggregateType;
+    private String aggregateId;
+    private String eventType;
+    private OutboxPublicationStatus publicationStatus;
+    private OffsetDateTime occurredAt;
+    private OffsetDateTime publishedAt;
+    private int retryCount;
+    private OffsetDateTime firstFailedAt;
+    private OffsetDateTime nextRetryAt;
+    private String lastError;
+    private String lockedBy;
+    private OffsetDateTime lockedUntil;
+    @Schema(description = &quot;Falcon envelope exactly as it is sent to cms_notification&quot;)
+    private Map&lt;String, Object&gt; envelope;
+
+    static OutboxEventV2Response from(OutboxEventV2 event) {
+<span class="fc" id="L36">        return OutboxEventV2Response.builder()</span>
+<span class="fc" id="L37">                .outboxEventId(event.getOutboxEventId())</span>
+<span class="fc" id="L38">                .institutionId(event.getInstitutionId())</span>
+<span class="fc" id="L39">                .aggregateType(event.getAggregateType())</span>
+<span class="fc" id="L40">                .aggregateId(event.getAggregateId())</span>
+<span class="fc" id="L41">                .eventType(event.getEventType())</span>
+<span class="fc" id="L42">                .publicationStatus(event.getPublicationStatus())</span>
+<span class="fc" id="L43">                .occurredAt(event.getOccurredAt())</span>
+<span class="fc" id="L44">                .publishedAt(event.getPublishedAt())</span>
+<span class="fc" id="L45">                .retryCount(event.getRetryCount())</span>
+<span class="fc" id="L46">                .firstFailedAt(event.getFirstFailedAt())</span>
+<span class="fc" id="L47">                .nextRetryAt(event.getNextRetryAt())</span>
+<span class="fc" id="L48">                .lastError(event.getLastError())</span>
+<span class="fc" id="L49">                .lockedBy(event.getLockedBy())</span>
+<span class="fc" id="L50">                .lockedUntil(event.getLockedUntil())</span>
+<span class="fc" id="L51">                .envelope(event.getEventPayload())</span>
+<span class="fc" id="L52">                .build();</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.15.202606040825</span></div></body></html>

@@ -1,0 +1,153 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>InstitutionV2.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">CMS Core Service</a> &gt; <a href="index.source.html" class="el_package">com.xenomi.cms.core.v2.institution.entity</a> &gt; <span class="el_source">InstitutionV2.java</span></div><h1>InstitutionV2.java</h1><pre class="source lang-java linenums">package com.xenomi.cms.core.v2.institution.entity;
+
+import java.time.LocalDate;
+import java.time.OffsetDateTime;
+import java.time.ZoneOffset;
+import java.util.UUID;
+
+import com.xenomi.cms.core.v2.institution.model.InstitutionStatus;
+import com.xenomi.cms.core.v2.institution.model.InstitutionType;
+
+import jakarta.persistence.Column;
+import jakarta.persistence.Entity;
+import jakarta.persistence.EnumType;
+import jakarta.persistence.Enumerated;
+import jakarta.persistence.Id;
+import jakarta.persistence.PrePersist;
+import jakarta.persistence.PreUpdate;
+import jakarta.persistence.Table;
+import lombok.AllArgsConstructor;
+import lombok.Builder;
+import lombok.Data;
+import lombok.NoArgsConstructor;
+
+@Entity(name = &quot;InstitutionV2&quot;)
+@Table(name = &quot;institution&quot;, schema = &quot;cms_v2&quot;)
+@Data
+@Builder
+@NoArgsConstructor
+@AllArgsConstructor
+public class InstitutionV2 {
+
+    @Id
+    @Column(name = &quot;institution_id&quot;, nullable = false, updatable = false)
+    private UUID institutionId;
+
+    @Column(name = &quot;institution_name&quot;, nullable = false, length = 200)
+    private String institutionName;
+
+    @Column(name = &quot;institution_code&quot;, nullable = false, unique = true, length = 20, updatable = false)
+    private String institutionCode;
+
+    @Column(name = &quot;institution_short_name&quot;, length = 50)
+    private String institutionShortName;
+
+    @Enumerated(EnumType.STRING)
+    @Column(name = &quot;institution_type&quot;, nullable = false, length = 20, updatable = false)
+    private InstitutionType institutionType;
+
+    @Column(name = &quot;visa_member_flag&quot;)
+    private boolean visaMemberFlag;
+
+    @Column(name = &quot;visa_member_id&quot;, length = 20)
+    private String visaMemberId;
+
+    @Column(name = &quot;rupay_member_flag&quot;)
+    private boolean rupayMemberFlag;
+
+    @Column(name = &quot;npci_member_id&quot;, length = 20)
+    private String npciMemberId;
+
+    @Column(name = &quot;registered_address_line1&quot;, nullable = false, length = 200)
+    private String registeredAddressLine1;
+
+    @Column(name = &quot;registered_address_line2&quot;, length = 200)
+    private String registeredAddressLine2;
+
+    @Column(name = &quot;city&quot;, nullable = false, length = 100)
+    private String city;
+
+    @Column(name = &quot;state_code&quot;, nullable = false, length = 50)
+    private String stateCode;
+
+    @org.hibernate.annotations.JdbcTypeCode(org.hibernate.type.SqlTypes.CHAR)
+    @Column(name = &quot;country_code&quot;, nullable = false, length = 3, columnDefinition = &quot;char(3)&quot;)
+    private String countryCode;
+
+    @Column(name = &quot;postal_code&quot;, nullable = false, length = 10)
+    private String postalCode;
+
+    @Column(name = &quot;contact_phone_primary&quot;, nullable = false, length = 20)
+    private String contactPhonePrimary;
+
+    @Column(name = &quot;contact_phone_secondary&quot;, length = 20)
+    private String contactPhoneSecondary;
+
+    @Column(name = &quot;contact_email_primary&quot;, nullable = false, length = 100)
+    private String contactEmailPrimary;
+
+    @Column(name = &quot;contact_email_secondary&quot;, length = 100)
+    private String contactEmailSecondary;
+
+    @Column(name = &quot;website_url&quot;, length = 200)
+    private String websiteUrl;
+
+    @Column(name = &quot;timezone&quot;, nullable = false, length = 60)
+    private String timezone;
+
+    @Column(name = &quot;report_delivery_sftp_path&quot;, length = 500)
+    private String reportDeliverySftpPath;
+
+    @Column(name = &quot;report_delivery_email&quot;, length = 500)
+    private String reportDeliveryEmail;
+
+    @Column(name = &quot;prepaid_card_issuing_enabled&quot;)
+    private boolean prepaidCardIssuingEnabled;
+
+    @Column(name = &quot;credit_card_issuing_enabled&quot;)
+    private boolean creditCardIssuingEnabled;
+
+    @Column(name = &quot;default_card_validity_months&quot;)
+    private int defaultCardValidityMonths;
+
+    @org.hibernate.annotations.JdbcTypeCode(org.hibernate.type.SqlTypes.CHAR)
+    @Column(name = &quot;base_currency&quot;, nullable = false, length = 3, columnDefinition = &quot;char(3)&quot;)
+    private String baseCurrency;
+
+    @Column(name = &quot;currency_exponent&quot;, nullable = false)
+    private short currencyExponent;
+
+    @Column(name = &quot;business_date&quot;)
+    private LocalDate businessDate;
+
+    @Enumerated(EnumType.STRING)
+    @Column(name = &quot;status&quot;, nullable = false, length = 20)
+    private InstitutionStatus status;
+
+    @Column(name = &quot;created_at&quot;, nullable = false, updatable = false)
+    private OffsetDateTime createdAt;
+
+    @Column(name = &quot;updated_at&quot;, nullable = false)
+    private OffsetDateTime updatedAt;
+
+    @Column(name = &quot;created_by&quot;, nullable = false, length = 50, updatable = false)
+    private String createdBy;
+
+    @Column(name = &quot;updated_by&quot;, nullable = false, length = 50)
+    private String updatedBy;
+
+    @PrePersist
+    void beforeInsert() {
+<span class="nc" id="L141">        OffsetDateTime now = OffsetDateTime.now(ZoneOffset.UTC);</span>
+<span class="nc bnc" id="L142" title="All 2 branches missed.">        if (createdAt == null) {</span>
+<span class="nc" id="L143">            createdAt = now;</span>
+        }
+<span class="nc" id="L145">        updatedAt = now;</span>
+<span class="nc" id="L146">    }</span>
+
+    @PreUpdate
+    void beforeUpdate() {
+<span class="nc" id="L150">        updatedAt = OffsetDateTime.now(ZoneOffset.UTC);</span>
+<span class="nc" id="L151">    }</span>
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.15.202606040825</span></div></body></html>

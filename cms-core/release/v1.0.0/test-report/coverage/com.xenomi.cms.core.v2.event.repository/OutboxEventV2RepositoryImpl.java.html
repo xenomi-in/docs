@@ -1,0 +1,80 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>OutboxEventV2RepositoryImpl.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">CMS Core Service</a> &gt; <a href="index.source.html" class="el_package">com.xenomi.cms.core.v2.event.repository</a> &gt; <span class="el_source">OutboxEventV2RepositoryImpl.java</span></div><h1>OutboxEventV2RepositoryImpl.java</h1><pre class="source lang-java linenums">package com.xenomi.cms.core.v2.event.repository;
+
+import java.util.List;
+import java.util.UUID;
+
+import com.xenomi.cms.core.v2.event.entity.OutboxEventV2;
+import jakarta.persistence.EntityManager;
+import jakarta.persistence.PersistenceContext;
+import org.springframework.stereotype.Repository;
+
+/**
+ * A single PostgreSQL statement claims an event and advances its fencing token.
+ * The CTE locks candidates before the update; {@code RETURNING} gives the
+ * dispatcher the exact token it must present while recording its outcome.
+ */
+@Repository
+<span class="nc" id="L17">class OutboxEventV2RepositoryImpl implements OutboxEventV2RepositoryCustom {</span>
+
+    private static final String CLAIM_DUE_EVENTS = &quot;&quot;&quot;
+            WITH candidates AS (
+                SELECT o.outbox_event_id
+                FROM cms_v2.outbox_event o
+                WHERE o.publication_status IN ('PENDING', 'FAILED')
+                  AND (o.next_retry_at IS NULL OR o.next_retry_at &lt;= now())
+                  AND (o.locked_until IS NULL OR o.locked_until &lt;= now())
+                  AND NOT EXISTS (
+                        SELECT 1
+                        FROM cms_v2.outbox_event earlier
+                        WHERE earlier.institution_id = o.institution_id
+                          AND earlier.aggregate_type = o.aggregate_type
+                          AND earlier.aggregate_id = o.aggregate_id
+                          AND earlier.publication_status IN ('PENDING', 'FAILED', 'DEAD_LETTER')
+                          AND earlier.aggregate_sequence &lt; o.aggregate_sequence)
+                ORDER BY o.occurred_at, o.aggregate_sequence
+                LIMIT :batchSize
+                FOR UPDATE OF o SKIP LOCKED
+            )
+            UPDATE cms_v2.outbox_event o
+            SET locked_until = now() + make_interval(secs =&gt; :leaseSeconds),
+                locked_by = :owner,
+                dispatch_attempt = o.dispatch_attempt + 1
+            FROM candidates
+            WHERE o.outbox_event_id = candidates.outbox_event_id
+            RETURNING o.*
+            &quot;&quot;&quot;;
+
+    private static final String NEXT_AGGREGATE_SEQUENCE = &quot;&quot;&quot;
+            INSERT INTO cms_v2.outbox_aggregate_sequence (
+                institution_id, aggregate_type, aggregate_id, next_sequence
+            )
+            VALUES (:institutionId, :aggregateType, :aggregateId, 2)
+            ON CONFLICT (institution_id, aggregate_type, aggregate_id)
+            DO UPDATE SET next_sequence = cms_v2.outbox_aggregate_sequence.next_sequence + 1
+            RETURNING next_sequence - 1
+            &quot;&quot;&quot;;
+
+    @PersistenceContext
+    private EntityManager entityManager;
+
+    @Override
+    @SuppressWarnings(&quot;unchecked&quot;)
+    public List&lt;OutboxEventV2&gt; claimDueEvents(String owner, long leaseSeconds, int batchSize) {
+<span class="nc" id="L63">        return entityManager.createNativeQuery(CLAIM_DUE_EVENTS, OutboxEventV2.class)</span>
+<span class="nc" id="L64">                .setParameter(&quot;owner&quot;, owner)</span>
+<span class="nc" id="L65">                .setParameter(&quot;leaseSeconds&quot;, leaseSeconds)</span>
+<span class="nc" id="L66">                .setParameter(&quot;batchSize&quot;, batchSize)</span>
+<span class="nc" id="L67">                .getResultList();</span>
+    }
+
+    @Override
+    public long nextAggregateSequence(UUID institutionId, String aggregateType, String aggregateId) {
+<span class="nc" id="L72">        Number sequence = (Number) entityManager.createNativeQuery(NEXT_AGGREGATE_SEQUENCE)</span>
+<span class="nc" id="L73">                .setParameter(&quot;institutionId&quot;, institutionId)</span>
+<span class="nc" id="L74">                .setParameter(&quot;aggregateType&quot;, aggregateType)</span>
+<span class="nc" id="L75">                .setParameter(&quot;aggregateId&quot;, aggregateId)</span>
+<span class="nc" id="L76">                .getSingleResult();</span>
+<span class="nc" id="L77">        return sequence.longValue();</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.15.202606040825</span></div></body></html>

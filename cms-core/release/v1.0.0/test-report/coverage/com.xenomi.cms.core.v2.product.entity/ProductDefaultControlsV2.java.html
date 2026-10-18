@@ -1,0 +1,75 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>ProductDefaultControlsV2.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">CMS Core Service</a> &gt; <a href="index.source.html" class="el_package">com.xenomi.cms.core.v2.product.entity</a> &gt; <span class="el_source">ProductDefaultControlsV2.java</span></div><h1>ProductDefaultControlsV2.java</h1><pre class="source lang-java linenums">package com.xenomi.cms.core.v2.product.entity;
+
+import java.time.OffsetDateTime;
+import java.util.LinkedHashMap;
+import java.util.Map;
+import java.util.UUID;
+
+import org.hibernate.annotations.JdbcTypeCode;
+import org.hibernate.type.SqlTypes;
+import jakarta.persistence.Column;
+import jakarta.persistence.Entity;
+import jakarta.persistence.Id;
+import jakarta.persistence.PrePersist;
+import jakarta.persistence.PreUpdate;
+import jakarta.persistence.Table;
+import lombok.AllArgsConstructor;
+import lombok.Builder;
+import lombok.Data;
+import lombok.NoArgsConstructor;
+
+@Entity(name = &quot;ProductDefaultControlsV2&quot;)
+@Table(name = &quot;product_default_controls&quot;, schema = &quot;cms_v2&quot;)
+@Data
+@Builder
+@NoArgsConstructor
+@AllArgsConstructor
+public class ProductDefaultControlsV2 {
+    @Id
+    @Column(name = &quot;product_version_id&quot;, nullable = false, updatable = false)
+    private UUID productVersionId;
+    @Column(name = &quot;institution_id&quot;, nullable = false, updatable = false)
+    private UUID institutionId;
+    private boolean domesticAtmEnabled;
+    @Builder.Default private boolean domesticAtmAllowed = true;
+    private boolean domesticPosEnabled;
+    @Builder.Default private boolean domesticPosAllowed = true;
+    private boolean domesticEcommerceEnabled;
+    @Builder.Default private boolean domesticEcommerceAllowed = true;
+    private boolean domesticMotoEnabled;
+    @Builder.Default private boolean domesticMotoAllowed = true;
+    private boolean domesticContactlessEnabled;
+    @Builder.Default private boolean domesticContactlessAllowed = true;
+    private boolean domesticCashWithdrawalEnabled;
+    @Builder.Default private boolean internationalEnabled = true;
+    private boolean internationalAtmEnabled;
+    @Builder.Default private boolean internationalAtmAllowed = true;
+    private boolean internationalPosEnabled;
+    @Builder.Default private boolean internationalPosAllowed = true;
+    private boolean internationalEcommerceEnabled;
+    @Builder.Default private boolean internationalEcommerceAllowed = true;
+    private boolean internationalMotoEnabled;
+    @Builder.Default private boolean internationalMotoAllowed = true;
+    private boolean internationalContactlessEnabled;
+    @Builder.Default private boolean internationalContactlessAllowed = true;
+    private boolean internationalCashWithdrawalEnabled;
+    @JdbcTypeCode(SqlTypes.JSON)
+    @Column(name = &quot;domestic_merchant_restrictions&quot;, nullable = false, columnDefinition = &quot;jsonb&quot;)
+    @Builder.Default
+    private Map&lt;String, Object&gt; domesticMerchantRestrictions = new LinkedHashMap&lt;&gt;();
+    @JdbcTypeCode(SqlTypes.JSON)
+    @Column(name = &quot;international_merchant_restrictions&quot;, nullable = false, columnDefinition = &quot;jsonb&quot;)
+    @Builder.Default
+    private Map&lt;String, Object&gt; internationalMerchantRestrictions = new LinkedHashMap&lt;&gt;();
+    @Column(name = &quot;updated_at&quot;, nullable = false)
+    private OffsetDateTime updatedAt;
+    @Column(name = &quot;updated_by&quot;, nullable = false, length = 100)
+    private String updatedBy;
+
+    @PrePersist
+    @PreUpdate
+    void touch() {
+<span class="nc" id="L72">        updatedAt = OffsetDateTime.now(java.time.ZoneOffset.UTC);</span>
+<span class="nc" id="L73">    }</span>
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.15.202606040825</span></div></body></html>

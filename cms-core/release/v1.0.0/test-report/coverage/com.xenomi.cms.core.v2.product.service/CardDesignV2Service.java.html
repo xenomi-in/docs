@@ -1,0 +1,107 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>CardDesignV2Service.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">CMS Core Service</a> &gt; <a href="index.source.html" class="el_package">com.xenomi.cms.core.v2.product.service</a> &gt; <span class="el_source">CardDesignV2Service.java</span></div><h1>CardDesignV2Service.java</h1><pre class="source lang-java linenums">package com.xenomi.cms.core.v2.product.service;
+
+import java.time.OffsetDateTime;
+import java.util.UUID;
+
+import com.xenomi.cms.core.exception.ResourceNotFoundException;
+import com.xenomi.cms.core.v2.bin.model.CardNetwork;
+import com.xenomi.cms.core.v2.common.DatabaseUuidV7Generator;
+import com.xenomi.cms.core.v2.product.dto.CardDesignV2Response;
+import com.xenomi.cms.core.v2.product.dto.CreateCardDesignV2Request;
+import com.xenomi.cms.core.v2.product.dto.UpdateCardDesignV2Request;
+import com.xenomi.cms.core.v2.product.entity.CardDesignV2;
+import com.xenomi.cms.core.v2.product.model.CardDesignStatus;
+import com.xenomi.cms.core.v2.product.repository.CardDesignV2Repository;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
+import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
+
+@Service
+public class CardDesignV2Service {
+    private final CardDesignV2Repository repository;
+    private final DatabaseUuidV7Generator uuidGenerator;
+
+<span class="fc" id="L25">    public CardDesignV2Service(CardDesignV2Repository repository, DatabaseUuidV7Generator uuidGenerator) {</span>
+<span class="fc" id="L26">        this.repository = repository;</span>
+<span class="fc" id="L27">        this.uuidGenerator = uuidGenerator;</span>
+<span class="fc" id="L28">    }</span>
+
+    @Transactional
+    public CardDesignV2Response create(UUID institutionId, CreateCardDesignV2Request request, String actorId) {
+<span class="fc" id="L32">        String code = request.designCode().trim().toUpperCase();</span>
+<span class="pc bpc" id="L33" title="1 of 2 branches missed.">        if (repository.existsByInstitutionIdAndDesignCodeAndDesignVersion(</span>
+<span class="fc" id="L34">                institutionId, code, request.designVersion())) {</span>
+<span class="nc" id="L35">            throw new IllegalArgumentException(&quot;The card design code and version already exist&quot;);</span>
+        }
+<span class="fc" id="L37">        validateDates(request.effectiveFrom(), request.effectiveTo());</span>
+<span class="fc" id="L38">        CardDesignV2 entity = CardDesignV2.builder()</span>
+<span class="fc" id="L39">                .cardDesignId(uuidGenerator.generate()).institutionId(institutionId)</span>
+<span class="fc" id="L40">                .designCode(code).designName(request.designName().trim())</span>
+<span class="fc" id="L41">                .designVersion(request.designVersion()).cardNetwork(request.cardNetwork())</span>
+<span class="fc" id="L42">                .orientation(request.orientation()).designStatus(CardDesignStatus.DRAFT)</span>
+<span class="fc" id="L43">                .effectiveFrom(request.effectiveFrom()).effectiveTo(request.effectiveTo())</span>
+<span class="fc" id="L44">                .createdBy(actorId.trim()).updatedBy(actorId.trim()).build();</span>
+<span class="fc" id="L45">        return toResponse(repository.save(entity));</span>
+    }
+
+    @Transactional(readOnly = true)
+    public Page&lt;CardDesignV2Response&gt; search(UUID institutionId, CardNetwork network,
+            CardDesignStatus status, Pageable pageable) {
+<span class="nc" id="L51">        return repository.search(institutionId, network, status, pageable).map(this::toResponse);</span>
+    }
+
+    @Transactional(readOnly = true)
+    public CardDesignV2Response get(UUID institutionId, UUID designId) {
+<span class="nc" id="L56">        return toResponse(find(institutionId, designId));</span>
+    }
+
+    @Transactional
+    public CardDesignV2Response update(UUID institutionId, UUID designId,
+            UpdateCardDesignV2Request request, String actorId) {
+<span class="nc" id="L62">        CardDesignV2 entity = find(institutionId, designId);</span>
+<span class="nc bnc" id="L63" title="All 4 branches missed.">        boolean configurationChange = request.designName() != null || request.orientation() != null</span>
+<span class="nc bnc" id="L64" title="All 4 branches missed.">                || request.effectiveFrom() != null || request.effectiveTo() != null;</span>
+<span class="nc bnc" id="L65" title="All 4 branches missed.">        if (configurationChange &amp;&amp; entity.getDesignStatus() != CardDesignStatus.DRAFT) {</span>
+<span class="nc" id="L66">            throw new IllegalArgumentException(&quot;Card design configuration can be changed only while DRAFT&quot;);</span>
+        }
+<span class="nc bnc" id="L68" title="All 2 branches missed.">        if (request.designName() != null) entity.setDesignName(request.designName().trim());</span>
+<span class="nc bnc" id="L69" title="All 2 branches missed.">        if (request.orientation() != null) entity.setOrientation(request.orientation());</span>
+<span class="nc bnc" id="L70" title="All 2 branches missed.">        if (request.effectiveFrom() != null) entity.setEffectiveFrom(request.effectiveFrom());</span>
+<span class="nc bnc" id="L71" title="All 2 branches missed.">        if (request.effectiveTo() != null) entity.setEffectiveTo(request.effectiveTo());</span>
+<span class="nc bnc" id="L72" title="All 4 branches missed.">        if (request.designStatus() != null &amp;&amp; request.designStatus() != entity.getDesignStatus()) {</span>
+<span class="nc" id="L73">            validateTransition(entity.getDesignStatus(), request.designStatus());</span>
+<span class="nc" id="L74">            entity.setDesignStatus(request.designStatus());</span>
+        }
+<span class="nc" id="L76">        validateDates(entity.getEffectiveFrom(), entity.getEffectiveTo());</span>
+<span class="nc" id="L77">        entity.setUpdatedBy(actorId.trim());</span>
+<span class="nc" id="L78">        return toResponse(repository.save(entity));</span>
+    }
+
+    private CardDesignV2 find(UUID institutionId, UUID designId) {
+<span class="nc" id="L82">        return repository.findByCardDesignIdAndInstitutionId(designId, institutionId)</span>
+<span class="nc" id="L83">                .orElseThrow(() -&gt; new ResourceNotFoundException(&quot;Card design&quot;, designId.toString()));</span>
+    }
+
+    private static void validateDates(OffsetDateTime from, OffsetDateTime to) {
+<span class="pc bpc" id="L87" title="3 of 4 branches missed.">        if (to != null &amp;&amp; !to.isAfter(from)) throw new IllegalArgumentException(&quot;effectiveTo must be after effectiveFrom&quot;);</span>
+<span class="fc" id="L88">    }</span>
+
+    private static void validateTransition(CardDesignStatus current, CardDesignStatus target) {
+<span class="nc bnc" id="L91" title="All 4 branches missed.">        boolean allowed = switch (current) {</span>
+<span class="nc bnc" id="L92" title="All 4 branches missed.">            case DRAFT -&gt; target == CardDesignStatus.ACTIVE || target == CardDesignStatus.RETIRED;</span>
+<span class="nc bnc" id="L93" title="All 4 branches missed.">            case ACTIVE -&gt; target == CardDesignStatus.SUSPENDED || target == CardDesignStatus.RETIRED;</span>
+<span class="nc bnc" id="L94" title="All 4 branches missed.">            case SUSPENDED -&gt; target == CardDesignStatus.ACTIVE || target == CardDesignStatus.RETIRED;</span>
+<span class="nc" id="L95">            case RETIRED -&gt; false;</span>
+        };
+<span class="nc bnc" id="L97" title="All 2 branches missed.">        if (!allowed) throw new IllegalArgumentException(&quot;Invalid card design status transition: &quot; + current + &quot; -&gt; &quot; + target);</span>
+<span class="nc" id="L98">    }</span>
+
+    private CardDesignV2Response toResponse(CardDesignV2 d) {
+<span class="fc" id="L101">        return new CardDesignV2Response(d.getCardDesignId(), d.getInstitutionId(), d.getDesignCode(),</span>
+<span class="fc" id="L102">                d.getDesignName(), d.getDesignVersion(), d.getCardNetwork(), d.getOrientation(),</span>
+<span class="fc" id="L103">                d.getDesignStatus(), d.getEffectiveFrom(), d.getEffectiveTo(), d.getCreatedAt(),</span>
+<span class="fc" id="L104">                d.getUpdatedAt(), d.getCreatedBy(), d.getUpdatedBy());</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.15.202606040825</span></div></body></html>

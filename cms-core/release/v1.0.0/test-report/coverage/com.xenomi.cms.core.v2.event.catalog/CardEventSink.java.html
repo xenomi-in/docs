@@ -1,0 +1,156 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>CardEventSink.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">CMS Core Service</a> &gt; <a href="index.source.html" class="el_package">com.xenomi.cms.core.v2.event.catalog</a> &gt; <span class="el_source">CardEventSink.java</span></div><h1>CardEventSink.java</h1><pre class="source lang-java linenums">package com.xenomi.cms.core.v2.event.catalog;
+
+import java.util.Map;
+import java.util.UUID;
+
+import com.xenomi.cms.core.v2.card.dto.CardV2Response;
+import com.xenomi.cms.core.v2.card.lifecycle.dto.CardLifecycleActionV2Response;
+import com.xenomi.cms.core.v2.card.lifecycle.dto.HotlistCardV2Response;
+import com.xenomi.cms.core.v2.card.replacement.dto.CardReplacementV2Response;
+import com.xenomi.cms.core.v2.event.mapper.PayloadValues;
+import com.xenomi.cms.core.v2.event.model.EventTypes;
+import com.xenomi.cms.core.v2.event.model.IdempotencyKeys;
+import com.xenomi.cms.core.v2.event.model.NotificationPriority;
+import com.xenomi.cms.core.v2.event.model.OutboxEventCommand;
+import com.xenomi.cms.core.v2.event.writer.OutboxEventWriter;
+import org.springframework.stereotype.Component;
+
+/**
+ * Card lifecycle events, built solely from the response the service already returns.
+ * The sink performs no database reads: every payload field comes from the DTO.
+ *
+ * &lt;p&gt;Idempotency keys are the immutable {@code card_event} ids (or the card /
+ * replacement-request id for creation), so a service that returns an existing result on
+ * replay produces the same key and the duplicate is discarded at the database.
+ */
+@Component
+public class CardEventSink {
+
+    private final OutboxEventWriter writer;
+
+<span class="fc" id="L31">    public CardEventSink(OutboxEventWriter writer) {</span>
+<span class="fc" id="L32">        this.writer = writer;</span>
+<span class="fc" id="L33">    }</span>
+
+    public void onCreated(CardV2Response card, String correlationId) {
+<span class="pc bpc" id="L36" title="1 of 2 branches missed.">        if (card == null) {</span>
+<span class="nc" id="L37">            return;</span>
+        }
+<span class="fc" id="L39">        String customerId = PayloadValues.uuid(card.getCustomerReferenceId());</span>
+<span class="fc" id="L40">        writer.enqueue(cardCommand(card.getInstitutionId(), card.getCardId(), EventTypes.CARD_CREATED,</span>
+                customerId, correlationId, NotificationPriority.MEDIUM,
+<span class="fc" id="L42">                IdempotencyKeys.of(card.getInstitutionId(), EventTypes.CARD_CREATED, card.getCardId()),</span>
+<span class="fc" id="L43">                PayloadValues.entries(</span>
+<span class="fc" id="L44">                        &quot;cardId&quot;, PayloadValues.uuid(card.getCardId()),</span>
+<span class="fc" id="L45">                        &quot;institutionId&quot;, PayloadValues.uuid(card.getInstitutionId()),</span>
+                        &quot;customerId&quot;, customerId,
+<span class="fc" id="L47">                        &quot;accountReferenceId&quot;, PayloadValues.uuid(card.getAccountReferenceId()),</span>
+<span class="fc" id="L48">                        &quot;productId&quot;, PayloadValues.uuid(card.getProductId()),</span>
+<span class="fc" id="L49">                        &quot;productVersionId&quot;, PayloadValues.uuid(card.getProductVersionId()),</span>
+<span class="fc" id="L50">                        &quot;binId&quot;, PayloadValues.uuid(card.getBinId()),</span>
+<span class="fc" id="L51">                        &quot;binRangeId&quot;, PayloadValues.uuid(card.getBinRangeId()),</span>
+<span class="fc" id="L52">                        &quot;cardNumberLastFour&quot;, card.getPanLastFour(),</span>
+<span class="fc" id="L53">                        &quot;cardForm&quot;, PayloadValues.name(card.getCardForm()),</span>
+<span class="fc" id="L54">                        &quot;issuanceMode&quot;, PayloadValues.name(card.getIssuanceMode()),</span>
+<span class="fc" id="L55">                        &quot;status&quot;, PayloadValues.name(card.getCardStatus()),</span>
+<span class="fc" id="L56">                        &quot;digitalAvailable&quot;, card.isDigitalAvailable(),</span>
+<span class="fc" id="L57">                        &quot;lifecycleVersion&quot;, card.getLifecycleVersion(),</span>
+<span class="fc" id="L58">                        &quot;issueDate&quot;, PayloadValues.date(card.getIssueDate()),</span>
+<span class="fc" id="L59">                        &quot;expiryDate&quot;, PayloadValues.date(card.getExpiryDate()),</span>
+<span class="fc" id="L60">                        &quot;productionRequestId&quot;, PayloadValues.uuid(card.getProductionRequestId()),</span>
+<span class="fc" id="L61">                        &quot;createdAt&quot;, PayloadValues.instant(card.getCreatedAt()))));</span>
+<span class="fc" id="L62">    }</span>
+
+    public void onActivated(CardLifecycleActionV2Response action, String correlationId) {
+<span class="fc" id="L65">        lifecycle(action, EventTypes.CARD_ACTIVATED, &quot;activatedAt&quot;, correlationId);</span>
+<span class="fc" id="L66">    }</span>
+
+    public void onStatusChanged(CardLifecycleActionV2Response action, String correlationId) {
+<span class="fc" id="L69">        lifecycle(action, EventTypes.CARD_STATUS_CHANGED, &quot;changedAt&quot;, correlationId);</span>
+<span class="fc" id="L70">    }</span>
+
+    private void lifecycle(CardLifecycleActionV2Response action, String eventType,
+            String timestampKey, String correlationId) {
+<span class="pc bpc" id="L74" title="1 of 2 branches missed.">        if (action == null) {</span>
+<span class="nc" id="L75">            return;</span>
+        }
+<span class="fc" id="L77">        writer.enqueue(cardCommand(action.getInstitutionId(), action.getCardId(), eventType,</span>
+                null, correlationId, NotificationPriority.MEDIUM,
+<span class="fc" id="L79">                IdempotencyKeys.of(action.getInstitutionId(), eventType, action.getEventId()),</span>
+<span class="fc" id="L80">                PayloadValues.entries(</span>
+<span class="fc" id="L81">                        &quot;cardId&quot;, PayloadValues.uuid(action.getCardId()),</span>
+<span class="fc" id="L82">                        &quot;institutionId&quot;, PayloadValues.uuid(action.getInstitutionId()),</span>
+<span class="fc" id="L83">                        &quot;previousStatus&quot;, PayloadValues.name(action.getPreviousStatus()),</span>
+<span class="fc" id="L84">                        &quot;newStatus&quot;, PayloadValues.name(action.getCardStatus()),</span>
+<span class="fc" id="L85">                        &quot;lifecycleVersion&quot;, action.getLifecycleVersion(),</span>
+<span class="fc" id="L86">                        &quot;reason&quot;, action.getReason(),</span>
+<span class="fc" id="L87">                        &quot;cardEventId&quot;, PayloadValues.uuid(action.getEventId()),</span>
+<span class="fc" id="L88">                        timestampKey, PayloadValues.instant(action.getOccurredAt()))));</span>
+<span class="fc" id="L89">    }</span>
+
+    public void onHotlisted(HotlistCardV2Response hotlist, String correlationId) {
+<span class="pc bpc" id="L92" title="1 of 2 branches missed.">        if (hotlist == null) {</span>
+<span class="nc" id="L93">            return;</span>
+        }
+<span class="fc" id="L95">        writer.enqueue(cardCommand(hotlist.getInstitutionId(), hotlist.getCardId(), EventTypes.CARD_HOTLISTED,</span>
+                null, correlationId, NotificationPriority.HIGH,
+<span class="fc" id="L97">                IdempotencyKeys.of(hotlist.getInstitutionId(), EventTypes.CARD_HOTLISTED, hotlist.getEventId()),</span>
+<span class="fc" id="L98">                PayloadValues.entries(</span>
+<span class="fc" id="L99">                        &quot;cardId&quot;, PayloadValues.uuid(hotlist.getCardId()),</span>
+<span class="fc" id="L100">                        &quot;institutionId&quot;, PayloadValues.uuid(hotlist.getInstitutionId()),</span>
+<span class="fc" id="L101">                        &quot;previousStatus&quot;, PayloadValues.name(hotlist.getPreviousStatus()),</span>
+<span class="fc" id="L102">                        &quot;newStatus&quot;, PayloadValues.name(hotlist.getCardStatus()),</span>
+<span class="fc" id="L103">                        &quot;lifecycleVersion&quot;, hotlist.getLifecycleVersion(),</span>
+<span class="fc" id="L104">                        &quot;reason&quot;, PayloadValues.name(hotlist.getReason()),</span>
+<span class="fc" id="L105">                        &quot;callerType&quot;, PayloadValues.name(hotlist.getCallerType()),</span>
+<span class="fc" id="L106">                        &quot;cardEventId&quot;, PayloadValues.uuid(hotlist.getEventId()),</span>
+<span class="fc" id="L107">                        &quot;hotlistedAt&quot;, PayloadValues.instant(hotlist.getHotlistedAt()))));</span>
+<span class="fc" id="L108">    }</span>
+
+    public void onReplacementRequested(CardReplacementV2Response replacement, String correlationId) {
+<span class="pc bpc" id="L111" title="1 of 2 branches missed.">        if (replacement == null) {</span>
+<span class="nc" id="L112">            return;</span>
+        }
+<span class="fc" id="L114">        writer.enqueue(OutboxEventCommand.builder()</span>
+<span class="fc" id="L115">                .institutionId(replacement.getInstitutionId())</span>
+<span class="fc" id="L116">                .eventType(EventTypes.CARD_REPLACEMENT_REQUESTED)</span>
+<span class="fc" id="L117">                .aggregateType(EventTypes.AGGREGATE_REPLACEMENT)</span>
+<span class="fc" id="L118">                .aggregateId(replacement.getReplacementRequestId())</span>
+<span class="fc" id="L119">                .correlationId(correlationId)</span>
+<span class="fc" id="L120">                .priority(NotificationPriority.MEDIUM)</span>
+<span class="fc" id="L121">                .idempotencyKey(IdempotencyKeys.of(replacement.getInstitutionId(),</span>
+<span class="fc" id="L122">                        EventTypes.CARD_REPLACEMENT_REQUESTED, replacement.getReplacementRequestId()))</span>
+<span class="fc" id="L123">                .payload(PayloadValues.entries(</span>
+<span class="fc" id="L124">                        &quot;replacementRequestId&quot;, PayloadValues.uuid(replacement.getReplacementRequestId()),</span>
+<span class="fc" id="L125">                        &quot;institutionId&quot;, PayloadValues.uuid(replacement.getInstitutionId()),</span>
+<span class="fc" id="L126">                        &quot;sourceCardId&quot;, PayloadValues.uuid(replacement.getSourceCardId()),</span>
+<span class="fc" id="L127">                        &quot;replacementCardId&quot;, PayloadValues.uuid(replacement.getReplacementCardId()),</span>
+<span class="fc" id="L128">                        &quot;requestType&quot;, PayloadValues.name(replacement.getReplacementReason()),</span>
+<span class="fc" id="L129">                        &quot;policyPanStrategy&quot;, PayloadValues.name(replacement.getPolicyPanStrategy()),</span>
+<span class="fc" id="L130">                        &quot;resolvedPanStrategy&quot;, PayloadValues.name(replacement.getResolvedPanStrategy()),</span>
+<span class="fc" id="L131">                        &quot;requestStatus&quot;, PayloadValues.name(replacement.getRequestStatus()),</span>
+<span class="fc" id="L132">                        &quot;sourceCardStatus&quot;, PayloadValues.name(replacement.getSourceCardStatus()),</span>
+<span class="fc" id="L133">                        &quot;replacementCardStatus&quot;, PayloadValues.name(replacement.getReplacementCardStatus()),</span>
+<span class="fc" id="L134">                        &quot;productionRequestId&quot;, PayloadValues.uuid(replacement.getProductionRequestId()),</span>
+<span class="fc" id="L135">                        &quot;requestedAt&quot;, PayloadValues.instant(replacement.getRequestedAt()),</span>
+<span class="fc" id="L136">                        &quot;completedAt&quot;, PayloadValues.instant(replacement.getCompletedAt())))</span>
+<span class="fc" id="L137">                .build());</span>
+<span class="fc" id="L138">    }</span>
+
+    private static OutboxEventCommand cardCommand(UUID institutionId, UUID cardId, String eventType,
+            String customerId, String correlationId, NotificationPriority priority,
+            UUID idempotencyKey, Map&lt;String, Object&gt; payload) {
+<span class="fc" id="L143">        return OutboxEventCommand.builder()</span>
+<span class="fc" id="L144">                .institutionId(institutionId)</span>
+<span class="fc" id="L145">                .eventType(eventType)</span>
+<span class="fc" id="L146">                .aggregateType(EventTypes.AGGREGATE_CARD)</span>
+<span class="fc" id="L147">                .aggregateId(cardId)</span>
+<span class="fc" id="L148">                .customerId(customerId)</span>
+<span class="fc" id="L149">                .correlationId(correlationId)</span>
+<span class="fc" id="L150">                .priority(priority)</span>
+<span class="fc" id="L151">                .idempotencyKey(idempotencyKey)</span>
+<span class="fc" id="L152">                .payload(payload)</span>
+<span class="fc" id="L153">                .build();</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.15.202606040825</span></div></body></html>

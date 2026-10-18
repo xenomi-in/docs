@@ -1,0 +1,52 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>PageableDefaults.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">CMS Core Service</a> &gt; <a href="index.source.html" class="el_package">com.xenomi.cms.core.api</a> &gt; <span class="el_source">PageableDefaults.java</span></div><h1>PageableDefaults.java</h1><pre class="source lang-java linenums">package com.xenomi.cms.core.api;
+
+import org.springframework.data.domain.PageRequest;
+import org.springframework.data.domain.Pageable;
+import org.springframework.data.domain.Sort;
+
+/**
+ * Utility class for creating Pageable instances with default and maximum size limits.
+ * Provides methods for 0-based and 1-based pagination, with automatic size capping.
+ *
+ * @author LogicPoint Systems
+ * @version 1.0.0
+ * @since 2026-01-21
+ */
+public final class PageableDefaults {
+
+    public static final int DEFAULT_PAGE = 0;
+    public static final int DEFAULT_SIZE = 20;
+    public static final int MAX_SIZE = 100;
+
+    private PageableDefaults() {}
+
+    /**
+     * Build Pageable with defaults and cap. Use for list APIs.
+     * Page is 0-based (Spring Data standard).
+     */
+    public static Pageable of(Integer page, Integer size) {
+<span class="nc bnc" id="L28" title="All 4 branches missed.">        int p = page != null &amp;&amp; page &gt;= 0 ? page : DEFAULT_PAGE;</span>
+<span class="nc bnc" id="L29" title="All 4 branches missed.">        int s = size != null &amp;&amp; size &gt; 0 ? Math.min(size, MAX_SIZE) : DEFAULT_SIZE;</span>
+<span class="nc" id="L30">        return PageRequest.of(p, s);</span>
+    }
+    
+    /**
+     * Build Pageable with 1-based page number (converts to 0-based internally).
+     * Use when API accepts page starting from 1.
+     */
+    public static Pageable ofOneBased(Integer page, Integer size) {
+<span class="pc bpc" id="L38" title="1 of 4 branches missed.">        int p = page != null &amp;&amp; page &gt; 0 ? page - 1 : DEFAULT_PAGE;</span>
+<span class="pc bpc" id="L39" title="1 of 4 branches missed.">        int s = size != null &amp;&amp; size &gt; 0 ? Math.min(size, MAX_SIZE) : DEFAULT_SIZE;</span>
+<span class="fc" id="L40">        return PageRequest.of(p, s);</span>
+    }
+
+    /**
+     * Build Pageable with sort.
+     */
+    public static Pageable of(Integer page, Integer size, Sort sort) {
+<span class="nc bnc" id="L47" title="All 4 branches missed.">        int p = page != null &amp;&amp; page &gt;= 0 ? page : DEFAULT_PAGE;</span>
+<span class="nc bnc" id="L48" title="All 4 branches missed.">        int s = size != null &amp;&amp; size &gt; 0 ? Math.min(size, MAX_SIZE) : DEFAULT_SIZE;</span>
+<span class="nc bnc" id="L49" title="All 2 branches missed.">        return PageRequest.of(p, s, sort != null ? sort : Sort.unsorted());</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.15.202606040825</span></div></body></html>

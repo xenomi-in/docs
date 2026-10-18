@@ -1,0 +1,123 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>HsmKeyReferenceV2.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">CMS Core Service</a> &gt; <a href="index.source.html" class="el_package">com.xenomi.cms.core.v2.institution.entity</a> &gt; <span class="el_source">HsmKeyReferenceV2.java</span></div><h1>HsmKeyReferenceV2.java</h1><pre class="source lang-java linenums">package com.xenomi.cms.core.v2.institution.entity;
+
+import java.time.LocalDate;
+import java.time.OffsetDateTime;
+import java.time.ZoneOffset;
+import java.util.UUID;
+
+import com.xenomi.cms.core.v2.hsm.model.HsmKeyScheme;
+import com.xenomi.cms.core.v2.hsm.model.HsmKeyScope;
+import com.xenomi.cms.core.v2.hsm.model.HsmKeyStatus;
+import com.xenomi.cms.core.v2.hsm.model.HsmKeyType;
+
+import jakarta.persistence.Column;
+import jakarta.persistence.Entity;
+import jakarta.persistence.EnumType;
+import jakarta.persistence.Enumerated;
+import jakarta.persistence.Id;
+import jakarta.persistence.PrePersist;
+import jakarta.persistence.PreUpdate;
+import jakarta.persistence.Table;
+import lombok.AllArgsConstructor;
+import lombok.Builder;
+import lombok.Data;
+import lombok.NoArgsConstructor;
+import lombok.ToString;
+
+@Entity(name = &quot;HsmKeyReferenceV2&quot;)
+@Table(name = &quot;hsm_key_reference&quot;, schema = &quot;cms_v2&quot;)
+@Data
+@Builder
+@NoArgsConstructor
+@AllArgsConstructor
+public class HsmKeyReferenceV2 {
+
+    @Id @Column(name = &quot;key_id&quot;, nullable = false, updatable = false)
+    private UUID keyId;
+    @Enumerated(EnumType.STRING)
+    @Column(name = &quot;key_type&quot;, nullable = false, length = 50, updatable = false)
+    private HsmKeyType keyType;
+    @Column(name = &quot;key_index&quot;, nullable = false, length = 20, updatable = false)
+    private String keyIndex;
+    @Column(name = &quot;key_label&quot;, length = 100)
+    private String keyLabel;
+    @Column(name = &quot;key_check_value&quot;, nullable = false, length = 16)
+    private String keyCheckValue;
+    @Column(name = &quot;key_version&quot;, nullable = false, updatable = false)
+    private int keyVersion;
+    @Column(name = &quot;bin_id&quot;, updatable = false)
+    private UUID binId;
+    @Enumerated(EnumType.STRING)
+    @Column(name = &quot;key_scope&quot;, nullable = false, length = 20, updatable = false)
+    private HsmKeyScope keyScope;
+    @Enumerated(EnumType.STRING)
+    @Column(name = &quot;scheme&quot;, nullable = false, length = 20, updatable = false)
+    private HsmKeyScheme scheme;
+    @Column(name = &quot;key_length_bits&quot;, nullable = false, updatable = false)
+    private int keyLengthBits;
+    @Column(name = &quot;is_tr31&quot;, nullable = false, updatable = false)
+    private boolean tr31;
+    @Column(name = &quot;tr31_key_usage&quot;, length = 10, updatable = false)
+    private String tr31KeyUsage;
+    @Column(name = &quot;tr31_algorithm&quot;, length = 10, updatable = false)
+    private String tr31Algorithm;
+    @Column(name = &quot;tr31_mode_of_use&quot;, length = 10, updatable = false)
+    private String tr31ModeOfUse;
+    @Column(name = &quot;hsm_identifier&quot;, length = 50)
+    private String hsmIdentifier;
+    @Column(name = &quot;hsm_partition&quot;, length = 50)
+    private String hsmPartition;
+    @Column(name = &quot;hsm_serial_number&quot;, length = 100)
+    private String hsmSerialNumber;
+    @Column(name = &quot;effective_from&quot;, nullable = false)
+    private LocalDate effectiveFrom;
+    @Column(name = &quot;expiry_date&quot;, nullable = false)
+    private LocalDate expiryDate;
+    @Enumerated(EnumType.STRING)
+    @Column(name = &quot;status&quot;, nullable = false, length = 20)
+    private HsmKeyStatus status;
+    @Column(name = &quot;previous_key_id&quot;, updatable = false)
+    private UUID previousKeyId;
+    @Column(name = &quot;replacement_key_id&quot;)
+    private UUID replacementKeyId;
+    @Column(name = &quot;rotated_at&quot;)
+    private OffsetDateTime rotatedAt;
+    @Column(name = &quot;rotation_reason&quot;, length = 50)
+    private String rotationReason;
+    @Column(name = &quot;encrypted_key_block&quot;, length = 500)
+    @ToString.Exclude
+    private String encryptedKeyBlock;
+    @Column(name = &quot;institution_id&quot;, nullable = false, updatable = false)
+    private UUID institutionId;
+    @Column(name = &quot;acs_id&quot;, updatable = false)
+    private UUID acsId;
+    @Column(name = &quot;card_vendor_id&quot;, updatable = false)
+    private UUID cardVendorId;
+    @Column(name = &quot;stakeholder_id&quot;, updatable = false)
+    private UUID stakeholderId;
+    @Column(name = &quot;imported_via_kek_id&quot;, updatable = false)
+    private UUID importedViaKekId;
+    @Column(name = &quot;external_request_id&quot;, length = 100, updatable = false)
+    private String externalRequestId;
+    @Column(name = &quot;created_at&quot;, nullable = false, updatable = false)
+    private OffsetDateTime createdAt;
+    @Column(name = &quot;updated_at&quot;, nullable = false)
+    private OffsetDateTime updatedAt;
+    @Column(name = &quot;created_by&quot;, nullable = false, length = 50, updatable = false)
+    private String createdBy;
+    @Column(name = &quot;updated_by&quot;, nullable = false, length = 50)
+    private String updatedBy;
+
+    @PrePersist
+    void beforeInsert() {
+<span class="nc" id="L113">        OffsetDateTime now = OffsetDateTime.now(ZoneOffset.UTC);</span>
+<span class="nc bnc" id="L114" title="All 2 branches missed.">        if (createdAt == null) createdAt = now;</span>
+<span class="nc" id="L115">        updatedAt = now;</span>
+<span class="nc" id="L116">    }</span>
+
+    @PreUpdate
+    void beforeUpdate() {
+<span class="nc" id="L120">        updatedAt = OffsetDateTime.now(ZoneOffset.UTC);</span>
+<span class="nc" id="L121">    }</span>
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.15.202606040825</span></div></body></html>

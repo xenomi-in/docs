@@ -1,0 +1,898 @@
+<?xml version='1.0' encoding='utf-8'?>
+<testsuites tests="563" failures="0" errors="0" skipped="51">
+  <testsuite name="com.xenomi.cms.core.api.RequestIdFilterTest" tests="2" failures="0" errors="0" skipped="0" time="0.0">
+    <testcase classname="com.xenomi.cms.core.api.RequestIdFilterTest" name="acceptsAndEchoesClientRequestId" time="0.0" />
+    <testcase classname="com.xenomi.cms.core.api.RequestIdFilterTest" name="replacesUnsafeRequestIdAndEchoesGeneratedValue" time="0.0" />
+  </testsuite>
+  <testsuite name="com.xenomi.cms.core.api.idempotency.ApiIdempotencyFilterTest" tests="6" failures="0" errors="0" skipped="0" time="0.007">
+    <testcase classname="com.xenomi.cms.core.api.idempotency.ApiIdempotencyFilterTest" name="recordsSuccessfulFirstResponse" time="0.002" />
+    <testcase classname="com.xenomi.cms.core.api.idempotency.ApiIdempotencyFilterTest" name="rejectsReuseWithDifferentPayload" time="0.001" />
+    <testcase classname="com.xenomi.cms.core.api.idempotency.ApiIdempotencyFilterTest" name="acsContactReadNeverPersistsResponseOrRequiresIdempotencyKey" time="0.0" />
+    <testcase classname="com.xenomi.cms.core.api.idempotency.ApiIdempotencyFilterTest" name="requiresIdempotencyKeyForAuthenticatedV2Write" time="0.001" />
+    <testcase classname="com.xenomi.cms.core.api.idempotency.ApiIdempotencyFilterTest" name="replaysCompletedResponseWithoutInvokingController" time="0.0" />
+    <testcase classname="com.xenomi.cms.core.api.idempotency.ApiIdempotencyFilterTest" name="issuanceReplayReachesLifecycleWithoutConsultingHttpResponseCache" time="0.002" />
+  </testsuite>
+  <testsuite name="com.xenomi.cms.core.config.OpenApiConfigTest" tests="2" failures="0" errors="0" skipped="0" time="0.255">
+    <testcase classname="com.xenomi.cms.core.config.OpenApiConfigTest" name="v2ContractUsesCanonicalTagsAndDocumentsFieldsHeadersAndErrors" time="0.243" />
+    <testcase classname="com.xenomi.cms.core.config.OpenApiConfigTest" name="publishesOnlyTheV2ApiDefinition" time="0.004" />
+  </testsuite>
+  <testsuite name="com.xenomi.cms.core.exception.GlobalExceptionHandlerCoverageTest" tests="2" failures="0" errors="0" skipped="0" time="0.008">
+    <testcase classname="com.xenomi.cms.core.exception.GlobalExceptionHandlerCoverageTest" name="mapsDomainAndInfrastructureFailuresToStableStatuses" time="0.007" />
+    <testcase classname="com.xenomi.cms.core.exception.GlobalExceptionHandlerCoverageTest" name="methodValidationUsesPublishedValidationEnvelope" time="0.0" />
+  </testsuite>
+  <testsuite name="com.xenomi.cms.core.hms.HsmCommandLogSanitizerTest" tests="3" failures="0" errors="0" skipped="0" time="0.002">
+    <testcase classname="com.xenomi.cms.core.hms.HsmCommandLogSanitizerTest" name="neverEchoesMalformedOpaquePayload" time="0.001" />
+    <testcase classname="com.xenomi.cms.core.hms.HsmCommandLogSanitizerTest" name="redactsGeneratedResponseValues" time="0.001" />
+    <testcase classname="com.xenomi.cms.core.hms.HsmCommandLogSanitizerTest" name="redactsPanPinAndProtectedKeysButKeepsCommandShape" time="0.0" />
+  </testsuite>
+  <testsuite name="com.xenomi.cms.core.hms.service.HsmKeepAliveServiceTest" tests="5" failures="0" errors="0" skipped="0" time="0.259">
+    <testcase classname="com.xenomi.cms.core.hms.service.HsmKeepAliveServiceTest" name="disabledServiceDoesNotRunOrRegisterConnections" time="0.042" />
+    <testcase classname="com.xenomi.cms.core.hms.service.HsmKeepAliveServiceTest" name="shutdownClearsConnectionsAndStopsMonitoring" time="0.0" />
+    <testcase classname="com.xenomi.cms.core.hms.service.HsmKeepAliveServiceTest" name="registersUpdatesAndUnregistersHealthyConnections" time="0.0" />
+    <testcase classname="com.xenomi.cms.core.hms.service.HsmKeepAliveServiceTest" name="threeConsecutiveFailuresMarkAConnectionUnhealthyAndSuccessRecoversIt" time="0.002" />
+    <testcase classname="com.xenomi.cms.core.hms.service.HsmKeepAliveServiceTest" name="scheduledAndForcedChecksRefreshTrackedConnectionHealth" time="0.211" />
+  </testsuite>
+  <testsuite name="com.xenomi.cms.core.hms.service.NettyHsmServiceTest" tests="16" failures="0" errors="0" skipped="0" time="0.033">
+    <testcase classname="com.xenomi.cms.core.hms.service.NettyHsmServiceTest" name="randomPinOffsetFailsClosedOnProviderOrMalformedPan" time="0.012" />
+    <testcase classname="com.xenomi.cms.core.hms.service.NettyHsmServiceTest" name="translatesWorkingKeyAndSelectsRequestedOutputFormat" time="0.002" />
+    <testcase classname="com.xenomi.cms.core.hms.service.NettyHsmServiceTest" name="generatesMacUsingOnlyProtectedKeyMaterial" time="0.001" />
+    <testcase classname="com.xenomi.cms.core.hms.service.NettyHsmServiceTest" name="generatesCvvFromKeyReferenceAndHandlesInvalidInputs" time="0.0" />
+    <testcase classname="com.xenomi.cms.core.hms.service.NettyHsmServiceTest" name="translationFailureIsFailClosedAndDoesNotExposeProviderResponse" time="0.003" />
+    <testcase classname="com.xenomi.cms.core.hms.service.NettyHsmServiceTest" name="connectionHealthHandlesSuccessRejectionEmptyAndTransportFailure" time="0.002" />
+    <testcase classname="com.xenomi.cms.core.hms.service.NettyHsmServiceTest" name="protectedPinChangeReturnsVerificationAndNewOffset" time="0.001" />
+    <testcase classname="com.xenomi.cms.core.hms.service.NettyHsmServiceTest" name="legacyClearKekDerivationEntryPointIsExplicitlyUnsupported" time="0.001" />
+    <testcase classname="com.xenomi.cms.core.hms.service.NettyHsmServiceTest" name="protectedPinGenerationRejectsUnsupportedMethodAndHsmFailure" time="0.001" />
+    <testcase classname="com.xenomi.cms.core.hms.service.NettyHsmServiceTest" name="delegatesSynchronousAsynchronousBatchAndPoolOperations" time="0.002" />
+    <testcase classname="com.xenomi.cms.core.hms.service.NettyHsmServiceTest" name="workingKeyGenerationReturnsProviderErrorAndHandlesTransportFailure" time="0.001" />
+    <testcase classname="com.xenomi.cms.core.hms.service.NettyHsmServiceTest" name="randomPinOffsetSupportsVisaIbmAndIsoMethods" time="0.001" />
+    <testcase classname="com.xenomi.cms.core.hms.service.NettyHsmServiceTest" name="generatesWorkingKeysWithPurposeSpecificModifiers" time="0.0" />
+    <testcase classname="com.xenomi.cms.core.hms.service.NettyHsmServiceTest" name="protectedPinBlockProducesVisaOffsetWithoutExposingClearPin" time="0.001" />
+    <testcase classname="com.xenomi.cms.core.hms.service.NettyHsmServiceTest" name="protectedOffsetUsesIbmResponseFieldAndChangeFailsClosed" time="0.001" />
+    <testcase classname="com.xenomi.cms.core.hms.service.NettyHsmServiceTest" name="encryptsAndDecryptsHsmEnvelopeWithAlgorithmBinding" time="0.001" />
+  </testsuite>
+  <testsuite name="com.xenomi.cms.core.keymanagement.client.FuturexHsmClientAdapterTest" tests="4" failures="0" errors="0" skipped="0" time="0.005">
+    <testcase classname="com.xenomi.cms.core.keymanagement.client.FuturexHsmClientAdapterTest" name="convertsHsmErrorResponseIntoProcessingException" time="0.002" />
+    <testcase classname="com.xenomi.cms.core.keymanagement.client.FuturexHsmClientAdapterTest" name="rejectsAesUntilProviderCommandMappingIsConfigured" time="0.0" />
+    <testcase classname="com.xenomi.cms.core.keymanagement.client.FuturexHsmClientAdapterTest" name="generatesDoubleLengthTdesUsingExistingGwksCommand" time="0.002" />
+    <testcase classname="com.xenomi.cms.core.keymanagement.client.FuturexHsmClientAdapterTest" name="rejectsTr31RatherThanMislabelingLegacyTdesOutput" time="0.001" />
+  </testsuite>
+  <testsuite name="com.xenomi.cms.core.keymanagement.exchange.FuturexHsmKeyExchangeClientTest" tests="2" failures="0" errors="0" skipped="0" time="0.162">
+    <testcase classname="com.xenomi.cms.core.keymanagement.exchange.FuturexHsmKeyExchangeClientTest" name="rejectsMalformedProviderResponse" time="0.158" />
+    <testcase classname="com.xenomi.cms.core.keymanagement.exchange.FuturexHsmKeyExchangeClientTest" name="importsWorkingKeyUsingExplicitProtectedKek" time="0.004" />
+  </testsuite>
+  <testsuite name="com.xenomi.cms.core.security.CmsJwtRequestContextFilterTest" tests="8" failures="0" errors="0" skipped="0" time="0.052">
+    <testcase classname="com.xenomi.cms.core.security.CmsJwtRequestContextFilterTest" name="rejectsCrossInstitutionAccessAcrossV2Aggregates" time="0.028" />
+    <testcase classname="com.xenomi.cms.core.security.CmsJwtRequestContextFilterTest" name="tenantSubjectCannotListAllInstitutions" time="0.001" />
+    <testcase classname="com.xenomi.cms.core.security.CmsJwtRequestContextFilterTest" name="platformSubjectMayOperateOnExplicitInstitutionPath" time="0.001" />
+    <testcase classname="com.xenomi.cms.core.security.CmsJwtRequestContextFilterTest" name="rejectsLegacyInstitutionHeader" time="0.001" />
+    <testcase classname="com.xenomi.cms.core.security.CmsJwtRequestContextFilterTest" name="tenantSubjectRequiresValidInstitutionClaim" time="0.0" />
+    <testcase classname="com.xenomi.cms.core.security.CmsJwtRequestContextFilterTest" name="platformSubjectMayListInstitutions" time="0.0" />
+    <testcase classname="com.xenomi.cms.core.security.CmsJwtRequestContextFilterTest" name="rejectsCrossInstitutionAccess" time="0.001" />
+    <testcase classname="com.xenomi.cms.core.security.CmsJwtRequestContextFilterTest" name="replacesSpoofableActorHeaderWithSignedSubject" time="0.001" />
+  </testsuite>
+  <testsuite name="com.xenomi.cms.core.v2.acs.AcsContactAuthorizationTest" tests="1" failures="0" errors="0" skipped="0" time="0.0">
+    <testcase classname="com.xenomi.cms.core.v2.acs.AcsContactAuthorizationTest" name="onlyConfiguredAcsWithDedicatedPermissionAndPlatformAccessIsAllowed" time="0.0" />
+  </testsuite>
+  <testsuite name="com.xenomi.cms.core.v2.acs.AcsContactHttpTest" tests="3" failures="0" errors="0" skipped="0" time="0.076">
+    <testcase classname="com.xenomi.cms.core.v2.acs.AcsContactHttpTest" name="onlyAcsCanReadAndResponseIsNotCached" time="0.048" />
+    <testcase classname="com.xenomi.cms.core.v2.acs.AcsContactHttpTest" name="anonymousIsDenied" time="0.015" />
+    <testcase classname="com.xenomi.cms.core.v2.acs.AcsContactHttpTest" name="otherServiceWithPermissionIsDenied" time="0.012" />
+  </testsuite>
+  <testsuite name="com.xenomi.cms.core.v2.acs.AcsContactServiceTest" tests="7" failures="0" errors="0" skipped="0" time="0.007">
+    <testcase classname="com.xenomi.cms.core.v2.acs.AcsContactServiceTest" name="refusesAmbiguousInstitutionsBeforeHsm" time="0.0" />
+    <testcase classname="com.xenomi.cms.core.v2.acs.AcsContactServiceTest" name="configuredRangeDoesNotProveCardExists" time="0.0" />
+    <testcase classname="com.xenomi.cms.core.v2.acs.AcsContactServiceTest" name="missingContactsAreUnavailable" time="0.001" />
+    <testcase classname="com.xenomi.cms.core.v2.acs.AcsContactServiceTest" name="returnsLocalContactsForSamePanSuccessors" time="0.0" />
+    <testcase classname="com.xenomi.cms.core.v2.acs.AcsContactServiceTest" name="inconsistentFamilyCustomerIsRejected" time="0.001" />
+    <testcase classname="com.xenomi.cms.core.v2.acs.AcsContactServiceTest" name="invalidPanDoesNotQueryDatabase" time="0.0" />
+    <testcase classname="com.xenomi.cms.core.v2.acs.AcsContactServiceTest" name="supportsLegacyIdentity" time="0.0" />
+  </testsuite>
+  <testsuite name="com.xenomi.cms.core.v2.bin.controller.BinControllersDelegationTest" tests="2" failures="0" errors="0" skipped="0" time="0.007">
+    <testcase classname="com.xenomi.cms.core.v2.bin.controller.BinControllersDelegationTest" name="networkLookupsApplyActiveAndUnfilteredSearches" time="0.001" />
+    <testcase classname="com.xenomi.cms.core.v2.bin.controller.BinControllersDelegationTest" name="binAndRangeEndpointsDelegateAcrossCompleteContract" time="0.005" />
+  </testsuite>
+  <testsuite name="com.xenomi.cms.core.v2.bin.controller.BinLookupV2ControllerTest" tests="2" failures="0" errors="0" skipped="0" time="0.221">
+    <testcase classname="com.xenomi.cms.core.v2.bin.controller.BinLookupV2ControllerTest" name="activeNetworkLookupAppliesTenantNetworkAndStatus" time="0.011" />
+    <testcase classname="com.xenomi.cms.core.v2.bin.controller.BinLookupV2ControllerTest" name="networkLookupUsesInstitutionPath" time="0.003" />
+  </testsuite>
+  <testsuite name="com.xenomi.cms.core.v2.bin.controller.BinV2ControllerTest" tests="4" failures="0" errors="0" skipped="0" time="0.222">
+    <testcase classname="com.xenomi.cms.core.v2.bin.controller.BinV2ControllerTest" name="putUsesCanonicalResourceRouteAndFullRequestSchema" time="0.02" />
+    <testcase classname="com.xenomi.cms.core.v2.bin.controller.BinV2ControllerTest" name="immutableFieldFailureUsesThePublishedErrorCode" time="0.005" />
+    <testcase classname="com.xenomi.cms.core.v2.bin.controller.BinV2ControllerTest" name="immutableJsonFieldIsCapturedForExplicitServiceRejection" time="0.006" />
+    <testcase classname="com.xenomi.cms.core.v2.bin.controller.BinV2ControllerTest" name="putRejectsAnIncompleteRepresentation" time="0.003" />
+  </testsuite>
+  <testsuite name="com.xenomi.cms.core.v2.bin.service.BinConfigurationV2ServiceTest" tests="10" failures="0" errors="0" skipped="0" time="0.007">
+    <testcase classname="com.xenomi.cms.core.v2.bin.service.BinConfigurationV2ServiceTest" name="createRejectsDeclaredLengthThatDiffersFromBinNumber" time="0.001" />
+    <testcase classname="com.xenomi.cms.core.v2.bin.service.BinConfigurationV2ServiceTest" name="putReplacesEveryMutableFieldAndClearsNullableValues" time="0.001" />
+    <testcase classname="com.xenomi.cms.core.v2.bin.service.BinConfigurationV2ServiceTest" name="createRejectsSevenDigitBinEvenWhenDeclaredLengthMatches" time="0.001" />
+    <testcase classname="com.xenomi.cms.core.v2.bin.service.BinConfigurationV2ServiceTest" name="putRejectsUnknownFieldsExplicitly" time="0.0" />
+    <testcase classname="com.xenomi.cms.core.v2.bin.service.BinConfigurationV2ServiceTest" name="duplicateBinIsRejectedRegardlessOfRequestingInstitution" time="0.001" />
+    <testcase classname="com.xenomi.cms.core.v2.bin.service.BinConfigurationV2ServiceTest" name="concurrentDuplicateConstraintBecomesApiConflict" time="0.001" />
+    <testcase classname="com.xenomi.cms.core.v2.bin.service.BinConfigurationV2ServiceTest" name="createAppliesOperationalDefaultsAndNormalizesCodes" time="0.0" />
+    <testcase classname="com.xenomi.cms.core.v2.bin.service.BinConfigurationV2ServiceTest" name="putRejectsStaleVersion" time="0.001" />
+    <testcase classname="com.xenomi.cms.core.v2.bin.service.BinConfigurationV2ServiceTest" name="putRejectsImmutableFieldsExplicitly" time="0.001" />
+    <testcase classname="com.xenomi.cms.core.v2.bin.service.BinConfigurationV2ServiceTest" name="unrelatedDatabaseConstraintIsNotReportedAsDuplicateBin" time="0.0" />
+  </testsuite>
+  <testsuite name="com.xenomi.cms.core.v2.bin.service.BinRangeV2ServiceTest" tests="4" failures="0" errors="0" skipped="0" time="0.006">
+    <testcase classname="com.xenomi.cms.core.v2.bin.service.BinRangeV2ServiceTest" name="createRejectsPlatformOverlapUnderAnotherBin" time="0.004" />
+    <testcase classname="com.xenomi.cms.core.v2.bin.service.BinRangeV2ServiceTest" name="createRejectsRangeOutsideParentBin" time="0.001" />
+    <testcase classname="com.xenomi.cms.core.v2.bin.service.BinRangeV2ServiceTest" name="createCalculatesCapacityAndStartsInDraft" time="0.001" />
+    <testcase classname="com.xenomi.cms.core.v2.bin.service.BinRangeV2ServiceTest" name="createRejectsOverlapBeforeAllocatingId" time="0.0" />
+  </testsuite>
+  <testsuite name="com.xenomi.cms.core.v2.card.ProductionRequestEligibilityTest" tests="3" failures="0" errors="0" skipped="0" time="0.001">
+    <testcase classname="com.xenomi.cms.core.v2.card.ProductionRequestEligibilityTest" name="registeredReadyRequestStartsEligible" time="0.001" />
+    <testcase classname="com.xenomi.cms.core.v2.card.ProductionRequestEligibilityTest" name="unregisteredRequestStaysPending" time="0.0" />
+    <testcase classname="com.xenomi.cms.core.v2.card.ProductionRequestEligibilityTest" name="registeredRequestWithoutAddressStaysPending" time="0.0" />
+  </testsuite>
+  <testsuite name="com.xenomi.cms.core.v2.card.controller.CardIssuanceV2ControllerDelegationTest" tests="1" failures="0" errors="0" skipped="0" time="0.001">
+    <testcase classname="com.xenomi.cms.core.v2.card.controller.CardIssuanceV2ControllerDelegationTest" name="delegatesIssuanceReceiptMetadataAndPhysicalRequestEndpoints" time="0.001" />
+  </testsuite>
+  <testsuite name="com.xenomi.cms.core.v2.card.controller.CardIssuanceV2ControllerTest" tests="2" failures="0" errors="0" skipped="0" time="0.238">
+    <testcase classname="com.xenomi.cms.core.v2.card.controller.CardIssuanceV2ControllerTest" name="issuesCardWithoutAcceptingClearPanData" time="0.017" />
+    <testcase classname="com.xenomi.cms.core.v2.card.controller.CardIssuanceV2ControllerTest" name="requestsPhysicalProductionForVirtualFirstCard" time="0.008" />
+  </testsuite>
+  <testsuite name="com.xenomi.cms.core.v2.card.lifecycle.client.HttpCardLifecycleSwitchClientTest" tests="6" failures="0" errors="0" skipped="0" time="0.012">
+    <testcase classname="com.xenomi.cms.core.v2.card.lifecycle.client.HttpCardLifecycleSwitchClientTest" name="blockSendsRequiredFactsAndAcceptsMatchingConfirmation" time="0.004" />
+    <testcase classname="com.xenomi.cms.core.v2.card.lifecycle.client.HttpCardLifecycleSwitchClientTest" name="durableSyncSkipsImmediateCalls" time="0.0" />
+    <testcase classname="com.xenomi.cms.core.v2.card.lifecycle.client.HttpCardLifecycleSwitchClientTest" name="rejectsMissingConfigurationForBothOperations" time="0.001" />
+    <testcase classname="com.xenomi.cms.core.v2.card.lifecycle.client.HttpCardLifecycleSwitchClientTest" name="changeStatusSendsOperationsRequestAndAcceptsMatchingConfirmation" time="0.001" />
+    <testcase classname="com.xenomi.cms.core.v2.card.lifecycle.client.HttpCardLifecycleSwitchClientTest" name="rejectsMissingOrMismatchedConfirmations" time="0.003" />
+    <testcase classname="com.xenomi.cms.core.v2.card.lifecycle.client.HttpCardLifecycleSwitchClientTest" name="wrapsTransportFailuresForBothOperations" time="0.001" />
+  </testsuite>
+  <testsuite name="com.xenomi.cms.core.v2.card.lifecycle.command.LifecycleCommandApiAdaptersV2Test" tests="6" failures="0" errors="0" skipped="0" time="0.03">
+    <testcase classname="com.xenomi.cms.core.v2.card.lifecycle.command.LifecycleCommandApiAdaptersV2Test" name="securityReplacementSubmitMapsOperationMetadataForBothChannels" time="0.013" />
+    <testcase classname="com.xenomi.cms.core.v2.card.lifecycle.command.LifecycleCommandApiAdaptersV2Test" name="samePanRenewalSubmitAndGetMapLifecycleReceipt" time="0.006" />
+    <testcase classname="com.xenomi.cms.core.v2.card.lifecycle.command.LifecycleCommandApiAdaptersV2Test" name="originalIssuanceApiSubmitsAndRestrictsQueriesToActor" time="0.006" />
+    <testcase classname="com.xenomi.cms.core.v2.card.lifecycle.command.LifecycleCommandApiAdaptersV2Test" name="securityReplacementGetAddsOwnedOperationAndIgnoresOtherTenant" time="0.001" />
+    <testcase classname="com.xenomi.cms.core.v2.card.lifecycle.command.LifecycleCommandApiAdaptersV2Test" name="originalIssuanceHandlerValidatesAccountAndDelegates" time="0.001" />
+    <testcase classname="com.xenomi.cms.core.v2.card.lifecycle.command.LifecycleCommandApiAdaptersV2Test" name="replacementHandlersPublishContractsAndDelegateToWork" time="0.001" />
+  </testsuite>
+  <testsuite name="com.xenomi.cms.core.v2.card.lifecycle.command.LifecycleCommandContextV2Test" tests="6" failures="0" errors="0" skipped="0" time="0.005">
+    <testcase classname="com.xenomi.cms.core.v2.card.lifecycle.command.LifecycleCommandContextV2Test" name="validatesTransitionReasonAndRelatedCardBeforeMutation" time="0.001" />
+    <testcase classname="com.xenomi.cms.core.v2.card.lifecycle.command.LifecycleCommandContextV2Test" name="unchangedCardMutationDoesNotWriteFactsOrEvents" time="0.002" />
+    <testcase classname="com.xenomi.cms.core.v2.card.lifecycle.command.LifecycleCommandContextV2Test" name="externalIntentIsDurableIdempotentAndMovesOperationToPending" time="0.001" />
+    <testcase classname="com.xenomi.cms.core.v2.card.lifecycle.command.LifecycleCommandContextV2Test" name="rejectsUnsafeOrConflictingExternalIntentMetadata" time="0.0" />
+    <testcase classname="com.xenomi.cms.core.v2.card.lifecycle.command.LifecycleCommandContextV2Test" name="exposesOnlyObjectsInTheLockedCommandPlan" time="0.0" />
+    <testcase classname="com.xenomi.cms.core.v2.card.lifecycle.command.LifecycleCommandContextV2Test" name="pendingStatusRequiresAtLeastOneDurableExternalIntent" time="0.0" />
+  </testsuite>
+  <testsuite name="com.xenomi.cms.core.v2.card.lifecycle.command.LifecycleCommandCoordinatorV2UnitTest" tests="7" failures="0" errors="0" skipped="0" time="0.021">
+    <testcase classname="com.xenomi.cms.core.v2.card.lifecycle.command.LifecycleCommandCoordinatorV2UnitTest" name="rejectsUnknownPayloadFieldsAndBeanValidationFailures" time="0.009" />
+    <testcase classname="com.xenomi.cms.core.v2.card.lifecycle.command.LifecycleCommandCoordinatorV2UnitTest" name="rejectsInvalidAndDuplicateHandlerDefinitions" time="0.002" />
+    <testcase classname="com.xenomi.cms.core.v2.card.lifecycle.command.LifecycleCommandCoordinatorV2UnitTest" name="executeRejectsNestedTransactionAndUnsupportedKind" time="0.0" />
+    <testcase classname="com.xenomi.cms.core.v2.card.lifecycle.command.LifecycleCommandCoordinatorV2UnitTest" name="envelopeValidationCoversCreateCardAndFamilyRequirements" time="0.002" />
+    <testcase classname="com.xenomi.cms.core.v2.card.lifecycle.command.LifecycleCommandCoordinatorV2UnitTest" name="identicalIdempotencyReplayReturnsSavedReceiptWithoutPlanningAgain" time="0.003" />
+    <testcase classname="com.xenomi.cms.core.v2.card.lifecycle.command.LifecycleCommandCoordinatorV2UnitTest" name="changedIdempotentRequestConflictsAndMissingAccountFailsBeforePlan" time="0.003" />
+    <testcase classname="com.xenomi.cms.core.v2.card.lifecycle.command.LifecycleCommandCoordinatorV2UnitTest" name="executeRequiresCanonicalTenantAndAccount" time="0.001" />
+  </testsuite>
+  <testsuite name="com.xenomi.cms.core.v2.card.lifecycle.command.LifecycleCommandSecurityV2Test" tests="5" failures="0" errors="0" skipped="0" time="0.004">
+    <testcase classname="com.xenomi.cms.core.v2.card.lifecycle.command.LifecycleCommandSecurityV2Test" name="rejectsMissingAuthenticationAndPermission" time="0.0" />
+    <testcase classname="com.xenomi.cms.core.v2.card.lifecycle.command.LifecycleCommandSecurityV2Test" name="conflictCodesAreDistinctHttp409Responses" time="0.001" />
+    <testcase classname="com.xenomi.cms.core.v2.card.lifecycle.command.LifecycleCommandSecurityV2Test" name="resolvesActorFromAuthentication" time="0.0" />
+    <testcase classname="com.xenomi.cms.core.v2.card.lifecycle.command.LifecycleCommandSecurityV2Test" name="rejectsOtherTenantMissingActorAndSystemEscalation" time="0.0" />
+    <testcase classname="com.xenomi.cms.core.v2.card.lifecycle.command.LifecycleCommandSecurityV2Test" name="fingerprintsIgnoreObjectKeyOrderButBindActorAndVersions" time="0.002" />
+  </testsuite>
+  <testsuite name="com.xenomi.cms.core.v2.card.lifecycle.command.LifecycleTransitionHandlersV2Test" tests="6" failures="0" errors="0" skipped="0" time="0.011">
+    <testcase classname="com.xenomi.cms.core.v2.card.lifecycle.command.LifecycleTransitionHandlersV2Test" name="closeCardRetiresAndCancelsInFlightPhysicalCard" time="0.003" />
+    <testcase classname="com.xenomi.cms.core.v2.card.lifecycle.command.LifecycleTransitionHandlersV2Test" name="plansRejectMissingOrUnknownCards" time="0.001" />
+    <testcase classname="com.xenomi.cms.core.v2.card.lifecycle.command.LifecycleTransitionHandlersV2Test" name="makeUseReadyMutatesEligibleCardAndRejectsInvalidStates" time="0.002" />
+    <testcase classname="com.xenomi.cms.core.v2.card.lifecycle.command.LifecycleTransitionHandlersV2Test" name="activatePhysicalRejectsInvalidLifecycleStates" time="0.003" />
+    <testcase classname="com.xenomi.cms.core.v2.card.lifecycle.command.LifecycleTransitionHandlersV2Test" name="closeCardEnforcesTerminalAndSystemOnlyRules" time="0.0" />
+    <testcase classname="com.xenomi.cms.core.v2.card.lifecycle.command.LifecycleTransitionHandlersV2Test" name="activatePhysicalPublishesContractAndMutatesDeliveredCard" time="0.002" />
+  </testsuite>
+  <testsuite name="com.xenomi.cms.core.v2.card.lifecycle.command.LifecycleWorkersV2Test" tests="4" failures="0" errors="0" skipped="0" time="0.007">
+    <testcase classname="com.xenomi.cms.core.v2.card.lifecycle.command.LifecycleWorkersV2Test" name="unknownRecoveryValidatesDelayAndContainsPollFailures" time="0.003" />
+    <testcase classname="com.xenomi.cms.core.v2.card.lifecycle.command.LifecycleWorkersV2Test" name="securityReplacementPollProcessesItemsAndContainsFailures" time="0.001" />
+    <testcase classname="com.xenomi.cms.core.v2.card.lifecycle.command.LifecycleWorkersV2Test" name="renewalPollProcessesItemsAndContainsRepositoryFailure" time="0.001" />
+    <testcase classname="com.xenomi.cms.core.v2.card.lifecycle.command.LifecycleWorkersV2Test" name="originalIssuancePollProcessesEveryItemAndContainsItemFailures" time="0.001" />
+  </testsuite>
+  <testsuite name="com.xenomi.cms.core.v2.card.lifecycle.command.OriginalCardIssuanceWorkV2Test" tests="10" failures="0" errors="0" skipped="0" time="0.086">
+    <testcase classname="com.xenomi.cms.core.v2.card.lifecycle.command.OriginalCardIssuanceWorkV2Test" name="processRejectsMissingPreparation" time="0.029" />
+    <testcase classname="com.xenomi.cms.core.v2.card.lifecycle.command.OriginalCardIssuanceWorkV2Test" name="stageRejectsExhaustedRangeBeforeCreatingExternalIntent" time="0.002" />
+    <testcase classname="com.xenomi.cms.core.v2.card.lifecycle.command.OriginalCardIssuanceWorkV2Test" name="pendingReturnsBoundedDueOperationIdsAndNormalizesNull" time="0.006" />
+    <testcase classname="com.xenomi.cms.core.v2.card.lifecycle.command.OriginalCardIssuanceWorkV2Test" name="processRejectsCallerOwnedTransaction" time="0.001" />
+    <testcase classname="com.xenomi.cms.core.v2.card.lifecycle.command.OriginalCardIssuanceWorkV2Test" name="processDoesNotRedispatchUnknownExternalOperation" time="0.007" />
+    <testcase classname="com.xenomi.cms.core.v2.card.lifecycle.command.OriginalCardIssuanceWorkV2Test" name="stageRequiresFreshAuthoritativeRestrictions" time="0.002" />
+    <testcase classname="com.xenomi.cms.core.v2.card.lifecycle.command.OriginalCardIssuanceWorkV2Test" name="processReturnsWhenOperationAlreadyTerminal" time="0.001" />
+    <testcase classname="com.xenomi.cms.core.v2.card.lifecycle.command.OriginalCardIssuanceWorkV2Test" name="stageReservesCandidateAndPersistsDurableExternalWork" time="0.01" />
+    <testcase classname="com.xenomi.cms.core.v2.card.lifecycle.command.OriginalCardIssuanceWorkV2Test" name="processGeneratesCredentialsAndFinalizesOriginalCard" time="0.025" />
+    <testcase classname="com.xenomi.cms.core.v2.card.lifecycle.command.OriginalCardIssuanceWorkV2Test" name="stageRejectsOversizedActorBeforeReadingSensitiveConfiguration" time="0.001" />
+  </testsuite>
+  <testsuite name="com.xenomi.cms.core.v2.card.lifecycle.command.SamePanRenewalWorkV2Test" tests="8" failures="0" errors="0" skipped="0" time="0.025">
+    <testcase classname="com.xenomi.cms.core.v2.card.lifecycle.command.SamePanRenewalWorkV2Test" name="stageRequiresSynchronizedFamilyHoldsAndFreshRestrictions" time="0.002" />
+    <testcase classname="com.xenomi.cms.core.v2.card.lifecycle.command.SamePanRenewalWorkV2Test" name="accountAndPlanResolveCanonicalFamily" time="0.001" />
+    <testcase classname="com.xenomi.cms.core.v2.card.lifecycle.command.SamePanRenewalWorkV2Test" name="stageRejectsClosedSourceAndPermanentFamilySecurityHold" time="0.001" />
+    <testcase classname="com.xenomi.cms.core.v2.card.lifecycle.command.SamePanRenewalWorkV2Test" name="stageRequiresActiveAllowedRenewalPolicy" time="0.002" />
+    <testcase classname="com.xenomi.cms.core.v2.card.lifecycle.command.SamePanRenewalWorkV2Test" name="processPreparesCredentialsAndFinalizesSamePanRenewal" time="0.011" />
+    <testcase classname="com.xenomi.cms.core.v2.card.lifecycle.command.SamePanRenewalWorkV2Test" name="pendingReturnsBoundedDueWorkAndProcessRequiresOwnedTransaction" time="0.001" />
+    <testcase classname="com.xenomi.cms.core.v2.card.lifecycle.command.SamePanRenewalWorkV2Test" name="stagePersistsRenewalAndDurableCredentialIntent" time="0.003" />
+    <testcase classname="com.xenomi.cms.core.v2.card.lifecycle.command.SamePanRenewalWorkV2Test" name="stageValidatesReasonPanStrategyActorAndDuplicate" time="0.001" />
+  </testsuite>
+  <testsuite name="com.xenomi.cms.core.v2.card.lifecycle.command.SecurityReplacementWorkV2Test" tests="16" failures="0" errors="0" skipped="0" time="0.036">
+    <testcase classname="com.xenomi.cms.core.v2.card.lifecycle.command.SecurityReplacementWorkV2Test" name="processMarksProviderWorkUnknownBeforeDispatchFailure" time="0.009" />
+    <testcase classname="com.xenomi.cms.core.v2.card.lifecycle.command.SecurityReplacementWorkV2Test" name="stageBlocksFamilyReservesPanAndCreatesDurableCredentialWork" time="0.011" />
+    <testcase classname="com.xenomi.cms.core.v2.card.lifecycle.command.SecurityReplacementWorkV2Test" name="accountRejectsUnknownSourceCard" time="0.001" />
+    <testcase classname="com.xenomi.cms.core.v2.card.lifecycle.command.SecurityReplacementWorkV2Test" name="stageRejectsTerminalCardAndOversizedActor" time="0.001" />
+    <testcase classname="com.xenomi.cms.core.v2.card.lifecycle.command.SecurityReplacementWorkV2Test" name="stageRejectsUnsupportedReasonAndWrongPanStrategy" time="0.0" />
+    <testcase classname="com.xenomi.cms.core.v2.card.lifecycle.command.SecurityReplacementWorkV2Test" name="pendingReturnsBoundedDueWork" time="0.0" />
+    <testcase classname="com.xenomi.cms.core.v2.card.lifecycle.command.SecurityReplacementWorkV2Test" name="processRejectsCallerOwnedTransaction" time="0.001" />
+    <testcase classname="com.xenomi.cms.core.v2.card.lifecycle.command.SecurityReplacementWorkV2Test" name="stageRejectsCardFormMigration" time="0.001" />
+    <testcase classname="com.xenomi.cms.core.v2.card.lifecycle.command.SecurityReplacementWorkV2Test" name="processReturnsWhenLifecycleOperationIsAlreadyTerminal" time="0.001" />
+    <testcase classname="com.xenomi.cms.core.v2.card.lifecycle.command.SecurityReplacementWorkV2Test" name="stageRequiresFreshRestrictionsBeforePolicyOrHsmWork" time="0.001" />
+    <testcase classname="com.xenomi.cms.core.v2.card.lifecycle.command.SecurityReplacementWorkV2Test" name="processWithProtectedResultDoesNotRedispatchCredentials" time="0.002" />
+    <testcase classname="com.xenomi.cms.core.v2.card.lifecycle.command.SecurityReplacementWorkV2Test" name="planRequiresMatchingAccountAndReturnsEntireFamilyLockSet" time="0.001" />
+    <testcase classname="com.xenomi.cms.core.v2.card.lifecycle.command.SecurityReplacementWorkV2Test" name="stageRejectsDuplicateSourceReplacement" time="0.001" />
+    <testcase classname="com.xenomi.cms.core.v2.card.lifecycle.command.SecurityReplacementWorkV2Test" name="stageRejectsConflictingPermanentFamilyRestriction" time="0.001" />
+    <testcase classname="com.xenomi.cms.core.v2.card.lifecycle.command.SecurityReplacementWorkV2Test" name="stageRejectsPolicyThatDisallowsRequestedChannel" time="0.001" />
+    <testcase classname="com.xenomi.cms.core.v2.card.lifecycle.command.SecurityReplacementWorkV2Test" name="accountResolvesCanonicalFamilyAccount" time="0.001" />
+  </testsuite>
+  <testsuite name="com.xenomi.cms.core.v2.card.lifecycle.command.UnknownLifecycleOperationReconcilerV2Test" tests="7" failures="0" errors="0" skipped="0" time="0.022">
+    <testcase classname="com.xenomi.cms.core.v2.card.lifecycle.command.UnknownLifecycleOperationReconcilerV2Test" name="ignoresExternalWhoseParentIsNoLongerUnknown" time="0.004" />
+    <testcase classname="com.xenomi.cms.core.v2.card.lifecycle.command.UnknownLifecycleOperationReconcilerV2Test" name="failsUnknownParentAndProcessingReplacementButKeepsExternalUnknown" time="0.0" />
+    <testcase classname="com.xenomi.cms.core.v2.card.lifecycle.command.UnknownLifecycleOperationReconcilerV2Test" name="requiresPositiveTimeout(String)[1]" time="0.002" />
+    <testcase classname="com.xenomi.cms.core.v2.card.lifecycle.command.UnknownLifecycleOperationReconcilerV2Test" name="requiresPositiveTimeout(String)[2]" time="0.001" />
+    <testcase classname="com.xenomi.cms.core.v2.card.lifecycle.command.UnknownLifecycleOperationReconcilerV2Test" name="requiresPositiveTimeout(String)[3]" time="0.001" />
+    <testcase classname="com.xenomi.cms.core.v2.card.lifecycle.command.UnknownLifecycleOperationReconcilerV2Test" name="ignoresCandidateThatChangedBeforeItWasLocked" time="0.0" />
+    <testcase classname="com.xenomi.cms.core.v2.card.lifecycle.command.UnknownLifecycleOperationReconcilerV2Test" name="returnsZeroWhenCandidateQueryIsEmpty" time="0.001" />
+  </testsuite>
+  <testsuite name="com.xenomi.cms.core.v2.card.lifecycle.controller.CardHotlistV2ControllerTest" tests="2" failures="0" errors="0" skipped="0" time="0.986">
+    <testcase classname="com.xenomi.cms.core.v2.card.lifecycle.controller.CardHotlistV2ControllerTest" name="requiresDetailForOtherReason" time="0.061" />
+    <testcase classname="com.xenomi.cms.core.v2.card.lifecycle.controller.CardHotlistV2ControllerTest" name="derivesCustomerCallerTypeFromAuthority" time="0.015" />
+  </testsuite>
+  <testsuite name="com.xenomi.cms.core.v2.card.lifecycle.controller.CardLifecycleV2ControllerTest" tests="1" failures="0" errors="0" skipped="0" time="0.243">
+    <testcase classname="com.xenomi.cms.core.v2.card.lifecycle.controller.CardLifecycleV2ControllerTest" name="publishesActivateAction" time="0.013" />
+  </testsuite>
+  <testsuite name="com.xenomi.cms.core.v2.card.lifecycle.controller.LifecycleControllersDelegationTest" tests="3" failures="0" errors="0" skipped="0" time="0.02">
+    <testcase classname="com.xenomi.cms.core.v2.card.lifecycle.controller.LifecycleControllersDelegationTest" name="hotlistDerivesOperationsAuthorityAndRejectsUnauthorizedCaller" time="0.007" />
+    <testcase classname="com.xenomi.cms.core.v2.card.lifecycle.controller.LifecycleControllersDelegationTest" name="holdAndCompatibilityLifecycleEndpointsDelegate" time="0.009" />
+    <testcase classname="com.xenomi.cms.core.v2.card.lifecycle.controller.LifecycleControllersDelegationTest" name="canonicalCommandsBuildCoordinatorEnvelopes" time="0.003" />
+  </testsuite>
+  <testsuite name="com.xenomi.cms.core.v2.card.lifecycle.service.CardHoldV2ServiceTest" tests="8" failures="0" errors="0" skipped="0" time="0.004">
+    <testcase classname="com.xenomi.cms.core.v2.card.lifecycle.service.CardHoldV2ServiceTest" name="escalatesRiskBlockToStolenAndRetiresPhysicalCard" time="0.001" />
+    <testcase classname="com.xenomi.cms.core.v2.card.lifecycle.service.CardHoldV2ServiceTest" name="releasesReversibleHold" time="0.001" />
+    <testcase classname="com.xenomi.cms.core.v2.card.lifecycle.service.CardHoldV2ServiceTest" name="terminalCardsCannotReceiveHolds" time="0.0" />
+    <testcase classname="com.xenomi.cms.core.v2.card.lifecycle.service.CardHoldV2ServiceTest" name="duplicateHoldRequiresEscalation" time="0.001" />
+    <testcase classname="com.xenomi.cms.core.v2.card.lifecycle.service.CardHoldV2ServiceTest" name="cannotReleasePermanentOrUnsetHold" time="0.0" />
+    <testcase classname="com.xenomi.cms.core.v2.card.lifecycle.service.CardHoldV2ServiceTest" name="escalationMustBeStrictlyHigherInSameColumn" time="0.0" />
+    <testcase classname="com.xenomi.cms.core.v2.card.lifecycle.service.CardHoldV2ServiceTest" name="placesReversibleHoldAndRecordsOperationAndEvent" time="0.0" />
+    <testcase classname="com.xenomi.cms.core.v2.card.lifecycle.service.CardHoldV2ServiceTest" name="missingCardIsReported" time="0.0" />
+  </testsuite>
+  <testsuite name="com.xenomi.cms.core.v2.card.lifecycle.service.CardHotlistV2ServiceTest" tests="7" failures="0" errors="0" skipped="0" time="0.021">
+    <testcase classname="com.xenomi.cms.core.v2.card.lifecycle.service.CardHotlistV2ServiceTest" name="physicalCardIsRetiredAndPendingFulfilmentCancelled" time="0.015" />
+    <testcase classname="com.xenomi.cms.core.v2.card.lifecycle.service.CardHotlistV2ServiceTest" name="duplicateOrExistingSecurityHoldIsRejected" time="0.0" />
+    <testcase classname="com.xenomi.cms.core.v2.card.lifecycle.service.CardHotlistV2ServiceTest" name="reversibleAndUnspecifiedReasonsMustUseHoldApi" time="0.001" />
+    <testcase classname="com.xenomi.cms.core.v2.card.lifecycle.service.CardHotlistV2ServiceTest" name="missingAndTerminalCardsAreRejectedBeforeSwitchCall" time="0.0" />
+    <testcase classname="com.xenomi.cms.core.v2.card.lifecycle.service.CardHotlistV2ServiceTest" name="nextEventSequenceContinuesFromLatestEvent" time="0.001" />
+    <testcase classname="com.xenomi.cms.core.v2.card.lifecycle.service.CardHotlistV2ServiceTest" name="suspectedFraudMapsToSecurityFraudReason" time="0.001" />
+    <testcase classname="com.xenomi.cms.core.v2.card.lifecycle.service.CardHotlistV2ServiceTest" name="hotlistsCardThroughSwitchAndWritesAuditRecords" time="0.0" />
+  </testsuite>
+  <testsuite name="com.xenomi.cms.core.v2.card.lifecycle.service.CardLifecycleV2ServiceTest" tests="6" failures="0" errors="0" skipped="0" time="0.008">
+    <testcase classname="com.xenomi.cms.core.v2.card.lifecycle.service.CardLifecycleV2ServiceTest" name="unknownCardIsNotExposed" time="0.001" />
+    <testcase classname="com.xenomi.cms.core.v2.card.lifecycle.service.CardLifecycleV2ServiceTest" name="validatesCloseAndDelegatesHoldCompatibility" time="0.001" />
+    <testcase classname="com.xenomi.cms.core.v2.card.lifecycle.service.CardLifecycleV2ServiceTest" name="activationRejectsInvalidStates" time="0.001" />
+    <testcase classname="com.xenomi.cms.core.v2.card.lifecycle.service.CardLifecycleV2ServiceTest" name="closesPhysicalCardAndCancelsFulfilment" time="0.003" />
+    <testcase classname="com.xenomi.cms.core.v2.card.lifecycle.service.CardLifecycleV2ServiceTest" name="activationProjectsBlockedStatusForRiskHold" time="0.001" />
+    <testcase classname="com.xenomi.cms.core.v2.card.lifecycle.service.CardLifecycleV2ServiceTest" name="activatesVirtualCardAndPersistsAudit" time="0.001" />
+  </testsuite>
+  <testsuite name="com.xenomi.cms.core.v2.card.persistence.LifecycleCommandBoundaryV2Test" tests="1" failures="0" errors="0" skipped="0" time="0.009">
+    <testcase classname="com.xenomi.cms.core.v2.card.persistence.LifecycleCommandBoundaryV2Test" name="unfinishedCommandsRejectBeforeTouchingAnyDependency" time="0.009" />
+  </testsuite>
+  <testsuite name="com.xenomi.cms.core.v2.card.persistence.LifecycleCommandCoordinatorV2Test" tests="8" failures="0" errors="0" skipped="8" time="0.001">
+    <testcase classname="com.xenomi.cms.core.v2.card.persistence.LifecycleCommandCoordinatorV2Test" name="pendingAndUnknownOperationsReplayWithoutCreatingAnotherIntent" time="0.0">
+      <skipped message="System property [cms.lifecycle.test.url] does not exist" />
+    </testcase>
+    <testcase classname="com.xenomi.cms.core.v2.card.persistence.LifecycleCommandCoordinatorV2Test" name="failureRollsBackFactsReceiptEventsOutboxAndIntent" time="0.0">
+      <skipped message="System property [cms.lifecycle.test.url] does not exist" />
+    </testcase>
+    <testcase classname="com.xenomi.cms.core.v2.card.persistence.LifecycleCommandCoordinatorV2Test" name="familyCommandsRequireEveryLockedFamilyRevision" time="0.0">
+      <skipped message="System property [cms.lifecycle.test.url] does not exist" />
+    </testcase>
+    <testcase classname="com.xenomi.cms.core.v2.card.persistence.LifecycleCommandCoordinatorV2Test" name="creationPreparationRequiresNoInventedCardVersion" time="0.0">
+      <skipped message="System property [cms.lifecycle.test.url] does not exist" />
+    </testcase>
+    <testcase classname="com.xenomi.cms.core.v2.card.persistence.LifecycleCommandCoordinatorV2Test" name="replayPrecedesVersionCheckAndDifferentPayloadConflicts" time="0.0">
+      <skipped message="System property [cms.lifecycle.test.url] does not exist" />
+    </testcase>
+    <testcase classname="com.xenomi.cms.core.v2.card.persistence.LifecycleCommandCoordinatorV2Test" name="concurrentEqualRequestsProduceOneReceiptAndOneMutation" time="0.0">
+      <skipped message="System property [cms.lifecycle.test.url] does not exist" />
+    </testcase>
+    <testcase classname="com.xenomi.cms.core.v2.card.persistence.LifecycleCommandCoordinatorV2Test" name="eventSequencesAndFamilyRevisionAreDistinctAndNoopHasNoEvent" time="0.0">
+      <skipped message="System property [cms.lifecycle.test.url] does not exist" />
+    </testcase>
+    <testcase classname="com.xenomi.cms.core.v2.card.persistence.LifecycleCommandCoordinatorV2Test" name="unknownFieldsAndUnownedAccountAreRejectedBeforeMutation" time="0.0">
+      <skipped message="System property [cms.lifecycle.test.url] does not exist" />
+    </testcase>
+  </testsuite>
+  <testsuite name="com.xenomi.cms.core.v2.card.persistence.LifecyclePersistenceV2Test" tests="5" failures="0" errors="0" skipped="5" time="0.0">
+    <testcase classname="com.xenomi.cms.core.v2.card.persistence.LifecyclePersistenceV2Test" name="insertedCardReceivesGeneratedStatusAndVersion" time="0.0">
+      <skipped message="System property [cms.lifecycle.test.url] does not exist" />
+    </testcase>
+    <testcase classname="com.xenomi.cms.core.v2.card.persistence.LifecyclePersistenceV2Test" name="generatedProjectionsRefreshAndVersionAdvancesWithoutWritingStatus" time="0.0">
+      <skipped message="System property [cms.lifecycle.test.url] does not exist" />
+    </testcase>
+    <testcase classname="com.xenomi.cms.core.v2.card.persistence.LifecyclePersistenceV2Test" name="operationRepositoriesPersistJsonAndVersionedExternalIntents" time="0.0">
+      <skipped message="System property [cms.lifecycle.test.url] does not exist" />
+    </testcase>
+    <testcase classname="com.xenomi.cms.core.v2.card.persistence.LifecyclePersistenceV2Test" name="staleCardUpdateFailsOptimisticLock" time="0.0">
+      <skipped message="System property [cms.lifecycle.test.url] does not exist" />
+    </testcase>
+    <testcase classname="com.xenomi.cms.core.v2.card.persistence.LifecyclePersistenceV2Test" name="siblingsResolveOnePinAggregateAndTenantQueriesDoNotLeak" time="0.0">
+      <skipped message="System property [cms.lifecycle.test.url] does not exist" />
+    </testcase>
+  </testsuite>
+  <testsuite name="com.xenomi.cms.core.v2.card.persistence.OriginalCardIssuanceV2Test" tests="5" failures="0" errors="0" skipped="5" time="0.0">
+    <testcase classname="com.xenomi.cms.core.v2.card.persistence.OriginalCardIssuanceV2Test" name="virtualIssuePersistsRelationshipsControlsEventsAndReplays(AllocationStrategy)" time="0.0">
+      <skipped message="System property [cms.lifecycle.test.url] does not exist" />
+    </testcase>
+    <testcase classname="com.xenomi.cms.core.v2.card.persistence.OriginalCardIssuanceV2Test" name="freshRestrictionsRequiredBeforeAnyHsmWork" time="0.0">
+      <skipped message="System property [cms.lifecycle.test.url] does not exist" />
+    </testcase>
+    <testcase classname="com.xenomi.cms.core.v2.card.persistence.OriginalCardIssuanceV2Test" name="providerFailureIsTerminalizedAfterRecoveryWindowWithoutRedispatch" time="0.0">
+      <skipped message="System property [cms.lifecycle.test.url] does not exist" />
+    </testcase>
+    <testcase classname="com.xenomi.cms.core.v2.card.persistence.OriginalCardIssuanceV2Test" name="physicalModesCreateOnlyExpectedInitialPhysicalFacts(String)" time="0.0">
+      <skipped message="System property [cms.lifecycle.test.url] does not exist" />
+    </testcase>
+    <testcase classname="com.xenomi.cms.core.v2.card.persistence.OriginalCardIssuanceV2Test" name="finalizationRollbackRetriesStoredCredentialsAndInheritsLatestHolds" time="0.0">
+      <skipped message="System property [cms.lifecycle.test.url] does not exist" />
+    </testcase>
+  </testsuite>
+  <testsuite name="com.xenomi.cms.core.v2.card.persistence.SamePanRenewalV2Test" tests="4" failures="0" errors="0" skipped="4" time="0.0">
+    <testcase classname="com.xenomi.cms.core.v2.card.persistence.SamePanRenewalV2Test" name="uncertainProviderOutcomeIsNeverAutomaticallyRedispatched" time="0.0">
+      <skipped message="System property [cms.lifecycle.test.url] does not exist" />
+    </testcase>
+    <testcase classname="com.xenomi.cms.core.v2.card.persistence.SamePanRenewalV2Test" name="renewalPreservesFamilyPinAndSourceAndReturnsCurrentReplay" time="0.0">
+      <skipped message="System property [cms.lifecycle.test.url] does not exist" />
+    </testcase>
+    <testcase classname="com.xenomi.cms.core.v2.card.persistence.SamePanRenewalV2Test" name="finalizationRechecksHoldsAndReusesPreparedCredentials" time="0.0">
+      <skipped message="System property [cms.lifecycle.test.url] does not exist" />
+    </testcase>
+    <testcase classname="com.xenomi.cms.core.v2.card.persistence.SamePanRenewalV2Test" name="permanentFamilyHoldRejectsBeforeProviderWork" time="0.0">
+      <skipped message="System property [cms.lifecycle.test.url] does not exist" />
+    </testcase>
+  </testsuite>
+  <testsuite name="com.xenomi.cms.core.v2.card.persistence.SecurityReplacementV2Test" tests="1" failures="0" errors="0" skipped="1" time="0.0">
+    <testcase classname="com.xenomi.cms.core.v2.card.persistence.SecurityReplacementV2Test" name="lostCardIsBlockedBeforeHsmAndSuccessorGetsANewPanFamily" time="0.0">
+      <skipped message="System property [cms.lifecycle.test.url] does not exist" />
+    </testcase>
+  </testsuite>
+  <testsuite name="com.xenomi.cms.core.v2.card.pin.FuturexPinHsmOperationsTest" tests="5" failures="0" errors="0" skipped="0" time="0.004">
+    <testcase classname="com.xenomi.cms.core.v2.card.pin.FuturexPinHsmOperationsTest" name="delegatesVisaPinGenerationUsingOnlyProtectedKeyBlocks" time="0.002" />
+    <testcase classname="com.xenomi.cms.core.v2.card.pin.FuturexPinHsmOperationsTest" name="generatesOffsetFromEncryptedPinBlockUsingProtectedKeys" time="0.0" />
+    <testcase classname="com.xenomi.cms.core.v2.card.pin.FuturexPinHsmOperationsTest" name="reportsUnverifiedCurrentPinWithoutAcceptingAnOffset" time="0.001" />
+    <testcase classname="com.xenomi.cms.core.v2.card.pin.FuturexPinHsmOperationsTest" name="verifiesCurrentPinAndReturnsNewOffsetForChange" time="0.0" />
+    <testcase classname="com.xenomi.cms.core.v2.card.pin.FuturexPinHsmOperationsTest" name="rejectsMalformedHsmMetadata" time="0.0" />
+  </testsuite>
+  <testsuite name="com.xenomi.cms.core.v2.card.pin.PinLifecycleV2ServiceTest" tests="11" failures="0" errors="0" skipped="0" time="0.021">
+    <testcase classname="com.xenomi.cms.core.v2.card.pin.PinLifecycleV2ServiceTest" name="rejectsReplacementWithoutAnExplicitPinStrategy" time="0.004" />
+    <testcase classname="com.xenomi.cms.core.v2.card.pin.PinLifecycleV2ServiceTest" name="recordsGeneratedPinHistoryUsingTheLifecycleOperationId" time="0.002" />
+    <testcase classname="com.xenomi.cms.core.v2.card.pin.PinLifecycleV2ServiceTest" name="replacementResetStrategyCreatesResetRequiredStateWithoutHsmCall" time="0.002" />
+    <testcase classname="com.xenomi.cms.core.v2.card.pin.PinLifecycleV2ServiceTest" name="generatesRandomPinInHsmAndStoresOnlyOffsetAndKeyReferences" time="0.004" />
+    <testcase classname="com.xenomi.cms.core.v2.card.pin.PinLifecycleV2ServiceTest" name="rejectsPolicyChangedAfterIssuanceAcceptance" time="0.002" />
+    <testcase classname="com.xenomi.cms.core.v2.card.pin.PinLifecycleV2ServiceTest" name="rejectsHsmGenerationWhenProductAndBinPinLengthsDiffer" time="0.001" />
+    <testcase classname="com.xenomi.cms.core.v2.card.pin.PinLifecycleV2ServiceTest" name="initializesNotSetMetadataWhenProductDoesNotRequirePin" time="0.001" />
+    <testcase classname="com.xenomi.cms.core.v2.card.pin.PinLifecycleV2ServiceTest" name="preparesSwitchOwnedSelectedPinWithoutCallingTheHsm" time="0.001" />
+    <testcase classname="com.xenomi.cms.core.v2.card.pin.PinLifecycleV2ServiceTest" name="rejectsPreparationWhenPinStateAlreadyExistsForPan" time="0.001" />
+    <testcase classname="com.xenomi.cms.core.v2.card.pin.PinLifecycleV2ServiceTest" name="rejectsPinRequiredIssuanceWhenSwitchSyncHasNoPinIntegration" time="0.002" />
+    <testcase classname="com.xenomi.cms.core.v2.card.pin.PinLifecycleV2ServiceTest" name="failsClosedWhenPinGenerationKeyAssignmentIsMissing" time="0.001" />
+  </testsuite>
+  <testsuite name="com.xenomi.cms.core.v2.card.pin.PinManagementV2ControllerTest" tests="2" failures="0" errors="0" skipped="0" time="0.013">
+    <testcase classname="com.xenomi.cms.core.v2.card.pin.PinManagementV2ControllerTest" name="delegatesStateAndOneBasedHistoryPagination" time="0.012" />
+    <testcase classname="com.xenomi.cms.core.v2.card.pin.PinManagementV2ControllerTest" name="delegatesEverySwitchPinOperationAndPreservesAcceptedStatus" time="0.001" />
+  </testsuite>
+  <testsuite name="com.xenomi.cms.core.v2.card.pin.PinManagementV2ServiceTest" tests="2" failures="0" errors="0" skipped="0" time="0.004">
+    <testcase classname="com.xenomi.cms.core.v2.card.pin.PinManagementV2ServiceTest" name="historyRejectsCardOutsideInstitution" time="0.002" />
+    <testcase classname="com.xenomi.cms.core.v2.card.pin.PinManagementV2ServiceTest" name="historyMapsAuditableMetadataWithoutPinMaterial" time="0.002" />
+  </testsuite>
+  <testsuite name="com.xenomi.cms.core.v2.card.pin.switchpin.SwitchPinDatabaseTest" tests="9" failures="0" errors="0" skipped="9" time="0.0">
+    <testcase classname="com.xenomi.cms.core.v2.card.pin.switchpin.SwitchPinDatabaseTest" name="wrongReceiptCannotActivatePin" time="0.0">
+      <skipped message="Environment variable [CMS_SWITCH_TEST_DB] does not exist" />
+    </testcase>
+    <testcase classname="com.xenomi.cms.core.v2.card.pin.switchpin.SwitchPinDatabaseTest" name="generatedPolicyIsExplicitlyUnsupportedAndNeverPretendsMailerReady" time="0.0">
+      <skipped message="Environment variable [CMS_SWITCH_TEST_DB] does not exist" />
+    </testcase>
+    <testcase classname="com.xenomi.cms.core.v2.card.pin.switchpin.SwitchPinDatabaseTest" name="lostReplyUsesLookupAndNeverReencryptsOrResubmits" time="0.0">
+      <skipped message="Environment variable [CMS_SWITCH_TEST_DB] does not exist" />
+    </testcase>
+    <testcase classname="com.xenomi.cms.core.v2.card.pin.switchpin.SwitchPinDatabaseTest" name="resetCanUseFreshIssuerVersionAfterAtmChangeWithoutInventingLiveState" time="0.0">
+      <skipped message="Environment variable [CMS_SWITCH_TEST_DB] does not exist" />
+    </testcase>
+    <testcase classname="com.xenomi.cms.core.v2.card.pin.switchpin.SwitchPinDatabaseTest" name="configureWaitsForRegistrationAndDoesNotGeneratePin" time="0.0">
+      <skipped message="Environment variable [CMS_SWITCH_TEST_DB] does not exist" />
+    </testcase>
+    <testcase classname="com.xenomi.cms.core.v2.card.pin.switchpin.SwitchPinDatabaseTest" name="simultaneousFamilyChangesCannotBothDispatch" time="0.0">
+      <skipped message="Environment variable [CMS_SWITCH_TEST_DB] does not exist" />
+    </testcase>
+    <testcase classname="com.xenomi.cms.core.v2.card.pin.switchpin.SwitchPinDatabaseTest" name="initializationIsIdempotentAndLedgerNeverContainsSensitivePayloads" time="0.0">
+      <skipped message="Environment variable [CMS_SWITCH_TEST_DB] does not exist" />
+    </testcase>
+    <testcase classname="com.xenomi.cms.core.v2.card.pin.switchpin.SwitchPinDatabaseTest" name="failedVerificationDoesNotAdvanceVersionOrInferRetryCounters" time="0.0">
+      <skipped message="Environment variable [CMS_SWITCH_TEST_DB] does not exist" />
+    </testcase>
+    <testcase classname="com.xenomi.cms.core.v2.card.pin.switchpin.SwitchPinDatabaseTest" name="authorizationRejectionIsDurableAndDoesNotClaimSuccess" time="0.0">
+      <skipped message="Environment variable [CMS_SWITCH_TEST_DB] does not exist" />
+    </testcase>
+  </testsuite>
+  <testsuite name="com.xenomi.cms.core.v2.card.pin.switchpin.SwitchPinEnvelopeTest" tests="2" failures="0" errors="0" skipped="0" time="0.62">
+    <testcase classname="com.xenomi.cms.core.v2.card.pin.switchpin.SwitchPinEnvelopeTest" name="unknownClearPinFieldAndMalformedBlocksAreRejected" time="0.088" />
+    <testcase classname="com.xenomi.cms.core.v2.card.pin.switchpin.SwitchPinEnvelopeTest" name="dedicatedRecipientEnvelopeBindsAllFieldsAndContainsEncryptedBlocksOnly" time="0.532" />
+  </testsuite>
+  <testsuite name="com.xenomi.cms.core.v2.card.pin.switchpin.SwitchPinIssuanceTest" tests="1" failures="0" errors="0" skipped="0" time="0.05">
+    <testcase classname="com.xenomi.cms.core.v2.card.pin.switchpin.SwitchPinIssuanceTest" name="issuancePinsSwitchProfileWithoutCmsHsmWorkAndReselectionOverridesGeneratedPolicy" time="0.05" />
+  </testsuite>
+  <testsuite name="com.xenomi.cms.core.v2.card.pin.switchpin.SwitchPinMigrationTest" tests="1" failures="0" errors="0" skipped="1" time="0.0">
+    <testcase classname="com.xenomi.cms.core.v2.card.pin.switchpin.SwitchPinMigrationTest" name="migrationAppliesToRealBaselineWithoutChangingExistingPinOwnership" time="0.0">
+      <skipped message="Environment variable [CMS_SWITCH_TEST_DB] does not exist" />
+    </testcase>
+  </testsuite>
+  <testsuite name="com.xenomi.cms.core.v2.card.pin.switchpin.SwitchPinReceiptTest" tests="2" failures="0" errors="0" skipped="0" time="0.003">
+    <testcase classname="com.xenomi.cms.core.v2.card.pin.switchpin.SwitchPinReceiptTest" name="timestampAcceptsIsoAndFractionalUnixSeconds" time="0.002" />
+    <testcase classname="com.xenomi.cms.core.v2.card.pin.switchpin.SwitchPinReceiptTest" name="receiptRequiresExactBindingsIntegerVersionsAndMailerForGeneratedPin" time="0.001" />
+  </testsuite>
+  <testsuite name="com.xenomi.cms.core.v2.card.pin.switchpin.SwitchPinServiceValidationTest" tests="5" failures="0" errors="0" skipped="0" time="0.003">
+    <testcase classname="com.xenomi.cms.core.v2.card.pin.switchpin.SwitchPinServiceValidationTest" name="validatesCompletedCustomerOperationAndIncrementedVersion" time="0.001" />
+    <testcase classname="com.xenomi.cms.core.v2.card.pin.switchpin.SwitchPinServiceValidationTest" name="configurationCompletionDoesNotIncrementPinVersion" time="0.0" />
+    <testcase classname="com.xenomi.cms.core.v2.card.pin.switchpin.SwitchPinServiceValidationTest" name="publicCommandsFailFastWhenIntegrationIsDisabledOrActionShapeIsInvalid" time="0.001" />
+    <testcase classname="com.xenomi.cms.core.v2.card.pin.switchpin.SwitchPinServiceValidationTest" name="receiptValidationRejectsMismatchesInvalidVersionsAndMissingMailer" time="0.0" />
+    <testcase classname="com.xenomi.cms.core.v2.card.pin.switchpin.SwitchPinServiceValidationTest" name="receiptTimeSupportsIsoTextAndFractionalEpochSeconds" time="0.001" />
+  </testsuite>
+  <testsuite name="com.xenomi.cms.core.v2.card.pin.switchpin.SwitchPinServiceWorkflowTest" tests="5" failures="0" errors="0" skipped="0" time="0.028">
+    <testcase classname="com.xenomi.cms.core.v2.card.pin.switchpin.SwitchPinServiceWorkflowTest" name="submitChangePinAcceptsReceiptAndRecordsHistory" time="0.018" />
+    <testcase classname="com.xenomi.cms.core.v2.card.pin.switchpin.SwitchPinServiceWorkflowTest" name="pollRegistersCandidateAndSendsDueConfiguration" time="0.003" />
+    <testcase classname="com.xenomi.cms.core.v2.card.pin.switchpin.SwitchPinServiceWorkflowTest" name="configureProfileSendsPinnedProfileAndAcceptsCompletion" time="0.002" />
+    <testcase classname="com.xenomi.cms.core.v2.card.pin.switchpin.SwitchPinServiceWorkflowTest" name="operationReconcilesUnknownReceiptAndStateReturnsMetadataOnlyView" time="0.002" />
+    <testcase classname="com.xenomi.cms.core.v2.card.pin.switchpin.SwitchPinServiceWorkflowTest" name="submitRejectsPreparedOperationWhenEnvelopeCannotBeCreated" time="0.002" />
+  </testsuite>
+  <testsuite name="com.xenomi.cms.core.v2.card.replacement.controller.CardReplacementV2ControllerDelegationTest" tests="2" failures="0" errors="0" skipped="0" time="0.006">
+    <testcase classname="com.xenomi.cms.core.v2.card.replacement.controller.CardReplacementV2ControllerDelegationTest" name="routesRenewalSecurityAndCompatibilityReplacementCommands" time="0.005" />
+    <testcase classname="com.xenomi.cms.core.v2.card.replacement.controller.CardReplacementV2ControllerDelegationTest" name="delegatesDecisionEndpointsAndRejectsCallerWithoutPermission" time="0.001" />
+  </testsuite>
+  <testsuite name="com.xenomi.cms.core.v2.card.replacement.controller.CardReplacementV2ControllerTest" tests="3" failures="0" errors="0" skipped="0" time="0.247">
+    <testcase classname="com.xenomi.cms.core.v2.card.replacement.controller.CardReplacementV2ControllerTest" name="getsReplacementRequest" time="0.01" />
+    <testcase classname="com.xenomi.cms.core.v2.card.replacement.controller.CardReplacementV2ControllerTest" name="approvesPendingReplacementRequest" time="0.006" />
+    <testcase classname="com.xenomi.cms.core.v2.card.replacement.controller.CardReplacementV2ControllerTest" name="createsReplacementUsingOperationsCallerAuthority" time="0.007" />
+  </testsuite>
+  <testsuite name="com.xenomi.cms.core.v2.card.replacement.service.CardReplacementV2ServiceActiveTest" tests="12" failures="0" errors="0" skipped="0" time="0.074">
+    <testcase classname="com.xenomi.cms.core.v2.card.replacement.service.CardReplacementV2ServiceActiveTest" name="createRefusesADisallowedReasonAndDoesNotOpenThePendingCommand" time="0.043" />
+    <testcase classname="com.xenomi.cms.core.v2.card.replacement.service.CardReplacementV2ServiceActiveTest" name="createRequiresInstitutionActivePolicyAndPermittedChannel" time="0.0" />
+    <testcase classname="com.xenomi.cms.core.v2.card.replacement.service.CardReplacementV2ServiceActiveTest" name="getSupportsPendingRequestWithoutReplacementCard" time="0.0" />
+    <testcase classname="com.xenomi.cms.core.v2.card.replacement.service.CardReplacementV2ServiceActiveTest" name="getHidesRequestWhenSourceCardDoesNotMatch" time="0.0" />
+    <testcase classname="com.xenomi.cms.core.v2.card.replacement.service.CardReplacementV2ServiceActiveTest" name="createReplaysExistingIdempotentRequest" time="0.001" />
+    <testcase classname="com.xenomi.cms.core.v2.card.replacement.service.CardReplacementV2ServiceActiveTest" name="decisionCommandsRemainBehindCoordinatorBoundary" time="0.0" />
+    <testcase classname="com.xenomi.cms.core.v2.card.replacement.service.CardReplacementV2ServiceActiveTest" name="eligibleCreateHandsOffToLifecycleCommand" time="0.001" />
+    <testcase classname="com.xenomi.cms.core.v2.card.replacement.service.CardReplacementV2ServiceActiveTest" name="createValidatesDeterministicAndSecurityPanStrategies" time="0.0" />
+    <testcase classname="com.xenomi.cms.core.v2.card.replacement.service.CardReplacementV2ServiceActiveTest" name="getMapsSourceReplacementAndProductionState" time="0.001" />
+    <testcase classname="com.xenomi.cms.core.v2.card.replacement.service.CardReplacementV2ServiceActiveTest" name="createRefusesAMissingCardBeforeAnyReplacementWrite" time="0.001" />
+    <testcase classname="com.xenomi.cms.core.v2.card.replacement.service.CardReplacementV2ServiceActiveTest" name="getRejectsUnknownRequest" time="0.0" />
+    <testcase classname="com.xenomi.cms.core.v2.card.replacement.service.CardReplacementV2ServiceActiveTest" name="createRejectsClosedCardAndExistingSourceRequest" time="0.001" />
+  </testsuite>
+  <testsuite name="com.xenomi.cms.core.v2.card.replacement.service.CardReplacementV2ServiceTest" tests="7" failures="0" errors="0" skipped="7" time="0.0">
+    <testcase classname="com.xenomi.cms.core.v2.card.replacement.service.CardReplacementV2ServiceTest" name="rejectsPendingReplacementAsTerminalWithoutCreatingCard" time="0.0">
+      <skipped message="Legacy orchestration: re-enable with Step 3 guarded lifecycle commands; persistence is verified separately" />
+    </testcase>
+    <testcase classname="com.xenomi.cms.core.v2.card.replacement.service.CardReplacementV2ServiceTest" name="approvalPolicyCreatesPendingRequestWithoutAllocatingCard" time="0.0">
+      <skipped message="Legacy orchestration: re-enable with Step 3 guarded lifecycle commands; persistence is verified separately" />
+    </testcase>
+    <testcase classname="com.xenomi.cms.core.v2.card.replacement.service.CardReplacementV2ServiceTest" name="samePanReplacementCreatesNewCardIdAndSequenceWhileReusingAllocation" time="0.0">
+      <skipped message="Legacy orchestration: re-enable with Step 3 guarded lifecycle commands; persistence is verified separately" />
+    </testcase>
+    <testcase classname="com.xenomi.cms.core.v2.card.replacement.service.CardReplacementV2ServiceTest" name="newPanReplacementCreatesNewAllocationAndResetsCardSequence" time="0.0">
+      <skipped message="Legacy orchestration: re-enable with Step 3 guarded lifecycle commands; persistence is verified separately" />
+    </testcase>
+    <testcase classname="com.xenomi.cms.core.v2.card.replacement.service.CardReplacementV2ServiceTest" name="rejectsDamagedReasonForVirtualOnlyCardBeforePolicyResolution" time="0.0">
+      <skipped message="Legacy orchestration: re-enable with Step 3 guarded lifecycle commands; persistence is verified separately" />
+    </testcase>
+    <testcase classname="com.xenomi.cms.core.v2.card.replacement.service.CardReplacementV2ServiceTest" name="rejectsAuthenticatedChannelNotPermittedByReplacementPolicy" time="0.0">
+      <skipped message="Legacy orchestration: re-enable with Step 3 guarded lifecycle commands; persistence is verified separately" />
+    </testcase>
+    <testcase classname="com.xenomi.cms.core.v2.card.replacement.service.CardReplacementV2ServiceTest" name="approvesOnlyPendingReplacementAndRecordsDecision" time="0.0">
+      <skipped message="Legacy orchestration: re-enable with Step 3 guarded lifecycle commands; persistence is verified separately" />
+    </testcase>
+  </testsuite>
+  <testsuite name="com.xenomi.cms.core.v2.card.security.ApplicationKeyMaterialServiceTest" tests="2" failures="0" errors="0" skipped="0" time="0.016">
+    <testcase classname="com.xenomi.cms.core.v2.card.security.ApplicationKeyMaterialServiceTest" name="provisionsWrappedKeyAndUsesMemoryCacheWithoutImmediateUnwrap" time="0.014" />
+    <testcase classname="com.xenomi.cms.core.v2.card.security.ApplicationKeyMaterialServiceTest" name="unwrapsExistingMaterialAndValidatesChecksum" time="0.001" />
+  </testsuite>
+  <testsuite name="com.xenomi.cms.core.v2.card.security.CmsCardSecurityServiceTest" tests="2" failures="0" errors="0" skipped="0" time="0.021">
+    <testcase classname="com.xenomi.cms.core.v2.card.security.CmsCardSecurityServiceTest" name="generationUsesInstitutionDekAndHmacAndBinCvk" time="0.018" />
+    <testcase classname="com.xenomi.cms.core.v2.card.security.CmsCardSecurityServiceTest" name="samePanReplacementMigratesLegacyHsmMacToCurrentApplicationHmac" time="0.003" />
+  </testsuite>
+  <testsuite name="com.xenomi.cms.core.v2.card.security.FuturexCardHsmOperationsTest" tests="3" failures="0" errors="0" skipped="0" time="0.006">
+    <testcase classname="com.xenomi.cms.core.v2.card.security.FuturexCardHsmOperationsTest" name="usesHsmForLegacyCiphertext" time="0.003" />
+    <testcase classname="com.xenomi.cms.core.v2.card.security.FuturexCardHsmOperationsTest" name="encryptsAndDecryptsUsingLocalAesGcmEnvelope" time="0.002" />
+    <testcase classname="com.xenomi.cms.core.v2.card.security.FuturexCardHsmOperationsTest" name="generatesLocalDeterministicPanHmac" time="0.001" />
+  </testsuite>
+  <testsuite name="com.xenomi.cms.core.v2.card.service.CardIssuanceV2ServiceTest" tests="12" failures="0" errors="0" skipped="2" time="0.07">
+    <testcase classname="com.xenomi.cms.core.v2.card.service.CardIssuanceV2ServiceTest" name="prepareDraftRejectsNonPrimaryOriginalAccountLink" time="0.051" />
+    <testcase classname="com.xenomi.cms.core.v2.card.service.CardIssuanceV2ServiceTest" name="virtualFirstCardCanRequestPhysicalProductionWithoutAllocatingAnotherPan" time="0.004" />
+    <testcase classname="com.xenomi.cms.core.v2.card.service.CardIssuanceV2ServiceTest" name="finalizesPreparedVirtualIssuanceInsideLifecycleWorkerTransaction" time="0.005" />
+    <testcase classname="com.xenomi.cms.core.v2.card.service.CardIssuanceV2ServiceTest" name="physicalRequestForRegisteredCardStartsEligible" time="0.002" />
+    <testcase classname="com.xenomi.cms.core.v2.card.service.CardIssuanceV2ServiceTest" name="searchMapsEveryCardWithoutOptionalRelations" time="0.002" />
+    <testcase classname="com.xenomi.cms.core.v2.card.service.CardIssuanceV2ServiceTest" name="virtualFirstLaterDoesNotCreateProductionRequest" time="0.0">
+      <skipped message="Legacy issue entry point is intentionally guarded by the lifecycle coordinator" />
+    </testcase>
+    <testcase classname="com.xenomi.cms.core.v2.card.service.CardIssuanceV2ServiceTest" name="getMapsCardAndRelatedReferences" time="0.001" />
+    <testcase classname="com.xenomi.cms.core.v2.card.service.CardIssuanceV2ServiceTest" name="prepareDraftResolvesVirtualIssuanceConfiguration" time="0.001" />
+    <testcase classname="com.xenomi.cms.core.v2.card.service.CardIssuanceV2ServiceTest" name="requestPhysicalRequiresBothFulfilmentReferences" time="0.001" />
+    <testcase classname="com.xenomi.cms.core.v2.card.service.CardIssuanceV2ServiceTest" name="prepareDraftRequiresActivationPolicy" time="0.001" />
+    <testcase classname="com.xenomi.cms.core.v2.card.service.CardIssuanceV2ServiceTest" name="physicalOnlyCreatesProductionRequestInIssuanceTransaction" time="0.0">
+      <skipped message="Legacy issue entry point is intentionally guarded by the lifecycle coordinator" />
+    </testcase>
+    <testcase classname="com.xenomi.cms.core.v2.card.service.CardIssuanceV2ServiceTest" name="issueRemainsBehindLifecycleCoordinatorBoundary" time="0.001" />
+  </testsuite>
+  <testsuite name="com.xenomi.cms.core.v2.cardcontrol.client.HttpAccountingCardLimitClientTest" tests="15" failures="0" errors="0" skipped="0" time="0.018">
+    <testcase classname="com.xenomi.cms.core.v2.cardcontrol.client.HttpAccountingCardLimitClientTest" name="returnsFreshValidLimitFromAccounting" time="0.003" />
+    <testcase classname="com.xenomi.cms.core.v2.cardcontrol.client.HttpAccountingCardLimitClientTest" name="rejectsMissingConfiguration" time="0.0" />
+    <testcase classname="com.xenomi.cms.core.v2.cardcontrol.client.HttpAccountingCardLimitClientTest" name="rejectsInvalidOrStaleLimits(String)[1]" time="0.001" />
+    <testcase classname="com.xenomi.cms.core.v2.cardcontrol.client.HttpAccountingCardLimitClientTest" name="rejectsInvalidOrStaleLimits(String)[2]" time="0.0" />
+    <testcase classname="com.xenomi.cms.core.v2.cardcontrol.client.HttpAccountingCardLimitClientTest" name="rejectsInvalidOrStaleLimits(String)[3]" time="0.001" />
+    <testcase classname="com.xenomi.cms.core.v2.cardcontrol.client.HttpAccountingCardLimitClientTest" name="rejectsInvalidOrStaleLimits(String)[4]" time="0.001" />
+    <testcase classname="com.xenomi.cms.core.v2.cardcontrol.client.HttpAccountingCardLimitClientTest" name="rejectsInvalidOrStaleLimits(String)[5]" time="0.001" />
+    <testcase classname="com.xenomi.cms.core.v2.cardcontrol.client.HttpAccountingCardLimitClientTest" name="rejectsInvalidOrStaleLimits(String)[6]" time="0.001" />
+    <testcase classname="com.xenomi.cms.core.v2.cardcontrol.client.HttpAccountingCardLimitClientTest" name="rejectsInvalidOrStaleLimits(String)[7]" time="0.001" />
+    <testcase classname="com.xenomi.cms.core.v2.cardcontrol.client.HttpAccountingCardLimitClientTest" name="rejectsInvalidOrStaleLimits(String)[8]" time="0.001" />
+    <testcase classname="com.xenomi.cms.core.v2.cardcontrol.client.HttpAccountingCardLimitClientTest" name="rejectsInvalidOrStaleLimits(String)[9]" time="0.001" />
+    <testcase classname="com.xenomi.cms.core.v2.cardcontrol.client.HttpAccountingCardLimitClientTest" name="rejectsInvalidOrStaleLimits(String)[10]" time="0.001" />
+    <testcase classname="com.xenomi.cms.core.v2.cardcontrol.client.HttpAccountingCardLimitClientTest" name="rejectsInvalidOrStaleLimits(String)[11]" time="0.0" />
+    <testcase classname="com.xenomi.cms.core.v2.cardcontrol.client.HttpAccountingCardLimitClientTest" name="rejectsInvalidOrStaleLimits(String)[12]" time="0.0" />
+    <testcase classname="com.xenomi.cms.core.v2.cardcontrol.client.HttpAccountingCardLimitClientTest" name="wrapsTransportFailure" time="0.001" />
+  </testsuite>
+  <testsuite name="com.xenomi.cms.core.v2.cardcontrol.client.HttpSwitchCardControlClientTest" tests="4" failures="0" errors="0" skipped="0" time="0.009">
+    <testcase classname="com.xenomi.cms.core.v2.cardcontrol.client.HttpSwitchCardControlClientTest" name="wrapsTransportFailure" time="0.003" />
+    <testcase classname="com.xenomi.cms.core.v2.cardcontrol.client.HttpSwitchCardControlClientTest" name="applySendsControlsAndAcceptsMatchingVersion" time="0.002" />
+    <testcase classname="com.xenomi.cms.core.v2.cardcontrol.client.HttpSwitchCardControlClientTest" name="rejectsMissingConfigurationAndInvalidConfirmations" time="0.002" />
+    <testcase classname="com.xenomi.cms.core.v2.cardcontrol.client.HttpSwitchCardControlClientTest" name="durableSyncSkipsImmediateCall" time="0.001" />
+  </testsuite>
+  <testsuite name="com.xenomi.cms.core.v2.cardcontrol.controller.CardControlsV2ControllerDelegationTest" tests="1" failures="0" errors="0" skipped="0" time="0.0">
+    <testcase classname="com.xenomi.cms.core.v2.cardcontrol.controller.CardControlsV2ControllerDelegationTest" name="delegatesReadAndUpdate" time="0.0" />
+  </testsuite>
+  <testsuite name="com.xenomi.cms.core.v2.cardcontrol.controller.CardControlsV2ControllerTest" tests="1" failures="0" errors="0" skipped="0" time="0.283">
+    <testcase classname="com.xenomi.cms.core.v2.cardcontrol.controller.CardControlsV2ControllerTest" name="updatesPerTransactionControlContract" time="0.041" />
+  </testsuite>
+  <testsuite name="com.xenomi.cms.core.v2.cardcontrol.service.CardControlProfileInitializerV2Test" tests="6" failures="0" errors="0" skipped="0" time="0.036">
+    <testcase classname="com.xenomi.cms.core.v2.cardcontrol.service.CardControlProfileInitializerV2Test" name="mappingHelpersCoverEveryChannelAndGeography" time="0.031" />
+    <testcase classname="com.xenomi.cms.core.v2.cardcontrol.service.CardControlProfileInitializerV2Test" name="initializeFromSourceRequiresAllDimensionsAndAssignedLimit" time="0.002" />
+    <testcase classname="com.xenomi.cms.core.v2.cardcontrol.service.CardControlProfileInitializerV2Test" name="initializeFromSourceCopiesProfileAndAllControlFacts" time="0.001" />
+    <testcase classname="com.xenomi.cms.core.v2.cardcontrol.service.CardControlProfileInitializerV2Test" name="initializeFromSourceFallsBackWhenSourceHasNoProfile" time="0.0" />
+    <testcase classname="com.xenomi.cms.core.v2.cardcontrol.service.CardControlProfileInitializerV2Test" name="initializeCreatesCompleteSafeBaselineWithConfiguredLimits" time="0.001" />
+    <testcase classname="com.xenomi.cms.core.v2.cardcontrol.service.CardControlProfileInitializerV2Test" name="initializeAndValidationRejectMissingDefaults" time="0.001" />
+  </testsuite>
+  <testsuite name="com.xenomi.cms.core.v2.cardcontrol.service.CardControlsV2ServiceTest" tests="6" failures="0" errors="0" skipped="0" time="0.024">
+    <testcase classname="com.xenomi.cms.core.v2.cardcontrol.service.CardControlsV2ServiceTest" name="rejectsLimitAboveAccountingAssignmentBeforeSwitchCall" time="0.017" />
+    <testcase classname="com.xenomi.cms.core.v2.cardcontrol.service.CardControlsV2ServiceTest" name="rejectsAnyCardChangeWhenProductCapabilityIsNotAllowed" time="0.001" />
+    <testcase classname="com.xenomi.cms.core.v2.cardcontrol.service.CardControlsV2ServiceTest" name="validatesAccountingAndAppliesAcknowledgedVersionThroughLegacySwitchClient" time="0.002" />
+    <testcase classname="com.xenomi.cms.core.v2.cardcontrol.service.CardControlsV2ServiceTest" name="channelOnlyChangeDoesNotCallAccounting" time="0.001" />
+    <testcase classname="com.xenomi.cms.core.v2.cardcontrol.service.CardControlsV2ServiceTest" name="durableSwitchSyncLeavesProfilePendingUntilWorkerAcknowledgesIt" time="0.001" />
+    <testcase classname="com.xenomi.cms.core.v2.cardcontrol.service.CardControlsV2ServiceTest" name="rejectsInternationalMasterEnableWhenProductScopeIsDisabled" time="0.001" />
+  </testsuite>
+  <testsuite name="com.xenomi.cms.core.v2.contract.V2MutationContractTest" tests="2" failures="0" errors="0" skipped="0" time="0.024">
+    <testcase classname="com.xenomi.cms.core.v2.contract.V2MutationContractTest" name="mutationRequestsDoNotAcceptTenantOrAuditFields" time="0.015" />
+    <testcase classname="com.xenomi.cms.core.v2.contract.V2MutationContractTest" name="v2ContainsNoPatchOrDeleteEndpoints" time="0.008" />
+  </testsuite>
+  <testsuite name="com.xenomi.cms.core.v2.event.admin.OutboxAdminV2ServiceTest" tests="3" failures="0" errors="0" skipped="0" time="0.008">
+    <testcase classname="com.xenomi.cms.core.v2.event.admin.OutboxAdminV2ServiceTest" name="batchReplayIsBoundedAndRecordsTheResultAgainstItsIdempotencyKey" time="0.006" />
+    <testcase classname="com.xenomi.cms.core.v2.event.admin.OutboxAdminV2ServiceTest" name="rejectsAnUnboundedReplayRequest" time="0.0" />
+    <testcase classname="com.xenomi.cms.core.v2.event.admin.OutboxAdminV2ServiceTest" name="repeatedReplayKeyReturnsTheCurrentEventWithoutReplayingItAgain" time="0.002" />
+  </testsuite>
+  <testsuite name="com.xenomi.cms.core.v2.event.catalog.BinEventSinkTest" tests="2" failures="0" errors="0" skipped="0" time="0.0">
+    <testcase classname="com.xenomi.cms.core.v2.event.catalog.BinEventSinkTest" name="binUpdatedKeyChangesWithOptimisticLockVersion" time="0.0" />
+    <testcase classname="com.xenomi.cms.core.v2.event.catalog.BinEventSinkTest" name="binCreatedHasNullCustomerIdAndBinIdKey" time="0.0" />
+  </testsuite>
+  <testsuite name="com.xenomi.cms.core.v2.event.catalog.CardControlEventSinkTest" tests="3" failures="0" errors="0" skipped="0" time="0.001">
+    <testcase classname="com.xenomi.cms.core.v2.event.catalog.CardControlEventSinkTest" name="nullResponseIsIgnored" time="0.0" />
+    <testcase classname="com.xenomi.cms.core.v2.event.catalog.CardControlEventSinkTest" name="sameAuditEventReplayedProducesTheSameIdempotencyKey" time="0.0" />
+    <testcase classname="com.xenomi.cms.core.v2.event.catalog.CardControlEventSinkTest" name="updatedEventIsKeyedByCardControlEventIdAndCarriesDimensions" time="0.0" />
+  </testsuite>
+  <testsuite name="com.xenomi.cms.core.v2.event.catalog.CardEventSinkTest" tests="5" failures="0" errors="0" skipped="0" time="0.002">
+    <testcase classname="com.xenomi.cms.core.v2.event.catalog.CardEventSinkTest" name="hotlistedEventUsesHighPriorityAndBlockedStatus" time="0.001" />
+    <testcase classname="com.xenomi.cms.core.v2.event.catalog.CardEventSinkTest" name="activatedEventKeepsPreSavePreviousStatusAndUsesCardEventIdKey" time="0.0" />
+    <testcase classname="com.xenomi.cms.core.v2.event.catalog.CardEventSinkTest" name="cardCreatedIsBuiltEntirelyFromTheResponseBody" time="0.0" />
+    <testcase classname="com.xenomi.cms.core.v2.event.catalog.CardEventSinkTest" name="sameCardEventReplayedProducesSameIdempotencyKeyRegardlessOfRequestId" time="0.0" />
+    <testcase classname="com.xenomi.cms.core.v2.event.catalog.CardEventSinkTest" name="replacementRequestedIsKeyedByReplacementRequestId" time="0.0" />
+  </testsuite>
+  <testsuite name="com.xenomi.cms.core.v2.event.catalog.ProductEventSinkTest" tests="4" failures="0" errors="0" skipped="0" time="0.001">
+    <testcase classname="com.xenomi.cms.core.v2.event.catalog.ProductEventSinkTest" name="retiringAProductEmitsUpdateStatusChangeAndDeactivated" time="0.0" />
+    <testcase classname="com.xenomi.cms.core.v2.event.catalog.ProductEventSinkTest" name="updateWithoutStatusChangeEmitsOnlyProductUpdated" time="0.0" />
+    <testcase classname="com.xenomi.cms.core.v2.event.catalog.ProductEventSinkTest" name="noOpUpdateEmitsNothing" time="0.0" />
+    <testcase classname="com.xenomi.cms.core.v2.event.catalog.ProductEventSinkTest" name="createdEventHasNullCustomerAndNullOldStatusAndProductIdKey" time="0.0" />
+  </testsuite>
+  <testsuite name="com.xenomi.cms.core.v2.event.catalog.ProductVersionEventSinkTest" tests="4" failures="0" errors="0" skipped="0" time="0.004">
+    <testcase classname="com.xenomi.cms.core.v2.event.catalog.ProductVersionEventSinkTest" name="createdEventHasDraftStatusAndVersionIdKey" time="0.003" />
+    <testcase classname="com.xenomi.cms.core.v2.event.catalog.ProductVersionEventSinkTest" name="noOpUpdateEmitsNothing" time="0.0" />
+    <testcase classname="com.xenomi.cms.core.v2.event.catalog.ProductVersionEventSinkTest" name="activatingAVersionEmitsUpdateAndStatusChanged" time="0.001" />
+    <testcase classname="com.xenomi.cms.core.v2.event.catalog.ProductVersionEventSinkTest" name="configurationUpdateEmitsOnlyVersionUpdated" time="0.0" />
+  </testsuite>
+  <testsuite name="com.xenomi.cms.core.v2.event.config.EventV2PropertiesTest" tests="7" failures="0" errors="0" skipped="0" time="0.008">
+    <testcase classname="com.xenomi.cms.core.v2.event.config.EventV2PropertiesTest" name="rejectsLegacyUnscopedPublishPath" time="0.001" />
+    <testcase classname="com.xenomi.cms.core.v2.event.config.EventV2PropertiesTest" name="permitsAuthenticatedLoopbackForLocalDevelopment" time="0.001" />
+    <testcase classname="com.xenomi.cms.core.v2.event.config.EventV2PropertiesTest" name="rejectsALeaseTooShortForQueuedBatchWork" time="0.0" />
+    <testcase classname="com.xenomi.cms.core.v2.event.config.EventV2PropertiesTest" name="rejectsUnprotectedRemoteNotificationHub" time="0.0" />
+    <testcase classname="com.xenomi.cms.core.v2.event.config.EventV2PropertiesTest" name="yamlDefaultsPreserveInstitutionTemplateAndDeriveKeycloakTokenUri" time="0.004" />
+    <testcase classname="com.xenomi.cms.core.v2.event.config.EventV2PropertiesTest" name="disabledPublisherDoesNotRequireCredentials" time="0.002" />
+    <testcase classname="com.xenomi.cms.core.v2.event.config.EventV2PropertiesTest" name="rejectsMissingCredentialsAndUnauthenticatedPublishingEvenOnLoopback" time="0.0" />
+  </testsuite>
+  <testsuite name="com.xenomi.cms.core.v2.event.correlation.CorrelationIdResolverTest" tests="5" failures="0" errors="0" skipped="0" time="0.001">
+    <testcase classname="com.xenomi.cms.core.v2.event.correlation.CorrelationIdResolverTest" name="usesMdcRequestIdWithoutMintingANewValue" time="0.001" />
+    <testcase classname="com.xenomi.cms.core.v2.event.correlation.CorrelationIdResolverTest" name="mapsNonUuidRequestIdsDeterministicallyForTheDatabaseColumn" time="0.0" />
+    <testcase classname="com.xenomi.cms.core.v2.event.correlation.CorrelationIdResolverTest" name="prefersExplicitRequestIdOverMdc" time="0.0" />
+    <testcase classname="com.xenomi.cms.core.v2.event.correlation.CorrelationIdResolverTest" name="uuidCorrelationIdsAreUsedVerbatim" time="0.0" />
+    <testcase classname="com.xenomi.cms.core.v2.event.correlation.CorrelationIdResolverTest" name="blankCorrelationMapsToAFixedSentinelUuid" time="0.0" />
+  </testsuite>
+  <testsuite name="com.xenomi.cms.core.v2.event.mapper.NotificationEnvelopeFactoryTest" tests="2" failures="0" errors="0" skipped="0" time="0.002">
+    <testcase classname="com.xenomi.cms.core.v2.event.mapper.NotificationEnvelopeFactoryTest" name="configEventsSerialiseNullCustomerIdExplicitly" time="0.001" />
+    <testcase classname="com.xenomi.cms.core.v2.event.mapper.NotificationEnvelopeFactoryTest" name="buildsFalconEnvelopeWithStableSourceAndEmptyChannels" time="0.0" />
+  </testsuite>
+  <testsuite name="com.xenomi.cms.core.v2.event.publisher.CmsNotificationClientTest" tests="6" failures="0" errors="0" skipped="0" time="0.004">
+    <testcase classname="com.xenomi.cms.core.v2.event.publisher.CmsNotificationClientTest" name="acknowledgementClassification" time="0.0" />
+    <testcase classname="com.xenomi.cms.core.v2.event.publisher.CmsNotificationClientTest" name="serverErrorIsTransientAndClientErrorIsPermanent" time="0.002" />
+    <testcase classname="com.xenomi.cms.core.v2.event.publisher.CmsNotificationClientTest" name="wrapsPreEnvelopeLifecyclePayloadWithoutLosingIt" time="0.0" />
+    <testcase classname="com.xenomi.cms.core.v2.event.publisher.CmsNotificationClientTest" name="httpStatusClassification" time="0.0" />
+    <testcase classname="com.xenomi.cms.core.v2.event.publisher.CmsNotificationClientTest" name="postsStoredEnvelopeVerbatimWithIdempotencyAndAuthHeaders" time="0.001" />
+    <testcase classname="com.xenomi.cms.core.v2.event.publisher.CmsNotificationClientTest" name="inFlightConflictRetriesSameEventUntilAccepted" time="0.001" />
+  </testsuite>
+  <testsuite name="com.xenomi.cms.core.v2.event.publisher.NotificationAuthenticationTest" tests="2" failures="0" errors="0" skipped="0" time="0.008">
+    <testcase classname="com.xenomi.cms.core.v2.event.publisher.NotificationAuthenticationTest" name="refusesToSendAnEnvelopeForAnotherInstitution" time="0.002" />
+    <testcase classname="com.xenomi.cms.core.v2.event.publisher.NotificationAuthenticationTest" name="acquiresServiceTokenCachesItAndRefreshesAfterUnauthorized" time="0.006" />
+  </testsuite>
+  <testsuite name="com.xenomi.cms.core.v2.event.publisher.OutboxEventDispatcherTest" tests="10" failures="0" errors="0" skipped="0" time="0.017">
+    <testcase classname="com.xenomi.cms.core.v2.event.publisher.OutboxEventDispatcherTest" name="lifecycleDoesNotStartWhenEitherSideIsDisabled" time="0.007" />
+    <testcase classname="com.xenomi.cms.core.v2.event.publisher.OutboxEventDispatcherTest" name="terminalRowsAreNeverOverwrittenByALateResult" time="0.0" />
+    <testcase classname="com.xenomi.cms.core.v2.event.publisher.OutboxEventDispatcherTest" name="safeCycleReturnsWhenStoppedAndProcessesAfterLifecycleStart" time="0.001" />
+    <testcase classname="com.xenomi.cms.core.v2.event.publisher.OutboxEventDispatcherTest" name="deniedPublishPermitReleasesTheOwnedClaim" time="0.002" />
+    <testcase classname="com.xenomi.cms.core.v2.event.publisher.OutboxEventDispatcherTest" name="drainsUntilABatchComesBackShortAndRecordsEachOutcome" time="0.001" />
+    <testcase classname="com.xenomi.cms.core.v2.event.publisher.OutboxEventDispatcherTest" name="nullAndEmptyClaimsAreHandledWithoutPublishing" time="0.001" />
+    <testcase classname="com.xenomi.cms.core.v2.event.publisher.OutboxEventDispatcherTest" name="lifecycleStartsOnceWithMinimumIntervalAndStopsCleanly" time="0.0" />
+    <testcase classname="com.xenomi.cms.core.v2.event.publisher.OutboxEventDispatcherTest" name="runtimeClientFailureIsConvertedToRetryAndPermanentFailureDeadLetters" time="0.001" />
+    <testcase classname="com.xenomi.cms.core.v2.event.publisher.OutboxEventDispatcherTest" name="transportFailuresTripTheCircuitButLocalFailuresDoNot" time="0.001" />
+    <testcase classname="com.xenomi.cms.core.v2.event.publisher.OutboxEventDispatcherTest" name="openCircuitPausesClaimingInsteadOfBurningRetries" time="0.001" />
+  </testsuite>
+  <testsuite name="com.xenomi.cms.core.v2.event.publisher.OutboxRetentionJobTest" tests="5" failures="0" errors="0" skipped="0" time="0.026">
+    <testcase classname="com.xenomi.cms.core.v2.event.publisher.OutboxRetentionJobTest" name="purgeDrainsBatchesUntilRepositoryReturnsZero" time="0.024" />
+    <testcase classname="com.xenomi.cms.core.v2.event.publisher.OutboxRetentionJobTest" name="disabledOutboxOrRetentionDoesNotSchedule" time="0.001" />
+    <testcase classname="com.xenomi.cms.core.v2.event.publisher.OutboxRetentionJobTest" name="purgeUsesMinimumBatchSizeAndHandlesEmptyResult" time="0.0" />
+    <testcase classname="com.xenomi.cms.core.v2.event.publisher.OutboxRetentionJobTest" name="purgeSafelyContainsRepositoryFailure" time="0.001" />
+    <testcase classname="com.xenomi.cms.core.v2.event.publisher.OutboxRetentionJobTest" name="startSchedulesOnlyOnceAndStopCancelsHandle" time="0.0" />
+  </testsuite>
+  <testsuite name="com.xenomi.cms.core.v2.event.publisher.RetryPolicyTest" tests="8" failures="0" errors="0" skipped="0" time="0.004">
+    <testcase classname="com.xenomi.cms.core.v2.event.publisher.RetryPolicyTest" name="permanentFailureDeadLettersImmediately" time="0.0" />
+    <testcase classname="com.xenomi.cms.core.v2.event.publisher.RetryPolicyTest" name="transientFailureAfterWindowDeadLetters" time="0.0" />
+    <testcase classname="com.xenomi.cms.core.v2.event.publisher.RetryPolicyTest" name="backoffIsExponentialAndCapped" time="0.0" />
+    <testcase classname="com.xenomi.cms.core.v2.event.publisher.RetryPolicyTest" name="transientFailureSchedulesRetryWithinWindow" time="0.0" />
+    <testcase classname="com.xenomi.cms.core.v2.event.publisher.RetryPolicyTest" name="publishedClearsRetryStateAndLease" time="0.0" />
+    <testcase classname="com.xenomi.cms.core.v2.event.publisher.RetryPolicyTest" name="jitterStaysInsideBounds" time="0.0" />
+    <testcase classname="com.xenomi.cms.core.v2.event.publisher.RetryPolicyTest" name="nextRetryNeverExceedsWindowEnd" time="0.0" />
+    <testcase classname="com.xenomi.cms.core.v2.event.publisher.RetryPolicyTest" name="manyFailuresInsideTheWindowNeverDeadLetter" time="0.002" />
+  </testsuite>
+  <testsuite name="com.xenomi.cms.core.v2.event.writer.OutboxEventWriterTest" tests="4" failures="0" errors="0" skipped="0" time="0.002">
+    <testcase classname="com.xenomi.cms.core.v2.event.writer.OutboxEventWriterTest" name="duplicateIdempotencyKeyIsANoOpNotAFailure" time="0.001" />
+    <testcase classname="com.xenomi.cms.core.v2.event.writer.OutboxEventWriterTest" name="refusesToWriteOutsideABusinessTransaction" time="0.0" />
+    <testcase classname="com.xenomi.cms.core.v2.event.writer.OutboxEventWriterTest" name="doesNotWriteWhenOutboxDisabled" time="0.001" />
+    <testcase classname="com.xenomi.cms.core.v2.event.writer.OutboxEventWriterTest" name="insertsEnvelopeUsingGeneratedEventIdAndDomainIdempotencyKey" time="0.0" />
+  </testsuite>
+  <testsuite name="com.xenomi.cms.core.v2.hsm.controller.HsmControllersDelegationTest" tests="3" failures="0" errors="0" skipped="0" time="0.014">
+    <testcase classname="com.xenomi.cms.core.v2.hsm.controller.HsmControllersDelegationTest" name="keyImportReturnsCreatedThenOkForIdempotentReplay" time="0.007" />
+    <testcase classname="com.xenomi.cms.core.v2.hsm.controller.HsmControllersDelegationTest" name="binAssignmentEndpointsDelegateAcrossLifecycle" time="0.005" />
+    <testcase classname="com.xenomi.cms.core.v2.hsm.controller.HsmControllersDelegationTest" name="hsmKeyEndpointsDelegateAcrossLifecycle" time="0.001" />
+  </testsuite>
+  <testsuite name="com.xenomi.cms.core.v2.hsm.controller.HsmKeyV2ControllerTest" tests="3" failures="0" errors="0" skipped="0" time="0.207">
+    <testcase classname="com.xenomi.cms.core.v2.hsm.controller.HsmKeyV2ControllerTest" name="registerIsExposedUnderTenantScopedV2Path" time="0.012" />
+    <testcase classname="com.xenomi.cms.core.v2.hsm.controller.HsmKeyV2ControllerTest" name="hsmProcessingFailureReturnsInternalServerErrorWithoutProviderDetail" time="0.004" />
+    <testcase classname="com.xenomi.cms.core.v2.hsm.controller.HsmKeyV2ControllerTest" name="registerRejectsUnsupportedKeyTypeBeforeCallingService" time="0.003" />
+  </testsuite>
+  <testsuite name="com.xenomi.cms.core.v2.hsm.controller.HsmProviderHealthV2ControllerTest" tests="1" failures="0" errors="0" skipped="0" time="0.173">
+    <testcase classname="com.xenomi.cms.core.v2.hsm.controller.HsmProviderHealthV2ControllerTest" name="returnsApplicationLevelHsmHealthWithoutInstitutionScope" time="0.005" />
+  </testsuite>
+  <testsuite name="com.xenomi.cms.core.v2.hsm.service.BinHsmKeyAssignmentV2ServiceTest" tests="3" failures="0" errors="0" skipped="0" time="0.008">
+    <testcase classname="com.xenomi.cms.core.v2.hsm.service.BinHsmKeyAssignmentV2ServiceTest" name="createsAndReadsTenantScopedBinAssignment" time="0.006" />
+    <testcase classname="com.xenomi.cms.core.v2.hsm.service.BinHsmKeyAssignmentV2ServiceTest" name="activationRejectsKeyThatIsNotActive" time="0.001" />
+    <testcase classname="com.xenomi.cms.core.v2.hsm.service.BinHsmKeyAssignmentV2ServiceTest" name="activationCutsPreviousActiveVersionOverToVerifyOnly" time="0.001" />
+  </testsuite>
+  <testsuite name="com.xenomi.cms.core.v2.hsm.service.HsmKeyExchangeV2ServiceTest" tests="3" failures="0" errors="0" skipped="0" time="0.015">
+    <testcase classname="com.xenomi.cms.core.v2.hsm.service.HsmKeyExchangeV2ServiceTest" name="kcvMismatchIsAuditedAndDoesNotPersistWorkingKey" time="0.012" />
+    <testcase classname="com.xenomi.cms.core.v2.hsm.service.HsmKeyExchangeV2ServiceTest" name="rejectsOperationalImportWhenReferenceIsNotAKek" time="0.0" />
+    <testcase classname="com.xenomi.cms.core.v2.hsm.service.HsmKeyExchangeV2ServiceTest" name="importsUnderActiveKekAndCreatesPendingInstitutionAssignment" time="0.002" />
+  </testsuite>
+  <testsuite name="com.xenomi.cms.core.v2.hsm.service.HsmKeyV2ServiceTest" tests="7" failures="0" errors="0" skipped="0" time="0.007">
+    <testcase classname="com.xenomi.cms.core.v2.hsm.service.HsmKeyV2ServiceTest" name="tenantEndpointRejectsCardNetworkWithoutDedicatedScopeIdentifier" time="0.003" />
+    <testcase classname="com.xenomi.cms.core.v2.hsm.service.HsmKeyV2ServiceTest" name="generateAcceptsAesAndDelegatesProviderProcessingToHsmClient" time="0.001" />
+    <testcase classname="com.xenomi.cms.core.v2.hsm.service.HsmKeyV2ServiceTest" name="activatingReplacementMovesPreviousKeyToDecryptOnly" time="0.001" />
+    <testcase classname="com.xenomi.cms.core.v2.hsm.service.HsmKeyV2ServiceTest" name="registerStoresProtectedBlockButDoesNotReturnIt" time="0.0" />
+    <testcase classname="com.xenomi.cms.core.v2.hsm.service.HsmKeyV2ServiceTest" name="generateUsesExistingHsmClientAndPersistsOnlyProtectedOutput" time="0.001" />
+    <testcase classname="com.xenomi.cms.core.v2.hsm.service.HsmKeyV2ServiceTest" name="generateRejectsKeyTypeUnderWrongOperationalScope" time="0.0" />
+    <testcase classname="com.xenomi.cms.core.v2.hsm.service.HsmKeyV2ServiceTest" name="rotationCreatesNewVersionAndLinksHistory" time="0.001" />
+  </testsuite>
+  <testsuite name="com.xenomi.cms.core.v2.hsm.service.KeyExchangeEventAuditV2ServiceTest" tests="3" failures="0" errors="0" skipped="0" time="0.001">
+    <testcase classname="com.xenomi.cms.core.v2.hsm.service.KeyExchangeEventAuditV2ServiceTest" name="duplicateIdempotencyHashIsIgnored" time="0.0" />
+    <testcase classname="com.xenomi.cms.core.v2.hsm.service.KeyExchangeEventAuditV2ServiceTest" name="recordsCompleteFailureAuditWithoutKeyMaterial" time="0.0" />
+    <testcase classname="com.xenomi.cms.core.v2.hsm.service.KeyExchangeEventAuditV2ServiceTest" name="duplicateExternalRequestIdIsIgnored" time="0.0" />
+  </testsuite>
+  <testsuite name="com.xenomi.cms.core.v2.institution.controller.InstitutionControllersDelegationTest" tests="2" failures="0" errors="0" skipped="0" time="0.006">
+    <testcase classname="com.xenomi.cms.core.v2.institution.controller.InstitutionControllersDelegationTest" name="institutionEndpointsDelegateWithExpectedResponseStatusAndPaging" time="0.0" />
+    <testcase classname="com.xenomi.cms.core.v2.institution.controller.InstitutionControllersDelegationTest" name="policyAndDataKeyEndpointsDelegateAcrossCompleteContract" time="0.005" />
+  </testsuite>
+  <testsuite name="com.xenomi.cms.core.v2.institution.controller.InstitutionV2ControllerTest" tests="3" failures="0" errors="0" skipped="0" time="0.206">
+    <testcase classname="com.xenomi.cms.core.v2.institution.controller.InstitutionV2ControllerTest" name="createReturnsUuidInStandardEnvelope" time="0.02" />
+    <testcase classname="com.xenomi.cms.core.v2.institution.controller.InstitutionV2ControllerTest" name="getAcceptsUuidPathParameter" time="0.002" />
+    <testcase classname="com.xenomi.cms.core.v2.institution.controller.InstitutionV2ControllerTest" name="createRequiresActorHeader" time="0.004" />
+  </testsuite>
+  <testsuite name="com.xenomi.cms.core.v2.institution.service.InstitutionDataKeyAssignmentV2ServiceTest" tests="4" failures="0" errors="0" skipped="0" time="0.003">
+    <testcase classname="com.xenomi.cms.core.v2.institution.service.InstitutionDataKeyAssignmentV2ServiceTest" name="createRejectsKeyOwnedByAnotherInstitution" time="0.001" />
+    <testcase classname="com.xenomi.cms.core.v2.institution.service.InstitutionDataKeyAssignmentV2ServiceTest" name="pendingAssignmentRequiresApprovalWhenMakerCheckerDefaultsToEnabled" time="0.001" />
+    <testcase classname="com.xenomi.cms.core.v2.institution.service.InstitutionDataKeyAssignmentV2ServiceTest" name="retiredAssignmentCannotBeReactivated" time="0.0" />
+    <testcase classname="com.xenomi.cms.core.v2.institution.service.InstitutionDataKeyAssignmentV2ServiceTest" name="createAllocatesNextVersionWhileInstitutionIsLocked" time="0.001" />
+  </testsuite>
+  <testsuite name="com.xenomi.cms.core.v2.institution.service.InstitutionPolicyV2ServiceTest" tests="3" failures="0" errors="0" skipped="0" time="0.012">
+    <testcase classname="com.xenomi.cms.core.v2.institution.service.InstitutionPolicyV2ServiceTest" name="securityPolicyContractDoesNotRequireOrReturnSessionTimeout" time="0.01" />
+    <testcase classname="com.xenomi.cms.core.v2.institution.service.InstitutionPolicyV2ServiceTest" name="updateSecurityPreservesStructuredMaskingPolicy" time="0.0" />
+    <testcase classname="com.xenomi.cms.core.v2.institution.service.InstitutionPolicyV2ServiceTest" name="updateOperationalReplacesAllSwitches" time="0.001" />
+  </testsuite>
+  <testsuite name="com.xenomi.cms.core.v2.institution.service.InstitutionV2ServiceTest" tests="8" failures="0" errors="0" skipped="0" time="0.006">
+    <testcase classname="com.xenomi.cms.core.v2.institution.service.InstitutionV2ServiceTest" name="updateAppliesAndNormalizesEveryMutableField" time="0.003" />
+    <testcase classname="com.xenomi.cms.core.v2.institution.service.InstitutionV2ServiceTest" name="createUsesDatabaseUuidV7AndNormalizesCodes" time="0.001" />
+    <testcase classname="com.xenomi.cms.core.v2.institution.service.InstitutionV2ServiceTest" name="searchNormalizesBlankQueryAndMapsResults" time="0.0" />
+    <testcase classname="com.xenomi.cms.core.v2.institution.service.InstitutionV2ServiceTest" name="getReturnsInstitutionByUuid" time="0.0" />
+    <testcase classname="com.xenomi.cms.core.v2.institution.service.InstitutionV2ServiceTest" name="getsByNormalizedCodeAndReportsMissingInstitutions" time="0.001" />
+    <testcase classname="com.xenomi.cms.core.v2.institution.service.InstitutionV2ServiceTest" name="creationValidatesNetworkMembershipPairs" time="0.0" />
+    <testcase classname="com.xenomi.cms.core.v2.institution.service.InstitutionV2ServiceTest" name="updateRejectsInconsistentMembershipChanges" time="0.001" />
+    <testcase classname="com.xenomi.cms.core.v2.institution.service.InstitutionV2ServiceTest" name="createRejectsDuplicateCodeBeforeGeneratingAnId" time="0.0" />
+  </testsuite>
+  <testsuite name="com.xenomi.cms.core.v2.product.controller.CardProductV2ControllerTest" tests="2" failures="0" errors="0" skipped="0" time="0.192">
+    <testcase classname="com.xenomi.cms.core.v2.product.controller.CardProductV2ControllerTest" name="getProductAcceptsUuidIdentifiers" time="0.007" />
+    <testcase classname="com.xenomi.cms.core.v2.product.controller.CardProductV2ControllerTest" name="createProductIsExposedUnderV2InstitutionPath" time="0.006" />
+  </testsuite>
+  <testsuite name="com.xenomi.cms.core.v2.product.controller.ProductConfigurationV2ControllerTest" tests="5" failures="0" errors="0" skipped="0" time="0.203">
+    <testcase classname="com.xenomi.cms.core.v2.product.controller.ProductConfigurationV2ControllerTest" name="createsReasonSpecificReplacementPolicy" time="0.012" />
+    <testcase classname="com.xenomi.cms.core.v2.product.controller.ProductConfigurationV2ControllerTest" name="createsTypedProductLimit" time="0.006" />
+    <testcase classname="com.xenomi.cms.core.v2.product.controller.ProductConfigurationV2ControllerTest" name="acceptsSimplifiedCardFormModeAndReturnsDerivedFields" time="0.005" />
+    <testcase classname="com.xenomi.cms.core.v2.product.controller.ProductConfigurationV2ControllerTest" name="replacesVersionDefaultControls" time="0.011" />
+    <testcase classname="com.xenomi.cms.core.v2.product.controller.ProductConfigurationV2ControllerTest" name="replacesVersionPinPolicyWithEnumContract" time="0.014" />
+  </testsuite>
+  <testsuite name="com.xenomi.cms.core.v2.product.controller.ProductControllerDelegationTest" tests="4" failures="0" errors="0" skipped="0" time="0.041">
+    <testcase classname="com.xenomi.cms.core.v2.product.controller.ProductControllerDelegationTest" name="productConfigurationControllerDelegatesEveryPolicyOperation" time="0.019" />
+    <testcase classname="com.xenomi.cms.core.v2.product.controller.ProductControllerDelegationTest" name="issuanceProfileControllerDelegatesEveryProfileOperation" time="0.01" />
+    <testcase classname="com.xenomi.cms.core.v2.product.controller.ProductControllerDelegationTest" name="cardProductControllerDelegatesProductAndVersionOperations" time="0.008" />
+    <testcase classname="com.xenomi.cms.core.v2.product.controller.ProductControllerDelegationTest" name="cardDesignControllerDelegatesEveryOperationAndAppliesStablePaging" time="0.004" />
+  </testsuite>
+  <testsuite name="com.xenomi.cms.core.v2.product.service.CardProductV2ServiceTest" tests="7" failures="0" errors="0" skipped="0" time="0.008">
+    <testcase classname="com.xenomi.cms.core.v2.product.service.CardProductV2ServiceTest" name="rejectsInvalidTransitionsFromEveryLifecycleState" time="0.005" />
+    <testcase classname="com.xenomi.cms.core.v2.product.service.CardProductV2ServiceTest" name="creationRequiresInstitutionAndUniqueCode" time="0.001" />
+    <testcase classname="com.xenomi.cms.core.v2.product.service.CardProductV2ServiceTest" name="missingProductIsReportedWithoutCrossTenantFallback" time="0.0" />
+    <testcase classname="com.xenomi.cms.core.v2.product.service.CardProductV2ServiceTest" name="updatesFieldsAndValidStatusTransition" time="0.0" />
+    <testcase classname="com.xenomi.cms.core.v2.product.service.CardProductV2ServiceTest" name="searchNormalizesBlankQueryAndMapsPage" time="0.001" />
+    <testcase classname="com.xenomi.cms.core.v2.product.service.CardProductV2ServiceTest" name="getsProductByIdAndNormalizedCode" time="0.0" />
+    <testcase classname="com.xenomi.cms.core.v2.product.service.CardProductV2ServiceTest" name="createsNormalizedDraftProductAndPublishesEvent" time="0.0" />
+  </testsuite>
+  <testsuite name="com.xenomi.cms.core.v2.product.service.ProductConfigurationV2ServiceTest" tests="5" failures="0" errors="0" skipped="0" time="0.003">
+    <testcase classname="com.xenomi.cms.core.v2.product.service.ProductConfigurationV2ServiceTest" name="rejectsPolicyChangesAfterVersionLeavesDraft" time="0.001" />
+    <testcase classname="com.xenomi.cms.core.v2.product.service.ProductConfigurationV2ServiceTest" name="rejectsDefaultLimitAboveIssuerMaximum" time="0.001" />
+    <testcase classname="com.xenomi.cms.core.v2.product.service.ProductConfigurationV2ServiceTest" name="rejectsPeriodTypesThatAreReservedForFutureUse" time="0.0" />
+    <testcase classname="com.xenomi.cms.core.v2.product.service.ProductConfigurationV2ServiceTest" name="createsDraftAssignmentWhenTenantAndNetworkMatch" time="0.001" />
+    <testcase classname="com.xenomi.cms.core.v2.product.service.ProductConfigurationV2ServiceTest" name="rejectsAssignmentWhenProductAndBinNetworksDiffer" time="0.0" />
+  </testsuite>
+  <testsuite name="com.xenomi.cms.core.v2.product.service.ProductDesignAssignmentV2ServiceTest" tests="10" failures="0" errors="0" skipped="0" time="0.006">
+    <testcase classname="com.xenomi.cms.core.v2.product.service.ProductDesignAssignmentV2ServiceTest" name="activationRequiresActiveDesignAndUniqueDefault" time="0.001" />
+    <testcase classname="com.xenomi.cms.core.v2.product.service.ProductDesignAssignmentV2ServiceTest" name="invalidTransitionsAreRejectedFromEachState" time="0.001" />
+    <testcase classname="com.xenomi.cms.core.v2.product.service.ProductDesignAssignmentV2ServiceTest" name="activatesNonDefaultAssignment" time="0.0" />
+    <testcase classname="com.xenomi.cms.core.v2.product.service.ProductDesignAssignmentV2ServiceTest" name="createsDraftAssignmentWhenNetworkAndFormMatch" time="0.001" />
+    <testcase classname="com.xenomi.cms.core.v2.product.service.ProductDesignAssignmentV2ServiceTest" name="nonDraftAssignmentRejectsConfigurationChanges" time="0.0" />
+    <testcase classname="com.xenomi.cms.core.v2.product.service.ProductDesignAssignmentV2ServiceTest" name="listsAndGetsAssignmentsWithinVersionScope" time="0.001" />
+    <testcase classname="com.xenomi.cms.core.v2.product.service.ProductDesignAssignmentV2ServiceTest" name="formPolicyMustExistAndPermitRequestedForm" time="0.001" />
+    <testcase classname="com.xenomi.cms.core.v2.product.service.ProductDesignAssignmentV2ServiceTest" name="productAndDesignNetworksMustMatch" time="0.0" />
+    <testcase classname="com.xenomi.cms.core.v2.product.service.ProductDesignAssignmentV2ServiceTest" name="creationRequiresDraftVersion" time="0.0" />
+    <testcase classname="com.xenomi.cms.core.v2.product.service.ProductDesignAssignmentV2ServiceTest" name="effectiveDatesMustBeOrdered" time="0.001" />
+  </testsuite>
+  <testsuite name="com.xenomi.cms.core.v2.product.service.ProductIssuancePolicyV2ServiceTest" tests="7" failures="0" errors="0" skipped="0" time="0.004">
+    <testcase classname="com.xenomi.cms.core.v2.product.service.ProductIssuancePolicyV2ServiceTest" name="derivesSamePanVirtualThenPhysicalPolicy" time="0.001" />
+    <testcase classname="com.xenomi.cms.core.v2.product.service.ProductIssuancePolicyV2ServiceTest" name="rejectsPhysicalProductionFeaturesForVirtualOnlyMode" time="0.001" />
+    <testcase classname="com.xenomi.cms.core.v2.product.service.ProductIssuancePolicyV2ServiceTest" name="pinMailerRequiresEnabledPinPolicy" time="0.001" />
+    <testcase classname="com.xenomi.cms.core.v2.product.service.ProductIssuancePolicyV2ServiceTest" name="rejectsReservedNonPersonalisedMode" time="0.0" />
+    <testcase classname="com.xenomi.cms.core.v2.product.service.ProductIssuancePolicyV2ServiceTest" name="alwaysPersistsNonPersonalisedAsDisabled" time="0.0" />
+    <testcase classname="com.xenomi.cms.core.v2.product.service.ProductIssuancePolicyV2ServiceTest" name="derivesSeparateVirtualPansAndCapacity" time="0.001" />
+    <testcase classname="com.xenomi.cms.core.v2.product.service.ProductIssuancePolicyV2ServiceTest" name="rejectsIssuanceChangesAfterVersionLeavesDraft" time="0.0" />
+  </testsuite>
+  <testsuite name="com.xenomi.cms.core.v2.product.service.ProductIssuanceProfileV2ServiceTest" tests="5" failures="0" errors="0" skipped="0" time="0.019">
+    <testcase classname="com.xenomi.cms.core.v2.product.service.ProductIssuanceProfileV2ServiceTest" name="cardDesignStartsInDraft" time="0.015" />
+    <testcase classname="com.xenomi.cms.core.v2.product.service.ProductIssuanceProfileV2ServiceTest" name="virtualOnlyProductRejectsPhysicalTechnologyProfile" time="0.001" />
+    <testcase classname="com.xenomi.cms.core.v2.product.service.ProductIssuanceProfileV2ServiceTest" name="cdcvmIsRejectedOutsideContactlessInterface" time="0.001" />
+    <testcase classname="com.xenomi.cms.core.v2.product.service.ProductIssuanceProfileV2ServiceTest" name="offlinePinCvmRequiresOfflinePinPolicy" time="0.0" />
+    <testcase classname="com.xenomi.cms.core.v2.product.service.ProductIssuanceProfileV2ServiceTest" name="createsTechnologyProfileWhenPersonalisationMatches" time="0.001" />
+  </testsuite>
+  <testsuite name="com.xenomi.cms.core.v2.product.service.ProductPaymentProfileV2ServiceTest" tests="13" failures="0" errors="0" skipped="0" time="0.007">
+    <testcase classname="com.xenomi.cms.core.v2.product.service.ProductPaymentProfileV2ServiceTest" name="cvmAmountRangeMustBeOrdered" time="0.001" />
+    <testcase classname="com.xenomi.cms.core.v2.product.service.ProductPaymentProfileV2ServiceTest" name="cvmRuleSequencesMustBeUnique" time="0.001" />
+    <testcase classname="com.xenomi.cms.core.v2.product.service.ProductPaymentProfileV2ServiceTest" name="replacesRulesWhenUpdatingDraftCvmProfile" time="0.001" />
+    <testcase classname="com.xenomi.cms.core.v2.product.service.ProductPaymentProfileV2ServiceTest" name="cvmLimitAndCurrencyMustBeProvidedTogether" time="0.001" />
+    <testcase classname="com.xenomi.cms.core.v2.product.service.ProductPaymentProfileV2ServiceTest" name="createsCvmProfileAndNormalizedRules" time="0.0" />
+    <testcase classname="com.xenomi.cms.core.v2.product.service.ProductPaymentProfileV2ServiceTest" name="mapsStoredCvmRulesInResponse" time="0.001" />
+    <testcase classname="com.xenomi.cms.core.v2.product.service.ProductPaymentProfileV2ServiceTest" name="nonDraftVersionCannotBeChanged" time="0.0" />
+    <testcase classname="com.xenomi.cms.core.v2.product.service.ProductPaymentProfileV2ServiceTest" name="physicalCvmNeedsTechnologyProfile" time="0.0" />
+    <testcase classname="com.xenomi.cms.core.v2.product.service.ProductPaymentProfileV2ServiceTest" name="onlinePinRequiresSupportingPinPolicy" time="0.001" />
+    <testcase classname="com.xenomi.cms.core.v2.product.service.ProductPaymentProfileV2ServiceTest" name="missingVersionIsReported" time="0.0" />
+    <testcase classname="com.xenomi.cms.core.v2.product.service.ProductPaymentProfileV2ServiceTest" name="technologyCannotActivateWhenAnotherProfileIsActive" time="0.0" />
+    <testcase classname="com.xenomi.cms.core.v2.product.service.ProductPaymentProfileV2ServiceTest" name="technologyConfigurationCannotChangeAfterDraft" time="0.0" />
+    <testcase classname="com.xenomi.cms.core.v2.product.service.ProductPaymentProfileV2ServiceTest" name="cvmDatesMustBeOrdered" time="0.0" />
+  </testsuite>
+  <testsuite name="com.xenomi.cms.core.v2.product.service.ProductPinPolicyV2ServiceTest" tests="4" failures="0" errors="0" skipped="0" time="0.002">
+    <testcase classname="com.xenomi.cms.core.v2.product.service.ProductPinPolicyV2ServiceTest" name="rejectsUpdateAfterVersionLeavesDraft" time="0.001" />
+    <testcase classname="com.xenomi.cms.core.v2.product.service.ProductPinPolicyV2ServiceTest" name="rejectsGreenPinDeliveryWhenGreenPinIsDisabled" time="0.0" />
+    <testcase classname="com.xenomi.cms.core.v2.product.service.ProductPinPolicyV2ServiceTest" name="createsDraftPinPolicyForDraftVersion" time="0.0" />
+    <testcase classname="com.xenomi.cms.core.v2.product.service.ProductPinPolicyV2ServiceTest" name="rejectsPinRequiredWithoutVerificationMode" time="0.001" />
+  </testsuite>
+  <testsuite name="com.xenomi.cms.core.v2.product.service.ProductReplacementPolicyV2ServiceTest" tests="8" failures="0" errors="0" skipped="0" time="0.003">
+    <testcase classname="com.xenomi.cms.core.v2.product.service.ProductReplacementPolicyV2ServiceTest" name="compromisedReplacementRequiresImmediateBlock" time="0.0" />
+    <testcase classname="com.xenomi.cms.core.v2.product.service.ProductReplacementPolicyV2ServiceTest" name="rejectsDuplicateReasonWithinVersion" time="0.001" />
+    <testcase classname="com.xenomi.cms.core.v2.product.service.ProductReplacementPolicyV2ServiceTest" name="rejectsCompromisedCardWithSamePan" time="0.0" />
+    <testcase classname="com.xenomi.cms.core.v2.product.service.ProductReplacementPolicyV2ServiceTest" name="rejectsLostCardWithoutImmediateBlock" time="0.0" />
+    <testcase classname="com.xenomi.cms.core.v2.product.service.ProductReplacementPolicyV2ServiceTest" name="rejectsLostCardWithSamePanEvenWhenImmediateBlockIsConfigured" time="0.001" />
+    <testcase classname="com.xenomi.cms.core.v2.product.service.ProductReplacementPolicyV2ServiceTest" name="riskBasedDecisionRequiresApproval" time="0.0" />
+    <testcase classname="com.xenomi.cms.core.v2.product.service.ProductReplacementPolicyV2ServiceTest" name="createsDraftSamePanPolicyForDamagedCard" time="0.001" />
+    <testcase classname="com.xenomi.cms.core.v2.product.service.ProductReplacementPolicyV2ServiceTest" name="rejectsChangesAfterVersionLeavesDraft" time="0.0" />
+  </testsuite>
+  <testsuite name="com.xenomi.cms.core.v2.product.service.ProductVersionConfigurationV2ServiceTest" tests="9" failures="0" errors="0" skipped="0" time="0.004">
+    <testcase classname="com.xenomi.cms.core.v2.product.service.ProductVersionConfigurationV2ServiceTest" name="createsLimitWithDefaultActiveStatus" time="0.0" />
+    <testcase classname="com.xenomi.cms.core.v2.product.service.ProductVersionConfigurationV2ServiceTest" name="updatesAmountsAndStatus" time="0.0" />
+    <testcase classname="com.xenomi.cms.core.v2.product.service.ProductVersionConfigurationV2ServiceTest" name="enabledControlMustBeAllowed" time="0.001" />
+    <testcase classname="com.xenomi.cms.core.v2.product.service.ProductVersionConfigurationV2ServiceTest" name="listsAndGetsLimitsWithinVersionScope" time="0.001" />
+    <testcase classname="com.xenomi.cms.core.v2.product.service.ProductVersionConfigurationV2ServiceTest" name="updateRetainsUnspecifiedAmountsAndValidatesMaximum" time="0.0" />
+    <testcase classname="com.xenomi.cms.core.v2.product.service.ProductVersionConfigurationV2ServiceTest" name="createsAndUpdatesDefaultControls" time="0.0" />
+    <testcase classname="com.xenomi.cms.core.v2.product.service.ProductVersionConfigurationV2ServiceTest" name="internationalChannelsRequireMasterInternationalFlag" time="0.001" />
+    <testcase classname="com.xenomi.cms.core.v2.product.service.ProductVersionConfigurationV2ServiceTest" name="duplicateAndNegativeLimitsAreRejected" time="0.0" />
+    <testcase classname="com.xenomi.cms.core.v2.product.service.ProductVersionConfigurationV2ServiceTest" name="getsControlsAndReportsMissingConfiguration" time="0.0" />
+  </testsuite>
+  <testsuite name="com.xenomi.cms.core.v2.product.service.ProductVersionV2ServiceTest" tests="2" failures="0" errors="0" skipped="0" time="0.005">
+    <testcase classname="com.xenomi.cms.core.v2.product.service.ProductVersionV2ServiceTest" name="statusUpdatePublishesVersionEvents" time="0.004" />
+    <testcase classname="com.xenomi.cms.core.v2.product.service.ProductVersionV2ServiceTest" name="omittedProductValidityCopiesInstitutionFallbackIntoVersion" time="0.001" />
+  </testsuite>
+  <testsuite name="com.xenomi.cms.core.v2.switchsync.SwitchRegistrationEnvelopeTest" tests="1" failures="0" errors="0" skipped="0" time="0.694">
+    <testcase classname="com.xenomi.cms.core.v2.switchsync.SwitchRegistrationEnvelopeTest" name="onlyRecipientCanReadBoundRegistrationAndNoCvvOrTrackIsExported" time="0.694" />
+  </testsuite>
+  <testsuite name="com.xenomi.cms.core.v2.switchsync.SwitchSyncControllerTest" tests="2" failures="0" errors="0" skipped="0" time="0.007">
+    <testcase classname="com.xenomi.cms.core.v2.switchsync.SwitchSyncControllerTest" name="returnsSynchronizationStatusForExistingCard" time="0.006" />
+    <testcase classname="com.xenomi.cms.core.v2.switchsync.SwitchSyncControllerTest" name="hidesSynchronizationStateForUnknownCard" time="0.001" />
+  </testsuite>
+  <testsuite name="com.xenomi.cms.core.v2.switchsync.SwitchSyncDatabaseTest" tests="9" failures="0" errors="0" skipped="9" time="0.001">
+    <testcase classname="com.xenomi.cms.core.v2.switchsync.SwitchSyncDatabaseTest" name="registrationPromotesReadyProductionRequestAndLeavesIncompleteRequestPending" time="0.0">
+      <skipped message="Environment variable [CMS_SWITCH_TEST_DB] does not exist" />
+    </testcase>
+    <testcase classname="com.xenomi.cms.core.v2.switchsync.SwitchSyncDatabaseTest" name="pinEnrollmentPrecedesEnablingUseButRegistrationCanProceed" time="0.0">
+      <skipped message="Environment variable [CMS_SWITCH_TEST_DB] does not exist" />
+    </testcase>
+    <testcase classname="com.xenomi.cms.core.v2.switchsync.SwitchSyncDatabaseTest" name="sameTransactionRetiresSourceBeforeActiveSuccessorEvenWhenSuccessorChangedFirst" time="0.0">
+      <skipped message="Environment variable [CMS_SWITCH_TEST_DB] does not exist" />
+    </testcase>
+    <testcase classname="com.xenomi.cms.core.v2.switchsync.SwitchSyncDatabaseTest" name="registrationPrecedesDesiredProfileAndAcknowledgesControlVersion" time="0.0">
+      <skipped message="Environment variable [CMS_SWITCH_TEST_DB] does not exist" />
+    </testcase>
+    <testcase classname="com.xenomi.cms.core.v2.switchsync.SwitchSyncDatabaseTest" name="freezeAndUnfreezeAreSeparateSnapshots" time="0.0">
+      <skipped message="Environment variable [CMS_SWITCH_TEST_DB] does not exist" />
+    </testcase>
+    <testcase classname="com.xenomi.cms.core.v2.switchsync.SwitchSyncDatabaseTest" name="deferredCaptureSeesCompleteProfileAndRollbackLeavesNoWork" time="0.0">
+      <skipped message="Environment variable [CMS_SWITCH_TEST_DB] does not exist" />
+    </testcase>
+    <testcase classname="com.xenomi.cms.core.v2.switchsync.SwitchSyncDatabaseTest" name="timeoutUsesStoredRequestAndDoesNotReencrypt" time="0.0">
+      <skipped message="Environment variable [CMS_SWITCH_TEST_DB] does not exist" />
+    </testcase>
+    <testcase classname="com.xenomi.cms.core.v2.switchsync.SwitchSyncDatabaseTest" name="invalidReceiptCannotAcknowledgeState" time="0.0">
+      <skipped message="Environment variable [CMS_SWITCH_TEST_DB] does not exist" />
+    </testcase>
+    <testcase classname="com.xenomi.cms.core.v2.switchsync.SwitchSyncDatabaseTest" name="remoteReceiptRecoversLostRegistrationResponse" time="0.0">
+      <skipped message="Environment variable [CMS_SWITCH_TEST_DB] does not exist" />
+    </testcase>
+  </testsuite>
+  <testsuite name="com.xenomi.cms.core.v2.switchsync.SwitchSyncTransportHttpTest" tests="2" failures="0" errors="0" skipped="0" time="0.135">
+    <testcase classname="com.xenomi.cms.core.v2.switchsync.SwitchSyncTransportHttpTest" name="mapsMissingReceiptsToNullAndRejectsMissingOrRejectedTokens" time="0.13" />
+    <testcase classname="com.xenomi.cms.core.v2.switchsync.SwitchSyncTransportHttpTest" name="performsAuthenticatedCardAndPinOperations" time="0.004" />
+  </testsuite>
+  <testsuite name="com.xenomi.cms.core.v2.switchsync.SwitchSyncWorkerTest" tests="11" failures="0" errors="0" skipped="0" time="0.03">
+    <testcase classname="com.xenomi.cms.core.v2.switchsync.SwitchSyncWorkerTest" name="currencyUsesIsoNumericCodeWithoutChangingMinorUnits" time="0.002" />
+    <testcase classname="com.xenomi.cms.core.v2.switchsync.SwitchSyncWorkerTest" name="sendsPreparedUpdateAndPersistsValidatedReceipt" time="0.018" />
+    <testcase classname="com.xenomi.cms.core.v2.switchsync.SwitchSyncWorkerTest" name="refusesMissingControlInsteadOfSendingPartialProfile" time="0.0" />
+    <testcase classname="com.xenomi.cms.core.v2.switchsync.SwitchSyncWorkerTest" name="pollStopsCleanlyWhenAnotherWorkerOwnsTheAdvisoryLock" time="0.0" />
+    <testcase classname="com.xenomi.cms.core.v2.switchsync.SwitchSyncWorkerTest" name="transportRequiresHttpsAndDisallowsUrlCredentials" time="0.001" />
+    <testcase classname="com.xenomi.cms.core.v2.switchsync.SwitchSyncWorkerTest" name="tokenDiagnosticsExposeOnlyRecognizedErrorCodes" time="0.0" />
+    <testcase classname="com.xenomi.cms.core.v2.switchsync.SwitchSyncWorkerTest" name="localHttpModeStartsWithoutTlsKeystores" time="0.001" />
+    <testcase classname="com.xenomi.cms.core.v2.switchsync.SwitchSyncWorkerTest" name="refusesMixedCurrenciesAndDuplicateDimensions" time="0.001" />
+    <testcase classname="com.xenomi.cms.core.v2.switchsync.SwitchSyncWorkerTest" name="preparesRegistrationWithNormalizedProfileAndProtectedMaterial" time="0.002" />
+    <testcase classname="com.xenomi.cms.core.v2.switchsync.SwitchSyncWorkerTest" name="marksPermanentSwitchRejectionFailedWithoutRetainingRemoteBody" time="0.002" />
+    <testcase classname="com.xenomi.cms.core.v2.switchsync.SwitchSyncWorkerTest" name="pollHandlesEmptyQueueAndUnavailableDiagnostics" time="0.001" />
+  </testsuite>
+</testsuites>

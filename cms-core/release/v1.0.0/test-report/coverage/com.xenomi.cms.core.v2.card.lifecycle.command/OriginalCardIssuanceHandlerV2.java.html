@@ -1,0 +1,26 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>OriginalCardIssuanceHandlerV2.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">CMS Core Service</a> &gt; <a href="index.source.html" class="el_package">com.xenomi.cms.core.v2.card.lifecycle.command</a> &gt; <span class="el_source">OriginalCardIssuanceHandlerV2.java</span></div><h1>OriginalCardIssuanceHandlerV2.java</h1><pre class="source lang-java linenums">package com.xenomi.cms.core.v2.card.lifecycle.command;
+
+import com.xenomi.cms.core.v2.card.dto.CreateCardV2Request;
+import com.xenomi.cms.core.v2.card.model.LifecycleActorTypeV2;
+import jakarta.validation.Valid;
+import jakarta.validation.constraints.NotNull;
+import org.springframework.stereotype.Component;
+import java.util.*;
+
+@Component
+public class OriginalCardIssuanceHandlerV2 implements LifecycleCommandHandlerV2&lt;OriginalCardIssuanceHandlerV2.Payload&gt; {
+<span class="fc" id="L12">    public record Payload(@Valid @NotNull CreateCardV2Request card) {}</span>
+    private final OriginalCardIssuanceWorkV2 work;
+<span class="fc" id="L14">    public OriginalCardIssuanceHandlerV2(OriginalCardIssuanceWorkV2 work) { this.work = work; }</span>
+<span class="fc" id="L15">    public String kind() { return &quot;ISSUE_ORIGINAL&quot;; }</span>
+<span class="fc" id="L16">    public String permission() { return &quot;cms:card:issue&quot;; }</span>
+<span class="nc" id="L17">    public Set&lt;LifecycleActorTypeV2&gt; actors() { return Set.of(LifecycleActorTypeV2.OPS, LifecycleActorTypeV2.SYSTEM); }</span>
+<span class="nc" id="L18">    public Class&lt;Payload&gt; payloadType() { return Payload.class; }</span>
+<span class="fc" id="L19">    public VersionRequirement versionRequirement() { return VersionRequirement.CREATE; }</span>
+    public LockPlan plan(LifecycleCommandRequestV2 request, Payload payload) {
+<span class="fc bfc" id="L21" title="All 2 branches covered.">        if (!request.accountReferenceId().equals(payload.card().getAccountReferenceId())) throw new IllegalArgumentException(&quot;Account mismatch&quot;);</span>
+<span class="fc" id="L22">        return new LockPlan(Set.of(), Set.of());</span>
+    }
+<span class="fc" id="L24">    public void apply(LifecycleCommandContextV2 context, Payload payload) { work.stage(context, payload.card()); }</span>
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.15.202606040825</span></div></body></html>

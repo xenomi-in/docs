@@ -1,0 +1,300 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>BinRangeV2Service.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">CMS Core Service</a> &gt; <a href="index.source.html" class="el_package">com.xenomi.cms.core.v2.bin.service</a> &gt; <span class="el_source">BinRangeV2Service.java</span></div><h1>BinRangeV2Service.java</h1><pre class="source lang-java linenums">package com.xenomi.cms.core.v2.bin.service;
+
+import java.math.BigInteger;
+import java.time.OffsetDateTime;
+import java.util.UUID;
+
+import com.xenomi.cms.core.exception.ResourceNotFoundException;
+import com.xenomi.cms.core.v2.bin.dto.BinRangeV2Response;
+import com.xenomi.cms.core.v2.bin.dto.CreateBinRangeV2Request;
+import com.xenomi.cms.core.v2.bin.dto.UpdateBinRangeV2Request;
+import com.xenomi.cms.core.v2.bin.entity.BinConfigurationV2;
+import com.xenomi.cms.core.v2.bin.entity.BinRangeV2;
+import com.xenomi.cms.core.v2.bin.model.AllocationStrategy;
+import com.xenomi.cms.core.v2.bin.model.BinRangeStatus;
+import com.xenomi.cms.core.v2.bin.repository.BinConfigurationV2Repository;
+import com.xenomi.cms.core.v2.bin.repository.BinRangeV2Repository;
+import com.xenomi.cms.core.v2.card.repository.CardV2Repository;
+import com.xenomi.cms.core.v2.common.DatabaseUuidV7Generator;
+import com.xenomi.cms.core.v2.event.catalog.BinEventSink;
+import com.xenomi.cms.core.v2.event.correlation.CorrelationIdResolver;
+import com.xenomi.cms.core.bin.util.LuhnAlgorithm;
+
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
+
+@Service
+public class BinRangeV2Service {
+
+    private final BinRangeV2Repository repository;
+    private final BinConfigurationV2Repository binRepository;
+    private final DatabaseUuidV7Generator uuidGenerator;
+    private final CardV2Repository cardRepository;
+    private final BinEventSink eventSink;
+    private final CorrelationIdResolver correlationIdResolver;
+
+    public BinRangeV2Service(BinRangeV2Repository repository,
+            BinConfigurationV2Repository binRepository, DatabaseUuidV7Generator uuidGenerator,
+            BinEventSink eventSink, CorrelationIdResolver correlationIdResolver) {
+<span class="fc" id="L42">        this(repository, binRepository, uuidGenerator, null, eventSink, correlationIdResolver);</span>
+<span class="fc" id="L43">    }</span>
+
+    @Autowired
+    public BinRangeV2Service(BinRangeV2Repository repository,
+            BinConfigurationV2Repository binRepository, DatabaseUuidV7Generator uuidGenerator,
+            CardV2Repository cardRepository, BinEventSink eventSink,
+<span class="fc" id="L49">            CorrelationIdResolver correlationIdResolver) {</span>
+<span class="fc" id="L50">        this.repository = repository;</span>
+<span class="fc" id="L51">        this.binRepository = binRepository;</span>
+<span class="fc" id="L52">        this.uuidGenerator = uuidGenerator;</span>
+<span class="fc" id="L53">        this.cardRepository = cardRepository;</span>
+<span class="fc" id="L54">        this.eventSink = eventSink;</span>
+<span class="fc" id="L55">        this.correlationIdResolver = correlationIdResolver;</span>
+<span class="fc" id="L56">    }</span>
+
+    @Transactional
+    public BinRangeV2Response create(UUID institutionId, UUID binId,
+            CreateBinRangeV2Request request, String actorId) {
+<span class="fc" id="L61">        BinConfigurationV2 bin = lockBin(institutionId, binId);</span>
+<span class="fc" id="L62">        String start = request.getRangeStart().trim();</span>
+<span class="fc" id="L63">        String end = request.getRangeEnd().trim();</span>
+<span class="fc" id="L64">        BigInteger totalCapacity = validateRange(bin, start, end);</span>
+<span class="fc" id="L65">        assertNoOverlap(institutionId, binId, start, end);</span>
+<span class="fc bfc" id="L66" title="All 2 branches covered.">        if (repository.countPlatformOverlaps(start, end, start.length()) &gt; 0) {</span>
+<span class="fc" id="L67">            throw new IllegalArgumentException(&quot;PAN range overlaps an existing configured range&quot;);</span>
+        }
+
+        // usable_capacity is derived from the supplied range; callers cannot override it.
+<span class="fc" id="L71">        long usableCapacity = totalCapacity.longValueExact();</span>
+<span class="fc" id="L72">        validateThreshold(request.getExhaustionThreshold(), usableCapacity);</span>
+<span class="fc" id="L73">        validateDates(request.getEffectiveFrom(), request.getEffectiveTo());</span>
+
+<span class="fc" id="L75">        BinRangeV2 range = BinRangeV2.builder()</span>
+<span class="fc" id="L76">                .binRangeId(uuidGenerator.generate())</span>
+<span class="fc" id="L77">                .institutionId(institutionId)</span>
+<span class="fc" id="L78">                .binId(binId)</span>
+<span class="fc" id="L79">                .rangeStart(start)</span>
+<span class="fc" id="L80">                .rangeEnd(end)</span>
+<span class="pc bpc" id="L81" title="1 of 2 branches missed.">                .allocationStrategy(request.getAllocationStrategy() == null</span>
+<span class="pc" id="L82">                        ? AllocationStrategy.RANDOM : request.getAllocationStrategy())</span>
+<span class="fc" id="L83">                .usableCapacity(usableCapacity)</span>
+<span class="fc" id="L84">                .exhaustionThreshold(request.getExhaustionThreshold())</span>
+<span class="fc" id="L85">                .issuedPanCount(0L)</span>
+<span class="fc" id="L86">                .nextSequenceValue(0L)</span>
+<span class="fc" id="L87">                .rangeStatus(BinRangeStatus.DRAFT)</span>
+<span class="fc" id="L88">                .effectiveFrom(request.getEffectiveFrom())</span>
+<span class="fc" id="L89">                .effectiveTo(request.getEffectiveTo())</span>
+<span class="fc" id="L90">                .createdBy(actorId.trim())</span>
+<span class="fc" id="L91">                .updatedBy(actorId.trim())</span>
+<span class="fc" id="L92">                .build();</span>
+        BinRangeV2 saved;
+        try {
+<span class="fc" id="L95">            saved = repository.save(range);</span>
+            // Surface concurrent platform overlaps before emitting a successful creation event.
+<span class="fc" id="L97">            repository.flush();</span>
+<span class="nc" id="L98">        } catch (org.springframework.dao.DataIntegrityViolationException failure) {</span>
+<span class="nc bnc" id="L99" title="All 2 branches missed.">            for (Throwable cause = failure; cause != null; cause = cause.getCause()) {</span>
+<span class="nc bnc" id="L100" title="All 2 branches missed.">                if (cause instanceof org.hibernate.exception.ConstraintViolationException constraint</span>
+<span class="nc bnc" id="L101" title="All 2 branches missed.">                        &amp;&amp; &quot;ex_pan_range_platform&quot;.equals(constraint.getConstraintName())) {</span>
+<span class="nc" id="L102">                    throw new IllegalArgumentException(&quot;PAN range overlaps an existing configured range&quot;);</span>
+                }
+            }
+<span class="nc" id="L105">            throw failure;</span>
+<span class="fc" id="L106">        }</span>
+<span class="fc" id="L107">        BinRangeV2Response response = toResponse(saved);</span>
+<span class="fc" id="L108">        eventSink.onRangeCreated(response, correlationIdResolver.current());</span>
+<span class="fc" id="L109">        return response;</span>
+    }
+
+    @Transactional(readOnly = true)
+    public BinRangeV2Response get(UUID institutionId, UUID binId, UUID rangeId) {
+<span class="nc" id="L114">        return toResponse(find(institutionId, binId, rangeId));</span>
+    }
+
+    @Transactional(readOnly = true)
+    public Page&lt;BinRangeV2Response&gt; search(UUID institutionId, UUID binId,
+            BinRangeStatus status, Pageable pageable) {
+<span class="nc" id="L120">        requireBin(institutionId, binId);</span>
+<span class="nc" id="L121">        return repository.search(institutionId, binId, status, pageable).map(this::toResponse);</span>
+    }
+
+    @Transactional
+    public BinRangeV2Response update(UUID institutionId, UUID binId, UUID rangeId,
+            UpdateBinRangeV2Request request, String actorId) {
+<span class="nc" id="L127">        lockBin(institutionId, binId);</span>
+<span class="nc" id="L128">        BinRangeV2 range = find(institutionId, binId, rangeId);</span>
+<span class="nc bnc" id="L129" title="All 2 branches missed.">        if (request.getAllocationStrategy() != null) {</span>
+<span class="nc" id="L130">            requireDraft(range, &quot;allocationStrategy&quot;);</span>
+<span class="nc" id="L131">            range.setAllocationStrategy(request.getAllocationStrategy());</span>
+        }
+<span class="nc bnc" id="L133" title="All 2 branches missed.">        if (request.getExhaustionThreshold() != null) {</span>
+<span class="nc" id="L134">            range.setExhaustionThreshold(request.getExhaustionThreshold());</span>
+        }
+<span class="nc bnc" id="L136" title="All 2 branches missed.">        if (request.getEffectiveFrom() != null) range.setEffectiveFrom(request.getEffectiveFrom());</span>
+<span class="nc bnc" id="L137" title="All 2 branches missed.">        if (request.getEffectiveTo() != null) range.setEffectiveTo(request.getEffectiveTo());</span>
+<span class="nc bnc" id="L138" title="All 4 branches missed.">        if (request.getRangeStatus() != null &amp;&amp; request.getRangeStatus() != range.getRangeStatus()) {</span>
+<span class="nc" id="L139">            validateTransition(range.getRangeStatus(), request.getRangeStatus());</span>
+<span class="nc" id="L140">            range.setRangeStatus(request.getRangeStatus());</span>
+        }
+<span class="nc" id="L142">        validateThreshold(range.getExhaustionThreshold(), range.getUsableCapacity());</span>
+<span class="nc" id="L143">        validateDates(range.getEffectiveFrom(), range.getEffectiveTo());</span>
+<span class="nc" id="L144">        range.setUpdatedBy(actorId.trim());</span>
+<span class="nc" id="L145">        range.setUpdatedAt(OffsetDateTime.now(java.time.ZoneOffset.UTC));</span>
+<span class="nc" id="L146">        BinRangeV2Response response = toResponse(repository.save(range));</span>
+<span class="nc" id="L147">        eventSink.onRangeUpdated(response, correlationIdResolver.current());</span>
+<span class="nc" id="L148">        return response;</span>
+    }
+
+    private BinConfigurationV2 lockBin(UUID institutionId, UUID binId) {
+<span class="fc" id="L152">        return binRepository.findByTenantAndIdForUpdate(institutionId, binId)</span>
+<span class="pc" id="L153">                .orElseThrow(() -&gt; new ResourceNotFoundException(&quot;BIN configuration&quot;, binId.toString()));</span>
+    }
+
+    private void requireBin(UUID institutionId, UUID binId) {
+<span class="nc bnc" id="L157" title="All 2 branches missed.">        if (binRepository.findByBinIdAndInstitutionId(binId, institutionId).isEmpty()) {</span>
+<span class="nc" id="L158">            throw new ResourceNotFoundException(&quot;BIN configuration&quot;, binId.toString());</span>
+        }
+<span class="nc" id="L160">    }</span>
+
+    private BinRangeV2 find(UUID institutionId, UUID binId, UUID rangeId) {
+<span class="nc" id="L163">        return repository.findByBinRangeIdAndInstitutionIdAndBinId(rangeId, institutionId, binId)</span>
+<span class="nc" id="L164">                .orElseThrow(() -&gt; new ResourceNotFoundException(&quot;BIN range&quot;, rangeId.toString()));</span>
+    }
+
+    private static BigInteger validateRange(BinConfigurationV2 bin, String start, String end) {
+<span class="pc bpc" id="L168" title="1 of 2 branches missed.">        if (start.length() != end.length()) {</span>
+<span class="nc" id="L169">            throw new IllegalArgumentException(&quot;rangeStart and rangeEnd must have the same length&quot;);</span>
+        }
+<span class="pc bpc" id="L171" title="2 of 4 branches missed.">        if (start.length() &lt; 12 || start.length() &gt; 19) {</span>
+<span class="nc" id="L172">            throw new IllegalArgumentException(&quot;PAN range values must contain between 12 and 19 digits&quot;);</span>
+        }
+<span class="pc bpc" id="L174" title="1 of 2 branches missed.">        if (start.length() != bin.getPanLength()) {</span>
+<span class="nc" id="L175">            throw new IllegalArgumentException(&quot;PAN range values must match configured PAN length &quot; + bin.getPanLength());</span>
+        }
+<span class="pc bpc" id="L177" title="1 of 4 branches missed.">        if (!start.startsWith(bin.getBinNumber()) || !end.startsWith(bin.getBinNumber())) {</span>
+<span class="fc" id="L178">            throw new IllegalArgumentException(&quot;rangeStart and rangeEnd must start with BIN &quot; + bin.getBinNumber());</span>
+        }
+<span class="pc bpc" id="L180" title="1 of 2 branches missed.">        if (start.compareTo(end) &gt; 0) {</span>
+<span class="nc" id="L181">            throw new IllegalArgumentException(&quot;rangeStart must be less than or equal to rangeEnd&quot;);</span>
+        }
+<span class="fc" id="L183">        return luhnCapacity(start, end);</span>
+    }
+
+    private void assertNoOverlap(UUID institutionId, UUID binId, String start, String end) {
+<span class="fc bfc" id="L187" title="All 2 branches covered.">        if (repository.countOpenOverlaps(institutionId, binId, start, end,</span>
+<span class="fc" id="L188">                start.length(), BinRangeStatus.CLOSED) &gt; 0) {</span>
+<span class="fc" id="L189">            throw new IllegalArgumentException(&quot;PAN range overlaps an existing non-closed range for this BIN&quot;);</span>
+        }
+<span class="fc" id="L191">    }</span>
+
+    private static BigInteger capacity(String start, String end) {
+<span class="nc" id="L194">        return luhnCapacity(start, end);</span>
+    }
+
+    /** Every complete group of ten values contains exactly one valid Luhn check digit. */
+    private static BigInteger luhnCapacity(String startValue, String endValue) {
+<span class="fc" id="L199">        BigInteger start = new BigInteger(startValue);</span>
+<span class="fc" id="L200">        BigInteger end = new BigInteger(endValue);</span>
+<span class="fc" id="L201">        BigInteger ten = BigInteger.TEN;</span>
+<span class="fc" id="L202">        BigInteger firstGroup = start.divide(ten);</span>
+<span class="fc" id="L203">        BigInteger lastGroup = end.divide(ten);</span>
+<span class="pc bpc" id="L204" title="1 of 2 branches missed.">        if (firstGroup.equals(lastGroup)) {</span>
+<span class="nc" id="L205">            return countBoundary(start, end, startValue.length());</span>
+        }
+<span class="fc" id="L207">        BigInteger firstEnd = firstGroup.multiply(ten).add(BigInteger.valueOf(9));</span>
+<span class="fc" id="L208">        BigInteger lastStart = lastGroup.multiply(ten);</span>
+<span class="fc" id="L209">        BigInteger middleGroups = lastGroup.subtract(firstGroup).subtract(BigInteger.ONE)</span>
+<span class="fc" id="L210">                .max(BigInteger.ZERO);</span>
+<span class="fc" id="L211">        return middleGroups</span>
+<span class="fc" id="L212">                .add(countBoundary(start, firstEnd, startValue.length()))</span>
+<span class="fc" id="L213">                .add(countBoundary(lastStart, end, startValue.length()));</span>
+    }
+
+    private static BigInteger countBoundary(BigInteger start, BigInteger end, int length) {
+<span class="fc" id="L217">        long count = 0;</span>
+<span class="fc bfc" id="L218" title="All 2 branches covered.">        for (BigInteger value = start; value.compareTo(end) &lt;= 0;</span>
+<span class="fc" id="L219">                value = value.add(BigInteger.ONE)) {</span>
+<span class="fc bfc" id="L220" title="All 2 branches covered.">            if (LuhnAlgorithm.validate(leftPad(value.toString(), length))) count++;</span>
+        }
+<span class="fc" id="L222">        return BigInteger.valueOf(count);</span>
+    }
+
+    private static String leftPad(String value, int length) {
+<span class="fc" id="L226">        return &quot;0&quot;.repeat(Math.max(0, length - value.length())) + value;</span>
+    }
+
+    private static long resolveUsableCapacity(Long requested, BigInteger total) {
+<span class="nc bnc" id="L230" title="All 2 branches missed.">        if (requested == null) {</span>
+            try {
+<span class="nc" id="L232">                return total.longValueExact();</span>
+<span class="nc" id="L233">            } catch (ArithmeticException ex) {</span>
+<span class="nc" id="L234">                throw new IllegalArgumentException(</span>
+                        &quot;PAN range capacity exceeds the supported numeric capacity&quot;);
+            }
+        }
+<span class="nc bnc" id="L238" title="All 2 branches missed.">        if (BigInteger.valueOf(requested).compareTo(total) &gt; 0) {</span>
+<span class="nc" id="L239">            throw new IllegalArgumentException(&quot;usableCapacity cannot exceed the PAN range capacity&quot;);</span>
+        }
+<span class="nc" id="L241">        return requested;</span>
+    }
+
+    private static void validateThreshold(Long threshold, Long usableCapacity) {
+<span class="pc bpc" id="L245" title="2 of 4 branches missed.">        if (threshold != null &amp;&amp; threshold &gt; usableCapacity) {</span>
+<span class="nc" id="L246">            throw new IllegalArgumentException(&quot;exhaustionThreshold cannot exceed usableCapacity&quot;);</span>
+        }
+<span class="fc" id="L248">    }</span>
+
+    private static void validateDates(OffsetDateTime from, OffsetDateTime to) {
+<span class="pc bpc" id="L251" title="3 of 4 branches missed.">        if (to != null &amp;&amp; !to.isAfter(from)) {</span>
+<span class="nc" id="L252">            throw new IllegalArgumentException(&quot;effectiveTo must be after effectiveFrom&quot;);</span>
+        }
+<span class="fc" id="L254">    }</span>
+
+    private static void requireDraft(BinRangeV2 range, String field) {
+<span class="nc bnc" id="L257" title="All 2 branches missed.">        if (range.getRangeStatus() != BinRangeStatus.DRAFT) {</span>
+<span class="nc" id="L258">            throw new IllegalArgumentException(field + &quot; can be changed only while the BIN range is DRAFT&quot;);</span>
+        }
+<span class="nc" id="L260">    }</span>
+
+    private static void validateTransition(BinRangeStatus current, BinRangeStatus target) {
+<span class="nc bnc" id="L263" title="All 6 branches missed.">        boolean allowed = switch (current) {</span>
+<span class="nc bnc" id="L264" title="All 4 branches missed.">            case DRAFT -&gt; target == BinRangeStatus.PENDING_APPROVAL || target == BinRangeStatus.CLOSED;</span>
+<span class="nc bnc" id="L265" title="All 6 branches missed.">            case PENDING_APPROVAL -&gt; target == BinRangeStatus.ACTIVE</span>
+                    || target == BinRangeStatus.SUSPENDED || target == BinRangeStatus.CLOSED;
+<span class="nc bnc" id="L267" title="All 6 branches missed.">            case ACTIVE -&gt; target == BinRangeStatus.EXHAUSTED</span>
+                    || target == BinRangeStatus.SUSPENDED || target == BinRangeStatus.CLOSED;
+<span class="nc bnc" id="L269" title="All 4 branches missed.">            case SUSPENDED -&gt; target == BinRangeStatus.ACTIVE || target == BinRangeStatus.CLOSED;</span>
+<span class="nc bnc" id="L270" title="All 2 branches missed.">            case EXHAUSTED -&gt; target == BinRangeStatus.CLOSED;</span>
+<span class="nc" id="L271">            case CLOSED -&gt; false;</span>
+        };
+<span class="nc bnc" id="L273" title="All 2 branches missed.">        if (!allowed) {</span>
+<span class="nc" id="L274">            throw new IllegalArgumentException(&quot;Invalid BIN range status transition: &quot; + current + &quot; -&gt; &quot; + target);</span>
+        }
+<span class="nc" id="L276">    }</span>
+
+    private BinRangeV2Response toResponse(BinRangeV2 e) {
+<span class="fc" id="L279">        long totalPanCapacity = luhnCapacity(e.getRangeStart(), e.getRangeEnd()).longValueExact();</span>
+<span class="fc" id="L280">        long availablePanCapacity = Math.max(0L, totalPanCapacity - e.getIssuedPanCount());</span>
+<span class="pc bpc" id="L281" title="1 of 2 branches missed.">        long active = cardRepository == null ? 0L : cardRepository.countActiveCards(e.getInstitutionId(), e.getBinRangeId());</span>
+<span class="pc bpc" id="L282" title="1 of 2 branches missed.">        long blocked = cardRepository == null ? 0L : cardRepository.countBlockedOrSuspendedCards(e.getInstitutionId(), e.getBinRangeId());</span>
+<span class="pc bpc" id="L283" title="1 of 2 branches missed.">        long closed = cardRepository == null ? 0L : cardRepository.countClosedCards(e.getInstitutionId(), e.getBinRangeId());</span>
+<span class="fc" id="L284">        return BinRangeV2Response.builder()</span>
+<span class="fc" id="L285">                .binRangeId(e.getBinRangeId()).institutionId(e.getInstitutionId()).binId(e.getBinId())</span>
+<span class="fc" id="L286">                .rangeStart(e.getRangeStart()).rangeEnd(e.getRangeEnd())</span>
+<span class="fc" id="L287">                .allocationStrategy(e.getAllocationStrategy()).usableCapacity(e.getUsableCapacity())</span>
+<span class="fc" id="L288">                .totalPanCapacity(totalPanCapacity)</span>
+<span class="fc" id="L289">                .exhaustionThreshold(e.getExhaustionThreshold())</span>
+<span class="fc" id="L290">                .issuedPanCount(e.getIssuedPanCount())</span>
+<span class="fc" id="L291">                .remainingPanCapacity(availablePanCapacity)</span>
+<span class="fc" id="L292">                .availablePanCapacity(availablePanCapacity)</span>
+<span class="fc" id="L293">                .activeCardCount(active).blockedSuspendedCardCount(blocked).closedCardCount(closed)</span>
+<span class="fc" id="L294">                .nextSequenceValue(e.getNextSequenceValue()).rangeStatus(e.getRangeStatus())</span>
+<span class="fc" id="L295">                .effectiveFrom(e.getEffectiveFrom()).effectiveTo(e.getEffectiveTo())</span>
+<span class="fc" id="L296">                .createdAt(e.getCreatedAt()).updatedAt(e.getUpdatedAt())</span>
+<span class="fc" id="L297">                .createdBy(e.getCreatedBy()).updatedBy(e.getUpdatedBy()).build();</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.15.202606040825</span></div></body></html>

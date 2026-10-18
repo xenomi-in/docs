@@ -1,0 +1,310 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>ProductConfigurationV2Controller.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">CMS Core Service</a> &gt; <a href="index.source.html" class="el_package">com.xenomi.cms.core.v2.product.controller</a> &gt; <span class="el_source">ProductConfigurationV2Controller.java</span></div><h1>ProductConfigurationV2Controller.java</h1><pre class="source lang-java linenums">package com.xenomi.cms.core.v2.product.controller;
+
+import java.util.UUID;
+
+import com.xenomi.cms.core.api.ApiResponseEnvelope;
+import com.xenomi.cms.core.api.ApiResponseHelper;
+import com.xenomi.cms.core.api.PageableDefaults;
+import com.xenomi.cms.core.api.PagedResponse;
+import com.xenomi.cms.core.v2.product.dto.CreateProductBinRangeAssignmentV2Request;
+import com.xenomi.cms.core.v2.product.dto.CreateProductCardLimitV2Request;
+import com.xenomi.cms.core.v2.product.dto.ProductBinRangeAssignmentV2Response;
+import com.xenomi.cms.core.v2.product.dto.ProductCardLimitV2Response;
+import com.xenomi.cms.core.v2.product.dto.ProductDefaultControlsV2Response;
+import com.xenomi.cms.core.v2.product.dto.ProductPinPolicyV2Response;
+import com.xenomi.cms.core.v2.product.dto.CreateProductReplacementPolicyV2Request;
+import com.xenomi.cms.core.v2.product.dto.ProductReplacementPolicyV2Response;
+import com.xenomi.cms.core.v2.product.dto.UpdateProductReplacementPolicyV2Request;
+import com.xenomi.cms.core.v2.product.dto.ProductCardFormPolicyV2Response;
+import com.xenomi.cms.core.v2.product.dto.ProductPersonalisationPolicyV2Response;
+import com.xenomi.cms.core.v2.product.dto.UpsertProductCardFormPolicyV2Request;
+import com.xenomi.cms.core.v2.product.dto.UpsertProductPersonalisationPolicyV2Request;
+import com.xenomi.cms.core.v2.product.dto.UpdateProductBinRangeAssignmentV2Request;
+import com.xenomi.cms.core.v2.product.dto.UpdateProductCardLimitV2Request;
+import com.xenomi.cms.core.v2.product.dto.UpsertProductDefaultControlsV2Request;
+import com.xenomi.cms.core.v2.product.dto.UpsertProductPinPolicyV2Request;
+import com.xenomi.cms.core.v2.product.service.ProductBinRangeAssignmentV2Service;
+import com.xenomi.cms.core.v2.product.service.ProductVersionConfigurationV2Service;
+import com.xenomi.cms.core.v2.product.service.ProductPinPolicyV2Service;
+import com.xenomi.cms.core.v2.product.service.ProductReplacementPolicyV2Service;
+import com.xenomi.cms.core.v2.product.service.ProductIssuancePolicyV2Service;
+import io.swagger.v3.oas.annotations.Operation;
+import io.swagger.v3.oas.annotations.tags.Tag;
+import jakarta.validation.Valid;
+import jakarta.validation.constraints.NotBlank;
+import jakarta.validation.constraints.Size;
+import org.springframework.data.domain.PageRequest;
+import org.springframework.data.domain.Pageable;
+import org.springframework.data.domain.Sort;
+import org.springframework.http.ResponseEntity;
+import org.springframework.validation.annotation.Validated;
+import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PathVariable;
+import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.PutMapping;
+import org.springframework.web.bind.annotation.RequestBody;
+import org.springframework.web.bind.annotation.RequestHeader;
+import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestParam;
+import org.springframework.web.bind.annotation.RestController;
+
+@Validated
+@RestController
+@RequestMapping(&quot;/cms/api/v2/institutions/{institutionId}/products/{productId}&quot;)
+@Tag(name = &quot;V2 - Product Policies&quot;,
+        description = &quot;BIN allocation, transaction controls, limits and versioned product policies&quot;)
+public class ProductConfigurationV2Controller {
+    private static final String ACTOR_HEADER = &quot;X-Actor-Id&quot;;
+    private final ProductBinRangeAssignmentV2Service assignmentService;
+    private final ProductVersionConfigurationV2Service versionConfigurationService;
+    private final ProductPinPolicyV2Service pinPolicyService;
+    private final ProductReplacementPolicyV2Service replacementPolicyService;
+    private final ProductIssuancePolicyV2Service issuancePolicyService;
+
+    public ProductConfigurationV2Controller(
+            ProductBinRangeAssignmentV2Service assignmentService,
+            ProductVersionConfigurationV2Service versionConfigurationService,
+            ProductPinPolicyV2Service pinPolicyService,
+            ProductReplacementPolicyV2Service replacementPolicyService,
+<span class="fc" id="L69">            ProductIssuancePolicyV2Service issuancePolicyService) {</span>
+<span class="fc" id="L70">        this.assignmentService = assignmentService;</span>
+<span class="fc" id="L71">        this.versionConfigurationService = versionConfigurationService;</span>
+<span class="fc" id="L72">        this.pinPolicyService = pinPolicyService;</span>
+<span class="fc" id="L73">        this.replacementPolicyService = replacementPolicyService;</span>
+<span class="fc" id="L74">        this.issuancePolicyService = issuancePolicyService;</span>
+<span class="fc" id="L75">    }</span>
+
+    @PostMapping(&quot;/bin-range-assignments&quot;)
+    @Operation(operationId = &quot;createProductBinRangeAssignmentV2&quot;,
+            summary = &quot;Assign an institution-owned BIN range to a product&quot;)
+    public ResponseEntity&lt;ApiResponseEnvelope&lt;ProductBinRangeAssignmentV2Response&gt;&gt; createAssignment(
+            @PathVariable UUID institutionId, @PathVariable UUID productId,
+            @Valid @RequestBody CreateProductBinRangeAssignmentV2Request request,
+            @RequestHeader(ACTOR_HEADER) @NotBlank @Size(max = 100) String actorId) {
+<span class="fc" id="L84">        return ApiResponseHelper.created(assignmentService.create(institutionId, productId, request, actorId));</span>
+    }
+
+    @GetMapping(&quot;/bin-range-assignments&quot;)
+    @Operation(operationId = &quot;listProductBinRangeAssignmentsV2&quot;,
+            summary = &quot;List BIN-range assignments for a product&quot;)
+    public ResponseEntity&lt;ApiResponseEnvelope&lt;PagedResponse&lt;ProductBinRangeAssignmentV2Response&gt;&gt;&gt; listAssignments(
+            @PathVariable UUID institutionId, @PathVariable UUID productId,
+            @RequestParam(required = false) Integer page,
+            @RequestParam(required = false) Integer limit) {
+<span class="fc" id="L94">        Pageable base = PageableDefaults.ofOneBased(page, limit);</span>
+<span class="fc" id="L95">        Pageable pageable = PageRequest.of(base.getPageNumber(), base.getPageSize(),</span>
+<span class="fc" id="L96">                Sort.by(Sort.Direction.ASC, &quot;priority&quot;));</span>
+<span class="fc" id="L97">        return ApiResponseHelper.ok(PagedResponse.of(</span>
+<span class="fc" id="L98">                assignmentService.list(institutionId, productId, pageable)));</span>
+    }
+
+    @GetMapping(&quot;/bin-range-assignments/{assignmentId}&quot;)
+    @Operation(operationId = &quot;getProductBinRangeAssignmentV2&quot;,
+            summary = &quot;Get a product BIN-range assignment&quot;)
+    public ResponseEntity&lt;ApiResponseEnvelope&lt;ProductBinRangeAssignmentV2Response&gt;&gt; getAssignment(
+            @PathVariable UUID institutionId, @PathVariable UUID productId,
+            @PathVariable UUID assignmentId) {
+<span class="fc" id="L107">        return ApiResponseHelper.ok(assignmentService.get(institutionId, productId, assignmentId));</span>
+    }
+
+    @PostMapping(&quot;/bin-range-assignments/{assignmentId}/actions/update&quot;)
+    @Operation(operationId = &quot;updateProductBinRangeAssignmentV2&quot;,
+            summary = &quot;Update or transition a product BIN-range assignment&quot;)
+    public ResponseEntity&lt;ApiResponseEnvelope&lt;ProductBinRangeAssignmentV2Response&gt;&gt; updateAssignment(
+            @PathVariable UUID institutionId, @PathVariable UUID productId,
+            @PathVariable UUID assignmentId,
+            @Valid @RequestBody UpdateProductBinRangeAssignmentV2Request request,
+            @RequestHeader(ACTOR_HEADER) @NotBlank @Size(max = 100) String actorId) {
+<span class="fc" id="L118">        return ApiResponseHelper.ok(assignmentService.update(</span>
+                institutionId, productId, assignmentId, request, actorId));
+    }
+
+    @GetMapping(&quot;/versions/{versionId}/default-controls&quot;)
+    @Operation(operationId = &quot;getProductDefaultControlsV2&quot;,
+            summary = &quot;Get transaction-control capabilities and defaults for a product version&quot;)
+    public ResponseEntity&lt;ApiResponseEnvelope&lt;ProductDefaultControlsV2Response&gt;&gt; getDefaultControls(
+            @PathVariable UUID institutionId, @PathVariable UUID productId,
+            @PathVariable UUID versionId) {
+<span class="fc" id="L128">        return ApiResponseHelper.ok(versionConfigurationService.getControls(</span>
+                institutionId, productId, versionId));
+    }
+
+    @PutMapping(&quot;/versions/{versionId}/default-controls&quot;)
+    @Operation(operationId = &quot;putProductDefaultControlsV2&quot;,
+            summary = &quot;Create or replace transaction-control capabilities and defaults for a draft product version&quot;,
+            description = &quot;Defines immutable isAllowed boundaries and initial enabled values for ATM, POS, ECOM, MOTO and contactless POS in domestic and international scopes. An enabled default requires isAllowed=true. International defaults also require internationalEnabled=true.&quot;)
+    public ResponseEntity&lt;ApiResponseEnvelope&lt;ProductDefaultControlsV2Response&gt;&gt; putDefaultControls(
+            @PathVariable UUID institutionId, @PathVariable UUID productId,
+            @PathVariable UUID versionId,
+            @Valid @RequestBody UpsertProductDefaultControlsV2Request request,
+            @RequestHeader(ACTOR_HEADER) @NotBlank @Size(max = 100) String actorId) {
+<span class="fc" id="L141">        return ApiResponseHelper.ok(versionConfigurationService.putControls(</span>
+                institutionId, productId, versionId, request, actorId));
+    }
+
+    @PostMapping(&quot;/versions/{versionId}/limits&quot;)
+    @Operation(operationId = &quot;createProductCardLimitV2&quot;,
+            summary = &quot;Create a Card Issuance Limit Default for a draft product version&quot;,
+            description = &quot;Configures the default card-level limit values to be assigned when a new card &quot;
+                    + &quot;is issued under this product version. Changes do not affect previously issued cards &quot;
+                    + &quot;and are not evaluated by the Switch as product-level transaction limits.&quot;)
+    public ResponseEntity&lt;ApiResponseEnvelope&lt;ProductCardLimitV2Response&gt;&gt; createLimit(
+            @PathVariable UUID institutionId, @PathVariable UUID productId,
+            @PathVariable UUID versionId,
+            @Valid @RequestBody CreateProductCardLimitV2Request request) {
+<span class="fc" id="L155">        return ApiResponseHelper.created(versionConfigurationService.createLimit(</span>
+                institutionId, productId, versionId, request));
+    }
+
+    @GetMapping(&quot;/versions/{versionId}/limits&quot;)
+    @Operation(operationId = &quot;listProductCardLimitsV2&quot;,
+            summary = &quot;List Card Issuance Limit Defaults for a product version&quot;,
+            description = &quot;Returns the defaults used to initialize card-level limits during issuance. &quot;
+                    + &quot;These values are not dynamically evaluated by the Switch against the product.&quot;)
+    public ResponseEntity&lt;ApiResponseEnvelope&lt;PagedResponse&lt;ProductCardLimitV2Response&gt;&gt;&gt; listLimits(
+            @PathVariable UUID institutionId, @PathVariable UUID productId,
+            @PathVariable UUID versionId,
+            @RequestParam(required = false) Integer page,
+            @RequestParam(required = false) Integer limit) {
+<span class="fc" id="L169">        Pageable base = PageableDefaults.ofOneBased(page, limit);</span>
+<span class="fc" id="L170">        Pageable pageable = PageRequest.of(base.getPageNumber(), base.getPageSize(),</span>
+<span class="fc" id="L171">                Sort.by(Sort.Direction.ASC, &quot;limitType&quot;, &quot;periodType&quot;));</span>
+<span class="fc" id="L172">        return ApiResponseHelper.ok(PagedResponse.of(versionConfigurationService.listLimits(</span>
+                institutionId, productId, versionId, pageable)));
+    }
+
+    @GetMapping(&quot;/versions/{versionId}/limits/{limitId}&quot;)
+    @Operation(operationId = &quot;getProductCardLimitV2&quot;,
+            summary = &quot;Get a Card Issuance Limit Default&quot;,
+            description = &quot;Returns a product-version default used when initializing a newly issued card. &quot;
+                    + &quot;It does not represent a product-level runtime limit in the Switch.&quot;)
+    public ResponseEntity&lt;ApiResponseEnvelope&lt;ProductCardLimitV2Response&gt;&gt; getLimit(
+            @PathVariable UUID institutionId, @PathVariable UUID productId,
+            @PathVariable UUID versionId, @PathVariable UUID limitId) {
+<span class="fc" id="L184">        return ApiResponseHelper.ok(versionConfigurationService.getLimit(</span>
+                institutionId, productId, versionId, limitId));
+    }
+
+    @PostMapping(&quot;/versions/{versionId}/limits/{limitId}/actions/update&quot;)
+    @Operation(operationId = &quot;updateProductCardLimitV2&quot;,
+            summary = &quot;Update a Card Issuance Limit Default while the product version is draft&quot;,
+            description = &quot;Updates the default applied to cards issued afterward. Previously issued cards &quot;
+                    + &quot;retain their existing card-level limits unless they are explicitly updated.&quot;)
+    public ResponseEntity&lt;ApiResponseEnvelope&lt;ProductCardLimitV2Response&gt;&gt; updateLimit(
+            @PathVariable UUID institutionId, @PathVariable UUID productId,
+            @PathVariable UUID versionId, @PathVariable UUID limitId,
+            @Valid @RequestBody UpdateProductCardLimitV2Request request) {
+<span class="fc" id="L197">        return ApiResponseHelper.ok(versionConfigurationService.updateLimit(</span>
+                institutionId, productId, versionId, limitId, request));
+    }
+
+    @GetMapping(&quot;/versions/{versionId}/pin-policy&quot;)
+    @Operation(operationId = &quot;getProductPinPolicyV2&quot;,
+            summary = &quot;Get the PIN policy for a product version&quot;)
+    public ResponseEntity&lt;ApiResponseEnvelope&lt;ProductPinPolicyV2Response&gt;&gt; getPinPolicy(
+            @PathVariable UUID institutionId, @PathVariable UUID productId,
+            @PathVariable UUID versionId) {
+<span class="fc" id="L207">        return ApiResponseHelper.ok(pinPolicyService.get(institutionId, productId, versionId));</span>
+    }
+
+    @PutMapping(&quot;/versions/{versionId}/pin-policy&quot;)
+    @Operation(operationId = &quot;putProductPinPolicyV2&quot;,
+            summary = &quot;Create or replace the PIN policy for a draft product version&quot;)
+    public ResponseEntity&lt;ApiResponseEnvelope&lt;ProductPinPolicyV2Response&gt;&gt; putPinPolicy(
+            @PathVariable UUID institutionId, @PathVariable UUID productId,
+            @PathVariable UUID versionId,
+            @Valid @RequestBody UpsertProductPinPolicyV2Request request) {
+<span class="fc" id="L217">        return ApiResponseHelper.ok(pinPolicyService.put(</span>
+                institutionId, productId, versionId, request));
+    }
+
+    @PostMapping(&quot;/versions/{versionId}/replacement-policies&quot;)
+    @Operation(operationId = &quot;createProductReplacementPolicyV2&quot;,
+            summary = &quot;Create a reason-specific replacement policy for a draft product version&quot;)
+    public ResponseEntity&lt;ApiResponseEnvelope&lt;ProductReplacementPolicyV2Response&gt;&gt; createReplacementPolicy(
+            @PathVariable UUID institutionId, @PathVariable UUID productId,
+            @PathVariable UUID versionId,
+            @Valid @RequestBody CreateProductReplacementPolicyV2Request request) {
+<span class="fc" id="L228">        return ApiResponseHelper.created(replacementPolicyService.create(</span>
+                institutionId, productId, versionId, request));
+    }
+
+    @GetMapping(&quot;/versions/{versionId}/replacement-policies&quot;)
+    @Operation(operationId = &quot;listProductReplacementPoliciesV2&quot;,
+            summary = &quot;List replacement policies for a product version&quot;)
+    public ResponseEntity&lt;ApiResponseEnvelope&lt;PagedResponse&lt;ProductReplacementPolicyV2Response&gt;&gt;&gt; listReplacementPolicies(
+            @PathVariable UUID institutionId, @PathVariable UUID productId,
+            @PathVariable UUID versionId,
+            @RequestParam(required = false) Integer page,
+            @RequestParam(required = false) Integer limit) {
+<span class="fc" id="L240">        Pageable base = PageableDefaults.ofOneBased(page, limit);</span>
+<span class="fc" id="L241">        Pageable pageable = PageRequest.of(base.getPageNumber(), base.getPageSize(),</span>
+<span class="fc" id="L242">                Sort.by(Sort.Direction.ASC, &quot;replacementReason&quot;));</span>
+<span class="fc" id="L243">        return ApiResponseHelper.ok(PagedResponse.of(replacementPolicyService.list(</span>
+                institutionId, productId, versionId, pageable)));
+    }
+
+    @GetMapping(&quot;/versions/{versionId}/replacement-policies/{policyId}&quot;)
+    @Operation(operationId = &quot;getProductReplacementPolicyV2&quot;,
+            summary = &quot;Get a reason-specific replacement policy&quot;)
+    public ResponseEntity&lt;ApiResponseEnvelope&lt;ProductReplacementPolicyV2Response&gt;&gt; getReplacementPolicy(
+            @PathVariable UUID institutionId, @PathVariable UUID productId,
+            @PathVariable UUID versionId, @PathVariable UUID policyId) {
+<span class="fc" id="L253">        return ApiResponseHelper.ok(replacementPolicyService.get(</span>
+                institutionId, productId, versionId, policyId));
+    }
+
+    @PostMapping(&quot;/versions/{versionId}/replacement-policies/{policyId}/actions/update&quot;)
+    @Operation(operationId = &quot;updateProductReplacementPolicyV2&quot;,
+            summary = &quot;Update a replacement policy while the product version is draft&quot;)
+    public ResponseEntity&lt;ApiResponseEnvelope&lt;ProductReplacementPolicyV2Response&gt;&gt; updateReplacementPolicy(
+            @PathVariable UUID institutionId, @PathVariable UUID productId,
+            @PathVariable UUID versionId, @PathVariable UUID policyId,
+            @Valid @RequestBody UpdateProductReplacementPolicyV2Request request) {
+<span class="fc" id="L264">        return ApiResponseHelper.ok(replacementPolicyService.update(</span>
+                institutionId, productId, versionId, policyId, request));
+    }
+
+    @GetMapping(&quot;/versions/{versionId}/personalisation-policy&quot;)
+    @Operation(operationId = &quot;getProductPersonalisationPolicyV2&quot;,
+            summary = &quot;Get physical-card personalisation rules for a product version&quot;)
+    public ResponseEntity&lt;ApiResponseEnvelope&lt;ProductPersonalisationPolicyV2Response&gt;&gt; getPersonalisationPolicy(
+            @PathVariable UUID institutionId, @PathVariable UUID productId,
+            @PathVariable UUID versionId) {
+<span class="fc" id="L274">        return ApiResponseHelper.ok(issuancePolicyService.getPersonalisation(</span>
+                institutionId, productId, versionId));
+    }
+
+    @PutMapping(&quot;/versions/{versionId}/personalisation-policy&quot;)
+    @Operation(operationId = &quot;putProductPersonalisationPolicyV2&quot;,
+            summary = &quot;Create or replace personalisation rules for a draft product version&quot;)
+    public ResponseEntity&lt;ApiResponseEnvelope&lt;ProductPersonalisationPolicyV2Response&gt;&gt; putPersonalisationPolicy(
+            @PathVariable UUID institutionId, @PathVariable UUID productId,
+            @PathVariable UUID versionId,
+            @Valid @RequestBody UpsertProductPersonalisationPolicyV2Request request) {
+<span class="fc" id="L285">        return ApiResponseHelper.ok(issuancePolicyService.putPersonalisation(</span>
+                institutionId, productId, versionId, request));
+    }
+
+    @GetMapping(&quot;/versions/{versionId}/card-form-policy&quot;)
+    @Operation(operationId = &quot;getProductCardFormPolicyV2&quot;,
+            summary = &quot;Get physical and virtual card issuance behavior for a product version&quot;)
+    public ResponseEntity&lt;ApiResponseEnvelope&lt;ProductCardFormPolicyV2Response&gt;&gt; getCardFormPolicy(
+            @PathVariable UUID institutionId, @PathVariable UUID productId,
+            @PathVariable UUID versionId) {
+<span class="fc" id="L295">        return ApiResponseHelper.ok(issuancePolicyService.getCardForm(</span>
+                institutionId, productId, versionId));
+    }
+
+    @PutMapping(&quot;/versions/{versionId}/card-form-policy&quot;)
+    @Operation(operationId = &quot;putProductCardFormPolicyV2&quot;,
+            summary = &quot;Select an issuance mode for a draft product version&quot;)
+    public ResponseEntity&lt;ApiResponseEnvelope&lt;ProductCardFormPolicyV2Response&gt;&gt; putCardFormPolicy(
+            @PathVariable UUID institutionId, @PathVariable UUID productId,
+            @PathVariable UUID versionId,
+            @Valid @RequestBody UpsertProductCardFormPolicyV2Request request) {
+<span class="fc" id="L306">        return ApiResponseHelper.ok(issuancePolicyService.putCardForm(</span>
+                institutionId, productId, versionId, request));
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.15.202606040825</span></div></body></html>

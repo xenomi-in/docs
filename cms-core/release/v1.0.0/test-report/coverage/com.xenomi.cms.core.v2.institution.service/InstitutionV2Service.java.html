@@ -1,0 +1,203 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>InstitutionV2Service.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">CMS Core Service</a> &gt; <a href="index.source.html" class="el_package">com.xenomi.cms.core.v2.institution.service</a> &gt; <span class="el_source">InstitutionV2Service.java</span></div><h1>InstitutionV2Service.java</h1><pre class="source lang-java linenums">package com.xenomi.cms.core.v2.institution.service;
+
+import java.util.UUID;
+import java.util.Locale;
+
+import com.xenomi.cms.core.exception.ResourceAlreadyExistsException;
+import com.xenomi.cms.core.exception.ResourceNotFoundException;
+import com.xenomi.cms.core.v2.common.DatabaseUuidV7Generator;
+import com.xenomi.cms.core.v2.institution.dto.CreateInstitutionV2Request;
+import com.xenomi.cms.core.v2.institution.dto.InstitutionAddressV2;
+import com.xenomi.cms.core.v2.institution.dto.InstitutionV2Response;
+import com.xenomi.cms.core.v2.institution.dto.UpdateInstitutionV2Request;
+import com.xenomi.cms.core.v2.institution.entity.InstitutionV2;
+import com.xenomi.cms.core.v2.institution.mapper.InstitutionV2Mapper;
+import com.xenomi.cms.core.v2.institution.model.InstitutionStatus;
+import com.xenomi.cms.core.v2.institution.model.InstitutionType;
+import com.xenomi.cms.core.v2.institution.repository.InstitutionV2Repository;
+
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
+import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
+
+@Service
+public class InstitutionV2Service {
+
+    private final InstitutionV2Repository repository;
+    private final InstitutionV2Mapper mapper;
+    private final DatabaseUuidV7Generator uuidGenerator;
+    private final InstitutionPolicyProvisioner policyProvisioner;
+
+    public InstitutionV2Service(
+            InstitutionV2Repository repository,
+            InstitutionV2Mapper mapper,
+            DatabaseUuidV7Generator uuidGenerator,
+<span class="fc" id="L36">            InstitutionPolicyProvisioner policyProvisioner) {</span>
+<span class="fc" id="L37">        this.repository = repository;</span>
+<span class="fc" id="L38">        this.mapper = mapper;</span>
+<span class="fc" id="L39">        this.uuidGenerator = uuidGenerator;</span>
+<span class="fc" id="L40">        this.policyProvisioner = policyProvisioner;</span>
+<span class="fc" id="L41">    }</span>
+
+    @Transactional
+    public InstitutionV2Response create(CreateInstitutionV2Request request, String actorId) {
+<span class="fc" id="L45">        String institutionCode = InstitutionV2Mapper.upper(request.getInstitutionCode());</span>
+<span class="fc bfc" id="L46" title="All 2 branches covered.">        if (repository.existsByInstitutionCode(institutionCode)) {</span>
+<span class="fc" id="L47">            throw new ResourceAlreadyExistsException(&quot;Institution&quot;, institutionCode);</span>
+        }
+
+<span class="fc" id="L50">        InstitutionV2 institution = mapper.toEntity(request, uuidGenerator.generate(), actorId.trim());</span>
+<span class="fc" id="L51">        validateMemberships(institution);</span>
+<span class="fc" id="L52">        InstitutionV2 saved = repository.save(institution);</span>
+<span class="fc" id="L53">        policyProvisioner.createDefaults(saved.getInstitutionId(), actorId.trim());</span>
+<span class="fc" id="L54">        return mapper.toResponse(saved);</span>
+    }
+
+    @Transactional(readOnly = true)
+    public InstitutionV2Response get(UUID institutionId) {
+<span class="fc" id="L59">        return mapper.toResponse(find(institutionId));</span>
+    }
+
+    @Transactional(readOnly = true)
+    public InstitutionV2Response getByCode(String institutionCode) {
+<span class="fc" id="L64">        String normalizedCode = InstitutionV2Mapper.upper(institutionCode);</span>
+<span class="fc" id="L65">        return repository.findByInstitutionCode(normalizedCode)</span>
+<span class="fc" id="L66">                .map(mapper::toResponse)</span>
+<span class="fc" id="L67">                .orElseThrow(() -&gt; new ResourceNotFoundException(&quot;Institution&quot;, normalizedCode));</span>
+    }
+
+    @Transactional(readOnly = true)
+    public Page&lt;InstitutionV2Response&gt; search(
+            String query,
+            InstitutionType institutionType,
+            InstitutionStatus status,
+            Boolean visaMemberFlag,
+            Boolean rupayMemberFlag,
+            Pageable pageable) {
+<span class="fc" id="L78">        String normalizedQuery = InstitutionV2Mapper.trimToNull(query);</span>
+<span class="fc" id="L79">        return repository.search(normalizedQuery, institutionType, status,</span>
+                        visaMemberFlag, rupayMemberFlag, pageable)
+<span class="fc" id="L81">                .map(mapper::toResponse);</span>
+    }
+
+    @Transactional
+    public InstitutionV2Response update(UUID institutionId, UpdateInstitutionV2Request request, String actorId) {
+<span class="fc" id="L86">        InstitutionV2 institution = find(institutionId);</span>
+
+<span class="fc bfc" id="L88" title="All 2 branches covered.">        if (request.getInstitutionName() != null) {</span>
+<span class="fc" id="L89">            institution.setInstitutionName(request.getInstitutionName().trim());</span>
+        }
+<span class="fc bfc" id="L91" title="All 2 branches covered.">        if (request.getInstitutionShortName() != null) {</span>
+<span class="fc" id="L92">            institution.setInstitutionShortName(InstitutionV2Mapper.trimToNull(request.getInstitutionShortName()));</span>
+        }
+<span class="fc bfc" id="L94" title="All 2 branches covered.">        if (request.getVisaMemberFlag() != null) {</span>
+<span class="fc" id="L95">            institution.setVisaMemberFlag(request.getVisaMemberFlag());</span>
+<span class="pc bpc" id="L96" title="1 of 2 branches missed.">            if (!request.getVisaMemberFlag()) {</span>
+<span class="fc" id="L97">                institution.setVisaMemberId(null);</span>
+            }
+        }
+<span class="fc bfc" id="L100" title="All 2 branches covered.">        if (request.getVisaMemberId() != null) {</span>
+<span class="fc" id="L101">            institution.setVisaMemberId(InstitutionV2Mapper.trimToNull(request.getVisaMemberId()));</span>
+        }
+<span class="fc bfc" id="L103" title="All 2 branches covered.">        if (request.getRupayMemberFlag() != null) {</span>
+<span class="fc" id="L104">            institution.setRupayMemberFlag(request.getRupayMemberFlag());</span>
+<span class="fc bfc" id="L105" title="All 2 branches covered.">            if (!request.getRupayMemberFlag()) {</span>
+<span class="fc" id="L106">                institution.setNpciMemberId(null);</span>
+            }
+        }
+<span class="pc bpc" id="L109" title="1 of 2 branches missed.">        if (request.getNpciMemberId() != null) {</span>
+<span class="nc" id="L110">            institution.setNpciMemberId(InstitutionV2Mapper.trimToNull(request.getNpciMemberId()));</span>
+        }
+<span class="fc bfc" id="L112" title="All 2 branches covered.">        if (request.getRegisteredAddress() != null) {</span>
+<span class="fc" id="L113">            applyAddress(institution, request.getRegisteredAddress());</span>
+        }
+<span class="fc bfc" id="L115" title="All 2 branches covered.">        if (request.getContactPhonePrimary() != null) {</span>
+<span class="fc" id="L116">            institution.setContactPhonePrimary(request.getContactPhonePrimary().trim());</span>
+        }
+<span class="fc bfc" id="L118" title="All 2 branches covered.">        if (request.getContactPhoneSecondary() != null) {</span>
+<span class="fc" id="L119">            institution.setContactPhoneSecondary(InstitutionV2Mapper.trimToNull(request.getContactPhoneSecondary()));</span>
+        }
+<span class="fc bfc" id="L121" title="All 2 branches covered.">        if (request.getContactEmailPrimary() != null) {</span>
+<span class="fc" id="L122">            institution.setContactEmailPrimary(</span>
+<span class="fc" id="L123">                    request.getContactEmailPrimary().trim().toLowerCase(Locale.ROOT));</span>
+        }
+<span class="fc bfc" id="L125" title="All 2 branches covered.">        if (request.getContactEmailSecondary() != null) {</span>
+<span class="fc" id="L126">            institution.setContactEmailSecondary(lowerOrNull(request.getContactEmailSecondary()));</span>
+        }
+<span class="fc bfc" id="L128" title="All 2 branches covered.">        if (request.getWebsiteUrl() != null) {</span>
+<span class="fc" id="L129">            institution.setWebsiteUrl(InstitutionV2Mapper.trimToNull(request.getWebsiteUrl()));</span>
+        }
+<span class="fc bfc" id="L131" title="All 2 branches covered.">        if (request.getTimezone() != null) {</span>
+<span class="fc" id="L132">            institution.setTimezone(request.getTimezone().trim());</span>
+        }
+<span class="fc bfc" id="L134" title="All 2 branches covered.">        if (request.getReportDeliverySftpPath() != null) {</span>
+<span class="fc" id="L135">            institution.setReportDeliverySftpPath(</span>
+<span class="fc" id="L136">                    InstitutionV2Mapper.trimToNull(request.getReportDeliverySftpPath()));</span>
+        }
+<span class="fc bfc" id="L138" title="All 2 branches covered.">        if (request.getReportDeliveryEmail() != null) {</span>
+<span class="fc" id="L139">            institution.setReportDeliveryEmail(lowerOrNull(request.getReportDeliveryEmail()));</span>
+        }
+      //  if (request.getPrepaidCardIssuingEnabled() != null) {
+     //       institution.setPrepaidCardIssuingEnabled(request.getPrepaidCardIssuingEnabled());
+     //   }
+<span class="fc bfc" id="L144" title="All 2 branches covered.">        if (request.getCreditCardIssuingEnabled() != null) {</span>
+<span class="fc" id="L145">            institution.setCreditCardIssuingEnabled(request.getCreditCardIssuingEnabled());</span>
+        }
+<span class="fc bfc" id="L147" title="All 2 branches covered.">        if (request.getDefaultCardValidityMonths() != null) {</span>
+<span class="fc" id="L148">            institution.setDefaultCardValidityMonths(request.getDefaultCardValidityMonths());</span>
+        }
+<span class="fc bfc" id="L150" title="All 2 branches covered.">        if (request.getBaseCurrency() != null) {</span>
+<span class="fc" id="L151">            institution.setBaseCurrency(InstitutionV2Mapper.upper(request.getBaseCurrency()));</span>
+        }
+<span class="fc bfc" id="L153" title="All 2 branches covered.">        if (request.getCurrencyExponent() != null) {</span>
+<span class="fc" id="L154">            institution.setCurrencyExponent(request.getCurrencyExponent());</span>
+        }
+<span class="fc bfc" id="L156" title="All 2 branches covered.">        if (request.getBusinessDate() != null) {</span>
+<span class="fc" id="L157">            institution.setBusinessDate(request.getBusinessDate());</span>
+        }
+<span class="fc bfc" id="L159" title="All 2 branches covered.">        if (request.getStatus() != null) {</span>
+<span class="fc" id="L160">            institution.setStatus(request.getStatus());</span>
+        }
+
+<span class="fc" id="L163">        validateMemberships(institution);</span>
+<span class="fc" id="L164">        institution.setUpdatedBy(actorId.trim());</span>
+<span class="fc" id="L165">        return mapper.toResponse(repository.save(institution));</span>
+    }
+
+    private InstitutionV2 find(UUID institutionId) {
+<span class="fc" id="L169">        return repository.findById(institutionId)</span>
+<span class="fc" id="L170">                .orElseThrow(() -&gt; new ResourceNotFoundException(&quot;Institution&quot;, institutionId.toString()));</span>
+    }
+
+    private static void applyAddress(InstitutionV2 institution, InstitutionAddressV2 address) {
+<span class="fc" id="L174">        institution.setRegisteredAddressLine1(address.getAddressLine1().trim());</span>
+<span class="fc" id="L175">        institution.setRegisteredAddressLine2(InstitutionV2Mapper.trimToNull(address.getAddressLine2()));</span>
+<span class="fc" id="L176">        institution.setCity(address.getCity().trim());</span>
+<span class="fc" id="L177">        institution.setStateCode(InstitutionV2Mapper.upper(address.getStateCode()));</span>
+<span class="pc bpc" id="L178" title="1 of 2 branches missed.">        institution.setCountryCode(address.getCountryCode() == null</span>
+<span class="pc" id="L179">                ? &quot;IND&quot; : InstitutionV2Mapper.upper(address.getCountryCode()));</span>
+<span class="fc" id="L180">        institution.setPostalCode(address.getPostalCode().trim());</span>
+<span class="fc" id="L181">    }</span>
+
+    private static void validateMemberships(InstitutionV2 institution) {
+<span class="pc bpc" id="L184" title="1 of 4 branches missed.">        if (institution.isVisaMemberFlag() &amp;&amp; institution.getVisaMemberId() == null) {</span>
+<span class="fc" id="L185">            throw new IllegalArgumentException(&quot;visaMemberId is required when visaMemberFlag is true&quot;);</span>
+        }
+<span class="pc bpc" id="L187" title="1 of 4 branches missed.">        if (!institution.isVisaMemberFlag() &amp;&amp; institution.getVisaMemberId() != null) {</span>
+<span class="fc" id="L188">            throw new IllegalArgumentException(&quot;visaMemberId is allowed only when visaMemberFlag is true&quot;);</span>
+        }
+<span class="pc bpc" id="L190" title="1 of 4 branches missed.">        if (institution.isRupayMemberFlag() &amp;&amp; institution.getNpciMemberId() == null) {</span>
+<span class="fc" id="L191">            throw new IllegalArgumentException(&quot;npciMemberId is required when rupayMemberFlag is true&quot;);</span>
+        }
+<span class="pc bpc" id="L193" title="1 of 4 branches missed.">        if (!institution.isRupayMemberFlag() &amp;&amp; institution.getNpciMemberId() != null) {</span>
+<span class="fc" id="L194">            throw new IllegalArgumentException(&quot;npciMemberId is allowed only when rupayMemberFlag is true&quot;);</span>
+        }
+<span class="fc" id="L196">    }</span>
+
+    private static String lowerOrNull(String value) {
+<span class="fc" id="L199">        String normalized = InstitutionV2Mapper.trimToNull(value);</span>
+<span class="pc bpc" id="L200" title="1 of 2 branches missed.">        return normalized == null ? null : normalized.toLowerCase(Locale.ROOT);</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.15.202606040825</span></div></body></html>

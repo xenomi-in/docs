@@ -1,0 +1,42 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>FuturexHsmApplicationKeyWrapper.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">CMS Core Service</a> &gt; <a href="index.source.html" class="el_package">com.xenomi.cms.core.v2.card.security</a> &gt; <span class="el_source">FuturexHsmApplicationKeyWrapper.java</span></div><h1>FuturexHsmApplicationKeyWrapper.java</h1><pre class="source lang-java linenums">package com.xenomi.cms.core.v2.card.security;
+
+import com.xenomi.cms.core.hms.service.NettyHsmService;
+import com.xenomi.cms.core.v2.hsm.model.HsmKeyScheme;
+import com.xenomi.cms.core.v2.institution.entity.HsmKeyReferenceV2;
+import org.springframework.stereotype.Component;
+
+@Component
+class FuturexHsmApplicationKeyWrapper implements HsmApplicationKeyWrapper {
+    private final NettyHsmService hsm;
+
+<span class="nc" id="L12">    FuturexHsmApplicationKeyWrapper(NettyHsmService hsm) {</span>
+<span class="nc" id="L13">        this.hsm = hsm;</span>
+<span class="nc" id="L14">    }</span>
+
+    @Override
+    public String wrap(String clearKeyHex, HsmKeyReferenceV2 wrappingKey) {
+<span class="nc" id="L18">        return require(hsm.encryptDataWithKeyReference(clearKeyHex,</span>
+<span class="nc" id="L19">                wrappingKey.getEncryptedKeyBlock(), algorithm(wrappingKey)), &quot;key wrapping&quot;);</span>
+    }
+
+    @Override
+    public String unwrap(String wrappedKey, HsmKeyReferenceV2 wrappingKey) {
+<span class="nc" id="L24">        return require(hsm.decryptDataWithKeyReference(wrappedKey,</span>
+<span class="nc" id="L25">                wrappingKey.getEncryptedKeyBlock(), algorithm(wrappingKey)), &quot;key unwrapping&quot;);</span>
+    }
+
+    private static String algorithm(HsmKeyReferenceV2 key) {
+<span class="nc bnc" id="L29" title="All 2 branches missed.">        if (key.getScheme() == HsmKeyScheme.AES) return &quot;AES&quot;;</span>
+<span class="nc bnc" id="L30" title="All 4 branches missed.">        if (key.getScheme() == HsmKeyScheme.TR31 &amp;&amp; key.getTr31Algorithm() != null</span>
+<span class="nc bnc" id="L31" title="All 2 branches missed.">                &amp;&amp; key.getTr31Algorithm().toUpperCase().startsWith(&quot;A&quot;)) return &quot;AES&quot;;</span>
+<span class="nc" id="L32">        return &quot;TDES&quot;;</span>
+    }
+
+    private static String require(String value, String operation) {
+<span class="nc bnc" id="L36" title="All 4 branches missed.">        if (value == null || value.isBlank()) {</span>
+<span class="nc" id="L37">            throw new CardSecurityException(&quot;HSM &quot; + operation + &quot; failed&quot;);</span>
+        }
+<span class="nc" id="L39">        return value;</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.15.202606040825</span></div></body></html>

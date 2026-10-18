@@ -1,0 +1,472 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>HsmKeyV2Service.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">CMS Core Service</a> &gt; <a href="index.source.html" class="el_package">com.xenomi.cms.core.v2.hsm.service</a> &gt; <span class="el_source">HsmKeyV2Service.java</span></div><h1>HsmKeyV2Service.java</h1><pre class="source lang-java linenums">package com.xenomi.cms.core.v2.hsm.service;
+
+import java.time.OffsetDateTime;
+import java.time.ZoneOffset;
+import java.time.LocalDate;
+import java.util.EnumMap;
+import java.util.Locale;
+import java.util.Map;
+import java.util.Set;
+import java.util.UUID;
+
+import com.xenomi.cms.core.exception.ResourceAlreadyExistsException;
+import com.xenomi.cms.core.exception.ResourceNotFoundException;
+import com.xenomi.cms.core.keymanagement.client.HsmClient;
+import com.xenomi.cms.core.keymanagement.client.HsmKeyGenerationException;
+import com.xenomi.cms.core.keymanagement.client.KeyGenerationRequest;
+import com.xenomi.cms.core.keymanagement.client.KeyGenerationResult;
+import com.xenomi.cms.core.v2.bin.entity.BinConfigurationV2;
+import com.xenomi.cms.core.v2.bin.repository.BinConfigurationV2Repository;
+import com.xenomi.cms.core.v2.common.DatabaseUuidV7Generator;
+import com.xenomi.cms.core.v2.hsm.dto.GenerateHsmKeyV2Request;
+import com.xenomi.cms.core.v2.hsm.dto.HsmKeyV2Response;
+import com.xenomi.cms.core.v2.hsm.dto.RegisterHsmKeyV2Request;
+import com.xenomi.cms.core.v2.hsm.dto.RotateHsmKeyV2Request;
+import com.xenomi.cms.core.v2.hsm.dto.UpdateHsmKeyStatusV2Request;
+import com.xenomi.cms.core.v2.hsm.model.HsmKeyScheme;
+import com.xenomi.cms.core.v2.hsm.model.HsmKeyScope;
+import com.xenomi.cms.core.v2.hsm.model.HsmKeyStatus;
+import com.xenomi.cms.core.v2.hsm.model.HsmKeyType;
+import com.xenomi.cms.core.v2.institution.entity.HsmKeyReferenceV2;
+import com.xenomi.cms.core.v2.institution.repository.HsmKeyReferenceV2Repository;
+import com.xenomi.cms.core.v2.institution.repository.InstitutionV2Repository;
+
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
+import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
+
+@Service
+public class HsmKeyV2Service {
+
+<span class="fc" id="L42">    private static final Map&lt;HsmKeyStatus, Set&lt;HsmKeyStatus&gt;&gt; TRANSITIONS = transitions();</span>
+    private final InstitutionV2Repository institutionRepository;
+    private final BinConfigurationV2Repository binRepository;
+    private final HsmKeyReferenceV2Repository keyRepository;
+    private final DatabaseUuidV7Generator uuidGenerator;
+    private final HsmClient hsmClient;
+
+    public HsmKeyV2Service(InstitutionV2Repository institutionRepository,
+            BinConfigurationV2Repository binRepository,
+            HsmKeyReferenceV2Repository keyRepository,
+            DatabaseUuidV7Generator uuidGenerator,
+<span class="fc" id="L53">            HsmClient hsmClient) {</span>
+<span class="fc" id="L54">        this.institutionRepository = institutionRepository;</span>
+<span class="fc" id="L55">        this.binRepository = binRepository;</span>
+<span class="fc" id="L56">        this.keyRepository = keyRepository;</span>
+<span class="fc" id="L57">        this.uuidGenerator = uuidGenerator;</span>
+<span class="fc" id="L58">        this.hsmClient = hsmClient;</span>
+<span class="fc" id="L59">    }</span>
+
+    @Transactional
+    public HsmKeyV2Response generate(UUID institutionId, GenerateHsmKeyV2Request request,
+            String actorId) {
+<span class="fc" id="L64">        requireInstitution(institutionId);</span>
+<span class="fc" id="L65">        BinConfigurationV2 bin = validateGenerationRequest(institutionId, request);</span>
+<span class="fc" id="L66">        String keyIndex = deriveGeneratedKeyIndex(</span>
+<span class="fc" id="L67">                institutionId, bin, request.getKeyType(), request.getKeyScope());</span>
+<span class="fc" id="L68">        int version = keyRepository.findMaximumVersion(request.getKeyType(), keyIndex) + 1;</span>
+<span class="pc bpc" id="L69" title="1 of 2 branches missed.">        if (keyRepository.existsByKeyTypeAndKeyIndexAndKeyVersion(</span>
+<span class="fc" id="L70">                request.getKeyType(), keyIndex, version)) {</span>
+<span class="nc" id="L71">            throw new ResourceAlreadyExistsException(&quot;HSM key version&quot;,</span>
+<span class="nc" id="L72">                    request.getKeyType() + &quot;/&quot; + keyIndex + &quot;/&quot; + version);</span>
+        }
+
+<span class="pc bpc" id="L75" title="1 of 2 branches missed.">        boolean tr31 = request.getKeyScheme() == HsmKeyScheme.TR31;</span>
+<span class="fc" id="L76">        KeyGenerationRequest hsmRequest = KeyGenerationRequest.builder()</span>
+<span class="fc" id="L77">                .keyType(request.getKeyType().name())</span>
+<span class="fc" id="L78">                .scheme(request.getKeyScheme().name())</span>
+<span class="fc bfc" id="L79" title="All 2 branches covered.">                .binNumber(bin == null ? null : bin.getBinNumber())</span>
+<span class="fc" id="L80">                .keyScope(request.getKeyScope().name())</span>
+<span class="fc" id="L81">                .keyLengthBits(request.getKeyLengthBits())</span>
+<span class="fc" id="L82">                .tr31Format(tr31)</span>
+<span class="fc" id="L83">                .tr31KeyUsage(normalizeNullable(request.getTr31KeyUsage()))</span>
+<span class="fc" id="L84">                .tr31Algorithm(normalizeNullable(request.getTr31Algorithm()))</span>
+<span class="fc" id="L85">                .tr31ModeOfUse(normalizeNullable(request.getTr31ModeOfUse()))</span>
+<span class="fc" id="L86">                .build();</span>
+        KeyGenerationResult result;
+<span class="fc" id="L88">        result = hsmClient.generateKey(hsmRequest);</span>
+<span class="fc" id="L89">        validateHsmResult(result, tr31);</span>
+
+<span class="fc" id="L91">        LocalDate effectiveFrom = LocalDate.now();</span>
+<span class="fc" id="L92">        String actor = actorId.trim();</span>
+<span class="fc" id="L93">        HsmKeyReferenceV2 key = HsmKeyReferenceV2.builder()</span>
+<span class="fc" id="L94">                .keyId(uuidGenerator.generate()).institutionId(institutionId)</span>
+<span class="fc" id="L95">                .keyType(request.getKeyType()).keyIndex(keyIndex)</span>
+<span class="fc" id="L96">                .keyLabel(resolveGeneratedLabel(request, bin))</span>
+<span class="fc" id="L97">                .keyCheckValue(result.getKeyCheckValue().trim().toUpperCase(Locale.ROOT))</span>
+<span class="fc" id="L98">                .keyVersion(version).keyScope(request.getKeyScope()).scheme(request.getKeyScheme())</span>
+<span class="fc" id="L99">                .keyLengthBits(request.getKeyLengthBits()).tr31(result.isTr31Format())</span>
+<span class="fc" id="L100">                .tr31KeyUsage(normalizeNullable(request.getTr31KeyUsage()))</span>
+<span class="fc" id="L101">                .tr31Algorithm(normalizeNullable(request.getTr31Algorithm()))</span>
+<span class="fc" id="L102">                .tr31ModeOfUse(normalizeNullable(request.getTr31ModeOfUse()))</span>
+<span class="fc" id="L103">                .hsmIdentifier(firstNonBlank(result.getHsmIdentifier(), hsmClient.getProviderId()))</span>
+<span class="fc" id="L104">                .hsmPartition(trimToNull(result.getHsmPartition()))</span>
+<span class="fc" id="L105">                .effectiveFrom(effectiveFrom)</span>
+<span class="fc" id="L106">                .expiryDate(effectiveFrom.plusYears(request.getValidityYears()))</span>
+<span class="fc" id="L107">                .status(HsmKeyStatus.PENDING_APPROVAL)</span>
+<span class="fc bfc" id="L108" title="All 2 branches covered.">                .binId(bin == null ? null : bin.getBinId())</span>
+<span class="fc" id="L109">                .encryptedKeyBlock(result.getEncryptedKeyBlock().trim())</span>
+<span class="fc" id="L110">                .createdBy(actor).updatedBy(actor).build();</span>
+<span class="fc" id="L111">        return toResponse(keyRepository.save(key));</span>
+    }
+
+    public boolean testHsmConnection() {
+<span class="nc" id="L115">        return hsmClient.testConnection();</span>
+    }
+
+    @Transactional
+    public HsmKeyV2Response register(UUID institutionId, RegisterHsmKeyV2Request request,
+            String actorId) {
+<span class="fc" id="L121">        requireInstitution(institutionId);</span>
+<span class="fc" id="L122">        validateRequest(institutionId, request);</span>
+<span class="fc" id="L123">        HsmKeyType keyType = request.getKeyType();</span>
+<span class="fc" id="L124">        String keyIndex = normalize(request.getKeyIndex());</span>
+<span class="fc" id="L125">        int version = keyRepository.findMaximumVersion(keyType, keyIndex) + 1;</span>
+<span class="pc bpc" id="L126" title="1 of 2 branches missed.">        if (keyRepository.existsByKeyTypeAndKeyIndexAndKeyVersion(keyType, keyIndex, version)) {</span>
+<span class="nc" id="L127">            throw new ResourceAlreadyExistsException(&quot;HSM key version&quot;, keyType + &quot;/&quot; + keyIndex + &quot;/&quot; + version);</span>
+        }
+<span class="fc" id="L129">        String actor = actorId.trim();</span>
+<span class="fc" id="L130">        HsmKeyReferenceV2 key = HsmKeyReferenceV2.builder()</span>
+<span class="fc" id="L131">                .keyId(uuidGenerator.generate()).institutionId(institutionId)</span>
+<span class="fc" id="L132">                .keyType(keyType).keyIndex(keyIndex).keyLabel(trimToNull(request.getKeyLabel()))</span>
+<span class="fc" id="L133">                .keyCheckValue(request.getKeyCheckValue().toUpperCase(Locale.ROOT))</span>
+<span class="fc" id="L134">                .keyVersion(version).keyScope(request.getKeyScope()).scheme(request.getKeyScheme())</span>
+<span class="fc" id="L135">                .keyLengthBits(request.getKeyLengthBits()).tr31(request.isTr31())</span>
+<span class="fc" id="L136">                .tr31KeyUsage(normalizeNullable(request.getTr31KeyUsage()))</span>
+<span class="fc" id="L137">                .tr31Algorithm(normalizeNullable(request.getTr31Algorithm()))</span>
+<span class="fc" id="L138">                .tr31ModeOfUse(normalizeNullable(request.getTr31ModeOfUse()))</span>
+<span class="fc" id="L139">                .hsmIdentifier(trimToNull(request.getHsmIdentifier()))</span>
+<span class="fc" id="L140">                .hsmPartition(trimToNull(request.getHsmPartition()))</span>
+<span class="fc" id="L141">                .hsmSerialNumber(trimToNull(request.getHsmSerialNumber()))</span>
+<span class="fc" id="L142">                .effectiveFrom(request.getEffectiveFrom()).expiryDate(request.getExpiryDate())</span>
+<span class="fc" id="L143">                .status(HsmKeyStatus.PENDING_APPROVAL)</span>
+<span class="fc" id="L144">                .binId(request.getBinId()).acsId(request.getAcsId())</span>
+<span class="fc" id="L145">                .cardVendorId(request.getCardVendorId()).stakeholderId(request.getStakeholderId())</span>
+<span class="fc" id="L146">                .encryptedKeyBlock(trimToNull(request.getEncryptedKeyBlock()))</span>
+<span class="fc" id="L147">                .createdBy(actor).updatedBy(actor).build();</span>
+<span class="fc" id="L148">        return toResponse(keyRepository.save(key));</span>
+    }
+
+    @Transactional(readOnly = true)
+    public HsmKeyV2Response get(UUID institutionId, UUID keyId) {
+<span class="nc" id="L153">        return toResponse(find(institutionId, keyId));</span>
+    }
+
+    @Transactional(readOnly = true)
+    public Page&lt;HsmKeyV2Response&gt; search(UUID institutionId, HsmKeyType keyType, HsmKeyScope scope,
+            HsmKeyStatus status, UUID binId, Pageable pageable) {
+<span class="nc" id="L159">        requireInstitution(institutionId);</span>
+<span class="nc bnc" id="L160" title="All 4 branches missed.">        if (binId != null &amp;&amp; binRepository.findByBinIdAndInstitutionId(binId, institutionId).isEmpty()) {</span>
+<span class="nc" id="L161">            throw new ResourceNotFoundException(&quot;BIN configuration&quot;, binId.toString());</span>
+        }
+<span class="nc" id="L163">        return keyRepository.search(institutionId, keyType, scope, status, binId, pageable)</span>
+<span class="nc" id="L164">                .map(HsmKeyV2Service::toResponse);</span>
+    }
+
+    @Transactional
+    public HsmKeyV2Response changeStatus(UUID institutionId, UUID keyId,
+            UpdateHsmKeyStatusV2Request request, String actorId) {
+<span class="fc" id="L170">        HsmKeyReferenceV2 key = keyRepository.findByTenantAndIdForUpdate(institutionId, keyId)</span>
+<span class="pc" id="L171">                .orElseThrow(() -&gt; new ResourceNotFoundException(&quot;HSM key&quot;, keyId.toString()));</span>
+<span class="fc" id="L172">        HsmKeyStatus current = key.getStatus();</span>
+<span class="fc" id="L173">        HsmKeyStatus requested = request.getStatus();</span>
+<span class="pc bpc" id="L174" title="1 of 2 branches missed.">        if (!TRANSITIONS.getOrDefault(current, Set.of()).contains(requested)) {</span>
+<span class="nc" id="L175">            throw new IllegalArgumentException(&quot;Invalid HSM key transition: &quot; + current + &quot; -&gt; &quot; + requested);</span>
+        }
+<span class="fc" id="L177">        LocalDate today = LocalDate.now();</span>
+<span class="pc bpc" id="L178" title="3 of 4 branches missed.">        if (requested == HsmKeyStatus.SCHEDULED &amp;&amp; !key.getEffectiveFrom().isAfter(today)) {</span>
+<span class="nc" id="L179">            throw new IllegalArgumentException(&quot;SCHEDULED keys require a future effectiveFrom date&quot;);</span>
+        }
+<span class="pc bpc" id="L181" title="1 of 2 branches missed.">        if (requested == HsmKeyStatus.ACTIVE</span>
+<span class="pc bpc" id="L182" title="2 of 4 branches missed.">                &amp;&amp; (key.getEffectiveFrom().isAfter(today) || !key.getExpiryDate().isAfter(today))) {</span>
+<span class="nc" id="L183">            throw new IllegalArgumentException(&quot;ACTIVE keys must be within their cryptoperiod&quot;);</span>
+        }
+<span class="pc bpc" id="L185" title="1 of 2 branches missed.">        if (request.getExpiryDate() != null) {</span>
+<span class="nc bnc" id="L186" title="All 2 branches missed.">            if (!request.getExpiryDate().isAfter(key.getEffectiveFrom())) {</span>
+<span class="nc" id="L187">                throw new IllegalArgumentException(&quot;expiryDate must be later than effectiveFrom&quot;);</span>
+            }
+<span class="nc" id="L189">            key.setExpiryDate(request.getExpiryDate());</span>
+        }
+<span class="pc bpc" id="L191" title="2 of 4 branches missed.">        if ((requested == HsmKeyStatus.RETIRED || requested == HsmKeyStatus.REVOKED)</span>
+<span class="nc bnc" id="L192" title="All 2 branches missed.">                &amp;&amp; request.getReason() == null) {</span>
+<span class="nc" id="L193">            throw new IllegalArgumentException(&quot;reason is required when retiring or revoking a key&quot;);</span>
+        }
+<span class="fc" id="L195">        key.setStatus(requested);</span>
+<span class="fc" id="L196">        key.setRotationReason(trimToNull(request.getReason()));</span>
+<span class="pc bpc" id="L197" title="3 of 6 branches missed.">        if (requested == HsmKeyStatus.DECRYPT_ONLY || requested == HsmKeyStatus.RETIRED</span>
+                || requested == HsmKeyStatus.REVOKED) {
+<span class="nc" id="L199">            key.setRotatedAt(OffsetDateTime.now(ZoneOffset.UTC));</span>
+        }
+<span class="fc" id="L201">        key.setUpdatedBy(actorId.trim());</span>
+<span class="pc bpc" id="L202" title="2 of 4 branches missed.">        if (requested == HsmKeyStatus.ACTIVE &amp;&amp; key.getPreviousKeyId() != null) {</span>
+<span class="fc" id="L203">            HsmKeyReferenceV2 previous = keyRepository</span>
+<span class="fc" id="L204">                    .findByTenantAndIdForUpdate(institutionId, key.getPreviousKeyId())</span>
+<span class="pc" id="L205">                    .orElseThrow(() -&gt; new ResourceNotFoundException(</span>
+<span class="nc" id="L206">                            &quot;Previous HSM key&quot;, key.getPreviousKeyId().toString()));</span>
+<span class="pc bpc" id="L207" title="1 of 2 branches missed.">            if (previous.getStatus() == HsmKeyStatus.ACTIVE) {</span>
+<span class="fc" id="L208">                previous.setStatus(HsmKeyStatus.DECRYPT_ONLY);</span>
+<span class="fc" id="L209">                previous.setRotatedAt(OffsetDateTime.now(ZoneOffset.UTC));</span>
+<span class="fc" id="L210">                previous.setUpdatedBy(actorId.trim());</span>
+<span class="fc" id="L211">                keyRepository.save(previous);</span>
+            }
+        }
+<span class="fc" id="L214">        return toResponse(keyRepository.save(key));</span>
+    }
+
+    @Transactional
+    public HsmKeyV2Response rotate(UUID institutionId, UUID keyId,
+            RotateHsmKeyV2Request request, String actorId) {
+<span class="fc" id="L220">        HsmKeyReferenceV2 previous = keyRepository.findByTenantAndIdForUpdate(institutionId, keyId)</span>
+<span class="pc" id="L221">                .orElseThrow(() -&gt; new ResourceNotFoundException(&quot;HSM key&quot;, keyId.toString()));</span>
+<span class="fc" id="L222">        if (!Set.of(HsmKeyStatus.ACTIVE, HsmKeyStatus.DECRYPT_ONLY,</span>
+<span class="pc bpc" id="L223" title="1 of 2 branches missed.">                HsmKeyStatus.SUSPENDED).contains(previous.getStatus())) {</span>
+<span class="nc" id="L224">            throw new IllegalArgumentException(&quot;Only ACTIVE, DECRYPT_ONLY or SUSPENDED keys can be rotated&quot;);</span>
+        }
+<span class="pc bpc" id="L226" title="1 of 2 branches missed.">        if (previous.getReplacementKeyId() != null) {</span>
+<span class="nc" id="L227">            throw new IllegalArgumentException(&quot;This key already has a registered replacement&quot;);</span>
+        }
+<span class="pc bpc" id="L229" title="1 of 2 branches missed.">        if (!request.getExpiryDate().isAfter(request.getEffectiveFrom())) {</span>
+<span class="nc" id="L230">            throw new IllegalArgumentException(&quot;expiryDate must be later than effectiveFrom&quot;);</span>
+        }
+<span class="pc bpc" id="L232" title="2 of 4 branches missed.">        if (previous.isTr31() &amp;&amp; isBlank(request.getEncryptedKeyBlock())) {</span>
+<span class="nc" id="L233">            throw new IllegalArgumentException(&quot;A protected replacement key block is required for a TR-31 key&quot;);</span>
+        }
+<span class="fc" id="L235">        int version = keyRepository.findMaximumVersion(previous.getKeyType(), previous.getKeyIndex()) + 1;</span>
+<span class="fc" id="L236">        UUID replacementId = uuidGenerator.generate();</span>
+<span class="fc" id="L237">        String actor = actorId.trim();</span>
+<span class="fc" id="L238">        HsmKeyReferenceV2 replacement = HsmKeyReferenceV2.builder()</span>
+<span class="fc" id="L239">                .keyId(replacementId).institutionId(institutionId)</span>
+<span class="fc" id="L240">                .keyType(previous.getKeyType()).keyIndex(previous.getKeyIndex())</span>
+<span class="fc" id="L241">                .keyLabel(trimToNull(request.getKeyLabel()))</span>
+<span class="fc" id="L242">                .keyCheckValue(request.getKeyCheckValue().toUpperCase(Locale.ROOT)).keyVersion(version)</span>
+<span class="fc" id="L243">                .keyScope(previous.getKeyScope()).scheme(previous.getScheme())</span>
+<span class="fc" id="L244">                .keyLengthBits(previous.getKeyLengthBits()).tr31(previous.isTr31())</span>
+<span class="fc" id="L245">                .tr31KeyUsage(previous.getTr31KeyUsage()).tr31Algorithm(previous.getTr31Algorithm())</span>
+<span class="fc" id="L246">                .tr31ModeOfUse(previous.getTr31ModeOfUse())</span>
+<span class="fc" id="L247">                .hsmIdentifier(trimToNull(request.getHsmIdentifier()))</span>
+<span class="fc" id="L248">                .hsmPartition(trimToNull(request.getHsmPartition()))</span>
+<span class="fc" id="L249">                .hsmSerialNumber(trimToNull(request.getHsmSerialNumber()))</span>
+<span class="fc" id="L250">                .effectiveFrom(request.getEffectiveFrom()).expiryDate(request.getExpiryDate())</span>
+<span class="fc" id="L251">                .status(HsmKeyStatus.PENDING_APPROVAL).previousKeyId(previous.getKeyId())</span>
+<span class="fc" id="L252">                .rotationReason(request.getRotationReason().trim())</span>
+<span class="fc" id="L253">                .encryptedKeyBlock(trimToNull(request.getEncryptedKeyBlock()))</span>
+<span class="fc" id="L254">                .binId(previous.getBinId()).acsId(previous.getAcsId())</span>
+<span class="fc" id="L255">                .cardVendorId(previous.getCardVendorId()).stakeholderId(previous.getStakeholderId())</span>
+<span class="fc" id="L256">                .createdBy(actor).updatedBy(actor).build();</span>
+<span class="fc" id="L257">        keyRepository.save(replacement);</span>
+<span class="fc" id="L258">        previous.setReplacementKeyId(replacementId);</span>
+<span class="fc" id="L259">        previous.setRotationReason(request.getRotationReason().trim());</span>
+<span class="fc" id="L260">        previous.setUpdatedBy(actor);</span>
+<span class="fc" id="L261">        keyRepository.save(previous);</span>
+<span class="fc" id="L262">        return toResponse(replacement);</span>
+    }
+
+    private void validateRequest(UUID institutionId, RegisterHsmKeyV2Request request) {
+<span class="pc bpc" id="L266" title="1 of 2 branches missed.">        if (!request.getExpiryDate().isAfter(request.getEffectiveFrom())) {</span>
+<span class="nc" id="L267">            throw new IllegalArgumentException(&quot;expiryDate must be later than effectiveFrom&quot;);</span>
+        }
+<span class="pc bpc" id="L269" title="2 of 3 branches missed.">        boolean validLength = switch (request.getKeyScheme()) {</span>
+<span class="nc" id="L270">            case TDES -&gt; Set.of(112, 168).contains(request.getKeyLengthBits());</span>
+<span class="nc" id="L271">            case AES -&gt; Set.of(128, 192, 256).contains(request.getKeyLengthBits());</span>
+<span class="fc" id="L272">            case TR31 -&gt; Set.of(112, 128, 168, 192, 256).contains(request.getKeyLengthBits());</span>
+        };
+<span class="pc bpc" id="L274" title="1 of 2 branches missed.">        if (!validLength) throw new IllegalArgumentException(&quot;keyLengthBits is invalid for &quot; + request.getKeyScheme());</span>
+<span class="pc bpc" id="L275" title="2 of 4 branches missed.">        if (request.getKeyScheme() == HsmKeyScheme.TR31 &amp;&amp; !request.isTr31()) {</span>
+<span class="nc" id="L276">            throw new IllegalArgumentException(&quot;tr31 must be true when keyScheme=TR31&quot;);</span>
+        }
+<span class="pc bpc" id="L278" title="3 of 4 branches missed.">        if (request.getKeyScheme() != HsmKeyScheme.TR31 &amp;&amp; request.isTr31()) {</span>
+<span class="nc" id="L279">            throw new IllegalArgumentException(&quot;tr31 is allowed only when keyScheme=TR31&quot;);</span>
+        }
+<span class="pc bpc" id="L281" title="1 of 2 branches missed.">        if (request.isTr31()) {</span>
+<span class="pc bpc" id="L282" title="2 of 4 branches missed.">            if (isBlank(request.getTr31KeyUsage()) || isBlank(request.getTr31Algorithm())</span>
+<span class="pc bpc" id="L283" title="2 of 4 branches missed.">                    || isBlank(request.getTr31ModeOfUse()) || isBlank(request.getEncryptedKeyBlock())) {</span>
+<span class="nc" id="L284">                throw new IllegalArgumentException(&quot;TR-31 keys require usage, algorithm, modeOfUse and a protected key block&quot;);</span>
+            }
+<span class="nc bnc" id="L286" title="All 4 branches missed.">        } else if (!isBlank(request.getTr31KeyUsage()) || !isBlank(request.getTr31Algorithm())</span>
+<span class="nc bnc" id="L287" title="All 2 branches missed.">                || !isBlank(request.getTr31ModeOfUse())) {</span>
+<span class="nc" id="L288">            throw new IllegalArgumentException(&quot;TR-31 attributes are only allowed when tr31=true&quot;);</span>
+        }
+<span class="fc" id="L290">        validateScope(institutionId, request);</span>
+<span class="fc" id="L291">    }</span>
+
+    private BinConfigurationV2 validateGenerationRequest(
+            UUID institutionId, GenerateHsmKeyV2Request request) {
+<span class="pc bpc" id="L295" title="1 of 2 branches missed.">        if (request.getKeyType() == HsmKeyType.KEK) {</span>
+<span class="nc" id="L296">            throw new IllegalArgumentException(</span>
+                    &quot;KEK must be provisioned through the secure registration process&quot;);
+        }
+<span class="pc bpc" id="L299" title="1 of 2 branches missed.">        if (request.getKeyType() != null</span>
+<span class="fc bfc" id="L300" title="All 2 branches covered.">                &amp;&amp; request.getKeyScope() != request.getKeyType().generationScope()) {</span>
+<span class="fc" id="L301">            throw new IllegalArgumentException(request.getKeyType() + &quot; keys must use &quot;</span>
+<span class="fc" id="L302">                    + request.getKeyType().generationScope() + &quot; scope&quot;);</span>
+        }
+<span class="fc" id="L304">        validateGenerationFormat(request);</span>
+<span class="fc bfc" id="L305" title="All 2 branches covered.">        if (request.getKeyScope() == HsmKeyScope.BIN) {</span>
+<span class="pc bpc" id="L306" title="1 of 2 branches missed.">            if (request.getBinId() == null) {</span>
+<span class="nc" id="L307">                throw new IllegalArgumentException(&quot;binId is required when keyScope=BIN&quot;);</span>
+            }
+<span class="fc" id="L309">            return binRepository.findByTenantAndIdForUpdate(institutionId, request.getBinId())</span>
+<span class="pc" id="L310">                    .orElseThrow(() -&gt; new ResourceNotFoundException(</span>
+<span class="nc" id="L311">                            &quot;BIN configuration&quot;, request.getBinId().toString()));</span>
+        }
+<span class="pc bpc" id="L313" title="2 of 4 branches missed.">        if (request.getKeyScope() != HsmKeyScope.INSTITUTION || request.getBinId() != null) {</span>
+<span class="nc" id="L314">            throw new IllegalArgumentException(</span>
+                    &quot;HSM generation currently supports only INSTITUTION or BIN scope&quot;);
+        }
+<span class="fc" id="L317">        institutionRepository.findByIdForUpdate(institutionId)</span>
+<span class="pc" id="L318">                .orElseThrow(() -&gt; new ResourceNotFoundException(</span>
+<span class="nc" id="L319">                        &quot;Institution&quot;, institutionId.toString()));</span>
+<span class="fc" id="L320">        return null;</span>
+    }
+
+    private static void validateGenerationFormat(GenerateHsmKeyV2Request request) {
+<span class="fc" id="L324">        Integer length = request.getKeyLengthBits();</span>
+<span class="pc bpc" id="L325" title="2 of 4 branches missed.">        switch (request.getKeyScheme()) {</span>
+            case TDES -&gt; {
+<span class="pc bpc" id="L327" title="1 of 2 branches missed.">                if (!Integer.valueOf(112).equals(length)) {</span>
+<span class="nc" id="L328">                    throw new IllegalArgumentException(</span>
+                            &quot;TDES generation requires a double-length key with keyLengthBits=112&quot;);
+                }
+<span class="fc" id="L331">                rejectTr31Metadata(request);</span>
+<span class="fc" id="L332">            }</span>
+            case AES -&gt; {
+<span class="pc bpc" id="L334" title="1 of 2 branches missed.">                if (!Set.of(128, 192, 256).contains(length)) {</span>
+<span class="nc" id="L335">                    throw new IllegalArgumentException(</span>
+                            &quot;AES generation requires keyLengthBits of 128, 192, or 256&quot;);
+                }
+<span class="fc" id="L338">                rejectTr31Metadata(request);</span>
+<span class="fc" id="L339">            }</span>
+            case TR31 -&gt; {
+<span class="nc bnc" id="L341" title="All 2 branches missed.">                if (!Set.of(112, 128, 168, 192, 256).contains(length)) {</span>
+<span class="nc" id="L342">                    throw new IllegalArgumentException(&quot;Invalid keyLengthBits for TR-31 generation&quot;);</span>
+                }
+<span class="nc bnc" id="L344" title="All 4 branches missed.">                if (isBlank(request.getTr31KeyUsage()) || isBlank(request.getTr31Algorithm())</span>
+<span class="nc bnc" id="L345" title="All 2 branches missed.">                        || isBlank(request.getTr31ModeOfUse())) {</span>
+<span class="nc" id="L346">                    throw new IllegalArgumentException(</span>
+                            &quot;TR-31 generation requires keyUsage, algorithm, and modeOfUse&quot;);
+                }
+            }
+        }
+<span class="fc" id="L351">    }</span>
+
+    private static void rejectTr31Metadata(GenerateHsmKeyV2Request request) {
+<span class="pc bpc" id="L354" title="2 of 4 branches missed.">        if (!isBlank(request.getTr31KeyUsage()) || !isBlank(request.getTr31Algorithm())</span>
+<span class="pc bpc" id="L355" title="1 of 2 branches missed.">                || !isBlank(request.getTr31ModeOfUse())) {</span>
+<span class="nc" id="L356">            throw new IllegalArgumentException(&quot;TR-31 metadata is allowed only when keyScheme=TR31&quot;);</span>
+        }
+<span class="fc" id="L358">    }</span>
+
+    private static void validateHsmResult(KeyGenerationResult result, boolean tr31Expected) {
+<span class="pc bpc" id="L361" title="2 of 4 branches missed.">        if (result == null || isBlank(result.getEncryptedKeyBlock())) {</span>
+<span class="nc" id="L362">            throw new HsmKeyGenerationException(&quot;HSM returned no protected key block&quot;);</span>
+        }
+<span class="pc bpc" id="L364" title="1 of 2 branches missed.">        if (isBlank(result.getKeyCheckValue())</span>
+<span class="pc bpc" id="L365" title="1 of 2 branches missed.">                || !result.getKeyCheckValue().trim().matches(&quot;[0-9A-Fa-f]{4,16}&quot;)) {</span>
+<span class="nc" id="L366">            throw new HsmKeyGenerationException(&quot;HSM returned an invalid key check value&quot;);</span>
+        }
+<span class="pc bpc" id="L368" title="1 of 2 branches missed.">        if (result.isTr31Format() != tr31Expected) {</span>
+<span class="nc" id="L369">            throw new HsmKeyGenerationException(</span>
+                    &quot;HSM response format does not match the requested generation format&quot;);
+        }
+<span class="fc" id="L372">    }</span>
+
+    private static String deriveGeneratedKeyIndex(UUID institutionId, BinConfigurationV2 bin,
+            HsmKeyType keyType, HsmKeyScope scope) {
+<span class="fc bfc" id="L376" title="All 2 branches covered.">        if (scope == HsmKeyScope.BIN) {</span>
+<span class="fc" id="L377">            String digits = bin.getBinNumber().replaceAll(&quot;\\D&quot;, &quot;&quot;);</span>
+<span class="fc" id="L378">            String suffix = digits.substring(Math.max(0, digits.length() - 6));</span>
+<span class="fc" id="L379">            return &quot;BIN_&quot; + keyType + &quot;_&quot; + suffix;</span>
+        }
+<span class="fc" id="L381">        String tenantSuffix = institutionId.toString().replace(&quot;-&quot;, &quot;&quot;);</span>
+<span class="fc" id="L382">        return &quot;INST_&quot; + keyType + &quot;_&quot; + tenantSuffix.substring(tenantSuffix.length() - 8);</span>
+    }
+
+    private static String resolveGeneratedLabel(
+            GenerateHsmKeyV2Request request, BinConfigurationV2 bin) {
+<span class="fc" id="L387">        String supplied = trimToNull(request.getKeyLabel());</span>
+<span class="pc bpc" id="L388" title="1 of 2 branches missed.">        return supplied != null ? supplied</span>
+<span class="fc bfc" id="L389" title="All 2 branches covered.">                : request.getKeyType() + &quot;_&quot; + (bin == null ? &quot;INSTITUTION&quot; : bin.getBinNumber());</span>
+    }
+
+    private static String firstNonBlank(String preferred, String fallback) {
+<span class="fc" id="L393">        String value = trimToNull(preferred);</span>
+<span class="pc bpc" id="L394" title="1 of 2 branches missed.">        return value == null ? trimToNull(fallback) : value;</span>
+    }
+
+    private void validateScope(UUID institutionId, RegisterHsmKeyV2Request request) {
+<span class="fc" id="L398">        int scopedIds = count(request.getBinId()) + count(request.getAcsId())</span>
+<span class="fc" id="L399">                + count(request.getCardVendorId()) + count(request.getStakeholderId());</span>
+<span class="pc bpc" id="L400" title="5 of 7 branches missed.">        switch (request.getKeyScope()) {</span>
+<span class="pc bpc" id="L401" title="1 of 2 branches missed.">            case INSTITUTION -&gt; { if (scopedIds != 0) throw scopeError(); }</span>
+            case BIN -&gt; {
+<span class="nc bnc" id="L403" title="All 4 branches missed.">                if (request.getBinId() == null || scopedIds != 1) throw scopeError();</span>
+<span class="nc bnc" id="L404" title="All 2 branches missed.">                if (binRepository.findByBinIdAndInstitutionId(request.getBinId(), institutionId).isEmpty())</span>
+<span class="nc" id="L405">                    throw new ResourceNotFoundException(&quot;BIN configuration&quot;, request.getBinId().toString());</span>
+            }
+<span class="nc bnc" id="L407" title="All 4 branches missed.">            case ACS -&gt; { if (request.getAcsId() == null || scopedIds != 1) throw scopeError(); }</span>
+<span class="nc bnc" id="L408" title="All 4 branches missed.">            case CARD_VENDOR -&gt; { if (request.getCardVendorId() == null || scopedIds != 1) throw scopeError(); }</span>
+<span class="nc bnc" id="L409" title="All 4 branches missed.">            case STAKEHOLDER -&gt; { if (request.getStakeholderId() == null || scopedIds != 1) throw scopeError(); }</span>
+<span class="fc" id="L410">            case CARD_NETWORK -&gt; throw new IllegalArgumentException(</span>
+                    &quot;CARD_NETWORK scope requires a dedicated scope identifier before it can be registered&quot;);
+        }
+<span class="pc bpc" id="L413" title="1 of 2 branches missed.">        if (request.getKeyType() == HsmKeyType.KEK) {</span>
+<span class="nc" id="L414">            if (!Set.of(HsmKeyScope.ACS, HsmKeyScope.CARD_VENDOR,</span>
+<span class="nc bnc" id="L415" title="All 2 branches missed.">                    HsmKeyScope.STAKEHOLDER).contains(request.getKeyScope())) {</span>
+<span class="nc" id="L416">                throw new IllegalArgumentException(</span>
+                        &quot;KEK must be scoped to ACS, CARD_VENDOR, or STAKEHOLDER&quot;);
+            }
+<span class="nc bnc" id="L419" title="All 2 branches missed.">            if (isBlank(request.getEncryptedKeyBlock())) {</span>
+<span class="nc" id="L420">                throw new IllegalArgumentException(</span>
+                        &quot;KEK registration requires a CMS-HSM-protected key block&quot;);
+            }
+        }
+<span class="fc" id="L424">    }</span>
+
+    private static IllegalArgumentException scopeError() {
+<span class="nc" id="L427">        return new IllegalArgumentException(&quot;Exactly the identifier matching keyScope must be supplied&quot;);</span>
+    }
+<span class="pc bpc" id="L429" title="1 of 2 branches missed.">    private static int count(UUID value) { return value == null ? 0 : 1; }</span>
+<span class="pc bpc" id="L430" title="1 of 4 branches missed.">    private static boolean isBlank(String value) { return value == null || value.isBlank(); }</span>
+    private void requireInstitution(UUID id) {
+<span class="pc bpc" id="L432" title="1 of 2 branches missed.">        if (!institutionRepository.existsById(id)) throw new ResourceNotFoundException(&quot;Institution&quot;, id.toString());</span>
+<span class="fc" id="L433">    }</span>
+    private HsmKeyReferenceV2 find(UUID institutionId, UUID keyId) {
+<span class="nc" id="L435">        return keyRepository.findByKeyIdAndInstitutionId(keyId, institutionId)</span>
+<span class="nc" id="L436">                .orElseThrow(() -&gt; new ResourceNotFoundException(&quot;HSM key&quot;, keyId.toString()));</span>
+    }
+<span class="fc" id="L438">    private static String normalize(String value) { return value.trim().toUpperCase(Locale.ROOT); }</span>
+<span class="fc bfc" id="L439" title="All 2 branches covered.">    private static String normalizeNullable(String value) { return isBlank(value) ? null : normalize(value); }</span>
+<span class="fc bfc" id="L440" title="All 2 branches covered.">    private static String trimToNull(String value) { return isBlank(value) ? null : value.trim(); }</span>
+
+    static HsmKeyV2Response toResponse(HsmKeyReferenceV2 k) {
+<span class="fc" id="L443">        return HsmKeyV2Response.builder().keyId(k.getKeyId()).institutionId(k.getInstitutionId())</span>
+<span class="fc" id="L444">                .keyType(k.getKeyType()).keyIndex(k.getKeyIndex()).keyLabel(k.getKeyLabel())</span>
+<span class="fc" id="L445">                .keyCheckValue(k.getKeyCheckValue()).keyVersion(k.getKeyVersion())</span>
+<span class="fc" id="L446">                .keyScope(k.getKeyScope()).keyScheme(k.getScheme()).keyLengthBits(k.getKeyLengthBits())</span>
+<span class="fc" id="L447">                .tr31(k.isTr31()).tr31KeyUsage(k.getTr31KeyUsage()).tr31Algorithm(k.getTr31Algorithm())</span>
+<span class="fc" id="L448">                .tr31ModeOfUse(k.getTr31ModeOfUse()).hsmIdentifier(k.getHsmIdentifier())</span>
+<span class="fc" id="L449">                .hsmPartition(k.getHsmPartition()).hsmSerialNumber(k.getHsmSerialNumber())</span>
+<span class="fc" id="L450">                .effectiveFrom(k.getEffectiveFrom()).expiryDate(k.getExpiryDate()).status(k.getStatus())</span>
+<span class="fc" id="L451">                .binId(k.getBinId()).acsId(k.getAcsId()).cardVendorId(k.getCardVendorId())</span>
+<span class="fc" id="L452">                .stakeholderId(k.getStakeholderId()).importedViaKekId(k.getImportedViaKekId())</span>
+<span class="fc" id="L453">                .externalRequestId(k.getExternalRequestId()).previousKeyId(k.getPreviousKeyId())</span>
+<span class="fc" id="L454">                .replacementKeyId(k.getReplacementKeyId()).rotatedAt(k.getRotatedAt())</span>
+<span class="fc" id="L455">                .rotationReason(k.getRotationReason())</span>
+<span class="fc bfc" id="L456" title="All 2 branches covered.">                .protectedKeyBlockStored(k.getEncryptedKeyBlock() != null)</span>
+<span class="fc" id="L457">                .createdAt(k.getCreatedAt()).updatedAt(k.getUpdatedAt())</span>
+<span class="fc" id="L458">                .createdBy(k.getCreatedBy()).updatedBy(k.getUpdatedBy()).build();</span>
+    }
+
+    private static Map&lt;HsmKeyStatus, Set&lt;HsmKeyStatus&gt;&gt; transitions() {
+<span class="fc" id="L462">        Map&lt;HsmKeyStatus, Set&lt;HsmKeyStatus&gt;&gt; m = new EnumMap&lt;&gt;(HsmKeyStatus.class);</span>
+<span class="fc" id="L463">        m.put(HsmKeyStatus.PENDING_APPROVAL, Set.of(HsmKeyStatus.SCHEDULED, HsmKeyStatus.ACTIVE, HsmKeyStatus.REVOKED));</span>
+<span class="fc" id="L464">        m.put(HsmKeyStatus.SCHEDULED, Set.of(HsmKeyStatus.ACTIVE, HsmKeyStatus.SUSPENDED, HsmKeyStatus.REVOKED));</span>
+<span class="fc" id="L465">        m.put(HsmKeyStatus.ACTIVE, Set.of(HsmKeyStatus.DECRYPT_ONLY, HsmKeyStatus.SUSPENDED, HsmKeyStatus.RETIRED, HsmKeyStatus.REVOKED));</span>
+<span class="fc" id="L466">        m.put(HsmKeyStatus.DECRYPT_ONLY, Set.of(HsmKeyStatus.RETIRED, HsmKeyStatus.REVOKED));</span>
+<span class="fc" id="L467">        m.put(HsmKeyStatus.SUSPENDED, Set.of(HsmKeyStatus.ACTIVE, HsmKeyStatus.RETIRED, HsmKeyStatus.REVOKED));</span>
+<span class="fc" id="L468">        m.put(HsmKeyStatus.RETIRED, Set.of()); m.put(HsmKeyStatus.REVOKED, Set.of());</span>
+<span class="fc" id="L469">        return Map.copyOf(m);</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.15.202606040825</span></div></body></html>

@@ -1,0 +1,421 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>CardControlsV2Service.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">CMS Core Service</a> &gt; <a href="index.source.html" class="el_package">com.xenomi.cms.core.v2.cardcontrol.service</a> &gt; <span class="el_source">CardControlsV2Service.java</span></div><h1>CardControlsV2Service.java</h1><pre class="source lang-java linenums">package com.xenomi.cms.core.v2.cardcontrol.service;
+
+import java.nio.charset.StandardCharsets;
+import java.time.OffsetDateTime;
+import java.time.ZoneOffset;
+import java.util.ArrayList;
+import java.util.EnumMap;
+import java.util.HashSet;
+import java.util.LinkedHashMap;
+import java.util.List;
+import java.util.Map;
+import java.util.Set;
+import java.util.UUID;
+import java.util.function.Function;
+import java.util.stream.Collectors;
+
+import com.xenomi.cms.core.exception.BusinessRuleViolationException;
+import com.xenomi.cms.core.exception.ResourceNotFoundException;
+import com.xenomi.cms.core.v2.card.entity.CardAccountLinkV2;
+import com.xenomi.cms.core.v2.card.entity.CardV2;
+import com.xenomi.cms.core.v2.card.model.CardStatusV2;
+import com.xenomi.cms.core.v2.card.repository.CardAccountLinkV2Repository;
+import com.xenomi.cms.core.v2.card.repository.CardV2Repository;
+import com.xenomi.cms.core.v2.cardcontrol.client.AccountingCardLimit;
+import com.xenomi.cms.core.v2.cardcontrol.client.AccountingCardLimitClient;
+import com.xenomi.cms.core.v2.cardcontrol.client.SwitchCardControl;
+import com.xenomi.cms.core.v2.cardcontrol.client.SwitchCardControlClient;
+import com.xenomi.cms.core.v2.cardcontrol.dto.CardControlDimensionV2Request;
+import com.xenomi.cms.core.v2.cardcontrol.dto.CardControlDimensionV2Response;
+import com.xenomi.cms.core.v2.cardcontrol.dto.CardControlsV2Response;
+import com.xenomi.cms.core.v2.cardcontrol.dto.UpdateCardControlsV2Request;
+import com.xenomi.cms.core.v2.cardcontrol.entity.CardControlEventV2;
+import com.xenomi.cms.core.v2.cardcontrol.entity.CardControlProfileV2;
+import com.xenomi.cms.core.v2.cardcontrol.entity.CardLimitSnapshotV2;
+import com.xenomi.cms.core.v2.cardcontrol.entity.CardTransactionControlV2;
+import com.xenomi.cms.core.v2.cardcontrol.model.ControlChannel;
+import com.xenomi.cms.core.v2.cardcontrol.model.ControlGeography;
+import com.xenomi.cms.core.v2.cardcontrol.model.ControlProfileStatus;
+import com.xenomi.cms.core.v2.cardcontrol.repository.CardControlEventV2Repository;
+import com.xenomi.cms.core.v2.cardcontrol.repository.CardControlProfileV2Repository;
+import com.xenomi.cms.core.v2.cardcontrol.repository.CardLimitSnapshotV2Repository;
+import com.xenomi.cms.core.v2.cardcontrol.repository.CardTransactionControlV2Repository;
+import com.xenomi.cms.core.v2.common.DatabaseUuidV7Generator;
+import com.xenomi.cms.core.v2.event.catalog.CardControlEventSink;
+import com.xenomi.cms.core.v2.institution.entity.InstitutionV2;
+import com.xenomi.cms.core.v2.institution.repository.InstitutionV2Repository;
+import com.xenomi.cms.core.v2.product.entity.ProductCardLimitV2;
+import com.xenomi.cms.core.v2.product.entity.ProductDefaultControlsV2;
+import com.xenomi.cms.core.v2.product.model.LimitPeriodType;
+import com.xenomi.cms.core.v2.product.model.ProductLimitStatus;
+import com.xenomi.cms.core.v2.product.model.ProductLimitType;
+import com.xenomi.cms.core.v2.product.repository.ProductCardLimitV2Repository;
+import com.xenomi.cms.core.v2.product.repository.ProductDefaultControlsV2Repository;
+import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
+
+@Service
+public class CardControlsV2Service {
+    @org.springframework.beans.factory.annotation.Value(&quot;${cms.switch.sync.enabled:false}&quot;)
+    private boolean durableSyncEnabled;
+    private final InstitutionV2Repository institutionRepository;
+    private final CardV2Repository cardRepository;
+    private final CardAccountLinkV2Repository accountLinkRepository;
+    private final CardControlProfileV2Repository profileRepository;
+    private final CardTransactionControlV2Repository controlRepository;
+    private final CardLimitSnapshotV2Repository snapshotRepository;
+    private final CardControlEventV2Repository eventRepository;
+    private final ProductDefaultControlsV2Repository defaultsRepository;
+    private final ProductCardLimitV2Repository productLimitRepository;
+    private final CardControlProfileInitializerV2 initializer;
+    private final AccountingCardLimitClient accountingClient;
+    private final SwitchCardControlClient switchClient;
+    private final DatabaseUuidV7Generator uuidGenerator;
+    private final CardControlEventSink eventSink;
+
+    public CardControlsV2Service(
+            InstitutionV2Repository institutionRepository,
+            CardV2Repository cardRepository,
+            CardAccountLinkV2Repository accountLinkRepository,
+            CardControlProfileV2Repository profileRepository,
+            CardTransactionControlV2Repository controlRepository,
+            CardLimitSnapshotV2Repository snapshotRepository,
+            CardControlEventV2Repository eventRepository,
+            ProductDefaultControlsV2Repository defaultsRepository,
+            ProductCardLimitV2Repository productLimitRepository,
+            CardControlProfileInitializerV2 initializer,
+            AccountingCardLimitClient accountingClient,
+            SwitchCardControlClient switchClient,
+            DatabaseUuidV7Generator uuidGenerator,
+<span class="fc" id="L90">            CardControlEventSink eventSink) {</span>
+<span class="fc" id="L91">        this.institutionRepository = institutionRepository;</span>
+<span class="fc" id="L92">        this.cardRepository = cardRepository;</span>
+<span class="fc" id="L93">        this.accountLinkRepository = accountLinkRepository;</span>
+<span class="fc" id="L94">        this.profileRepository = profileRepository;</span>
+<span class="fc" id="L95">        this.controlRepository = controlRepository;</span>
+<span class="fc" id="L96">        this.snapshotRepository = snapshotRepository;</span>
+<span class="fc" id="L97">        this.eventRepository = eventRepository;</span>
+<span class="fc" id="L98">        this.defaultsRepository = defaultsRepository;</span>
+<span class="fc" id="L99">        this.productLimitRepository = productLimitRepository;</span>
+<span class="fc" id="L100">        this.initializer = initializer;</span>
+<span class="fc" id="L101">        this.accountingClient = accountingClient;</span>
+<span class="fc" id="L102">        this.switchClient = switchClient;</span>
+<span class="fc" id="L103">        this.uuidGenerator = uuidGenerator;</span>
+<span class="fc" id="L104">        this.eventSink = eventSink;</span>
+<span class="fc" id="L105">    }</span>
+
+    @Transactional(readOnly = true)
+    public CardControlsV2Response get(UUID institutionId, UUID cardId) {
+<span class="nc" id="L109">        requireCard(institutionId, cardId);</span>
+<span class="nc" id="L110">        CardControlProfileV2 profile = profileRepository</span>
+<span class="nc" id="L111">                .findByInstitutionIdAndCardId(institutionId, cardId)</span>
+<span class="nc" id="L112">                .orElseThrow(() -&gt; new ResourceNotFoundException(</span>
+<span class="nc" id="L113">                        &quot;Card control profile&quot;, cardId.toString()));</span>
+<span class="nc" id="L114">        return toResponse(profile, loadControls(profile), latestSnapshot(institutionId, cardId));</span>
+    }
+
+    @Transactional
+    public CardControlsV2Response update(UUID institutionId, UUID cardId,
+            UpdateCardControlsV2Request request, String idempotencyKey,
+            String requestId, String actorId) {
+<span class="fc" id="L121">        String actor = actorId.trim();</span>
+<span class="pc bpc" id="L122" title="1 of 4 branches missed.">        String correlation = requestId == null || requestId.isBlank()</span>
+<span class="fc" id="L123">                ? uuidGenerator.generate().toString() : requestId.trim();</span>
+<span class="fc" id="L124">        InstitutionV2 institution = institutionRepository.findById(institutionId)</span>
+<span class="pc" id="L125">                .orElseThrow(() -&gt; new ResourceNotFoundException(</span>
+<span class="nc" id="L126">                        &quot;Institution&quot;, institutionId.toString()));</span>
+<span class="fc" id="L127">        CardV2 card = cardRepository.findForUpdate(institutionId, cardId)</span>
+<span class="pc" id="L128">                .orElseThrow(() -&gt; new ResourceNotFoundException(&quot;Card&quot;, cardId.toString()));</span>
+<span class="pc bpc" id="L129" title="1 of 2 branches missed.">        if (card.getCardStatus() == CardStatusV2.CLOSED) {</span>
+<span class="nc" id="L130">            throw new BusinessRuleViolationException(&quot;Closed-card controls cannot be modified&quot;);</span>
+        }
+<span class="pc bpc" id="L132" title="1 of 2 branches missed.">        if (card.getCardStatus() == CardStatusV2.BLOCKED) {</span>
+<span class="nc" id="L133">            throw new BusinessRuleViolationException(</span>
+                    &quot;Blocked or hot-listed card controls cannot be modified&quot;);
+        }
+
+<span class="fc" id="L137">        CardControlProfileV2 profile = profileRepository.findForUpdate(institutionId, cardId)</span>
+<span class="pc" id="L138">                .orElseGet(() -&gt; initializer.initialize(card, institution, actor).profile());</span>
+<span class="fc" id="L139">        List&lt;CardTransactionControlV2&gt; controls = loadControls(profile);</span>
+<span class="pc bpc" id="L140" title="1 of 2 branches missed.">        if (controls.size() != ControlGeography.values().length * ControlChannel.values().length) {</span>
+<span class="nc" id="L141">            throw new IllegalStateException(&quot;Card control profile does not contain all ten dimensions&quot;);</span>
+        }
+<span class="fc" id="L143">        Map&lt;String, Object&gt; previousState = state(profile, controls);</span>
+<span class="fc" id="L144">        validateUniqueDimensions(request.getControls());</span>
+
+<span class="fc" id="L146">        ProductDefaultControlsV2 defaults = defaultsRepository</span>
+<span class="fc" id="L147">                .findByProductVersionIdAndInstitutionId(card.getProductVersionId(), institutionId)</span>
+<span class="pc" id="L148">                .orElseThrow(() -&gt; new BusinessRuleViolationException(</span>
+                        &quot;Product version does not define default controls&quot;));
+<span class="fc bfc" id="L150" title="All 2 branches covered.">        if (request.getInternationalEnabled() != null) {</span>
+<span class="pc bpc" id="L151" title="2 of 4 branches missed.">            if (request.getInternationalEnabled() &amp;&amp; !defaults.isInternationalEnabled()) {</span>
+<span class="fc" id="L152">                throw new BusinessRuleViolationException(</span>
+                        &quot;Card international controls cannot be enabled when the product international scope is disabled&quot;);
+            }
+<span class="nc" id="L155">            profile.setInternationalEnabled(request.getInternationalEnabled());</span>
+        }
+<span class="fc" id="L157">        Map&lt;ProductLimitType, ProductCardLimitV2&gt; productLimits = productLimitRepository</span>
+<span class="fc" id="L158">                .findByInstitutionIdAndProductVersionIdAndPeriodTypeAndLimitStatus(</span>
+<span class="fc" id="L159">                        institutionId, card.getProductVersionId(),</span>
+                        LimitPeriodType.PER_TRANSACTION, ProductLimitStatus.ACTIVE)
+<span class="fc" id="L161">                .stream().collect(Collectors.toMap(ProductCardLimitV2::getLimitType, Function.identity()));</span>
+<span class="fc" id="L162">        Map&lt;Dimension, CardTransactionControlV2&gt; byDimension = controls.stream()</span>
+<span class="fc" id="L163">                .collect(Collectors.toMap(</span>
+<span class="fc" id="L164">                        value -&gt; new Dimension(value.getGeography(), value.getChannel()),</span>
+<span class="fc" id="L165">                        Function.identity()));</span>
+
+<span class="fc" id="L167">        boolean limitChanged = request.getControls().stream().anyMatch(value -&gt;</span>
+<span class="fc bfc" id="L168" title="All 2 branches covered.">                value.getPerTransactionLimitMinor() != null);</span>
+<span class="fc bfc" id="L169" title="All 2 branches covered.">        AccountingCardLimit accountingLimit = limitChanged</span>
+<span class="fc" id="L170">                ? loadAccountingLimit(institutionId, cardId, institution, correlation) : null;</span>
+<span class="fc" id="L171">        OffsetDateTime now = OffsetDateTime.now(ZoneOffset.UTC);</span>
+<span class="fc bfc" id="L172" title="All 2 branches covered.">        for (CardControlDimensionV2Request change : request.getControls()) {</span>
+<span class="fc" id="L173">            CardTransactionControlV2 current = byDimension.get(</span>
+<span class="fc" id="L174">                    new Dimension(change.getGeography(), change.getChannel()));</span>
+<span class="fc" id="L175">            validateAndApply(change, current, profile.isInternationalEnabled(),</span>
+                    defaults, productLimits, accountingLimit, now);
+<span class="fc" id="L177">        }</span>
+
+<span class="fc" id="L179">        int nextVersion = profile.getControlVersion() + 1;</span>
+<span class="fc" id="L180">        profile.setControlVersion(nextVersion);</span>
+<span class="fc" id="L181">        profile.setProfileStatus(ControlProfileStatus.PENDING_SWITCH);</span>
+<span class="fc" id="L182">        profile.setUpdatedAt(now);</span>
+<span class="fc" id="L183">        profile.setUpdatedBy(actor);</span>
+<span class="fc" id="L184">        controlRepository.saveAll(controls);</span>
+<span class="fc" id="L185">        profileRepository.save(profile);</span>
+
+<span class="fc" id="L187">        List&lt;SwitchCardControl&gt; switchControls = controls.stream()</span>
+<span class="fc" id="L188">                .map(this::toSwitchControl).toList();</span>
+<span class="fc" id="L189">        switchClient.apply(institutionId, cardId, nextVersion,</span>
+<span class="fc" id="L190">                profile.isInternationalEnabled(), switchControls,</span>
+                idempotencyKey, correlation);
+
+<span class="fc bfc" id="L193" title="All 2 branches covered.">        profile.setProfileStatus(durableSyncEnabled ? ControlProfileStatus.PENDING_SWITCH : ControlProfileStatus.ACTIVE);</span>
+<span class="fc" id="L194">        profileRepository.save(profile);</span>
+<span class="fc bfc" id="L195" title="All 2 branches covered.">        CardLimitSnapshotV2 appliedSnapshot = accountingLimit == null</span>
+<span class="fc" id="L196">                ? latestSnapshot(institutionId, cardId)</span>
+<span class="fc" id="L197">                : snapshotRepository.save(toSnapshot(</span>
+                        institutionId, cardId, accountingLimit, correlation));
+<span class="fc" id="L199">        CardControlEventV2 audit = eventRepository.save(CardControlEventV2.builder()</span>
+<span class="fc" id="L200">                .cardControlEventId(uuidGenerator.generate())</span>
+<span class="fc" id="L201">                .institutionId(institutionId)</span>
+<span class="fc" id="L202">                .cardId(cardId)</span>
+<span class="fc" id="L203">                .controlVersion(nextVersion)</span>
+<span class="fc" id="L204">                .previousState(previousState)</span>
+<span class="fc" id="L205">                .resultingState(state(profile, controls))</span>
+<span class="fc" id="L206">                .reasonCode(trim(request.getReasonCode()))</span>
+<span class="fc" id="L207">                .occurredAt(now)</span>
+<span class="fc" id="L208">                .actorReference(actor)</span>
+<span class="fc" id="L209">                .correlationId(correlationId(correlation))</span>
+<span class="fc" id="L210">                .build());</span>
+<span class="fc" id="L211">        CardControlsV2Response response = toResponse(profile, controls, appliedSnapshot, audit);</span>
+<span class="fc" id="L212">        eventSink.onUpdated(response, correlation);</span>
+<span class="fc" id="L213">        return response;</span>
+    }
+
+    private AccountingCardLimit loadAccountingLimit(UUID institutionId, UUID cardId,
+            InstitutionV2 institution, String requestId) {
+<span class="fc" id="L218">        CardAccountLinkV2 link = accountLinkRepository</span>
+<span class="fc" id="L219">                .findFirstByInstitutionIdAndCardIdAndPrimaryTrue(institutionId, cardId)</span>
+<span class="pc" id="L220">                .orElseThrow(() -&gt; new BusinessRuleViolationException(</span>
+                        &quot;Card must have a primary account link before transaction limits can be changed&quot;));
+<span class="fc" id="L222">        AccountingCardLimit result = accountingClient.getAssignedLimit(</span>
+<span class="fc" id="L223">                institutionId, link.getExternalAccountReferenceId(), cardId, requestId);</span>
+<span class="pc bpc" id="L224" title="1 of 2 branches missed.">        if (!institution.getBaseCurrency().equals(result.currencyCode())) {</span>
+<span class="nc" id="L225">            throw new BusinessRuleViolationException(</span>
+                    &quot;Accounting card-limit currency does not match the institution base currency&quot;);
+        }
+<span class="fc" id="L228">        return result;</span>
+    }
+
+    private void validateAndApply(CardControlDimensionV2Request change,
+            CardTransactionControlV2 current, boolean internationalEnabled,
+            ProductDefaultControlsV2 defaults,
+            Map&lt;ProductLimitType, ProductCardLimitV2&gt; productLimits,
+            AccountingCardLimit accountingLimit, OffsetDateTime now) {
+<span class="pc bpc" id="L236" title="1 of 2 branches missed.">        if (current == null) {</span>
+<span class="nc" id="L237">            throw new IllegalStateException(&quot;Card control dimension is missing&quot;);</span>
+        }
+<span class="fc bfc" id="L239" title="All 2 branches covered.">        if (!current.isAllowed()) {</span>
+<span class="fc" id="L240">            throw new BusinessRuleViolationException(</span>
+<span class="fc" id="L241">                    change.getGeography() + &quot; &quot; + change.getChannel()</span>
+                            + &quot; is disabled and immutable because product isAllowed is false&quot;);
+        }
+<span class="fc bfc" id="L244" title="All 2 branches covered.">        if (change.getGeography() == ControlGeography.INTERNATIONAL</span>
+<span class="pc bpc" id="L245" title="3 of 4 branches missed.">                &amp;&amp; Boolean.TRUE.equals(change.getEnabled()) &amp;&amp; !internationalEnabled) {</span>
+<span class="nc" id="L246">            throw new BusinessRuleViolationException(</span>
+                    &quot;An international control cannot be enabled while the card international scope is disabled&quot;);
+        }
+<span class="pc bpc" id="L249" title="2 of 4 branches missed.">        if (change.getContactlessEnabled() != null || change.getContactlessLimitMinor() != null) {</span>
+<span class="nc" id="L250">            throw new BusinessRuleViolationException(&quot;Use an independent CONTACTLESS_POS dimension; nested contactless fields are no longer supported&quot;);</span>
+        }
+<span class="fc bfc" id="L252" title="All 2 branches covered.">        if (Boolean.TRUE.equals(change.getEnabled())</span>
+<span class="pc bpc" id="L253" title="1 of 2 branches missed.">                &amp;&amp; !CardControlProfileInitializerV2.allowed(defaults, change.getGeography(), change.getChannel())) {</span>
+<span class="nc" id="L254">            throw new BusinessRuleViolationException(&quot;The product does not allow this channel&quot;);</span>
+        }
+<span class="fc" id="L256">        current.setEnabled(change.getEnabled());</span>
+<span class="fc bfc" id="L257" title="All 2 branches covered.">        if (change.getPerTransactionLimitMinor() != null) {</span>
+<span class="fc" id="L258">            validateLimit(change.getPerTransactionLimitMinor(),</span>
+<span class="fc" id="L259">                    CardControlProfileInitializerV2.limitType(change.getGeography(), change.getChannel(), false),</span>
+                    productLimits, accountingLimit);
+<span class="fc" id="L261">            current.setPerTransactionLimitMinor(change.getPerTransactionLimitMinor());</span>
+        }
+<span class="fc" id="L263">        current.setEffectiveAt(now);</span>
+
+<span class="fc" id="L265">    }</span>
+
+    private static void validateLimit(long value, ProductLimitType type,
+            Map&lt;ProductLimitType, ProductCardLimitV2&gt; productLimits,
+            AccountingCardLimit accountingLimit) {
+<span class="pc bpc" id="L270" title="1 of 2 branches missed.">        if (accountingLimit == null) {</span>
+<span class="nc" id="L271">            throw new IllegalStateException(&quot;Accounting limit is required for transaction-limit changes&quot;);</span>
+        }
+<span class="fc" id="L273">        ProductCardLimitV2 specific = productLimits.get(type);</span>
+<span class="fc" id="L274">        ProductCardLimitV2 overall = productLimits.get(ProductLimitType.OVERALL_CARD);</span>
+<span class="pc bpc" id="L275" title="2 of 4 branches missed.">        if (specific != null &amp;&amp; specific.getMaximumAmountMinor() != null</span>
+<span class="pc bpc" id="L276" title="1 of 2 branches missed.">                &amp;&amp; value &gt; specific.getMaximumAmountMinor()) {</span>
+<span class="nc" id="L277">            throw new BusinessRuleViolationException(</span>
+                    &quot;Requested limit exceeds the product maximum for &quot; + type);
+        }
+<span class="pc bpc" id="L280" title="2 of 4 branches missed.">        if (overall != null &amp;&amp; overall.getMaximumAmountMinor() != null</span>
+<span class="pc bpc" id="L281" title="1 of 2 branches missed.">                &amp;&amp; value &gt; overall.getMaximumAmountMinor()) {</span>
+<span class="nc" id="L282">            throw new BusinessRuleViolationException(</span>
+                    &quot;Requested limit exceeds the product overall-card maximum&quot;);
+        }
+<span class="fc bfc" id="L285" title="All 2 branches covered.">        if (value &gt; accountingLimit.assignedLimitMinor()) {</span>
+<span class="fc" id="L286">            throw new BusinessRuleViolationException(</span>
+                    &quot;Requested limit exceeds the issuer-assigned Accounting card limit&quot;);
+        }
+<span class="fc" id="L289">    }</span>
+
+    private CardLimitSnapshotV2 toSnapshot(UUID institutionId, UUID cardId,
+            AccountingCardLimit value, String requestId) {
+<span class="fc" id="L293">        UUID accountId = accountLinkRepository</span>
+<span class="fc" id="L294">                .findFirstByInstitutionIdAndCardIdAndPrimaryTrue(institutionId, cardId)</span>
+<span class="pc" id="L295">                .orElseThrow(() -&gt; new IllegalStateException(&quot;Primary account link disappeared&quot;))</span>
+<span class="fc" id="L296">                .getExternalAccountReferenceId();</span>
+<span class="fc" id="L297">        return CardLimitSnapshotV2.builder()</span>
+<span class="fc" id="L298">                .cardLimitSnapshotId(uuidGenerator.generate())</span>
+<span class="fc" id="L299">                .institutionId(institutionId)</span>
+<span class="fc" id="L300">                .cardId(cardId)</span>
+<span class="fc" id="L301">                .externalAccountReferenceId(accountId)</span>
+<span class="fc" id="L302">                .assignedLimitMinor(value.assignedLimitMinor())</span>
+<span class="fc" id="L303">                .availableAmountMinor(value.availableAmountMinor())</span>
+<span class="fc" id="L304">                .currencyCode(value.currencyCode())</span>
+<span class="pc bpc" id="L305" title="1 of 2 branches missed.">                .sourceSystem(value.sourceSystem() == null ? &quot;ACCOUNTING&quot; : value.sourceSystem())</span>
+<span class="pc bpc" id="L306" title="1 of 2 branches missed.">                .sourceVersion(value.sourceVersion() == null ? requestId : value.sourceVersion())</span>
+<span class="fc" id="L307">                .retrievedAt(value.retrievedAt())</span>
+<span class="fc" id="L308">                .expiresAt(value.expiresAt())</span>
+<span class="fc" id="L309">                .build();</span>
+    }
+
+    private CardV2 requireCard(UUID institutionId, UUID cardId) {
+<span class="nc" id="L313">        return cardRepository.findByCardIdAndInstitutionId(cardId, institutionId)</span>
+<span class="nc" id="L314">                .orElseThrow(() -&gt; new ResourceNotFoundException(&quot;Card&quot;, cardId.toString()));</span>
+    }
+
+    private List&lt;CardTransactionControlV2&gt; loadControls(CardControlProfileV2 profile) {
+<span class="fc" id="L318">        return controlRepository</span>
+<span class="fc" id="L319">                .findByInstitutionIdAndCardControlProfileIdOrderByGeographyAscChannelAsc(</span>
+<span class="fc" id="L320">                        profile.getInstitutionId(), profile.getCardControlProfileId());</span>
+    }
+
+    private CardLimitSnapshotV2 latestSnapshot(UUID institutionId, UUID cardId) {
+<span class="fc" id="L324">        return snapshotRepository.findFirstByInstitutionIdAndCardIdOrderByRetrievedAtDesc(</span>
+<span class="fc" id="L325">                institutionId, cardId).orElse(null);</span>
+    }
+
+    private CardControlsV2Response toResponse(CardControlProfileV2 profile,
+            List&lt;CardTransactionControlV2&gt; controls, CardLimitSnapshotV2 snapshot) {
+<span class="nc" id="L330">        return toResponse(profile, controls, snapshot, null);</span>
+    }
+
+    private CardControlsV2Response toResponse(CardControlProfileV2 profile,
+            List&lt;CardTransactionControlV2&gt; controls, CardLimitSnapshotV2 snapshot,
+            CardControlEventV2 audit) {
+<span class="fc" id="L336">        return CardControlsV2Response.builder()</span>
+<span class="fc" id="L337">                .cardControlProfileId(profile.getCardControlProfileId())</span>
+<span class="fc" id="L338">                .institutionId(profile.getInstitutionId())</span>
+<span class="fc" id="L339">                .cardId(profile.getCardId())</span>
+<span class="pc bpc" id="L340" title="1 of 2 branches missed.">                .cardControlEventId(audit == null ? null : audit.getCardControlEventId())</span>
+<span class="fc" id="L341">                .controlVersion(profile.getControlVersion())</span>
+<span class="fc" id="L342">                .internationalEnabled(profile.isInternationalEnabled())</span>
+<span class="fc" id="L343">                .profileStatus(profile.getProfileStatus())</span>
+<span class="pc bpc" id="L344" title="1 of 2 branches missed.">                .reasonCode(audit == null ? null : audit.getReasonCode())</span>
+<span class="fc" id="L345">                .updatedAt(profile.getUpdatedAt())</span>
+<span class="fc" id="L346">                .updatedBy(profile.getUpdatedBy())</span>
+<span class="fc bfc" id="L347" title="All 2 branches covered.">                .accountingAssignedLimitMinor(snapshot == null ? null : snapshot.getAssignedLimitMinor())</span>
+<span class="fc bfc" id="L348" title="All 2 branches covered.">                .accountingAvailableAmountMinor(snapshot == null ? null : snapshot.getAvailableAmountMinor())</span>
+<span class="fc bfc" id="L349" title="All 2 branches covered.">                .accountingCurrencyCode(snapshot == null ? null : snapshot.getCurrencyCode())</span>
+<span class="fc bfc" id="L350" title="All 2 branches covered.">                .accountingLimitRetrievedAt(snapshot == null ? null : snapshot.getRetrievedAt())</span>
+<span class="fc" id="L351">                .controls(controls.stream().map(this::toResponse).toList())</span>
+<span class="fc" id="L352">                .build();</span>
+    }
+
+    private CardControlDimensionV2Response toResponse(CardTransactionControlV2 value) {
+<span class="fc" id="L356">        return CardControlDimensionV2Response.builder()</span>
+<span class="fc" id="L357">                .cardTransactionControlId(value.getCardTransactionControlId())</span>
+<span class="fc" id="L358">                .geography(value.getGeography())</span>
+<span class="fc" id="L359">                .channel(value.getChannel())</span>
+<span class="fc" id="L360">                .isAllowed(value.isAllowed())</span>
+<span class="fc" id="L361">                .enabled(value.isEnabled())</span>
+<span class="fc" id="L362">                .perTransactionLimitMinor(value.getPerTransactionLimitMinor())</span>
+<span class="fc" id="L363">                .currencyCode(value.getCurrencyCode())</span>
+<span class="fc" id="L364">                .effectiveAt(value.getEffectiveAt())</span>
+<span class="fc" id="L365">                .build();</span>
+    }
+
+    private SwitchCardControl toSwitchControl(CardTransactionControlV2 value) {
+<span class="fc" id="L369">        return new SwitchCardControl(value.getGeography(), value.getChannel(), value.isAllowed(),</span>
+<span class="fc" id="L370">                value.isEnabled(), value.getPerTransactionLimitMinor(), null,</span>
+                null,
+<span class="fc" id="L372">                null, value.getCurrencyCode());</span>
+    }
+
+    private static void validateUniqueDimensions(List&lt;CardControlDimensionV2Request&gt; controls) {
+<span class="fc" id="L376">        Set&lt;Dimension&gt; dimensions = new HashSet&lt;&gt;();</span>
+<span class="fc bfc" id="L377" title="All 2 branches covered.">        for (CardControlDimensionV2Request value : controls) {</span>
+<span class="pc bpc" id="L378" title="1 of 2 branches missed.">            if (!dimensions.add(new Dimension(value.getGeography(), value.getChannel()))) {</span>
+<span class="nc" id="L379">                throw new BusinessRuleViolationException(</span>
+                        &quot;Each geography and channel dimension may appear only once per request&quot;);
+            }
+<span class="fc" id="L382">        }</span>
+<span class="fc" id="L383">    }</span>
+
+    private static Map&lt;String, Object&gt; state(CardControlProfileV2 profile,
+            List&lt;CardTransactionControlV2&gt; controls) {
+<span class="fc" id="L387">        Map&lt;String, Object&gt; result = new LinkedHashMap&lt;&gt;();</span>
+<span class="fc" id="L388">        result.put(&quot;controlVersion&quot;, profile.getControlVersion());</span>
+<span class="fc" id="L389">        result.put(&quot;profileStatus&quot;, profile.getProfileStatus().name());</span>
+<span class="fc" id="L390">        result.put(&quot;internationalEnabled&quot;, profile.isInternationalEnabled());</span>
+<span class="fc" id="L391">        List&lt;Map&lt;String, Object&gt;&gt; dimensions = new ArrayList&lt;&gt;();</span>
+<span class="fc bfc" id="L392" title="All 2 branches covered.">        for (CardTransactionControlV2 value : controls) {</span>
+<span class="fc" id="L393">            Map&lt;String, Object&gt; dimension = new LinkedHashMap&lt;&gt;();</span>
+<span class="fc" id="L394">            dimension.put(&quot;geography&quot;, value.getGeography().name());</span>
+<span class="fc" id="L395">            dimension.put(&quot;channel&quot;, value.getChannel().name());</span>
+<span class="fc" id="L396">            dimension.put(&quot;isAllowed&quot;, value.isAllowed());</span>
+<span class="fc" id="L397">            dimension.put(&quot;enabled&quot;, value.isEnabled());</span>
+<span class="fc" id="L398">            dimension.put(&quot;perTransactionLimitMinor&quot;, value.getPerTransactionLimitMinor());</span>
+<span class="fc" id="L399">            dimension.put(&quot;currencyCode&quot;, value.getCurrencyCode());</span>
+<span class="fc" id="L400">            dimensions.add(dimension);</span>
+<span class="fc" id="L401">        }</span>
+<span class="fc" id="L402">        result.put(&quot;controls&quot;, dimensions);</span>
+<span class="fc" id="L403">        return result;</span>
+    }
+
+    private static UUID correlationId(String requestId) {
+        try {
+<span class="fc" id="L408">            return UUID.fromString(requestId);</span>
+<span class="fc" id="L409">        } catch (IllegalArgumentException ignored) {</span>
+<span class="fc" id="L410">            return UUID.nameUUIDFromBytes(requestId.getBytes(StandardCharsets.UTF_8));</span>
+        }
+    }
+
+    private static String trim(String value) {
+<span class="pc bpc" id="L415" title="1 of 4 branches missed.">        return value == null || value.isBlank() ? null : value.trim();</span>
+    }
+
+<span class="fc" id="L418">    private record Dimension(ControlGeography geography, ControlChannel channel) {</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.15.202606040825</span></div></body></html>

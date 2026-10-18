@@ -1,0 +1,18 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>LifecycleCommandRequestV2.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">CMS Core Service</a> &gt; <a href="index.source.html" class="el_package">com.xenomi.cms.core.v2.card.lifecycle.command</a> &gt; <span class="el_source">LifecycleCommandRequestV2.java</span></div><h1>LifecycleCommandRequestV2.java</h1><pre class="source lang-java linenums">package com.xenomi.cms.core.v2.card.lifecycle.command;
+
+import com.fasterxml.jackson.databind.JsonNode;
+import java.util.Map;
+import java.util.UUID;
+
+/** Internal command envelope; actor and permissions are resolved from authenticated context. */
+public record LifecycleCommandRequestV2(UUID institutionId, UUID accountReferenceId,
+        UUID targetCardId, Long expectedVersion, Map&lt;UUID, Long&gt; expectedFamilyRevisions,
+        String idempotencyKey, UUID correlationId, JsonNode payload) {
+<span class="fc" id="L11">    public LifecycleCommandRequestV2 {</span>
+<span class="pc bpc" id="L12" title="1 of 2 branches missed.">        expectedFamilyRevisions = expectedFamilyRevisions == null ? Map.of() : Map.copyOf(expectedFamilyRevisions);</span>
+<span class="fc bfc" id="L13" title="All 2 branches covered.">        payload = payload == null ? null : payload.deepCopy();</span>
+<span class="fc" id="L14">    }</span>
+<span class="fc bfc" id="L15" title="All 2 branches covered.">    @Override public JsonNode payload() { return payload == null ? null : payload.deepCopy(); }</span>
+<span class="nc" id="L16">    @Override public String toString() { return &quot;LifecycleCommandRequestV2[institutionId=&quot; + institutionId + &quot;, targetCardId=&quot; + targetCardId + &quot;]&quot;; }</span>
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.15.202606040825</span></div></body></html>

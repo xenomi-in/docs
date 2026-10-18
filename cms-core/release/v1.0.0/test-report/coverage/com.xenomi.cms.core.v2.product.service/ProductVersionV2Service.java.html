@@ -1,0 +1,231 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>ProductVersionV2Service.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">CMS Core Service</a> &gt; <a href="index.source.html" class="el_package">com.xenomi.cms.core.v2.product.service</a> &gt; <span class="el_source">ProductVersionV2Service.java</span></div><h1>ProductVersionV2Service.java</h1><pre class="source lang-java linenums">package com.xenomi.cms.core.v2.product.service;
+
+import java.time.OffsetDateTime;
+import java.util.UUID;
+
+import com.xenomi.cms.core.exception.ResourceNotFoundException;
+import com.xenomi.cms.core.v2.common.DatabaseUuidV7Generator;
+import com.xenomi.cms.core.v2.event.catalog.ProductVersionEventSink;
+import com.xenomi.cms.core.v2.event.catalog.ProductVersionEventSink.VersionSnapshot;
+import com.xenomi.cms.core.v2.event.correlation.CorrelationIdResolver;
+import com.xenomi.cms.core.v2.product.dto.CreateProductVersionV2Request;
+import com.xenomi.cms.core.v2.product.dto.ProductVersionV2Response;
+import com.xenomi.cms.core.v2.product.dto.UpdateProductVersionV2Request;
+import com.xenomi.cms.core.v2.product.entity.CardProductV2;
+import com.xenomi.cms.core.v2.product.entity.ProductVersionV2;
+import com.xenomi.cms.core.v2.product.model.ExpiryCalculationRule;
+import com.xenomi.cms.core.v2.product.model.ProductStatus;
+import com.xenomi.cms.core.v2.product.model.ProductVersionStatus;
+import com.xenomi.cms.core.v2.product.model.ValidityStartRule;
+import com.xenomi.cms.core.v2.product.repository.CardProductV2Repository;
+import com.xenomi.cms.core.v2.product.repository.ProductVersionV2Repository;
+import com.xenomi.cms.core.v2.institution.repository.InstitutionV2Repository;
+
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
+import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
+
+@Service
+public class ProductVersionV2Service {
+
+    private final ProductVersionV2Repository repository;
+    private final CardProductV2Repository productRepository;
+    private final DatabaseUuidV7Generator uuidGenerator;
+    private final InstitutionV2Repository institutionRepository;
+    private final ProductVersionEventSink eventSink;
+    private final CorrelationIdResolver correlationIdResolver;
+
+    public ProductVersionV2Service(ProductVersionV2Repository repository,
+            CardProductV2Repository productRepository, DatabaseUuidV7Generator uuidGenerator,
+            InstitutionV2Repository institutionRepository, ProductVersionEventSink eventSink,
+<span class="fc" id="L42">            CorrelationIdResolver correlationIdResolver) {</span>
+<span class="fc" id="L43">        this.repository = repository;</span>
+<span class="fc" id="L44">        this.productRepository = productRepository;</span>
+<span class="fc" id="L45">        this.uuidGenerator = uuidGenerator;</span>
+<span class="fc" id="L46">        this.institutionRepository = institutionRepository;</span>
+<span class="fc" id="L47">        this.eventSink = eventSink;</span>
+<span class="fc" id="L48">        this.correlationIdResolver = correlationIdResolver;</span>
+<span class="fc" id="L49">    }</span>
+
+    @Transactional
+    public ProductVersionV2Response create(UUID institutionId, UUID productId,
+            CreateProductVersionV2Request request, String actorId) {
+<span class="fc" id="L54">        CardProductV2 product = lockProduct(institutionId, productId);</span>
+<span class="pc bpc" id="L55" title="1 of 2 branches missed.">        if (product.getProductStatus() == ProductStatus.RETIRED) {</span>
+<span class="nc" id="L56">            throw new IllegalArgumentException(&quot;A version cannot be created for a RETIRED product&quot;);</span>
+        }
+<span class="fc" id="L58">        validateDates(request.getEffectiveFrom(), request.getEffectiveTo());</span>
+<span class="fc" id="L59">        ProductVersionV2 version = ProductVersionV2.builder()</span>
+<span class="fc" id="L60">                .productVersionId(uuidGenerator.generate())</span>
+<span class="fc" id="L61">                .institutionId(institutionId)</span>
+<span class="fc" id="L62">                .productId(productId)</span>
+<span class="fc" id="L63">                .versionNumber(repository.findMaximumVersion(productId) + 1)</span>
+<span class="fc" id="L64">                .versionStatus(ProductVersionStatus.DRAFT)</span>
+<span class="fc" id="L65">                .validityMonths(resolveValidityMonths(institutionId, request.getValidityMonths()))</span>
+<span class="pc bpc" id="L66" title="1 of 2 branches missed.">                .validityStartRule(request.getValidityStartRule() == null</span>
+<span class="pc" id="L67">                        ? ValidityStartRule.ISSUANCE_DATE : request.getValidityStartRule())</span>
+<span class="pc bpc" id="L68" title="1 of 2 branches missed.">                .expiryCalculationRule(request.getExpiryCalculationRule() == null</span>
+<span class="pc" id="L69">                        ? ExpiryCalculationRule.END_OF_EXPIRY_MONTH : request.getExpiryCalculationRule())</span>
+<span class="fc" id="L70">                .renewalNoticeDays(request.getRenewalNoticeDays())</span>
+<span class="fc" id="L71">                .renewalProductionDays(request.getRenewalProductionDays())</span>
+<span class="pc bpc" id="L72" title="1 of 2 branches missed.">                .automaticRenewalEnabled(request.getAutomaticRenewalEnabled() == null</span>
+<span class="pc bnc" id="L73" title="All 2 branches missed.">                        || request.getAutomaticRenewalEnabled())</span>
+<span class="fc" id="L74">                .defaultServiceCode(request.getDefaultServiceCode())</span>
+<span class="fc" id="L75">                .icvvServiceCode(request.getIcvvServiceCode())</span>
+<span class="fc" id="L76">                .effectiveFrom(request.getEffectiveFrom())</span>
+<span class="fc" id="L77">                .effectiveTo(request.getEffectiveTo())</span>
+<span class="fc" id="L78">                .createdBy(actorId.trim())</span>
+<span class="fc" id="L79">                .updatedBy(actorId.trim())</span>
+<span class="fc" id="L80">                .build();</span>
+<span class="fc" id="L81">        ProductVersionV2Response response = toResponse(repository.save(version));</span>
+<span class="fc" id="L82">        eventSink.onCreated(response, correlationIdResolver.current());</span>
+<span class="fc" id="L83">        return response;</span>
+    }
+
+    @Transactional(readOnly = true)
+    public ProductVersionV2Response get(UUID institutionId, UUID productId, UUID versionId) {
+<span class="nc" id="L88">        return toResponse(find(institutionId, productId, versionId));</span>
+    }
+
+    @Transactional(readOnly = true)
+    public Page&lt;ProductVersionV2Response&gt; list(
+            UUID institutionId, UUID productId, Pageable pageable) {
+<span class="nc" id="L94">        requireProduct(institutionId, productId);</span>
+<span class="nc" id="L95">        return repository.findByInstitutionIdAndProductId(institutionId, productId, pageable)</span>
+<span class="nc" id="L96">                .map(this::toResponse);</span>
+    }
+
+    @Transactional
+    public ProductVersionV2Response update(UUID institutionId, UUID productId, UUID versionId,
+            UpdateProductVersionV2Request request, String actorId) {
+<span class="fc" id="L102">        CardProductV2 product = lockProduct(institutionId, productId);</span>
+<span class="fc" id="L103">        ProductVersionV2 version = find(institutionId, productId, versionId);</span>
+<span class="fc" id="L104">        VersionSnapshot before = snapshot(version);</span>
+<span class="pc bpc" id="L105" title="1 of 2 branches missed.">        boolean configurationUpdate = request.getValidityMonths() != null</span>
+<span class="pc bpc" id="L106" title="1 of 2 branches missed.">                || request.getValidityStartRule() != null</span>
+<span class="pc bpc" id="L107" title="1 of 2 branches missed.">                || request.getExpiryCalculationRule() != null</span>
+<span class="pc bpc" id="L108" title="1 of 2 branches missed.">                || request.getRenewalNoticeDays() != null</span>
+<span class="pc bpc" id="L109" title="1 of 2 branches missed.">                || request.getRenewalProductionDays() != null</span>
+<span class="pc bpc" id="L110" title="1 of 2 branches missed.">                || request.getAutomaticRenewalEnabled() != null</span>
+<span class="pc bpc" id="L111" title="1 of 2 branches missed.">                || request.getDefaultServiceCode() != null</span>
+<span class="pc bpc" id="L112" title="1 of 2 branches missed.">                || request.getIcvvServiceCode() != null</span>
+<span class="pc bpc" id="L113" title="1 of 2 branches missed.">                || request.getEffectiveFrom() != null</span>
+<span class="pc bpc" id="L114" title="1 of 2 branches missed.">                || request.getEffectiveTo() != null;</span>
+<span class="pc bpc" id="L115" title="3 of 4 branches missed.">        if (configurationUpdate &amp;&amp; version.getVersionStatus() != ProductVersionStatus.DRAFT) {</span>
+<span class="nc" id="L116">            throw new IllegalArgumentException(&quot;Product version configuration can be changed only while DRAFT&quot;);</span>
+        }
+<span class="pc bpc" id="L118" title="1 of 2 branches missed.">        if (request.getValidityMonths() != null) version.setValidityMonths(request.getValidityMonths());</span>
+<span class="pc bpc" id="L119" title="1 of 2 branches missed.">        if (request.getValidityStartRule() != null) version.setValidityStartRule(request.getValidityStartRule());</span>
+<span class="pc bpc" id="L120" title="1 of 2 branches missed.">        if (request.getExpiryCalculationRule() != null) version.setExpiryCalculationRule(request.getExpiryCalculationRule());</span>
+<span class="pc bpc" id="L121" title="1 of 2 branches missed.">        if (request.getRenewalNoticeDays() != null) version.setRenewalNoticeDays(request.getRenewalNoticeDays());</span>
+<span class="pc bpc" id="L122" title="1 of 2 branches missed.">        if (request.getRenewalProductionDays() != null) version.setRenewalProductionDays(request.getRenewalProductionDays());</span>
+<span class="pc bpc" id="L123" title="1 of 2 branches missed.">        if (request.getAutomaticRenewalEnabled() != null) version.setAutomaticRenewalEnabled(request.getAutomaticRenewalEnabled());</span>
+<span class="pc bpc" id="L124" title="1 of 2 branches missed.">        if (request.getDefaultServiceCode() != null) version.setDefaultServiceCode(request.getDefaultServiceCode());</span>
+<span class="pc bpc" id="L125" title="1 of 2 branches missed.">        if (request.getIcvvServiceCode() != null) version.setIcvvServiceCode(request.getIcvvServiceCode());</span>
+<span class="pc bpc" id="L126" title="1 of 2 branches missed.">        if (request.getEffectiveFrom() != null) version.setEffectiveFrom(request.getEffectiveFrom());</span>
+<span class="pc bpc" id="L127" title="1 of 2 branches missed.">        if (request.getEffectiveTo() != null) version.setEffectiveTo(request.getEffectiveTo());</span>
+
+<span class="pc bpc" id="L129" title="2 of 4 branches missed.">        if (request.getVersionStatus() != null &amp;&amp; request.getVersionStatus() != version.getVersionStatus()) {</span>
+<span class="fc" id="L130">            validateTransition(version.getVersionStatus(), request.getVersionStatus());</span>
+<span class="pc bpc" id="L131" title="1 of 2 branches missed.">            if (request.getVersionStatus() == ProductVersionStatus.ACTIVE) {</span>
+<span class="nc bnc" id="L132" title="All 2 branches missed.">                if (product.getProductStatus() != ProductStatus.ACTIVE) {</span>
+<span class="nc" id="L133">                    throw new IllegalArgumentException(&quot;The parent product must be ACTIVE before activating a version&quot;);</span>
+                }
+<span class="nc bnc" id="L135" title="All 2 branches missed.">                if (repository.existsByInstitutionIdAndProductIdAndVersionStatus(</span>
+                        institutionId, productId, ProductVersionStatus.ACTIVE)) {
+<span class="nc" id="L137">                    throw new IllegalArgumentException(&quot;The product already has an ACTIVE version&quot;);</span>
+                }
+<span class="nc" id="L139">                version.setActivatedAt(OffsetDateTime.now(java.time.ZoneOffset.UTC));</span>
+            }
+<span class="fc" id="L141">            version.setVersionStatus(request.getVersionStatus());</span>
+        }
+<span class="fc" id="L143">        validateDates(version.getEffectiveFrom(), version.getEffectiveTo());</span>
+<span class="fc" id="L144">        version.setUpdatedBy(actorId.trim());</span>
+<span class="fc" id="L145">        version.setUpdatedAt(OffsetDateTime.now(java.time.ZoneOffset.UTC));</span>
+<span class="fc" id="L146">        ProductVersionV2Response response = toResponse(repository.save(version));</span>
+<span class="fc" id="L147">        eventSink.onUpdated(response, before, correlationIdResolver.current());</span>
+<span class="fc" id="L148">        return response;</span>
+    }
+
+    private static VersionSnapshot snapshot(ProductVersionV2 version) {
+<span class="fc" id="L152">        return new VersionSnapshot(</span>
+<span class="fc" id="L153">                version.getVersionStatus(),</span>
+<span class="fc" id="L154">                version.getValidityMonths(),</span>
+<span class="fc" id="L155">                version.getValidityStartRule(),</span>
+<span class="fc" id="L156">                version.getExpiryCalculationRule(),</span>
+<span class="fc" id="L157">                version.getRenewalNoticeDays(),</span>
+<span class="fc" id="L158">                version.getRenewalProductionDays(),</span>
+<span class="fc" id="L159">                version.isAutomaticRenewalEnabled(),</span>
+<span class="fc" id="L160">                version.getDefaultServiceCode(),</span>
+<span class="fc" id="L161">                version.getIcvvServiceCode(),</span>
+<span class="fc" id="L162">                version.getEffectiveFrom(),</span>
+<span class="fc" id="L163">                version.getEffectiveTo());</span>
+    }
+
+    private CardProductV2 lockProduct(UUID institutionId, UUID productId) {
+<span class="fc" id="L167">        return productRepository.findByTenantAndIdForUpdate(institutionId, productId)</span>
+<span class="pc" id="L168">                .orElseThrow(() -&gt; new ResourceNotFoundException(&quot;Card product&quot;, productId.toString()));</span>
+    }
+
+    private int resolveValidityMonths(UUID institutionId, Integer productValidityMonths) {
+<span class="pc bpc" id="L172" title="1 of 2 branches missed.">        if (productValidityMonths != null) {</span>
+<span class="nc" id="L173">            return productValidityMonths;</span>
+        }
+<span class="fc" id="L175">        return institutionRepository.findById(institutionId)</span>
+<span class="pc" id="L176">                .orElseThrow(() -&gt; new ResourceNotFoundException(</span>
+<span class="nc" id="L177">                        &quot;Institution&quot;, institutionId.toString()))</span>
+<span class="fc" id="L178">                .getDefaultCardValidityMonths();</span>
+    }
+
+    private void requireProduct(UUID institutionId, UUID productId) {
+<span class="nc bnc" id="L182" title="All 2 branches missed.">        if (productRepository.findByProductIdAndInstitutionId(productId, institutionId).isEmpty()) {</span>
+<span class="nc" id="L183">            throw new ResourceNotFoundException(&quot;Card product&quot;, productId.toString());</span>
+        }
+<span class="nc" id="L185">    }</span>
+
+    private ProductVersionV2 find(UUID institutionId, UUID productId, UUID versionId) {
+<span class="fc" id="L188">        return repository.findByProductVersionIdAndInstitutionIdAndProductId(</span>
+                        versionId, institutionId, productId)
+<span class="pc" id="L190">                .orElseThrow(() -&gt; new ResourceNotFoundException(&quot;Product version&quot;, versionId.toString()));</span>
+    }
+
+    private static void validateDates(OffsetDateTime from, OffsetDateTime to) {
+<span class="pc bpc" id="L194" title="3 of 4 branches missed.">        if (to != null &amp;&amp; !to.isAfter(from)) {</span>
+<span class="nc" id="L195">            throw new IllegalArgumentException(&quot;effectiveTo must be after effectiveFrom&quot;);</span>
+        }
+<span class="fc" id="L197">    }</span>
+
+    private static void validateTransition(ProductVersionStatus current, ProductVersionStatus target) {
+<span class="pc bpc" id="L200" title="3 of 4 branches missed.">        boolean allowed = switch (current) {</span>
+<span class="pc bpc" id="L201" title="3 of 4 branches missed.">            case DRAFT -&gt; target == ProductVersionStatus.PENDING_APPROVAL</span>
+                    || target == ProductVersionStatus.CANCELLED;
+<span class="nc bnc" id="L203" title="All 6 branches missed.">            case PENDING_APPROVAL -&gt; target == ProductVersionStatus.DRAFT</span>
+                    || target == ProductVersionStatus.ACTIVE
+                    || target == ProductVersionStatus.CANCELLED;
+<span class="nc bnc" id="L206" title="All 2 branches missed.">            case ACTIVE -&gt; target == ProductVersionStatus.RETIRED;</span>
+<span class="nc" id="L207">            case RETIRED, CANCELLED -&gt; false;</span>
+        };
+<span class="pc bpc" id="L209" title="1 of 2 branches missed.">        if (!allowed) {</span>
+<span class="nc" id="L210">            throw new IllegalArgumentException(</span>
+                    &quot;Invalid product version status transition: &quot; + current + &quot; -&gt; &quot; + target);
+        }
+<span class="fc" id="L213">    }</span>
+
+    private ProductVersionV2Response toResponse(ProductVersionV2 v) {
+<span class="fc" id="L216">        return ProductVersionV2Response.builder()</span>
+<span class="fc" id="L217">                .productVersionId(v.getProductVersionId()).institutionId(v.getInstitutionId())</span>
+<span class="fc" id="L218">                .productId(v.getProductId()).versionNumber(v.getVersionNumber())</span>
+<span class="fc" id="L219">                .versionStatus(v.getVersionStatus()).validityMonths(v.getValidityMonths())</span>
+<span class="fc" id="L220">                .validityStartRule(v.getValidityStartRule())</span>
+<span class="fc" id="L221">                .expiryCalculationRule(v.getExpiryCalculationRule())</span>
+<span class="fc" id="L222">                .renewalNoticeDays(v.getRenewalNoticeDays())</span>
+<span class="fc" id="L223">                .renewalProductionDays(v.getRenewalProductionDays())</span>
+<span class="fc" id="L224">                .automaticRenewalEnabled(v.isAutomaticRenewalEnabled())</span>
+<span class="fc" id="L225">                .defaultServiceCode(v.getDefaultServiceCode()).icvvServiceCode(v.getIcvvServiceCode())</span>
+<span class="fc" id="L226">                .effectiveFrom(v.getEffectiveFrom()).effectiveTo(v.getEffectiveTo())</span>
+<span class="fc" id="L227">                .activatedAt(v.getActivatedAt()).createdAt(v.getCreatedAt()).updatedAt(v.getUpdatedAt())</span>
+<span class="fc" id="L228">                .createdBy(v.getCreatedBy()).updatedBy(v.getUpdatedBy()).build();</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.15.202606040825</span></div></body></html>

@@ -1,0 +1,32 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>UpsertProductPersonalisationPolicyV2Request.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">CMS Core Service</a> &gt; <a href="index.source.html" class="el_package">com.xenomi.cms.core.v2.product.dto</a> &gt; <span class="el_source">UpsertProductPersonalisationPolicyV2Request.java</span></div><h1>UpsertProductPersonalisationPolicyV2Request.java</h1><pre class="source lang-java linenums">package com.xenomi.cms.core.v2.product.dto;
+
+import java.util.UUID;
+
+import com.xenomi.cms.core.v2.product.model.PersonalisationMode;
+import com.xenomi.cms.core.v2.product.model.ProductionPriority;
+import io.swagger.v3.oas.annotations.media.Schema;
+import jakarta.validation.constraints.Max;
+import jakarta.validation.constraints.Min;
+import jakarta.validation.constraints.NotNull;
+import jakarta.validation.constraints.Size;
+
+<span class="fc" id="L13">public record UpsertProductPersonalisationPolicyV2Request(</span>
+        @NotNull Boolean personalisedAllowed,
+        @NotNull
+        @Schema(description = &quot;Currently supported personalisation mode&quot;,
+                allowableValues = &quot;PERSONALISED&quot;, example = &quot;PERSONALISED&quot;)
+        PersonalisationMode defaultMode,
+        @Size(max = 200) String vendorFormatProfileReference,
+        @Size(max = 40) String embossingNameRule,
+        @Min(1) @Max(100) Short maximumEmbossingNameLength,
+        @Min(1) @Max(4) Short embossingNameLineCount,
+        @NotNull Boolean printCardNumber,
+        @NotNull Boolean printExpiry,
+        @NotNull Boolean printCvv2,
+        @NotNull Boolean encodeMagneticStripe,
+        @NotNull Boolean personaliseEmvChip,
+        @NotNull Boolean pinMailerRequired,
+        UUID defaultVendorId,
+        @NotNull ProductionPriority productionPriority) {
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.15.202606040825</span></div></body></html>

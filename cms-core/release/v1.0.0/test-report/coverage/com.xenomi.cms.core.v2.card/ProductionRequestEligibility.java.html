@@ -1,0 +1,47 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>ProductionRequestEligibility.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">CMS Core Service</a> &gt; <a href="index.source.html" class="el_package">com.xenomi.cms.core.v2.card</a> &gt; <span class="el_source">ProductionRequestEligibility.java</span></div><h1>ProductionRequestEligibility.java</h1><pre class="source lang-java linenums">package com.xenomi.cms.core.v2.card;
+
+import java.time.OffsetDateTime;
+import java.util.UUID;
+
+import org.springframework.jdbc.core.JdbcTemplate;
+
+import com.xenomi.cms.core.v2.card.entity.CardProductionRequestV2;
+import com.xenomi.cms.core.v2.card.model.ProductionRequestStatus;
+
+/**
+ * ELIGIBLE means the embossing scheduler may claim the request.
+ * A request stays PENDING until Switch registration has been applied and card, address, and approval are ready.
+ */
+public final class ProductionRequestEligibility {
+    private ProductionRequestEligibility() {}
+
+    public static void stamp(CardProductionRequestV2 request, long appliedSwitchRevision, OffsetDateTime now) {
+<span class="pc bpc" id="L19" title="2 of 6 branches missed.">        boolean ready = request.isCardDataReady() &amp;&amp; request.isAddressReady() &amp;&amp; request.isApprovalReady();</span>
+<span class="fc bfc" id="L20" title="All 4 branches covered.">        if (appliedSwitchRevision &gt; 0 &amp;&amp; ready) {</span>
+<span class="fc" id="L21">            request.setSwitchOnboardingReady(true);</span>
+<span class="fc" id="L22">            request.setRequestStatus(ProductionRequestStatus.ELIGIBLE);</span>
+<span class="fc" id="L23">            request.setEligibleAt(now);</span>
+        } else {
+<span class="fc" id="L25">            request.setSwitchOnboardingReady(false);</span>
+<span class="fc" id="L26">            request.setRequestStatus(ProductionRequestStatus.PENDING);</span>
+<span class="fc" id="L27">            request.setEligibleAt(null);</span>
+        }
+<span class="fc" id="L29">    }</span>
+
+    public static int promoteAfterRegistration(JdbcTemplate db, UUID institutionId, UUID cardId) {
+<span class="nc" id="L32">        return db.update(&quot;&quot;&quot;</span>
+                update cms_v2.card_production_request
+                set switch_onboarding_ready = true,
+                    request_status = 'ELIGIBLE',
+                    eligible_at = now(),
+                    updated_at = now()
+                where institution_id = ?
+                  and card_id = ?
+                  and request_status = 'PENDING'
+                  and card_data_ready
+                  and address_ready
+                  and approval_ready
+                &quot;&quot;&quot;, institutionId, cardId);
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.15.202606040825</span></div></body></html>

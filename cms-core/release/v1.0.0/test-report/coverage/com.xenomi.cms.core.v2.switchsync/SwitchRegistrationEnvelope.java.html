@@ -1,0 +1,55 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>SwitchRegistrationEnvelope.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">CMS Core Service</a> &gt; <a href="index.source.html" class="el_package">com.xenomi.cms.core.v2.switchsync</a> &gt; <span class="el_source">SwitchRegistrationEnvelope.java</span></div><h1>SwitchRegistrationEnvelope.java</h1><pre class="source lang-java linenums">package com.xenomi.cms.core.v2.switchsync;
+
+import com.fasterxml.jackson.databind.ObjectMapper;
+import com.nimbusds.jose.*;
+import com.nimbusds.jose.crypto.RSAEncrypter;
+import com.xenomi.cms.core.v2.card.repository.CardV2Repository;
+import com.xenomi.cms.core.v2.card.security.CmsCardSecurityService;
+import org.springframework.beans.factory.annotation.Value;
+import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
+import org.springframework.jdbc.core.JdbcTemplate;
+import org.springframework.stereotype.Component;
+import java.nio.file.*;
+import java.security.cert.*;
+import java.security.interfaces.RSAPublicKey;
+import java.time.Instant;
+import java.time.format.DateTimeFormatter;
+import java.util.*;
+
+@Component
+@ConditionalOnProperty(name=&quot;cms.switch.sync.enabled&quot;,havingValue=&quot;true&quot;)
+public class SwitchRegistrationEnvelope {
+    private final CardV2Repository cards; private final CmsCardSecurityService security;
+    private final JdbcTemplate db; private final ObjectMapper json; private final X509Certificate certificate;
+    public SwitchRegistrationEnvelope(CardV2Repository cards,CmsCardSecurityService security,JdbcTemplate db,ObjectMapper json,
+<span class="fc" id="L25">            @Value(&quot;${cms.switch.sync.recipient-certificate}&quot;) String path) throws Exception {</span>
+<span class="fc" id="L26">        this.cards=cards; this.security=security; this.db=db; this.json=json;</span>
+<span class="pc bpc" id="L27" title="2 of 4 branches missed.">        var resource = path.startsWith(&quot;classpath:&quot;) || path.startsWith(&quot;file:&quot;)</span>
+<span class="nc" id="L28">                ? new org.springframework.core.io.DefaultResourceLoader().getResource(path)</span>
+<span class="fc" id="L29">                : new org.springframework.core.io.FileSystemResource(path);</span>
+<span class="fc" id="L30">        try(var in=resource.getInputStream()) {</span>
+<span class="fc" id="L31">            certificate=(X509Certificate)CertificateFactory.getInstance(&quot;X.509&quot;).generateCertificate(in);</span>
+        }
+<span class="pc bpc" id="L33" title="2 of 4 branches missed.">        if(!(certificate.getPublicKey() instanceof RSAPublicKey key) || key.getModulus().bitLength()&lt;2048)</span>
+<span class="nc" id="L34">            throw new IllegalArgumentException(&quot;Switch recipient must use RSA 2048 bits or stronger&quot;);</span>
+<span class="fc" id="L35">    }</span>
+    public String create(UUID tenant,UUID cardId,UUID command) {
+<span class="fc" id="L37">        var card=cards.findByCardIdAndInstitutionId(cardId,tenant).orElseThrow();</span>
+<span class="fc" id="L38">        var product=db.queryForMap(&quot;select funding_type,card_network from cms_v2.card_product where institution_id=? and product_id=?&quot;,tenant,card.getProductId());</span>
+<span class="fc" id="L39">        var material=new LinkedHashMap&lt;String,Object&gt;();</span>
+<span class="fc" id="L40">        material.put(&quot;institutionId&quot;,tenant); material.put(&quot;cardId&quot;,cardId); material.put(&quot;commandId&quot;,command);</span>
+<span class="fc" id="L41">        material.put(&quot;expiresAt&quot;,Instant.now().plusSeconds(240).toString());</span>
+<span class="fc" id="L42">        material.put(&quot;expiryYYMM&quot;,card.getExpiryDate().format(DateTimeFormatter.ofPattern(&quot;yyMM&quot;)));</span>
+<span class="pc bpc" id="L43" title="3 of 4 branches missed.">        material.put(&quot;cardType&quot;,switch(product.get(&quot;funding_type&quot;).toString()) { case &quot;CREDIT&quot;-&gt;&quot;C&quot;; case &quot;DEBIT&quot;-&gt;&quot;D&quot;; case &quot;PREPAID&quot;-&gt;&quot;P&quot;; default-&gt;throw new IllegalStateException(&quot;Unsupported funding type&quot;); });</span>
+<span class="pc bpc" id="L44" title="3 of 4 branches missed.">        material.put(&quot;cardScheme&quot;,switch(product.get(&quot;card_network&quot;).toString()) { case &quot;VISA&quot;-&gt;&quot;V&quot;; case &quot;MASTERCARD&quot;-&gt;&quot;M&quot;; case &quot;RUPAY&quot;-&gt;&quot;R&quot;; default-&gt;throw new IllegalStateException(&quot;Unsupported card network&quot;); });</span>
+<span class="fc" id="L45">        return security.withDecryptedPan(tenant,card,pan-&gt;{</span>
+            try {
+<span class="fc" id="L47">                certificate.checkValidity(); material.put(&quot;pan&quot;,pan);</span>
+<span class="fc" id="L48">                var jwe=new JWEObject(new JWEHeader.Builder(JWEAlgorithm.RSA_OAEP_256,EncryptionMethod.A256GCM).build(),new Payload(json.writeValueAsString(material)));</span>
+<span class="fc" id="L49">                jwe.encrypt(new RSAEncrypter((RSAPublicKey)certificate.getPublicKey())); return jwe.serialize();</span>
+<span class="nc" id="L50">            } catch(Exception ex) { throw new IllegalStateException(&quot;Switch envelope preparation failed&quot;); }</span>
+<span class="fc" id="L51">            finally { material.clear(); }</span>
+        });
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.15.202606040825</span></div></body></html>

@@ -1,0 +1,429 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>SwitchPinService.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">CMS Core Service</a> &gt; <a href="index.source.html" class="el_package">com.xenomi.cms.core.v2.card.pin.switchpin</a> &gt; <span class="el_source">SwitchPinService.java</span></div><h1>SwitchPinService.java</h1><pre class="source lang-java linenums">package com.xenomi.cms.core.v2.card.pin.switchpin;
+
+import com.fasterxml.jackson.databind.JsonNode;
+import com.fasterxml.jackson.databind.ObjectMapper;
+import com.fasterxml.jackson.databind.node.ObjectNode;
+import com.xenomi.cms.core.exception.*;
+import com.xenomi.cms.core.v2.switchsync.SwitchSyncTransport;
+import org.springframework.beans.factory.ObjectProvider;
+import org.springframework.beans.factory.annotation.Value;
+import org.springframework.jdbc.core.JdbcTemplate;
+import org.springframework.stereotype.Service;
+import org.springframework.transaction.PlatformTransactionManager;
+import org.springframework.transaction.support.TransactionTemplate;
+import org.springframework.transaction.support.TransactionSynchronizationManager;
+import org.springframework.web.client.RestClientResponseException;
+import java.nio.charset.StandardCharsets;
+import java.security.MessageDigest;
+import java.time.Instant;
+import java.util.*;
+
+/** Switch is the single writer. Durable state contains metadata only; network IO owns no DB transaction. */
+@Service
+public class SwitchPinService {
+<span class="fc" id="L24">    private static final Set&lt;String&gt; CUSTOMER_OPERATIONS=Set.of(&quot;INITIALIZE_SELECTED_PIN&quot;,&quot;CHANGE_PIN&quot;,&quot;RESET_PIN&quot;);</span>
+<span class="fc" id="L25">    private static final Set&lt;String&gt; TERMINAL=Set.of(&quot;COMPLETED&quot;,&quot;FAILED&quot;,&quot;REJECTED&quot;,&quot;UNSUPPORTED&quot;);</span>
+    private final JdbcTemplate db;
+    private final ObjectMapper json;
+    private final TransactionTemplate tx;
+    private final ObjectProvider&lt;SwitchSyncTransport&gt; transports;
+    private final SwitchPinEnvelope envelope;
+    private final boolean enabled;
+
+    public SwitchPinService(JdbcTemplate db, ObjectMapper json, PlatformTransactionManager tm,
+            ObjectProvider&lt;SwitchSyncTransport&gt; transports, SwitchPinEnvelope envelope,
+<span class="fc" id="L35">            @Value(&quot;${cms.switch.pin.enabled:${cms.switch.sync.enabled:false}}&quot;) boolean enabled) {</span>
+<span class="fc" id="L36">        this.db=db; this.json=json; tx=new TransactionTemplate(tm);</span>
+<span class="fc" id="L37">        this.transports=transports; this.envelope=envelope; this.enabled=enabled;</span>
+<span class="fc" id="L38">    }</span>
+
+<span class="fc" id="L40">    public record OperationResult(UUID operationId, UUID institutionId, UUID panFamilyReference,</span>
+            String operation, String status, long policyProfileVersion, long expectedPinVersion,
+            Long pinVersion, String mailerReference, String failureCode) {}
+
+<span class="fc" id="L44">    public record ConfigureRequest(@jakarta.validation.constraints.NotNull UUID operationId) {}</span>
+
+    /** Explicit retry after a definite configuration rejection; never migrates an existing CMS-owned PIN. */
+    public OperationResult configureProfile(UUID tenant,UUID card,ConfigureRequest request,String actor) {
+<span class="fc" id="L48">        requireTransport(); outsideTransaction();</span>
+<span class="fc" id="L49">        Map&lt;String,Object&gt; op=tx.execute(s -&gt; {</span>
+<span class="fc" id="L50">            db.queryForObject(&quot;select pg_advisory_xact_lock(hashtextextended(?, 3781))&quot;,Object.class,request.operationId().toString());</span>
+<span class="fc" id="L51">            var prior=find(request.operationId());</span>
+<span class="pc bpc" id="L52" title="1 of 2 branches missed.">            if(prior!=null) {</span>
+<span class="nc bnc" id="L53" title="All 4 branches missed.">                if(!tenant.equals(prior.get(&quot;institution_id&quot;)) || !card.equals(prior.get(&quot;card_id&quot;))</span>
+<span class="nc bnc" id="L54" title="All 2 branches missed.">                        || !&quot;CONFIGURE_PIN_PROFILE&quot;.equals(prior.get(&quot;operation&quot;)))</span>
+<span class="nc" id="L55">                    throw new ResourceVersionConflictException(&quot;PIN operation ID is already in use&quot;);</span>
+<span class="nc" id="L56">                return prior;</span>
+            }
+<span class="fc" id="L58">            var pin=cardPin(tenant,card,true);</span>
+<span class="pc bpc" id="L59" title="2 of 4 branches missed.">            if(!&quot;SWITCH&quot;.equals(pin.get(&quot;pin_authority&quot;)) || pin.get(&quot;switch_pin_profile&quot;)==null</span>
+<span class="pc bpc" id="L60" title="2 of 4 branches missed.">                    || number(pin,&quot;switch_policy_version&quot;)!=0 || number(pin,&quot;switch_pin_version&quot;)!=0</span>
+<span class="pc bpc" id="L61" title="1 of 2 branches missed.">                    || number(pin,&quot;applied_revision&quot;)&lt;1)</span>
+<span class="nc" id="L62">                throw new BusinessRuleViolationException(&quot;Only registered, unenrolled Switch PIN profiles may be configured&quot;);</span>
+<span class="pc bpc" id="L63" title="2 of 4 branches missed.">            if(!Set.of(&quot;PENDING&quot;,&quot;ACTIVE&quot;).contains(pin.get(&quot;card_status&quot;)) || pin.get(&quot;security_hold_reason&quot;)!=null)</span>
+<span class="nc" id="L64">                throw new BusinessRuleViolationException(&quot;Card is not eligible for PIN configuration&quot;);</span>
+<span class="fc" id="L65">            requireNoPending(tenant,(UUID)pin.get(&quot;pan_allocation_id&quot;));</span>
+<span class="fc" id="L66">            insert(request.operationId(),tenant,card,(UUID)pin.get(&quot;pan_allocation_id&quot;),&quot;CONFIGURE_PIN_PROFILE&quot;,1,0,</span>
+<span class="fc" id="L67">                    fingerprint(pin.get(&quot;switch_pin_profile&quot;).toString()),actor,&quot;PREPARED&quot;);</span>
+<span class="fc" id="L68">            return find(request.operationId());</span>
+        });
+<span class="pc bpc" id="L70" title="1 of 2 branches missed.">        if(&quot;PREPARED&quot;.equals(op.get(&quot;status&quot;))) {</span>
+<span class="fc" id="L71">            var pin=cardPin(tenant,card,false);</span>
+<span class="fc" id="L72">            var body=command(op); body.set(&quot;profile&quot;,parse(pin.get(&quot;switch_pin_profile&quot;).toString()));</span>
+<span class="fc" id="L73">            sendOnce(op,body);</span>
+<span class="pc bnc" id="L74" title="All 2 branches missed.">        } else if(&quot;UNKNOWN&quot;.equals(op.get(&quot;status&quot;))) reconcile(request.operationId());</span>
+<span class="fc" id="L75">        return result(find(request.operationId()));</span>
+    }
+
+    public OperationResult submit(UUID tenant, UUID card, String operation, SelectedPinRequest request, String actor) {
+<span class="fc" id="L79">        requireTransport(); outsideTransaction();</span>
+<span class="fc bfc" id="L80" title="All 2 branches covered.">        if (!CUSTOMER_OPERATIONS.contains(operation)) throw new IllegalArgumentException(&quot;Unsupported PIN action&quot;);</span>
+<span class="fc bfc" id="L81" title="All 4 branches covered.">        if ((&quot;CHANGE_PIN&quot;.equals(operation)) != (request.currentPin()!=null))</span>
+<span class="fc" id="L82">            throw new IllegalArgumentException(&quot;Current PIN is required only for CHANGE_PIN&quot;);</span>
+<span class="fc" id="L83">        String fingerprint=fingerprint(tenant+&quot;:&quot;+card+&quot;:&quot;+operation+&quot;:&quot;+encode(request));</span>
+<span class="fc" id="L84">        Map&lt;String,Object&gt; op=tx.execute(s -&gt; {</span>
+            // Serialize identical operation IDs before checking replay, including cross-family attempts.
+<span class="fc" id="L86">            db.queryForObject(&quot;select pg_advisory_xact_lock(hashtextextended(?, 3781))&quot;,Object.class,request.operationId().toString());</span>
+<span class="fc" id="L87">            var prior=find(request.operationId());</span>
+<span class="pc bpc" id="L88" title="1 of 2 branches missed.">            if (prior!=null) {</span>
+<span class="nc bnc" id="L89" title="All 4 branches missed.">                if (!tenant.equals(prior.get(&quot;institution_id&quot;)) || !card.equals(prior.get(&quot;card_id&quot;))</span>
+<span class="nc bnc" id="L90" title="All 2 branches missed.">                        || !fingerprint.equals(prior.get(&quot;request_fingerprint&quot;)))</span>
+<span class="nc" id="L91">                    throw new ResourceVersionConflictException(&quot;PIN operation ID was already used for a different request&quot;);</span>
+<span class="nc" id="L92">                return prior;</span>
+            }
+<span class="fc" id="L94">            var pin=cardPin(tenant,card,true);</span>
+<span class="fc" id="L95">            validateRequest(pin,operation,request);</span>
+<span class="fc" id="L96">            requireNoPending(tenant,(UUID)pin.get(&quot;pan_allocation_id&quot;));</span>
+<span class="fc" id="L97">            insert(request.operationId(),tenant,card,(UUID)pin.get(&quot;pan_allocation_id&quot;),operation,</span>
+<span class="fc" id="L98">                    request.policyProfileVersion(),request.expectedPinVersion(),fingerprint,actor,&quot;PREPARED&quot;);</span>
+<span class="fc" id="L99">            return find(request.operationId());</span>
+        });
+<span class="pc bpc" id="L101" title="1 of 2 branches missed.">        if (&quot;PREPARED&quot;.equals(op.get(&quot;status&quot;))) {</span>
+<span class="fc" id="L102">            ObjectNode command=command(op);</span>
+<span class="fc" id="L103">            try { command.put(&quot;protectedPinMaterial&quot;,envelope.create(command,request)); }</span>
+<span class="fc" id="L104">            catch (RuntimeException ex) {</span>
+<span class="fc" id="L105">                rejectPrepared(request.operationId(),&quot;ENVELOPE_UNAVAILABLE&quot;);</span>
+<span class="fc" id="L106">                return result(find(request.operationId()));</span>
+<span class="fc" id="L107">            }</span>
+<span class="fc" id="L108">            sendOnce(op,command);</span>
+<span class="pc bnc" id="L109" title="All 2 branches missed.">        } else if (&quot;UNKNOWN&quot;.equals(op.get(&quot;status&quot;))) reconcile(request.operationId());</span>
+<span class="fc" id="L110">        return result(find(request.operationId()));</span>
+    }
+
+    public OperationResult operation(UUID tenant, UUID card, UUID operation) {
+<span class="fc" id="L114">        var op=find(operation);</span>
+<span class="pc bpc" id="L115" title="2 of 6 branches missed.">        if (op==null || !tenant.equals(op.get(&quot;institution_id&quot;)) || !card.equals(op.get(&quot;card_id&quot;)))</span>
+<span class="fc" id="L116">            throw new ResourceNotFoundException(&quot;PIN operation&quot;,operation.toString());</span>
+        // GET is safe reconciliation; a 404 at Switch never causes a new submission.
+<span class="pc bpc" id="L118" title="2 of 4 branches missed.">        if (enabled &amp;&amp; &quot;UNKNOWN&quot;.equals(op.get(&quot;status&quot;))) reconcile(operation);</span>
+<span class="fc" id="L119">        return result(find(operation));</span>
+    }
+
+    public Map&lt;String,Object&gt; state(UUID tenant, UUID card) {
+<span class="fc" id="L123">        var pin=cardPin(tenant,card,false);</span>
+<span class="fc" id="L124">        var state=new LinkedHashMap&lt;String,Object&gt;();</span>
+<span class="fc" id="L125">        state.put(&quot;cardId&quot;,card); state.put(&quot;panFamilyReference&quot;,pin.get(&quot;pan_allocation_id&quot;));</span>
+<span class="fc" id="L126">        state.put(&quot;authority&quot;,pin.get(&quot;pin_authority&quot;)); state.put(&quot;pinStatus&quot;,pin.get(&quot;pin_status&quot;));</span>
+<span class="fc" id="L127">        state.put(&quot;pinRequired&quot;,pin.get(&quot;pin_required&quot;));</span>
+<span class="pc bpc" id="L128" title="2 of 4 branches missed.">        state.put(&quot;syncStatus&quot;,&quot;SWITCH&quot;.equals(pin.get(&quot;pin_authority&quot;)) &amp;&amp; pin.get(&quot;switch_pin_profile&quot;)==null</span>
+<span class="pc" id="L129">                ? &quot;NOT_REQUIRED&quot; : pin.get(&quot;switch_pin_sync_status&quot;));</span>
+<span class="fc" id="L130">        state.put(&quot;policyProfileVersion&quot;,pin.get(&quot;switch_policy_version&quot;));</span>
+<span class="fc" id="L131">        state.put(&quot;lastConfirmedPinVersion&quot;,pin.get(&quot;switch_pin_version&quot;));</span>
+<span class="fc" id="L132">        state.put(&quot;lastConfirmedAt&quot;,pin.get(&quot;switch_pin_confirmed_at&quot;));</span>
+<span class="fc" id="L133">        state.put(&quot;mailerReference&quot;,pin.get(&quot;pin_mailer_reference&quot;));</span>
+<span class="fc" id="L134">        state.put(&quot;liveSwitchState&quot;,false);</span>
+<span class="fc" id="L135">        state.put(&quot;operations&quot;,db.queryForList(&quot;&quot;&quot;</span>
+                select * from cms_v2.switch_pin_operation where institution_id=? and pan_family_id=?
+                order by created_at desc limit 20
+<span class="fc" id="L138">                &quot;&quot;&quot;,tenant,pin.get(&quot;pan_allocation_id&quot;)).stream().map(this::result).toList());</span>
+<span class="fc" id="L139">        return state;</span>
+    }
+
+    /** Bounded background provisioning and metadata-only reconciliation. */
+    public void poll() {
+<span class="pc bpc" id="L144" title="2 of 4 branches missed.">        if (!enabled || transports.getIfAvailable()==null) return;</span>
+<span class="fc" id="L145">        outsideTransaction();</span>
+<span class="fc" id="L146">        var candidates=db.queryForList(&quot;&quot;&quot;</span>
+                select p.institution_id, min(c.card_id::text)::uuid as card_id
+                from cms_v2.pin_data p join cms_v2.card c
+                  on c.institution_id=p.institution_id and c.pin_data_ref=p.pin_data_id
+                join cms_v2.switch_card_sync s on s.institution_id=c.institution_id and s.card_id=c.card_id
+                where p.pin_authority='SWITCH' and p.switch_pin_profile is not null
+                  and p.switch_policy_version=0 and s.applied_revision&gt;0
+                  and c.card_status not in ('CLOSED','BLOCKED','REPLACED','EXPIRED')
+                  and not exists(select 1 from cms_v2.switch_pin_operation o
+                    where o.institution_id=p.institution_id and o.pan_family_id=p.pan_allocation_id)
+                group by p.institution_id,p.pin_data_id limit 10
+                &quot;&quot;&quot;);
+<span class="fc bfc" id="L158" title="All 2 branches covered.">        for(var candidate:candidates) configure((UUID)candidate.get(&quot;institution_id&quot;),(UUID)candidate.get(&quot;card_id&quot;));</span>
+<span class="fc" id="L159">        var pending=db.queryForList(&quot;&quot;&quot;</span>
+                select operation_id from cms_v2.switch_pin_operation
+                where (status='UNKNOWN' or (status='PREPARED' and operation='CONFIGURE_PIN_PROFILE'))
+                  and next_lookup_at&lt;=now() order by created_at limit 20
+                &quot;&quot;&quot;,UUID.class);
+<span class="fc bfc" id="L164" title="All 2 branches covered.">        for(UUID id:pending) {</span>
+<span class="fc" id="L165">            var op=find(id);</span>
+<span class="pc bpc" id="L166" title="1 of 2 branches missed.">            if (&quot;PREPARED&quot;.equals(op.get(&quot;status&quot;))) {</span>
+<span class="fc" id="L167">                var pin=cardPin((UUID)op.get(&quot;institution_id&quot;),(UUID)op.get(&quot;card_id&quot;),false);</span>
+<span class="fc" id="L168">                var body=command(op); body.set(&quot;profile&quot;,parse(pin.get(&quot;switch_pin_profile&quot;).toString()));</span>
+<span class="fc" id="L169">                sendOnce(op,body);</span>
+<span class="pc" id="L170">            } else reconcile(id);</span>
+<span class="fc" id="L171">        }</span>
+<span class="fc" id="L172">    }</span>
+
+    private void configure(UUID tenant, UUID card) {
+<span class="fc" id="L175">        tx.executeWithoutResult(s -&gt; {</span>
+<span class="fc" id="L176">            var pin=cardPin(tenant,card,true);</span>
+<span class="pc bpc" id="L177" title="2 of 4 branches missed.">            if (number(pin,&quot;switch_policy_version&quot;)!=0 || Boolean.TRUE.equals(db.queryForObject(&quot;&quot;&quot;</span>
+                    select exists(select 1 from cms_v2.switch_pin_operation where institution_id=? and pan_family_id=?)
+<span class="pc" id="L179">                    &quot;&quot;&quot;,Boolean.class,tenant,pin.get(&quot;pan_allocation_id&quot;)))) return;</span>
+<span class="fc" id="L180">            UUID id=UUID.randomUUID();</span>
+<span class="fc" id="L181">            insert(id,tenant,card,(UUID)pin.get(&quot;pan_allocation_id&quot;),&quot;CONFIGURE_PIN_PROFILE&quot;,1,0,</span>
+<span class="fc" id="L182">                    fingerprint(pin.get(&quot;switch_pin_profile&quot;).toString()),&quot;switch-pin-worker&quot;,&quot;PREPARED&quot;);</span>
+<span class="fc" id="L183">            db.update(&quot;update cms_v2.pin_data set switch_pin_sync_status='CONFIGURING',version=version+1 where pin_data_id=?&quot;,pin.get(&quot;pin_data_id&quot;));</span>
+<span class="fc" id="L184">        });</span>
+<span class="fc" id="L185">    }</span>
+
+    private void sendOnce(Map&lt;String,Object&gt; op, ObjectNode body) {
+<span class="fc" id="L188">        outsideTransaction();</span>
+<span class="fc" id="L189">        UUID id=(UUID)op.get(&quot;operation_id&quot;);</span>
+        // Commit UNKNOWN before IO. Only the winner may send. A crash never triggers a second HSM call.
+<span class="fc" id="L191">        int claimed=db.update(&quot;&quot;&quot;</span>
+                update cms_v2.switch_pin_operation set status='UNKNOWN',updated_at=now(),next_lookup_at=now()+interval '30 seconds'
+                where operation_id=? and status='PREPARED'
+                &quot;&quot;&quot;,id);
+<span class="pc bpc" id="L195" title="1 of 2 branches missed.">        if (claimed!=1) return;</span>
+        try {
+<span class="fc" id="L197">            JsonNode receipt=requireTransport().sendPin((UUID)op.get(&quot;institution_id&quot;),(UUID)op.get(&quot;pan_family_id&quot;),id,body);</span>
+<span class="fc" id="L198">            accept(op,receipt);</span>
+<span class="nc" id="L199">        } catch (RestClientResponseException ex) {</span>
+<span class="nc" id="L200">            int code=ex.getStatusCode().value();</span>
+<span class="nc bnc" id="L201" title="All 2 branches missed.">            if (Set.of(400,401,403,404,409,422).contains(code)) reject(id,&quot;HTTP_&quot;+code);</span>
+<span class="nc" id="L202">            else uncertain(id,&quot;SWITCH_UNAVAILABLE&quot;);</span>
+<span class="nc" id="L203">        } catch (RuntimeException ex) { uncertain(id,&quot;OUTCOME_UNCONFIRMED&quot;); }</span>
+<span class="fc" id="L204">        finally { body.removeAll(); }</span>
+<span class="fc" id="L205">    }</span>
+
+    private void reconcile(UUID id) {
+<span class="fc" id="L208">        outsideTransaction();</span>
+<span class="fc" id="L209">        var op=find(id);</span>
+<span class="pc bpc" id="L210" title="2 of 4 branches missed.">        if (op==null || !&quot;UNKNOWN&quot;.equals(op.get(&quot;status&quot;))) return;</span>
+        try {
+<span class="fc" id="L212">            JsonNode receipt=requireTransport().pinReceipt((UUID)op.get(&quot;institution_id&quot;),id);</span>
+<span class="pc bpc" id="L213" title="1 of 2 branches missed.">            if (receipt!=null) accept(op,receipt);</span>
+<span class="pc bpc" id="L214" title="1 of 2 branches missed.">            else if (&quot;CONFIGURE_PIN_PROFILE&quot;.equals(op.get(&quot;operation&quot;))) {</span>
+                // This command has no encrypted input, expiry, or HSM side effect. Its pinned profile is replayable.
+<span class="nc" id="L216">                db.update(&quot;&quot;&quot;</span>
+                        update cms_v2.switch_pin_operation set status='PREPARED',next_lookup_at=now()+interval '30 seconds'
+                        where operation_id=? and status='UNKNOWN'
+                        &quot;&quot;&quot;,id);
+            }
+<span class="fc" id="L221">            else uncertain(id,&quot;RECEIPT_NOT_FOUND&quot;);</span>
+<span class="pc" id="L222">        } catch (RuntimeException ex) { uncertain(id,&quot;LOOKUP_UNAVAILABLE&quot;); }</span>
+<span class="fc" id="L223">    }</span>
+
+    private void accept(Map&lt;String,Object&gt; op, JsonNode receipt) {
+<span class="fc" id="L226">        validateReceipt(op,receipt);</span>
+<span class="pc bpc" id="L227" title="1 of 2 branches missed.">        if (&quot;PENDING&quot;.equals(receipt.path(&quot;status&quot;).asText())) {</span>
+<span class="nc" id="L228">            uncertain((UUID)op.get(&quot;operation_id&quot;),&quot;SWITCH_PENDING&quot;); return;</span>
+        }
+<span class="fc" id="L230">        tx.executeWithoutResult(s -&gt; {</span>
+            // Consistent family-before-ledger lock order.
+<span class="fc" id="L232">            var pin=cardPin((UUID)op.get(&quot;institution_id&quot;),(UUID)op.get(&quot;card_id&quot;),true);</span>
+<span class="fc" id="L233">            var current=db.queryForMap(&quot;select * from cms_v2.switch_pin_operation where operation_id=? for update&quot;,op.get(&quot;operation_id&quot;));</span>
+<span class="pc bpc" id="L234" title="1 of 2 branches missed.">            if (TERMINAL.contains(current.get(&quot;status&quot;))) return;</span>
+<span class="fc" id="L235">            String status=receipt.path(&quot;status&quot;).asText();</span>
+<span class="fc" id="L236">            long pinVersion=receipt.path(&quot;pinVersion&quot;).longValue();</span>
+<span class="fc" id="L237">            boolean configured=&quot;CONFIGURE_PIN_PROFILE&quot;.equals(op.get(&quot;operation&quot;));</span>
+<span class="fc" id="L238">            boolean completed=&quot;COMPLETED&quot;.equals(status);</span>
+<span class="pc bpc" id="L239" title="1 of 2 branches missed.">            String failure=completed ? null : safeFailure(receipt.path(&quot;failureCode&quot;).asText());</span>
+<span class="pc bpc" id="L240" title="1 of 2 branches missed.">            String mailer=receipt.path(&quot;mailerReference&quot;).isTextual()?receipt.path(&quot;mailerReference&quot;).asText():null;</span>
+<span class="fc" id="L241">            db.update(&quot;&quot;&quot;</span>
+                    update cms_v2.switch_pin_operation set status=?,result_pin_version=?,mailer_reference=?,failure_code=?,updated_at=now()
+                    where operation_id=?
+<span class="fc" id="L244">                    &quot;&quot;&quot;,status,pinVersion,mailer,failure,op.get(&quot;operation_id&quot;));</span>
+<span class="pc bpc" id="L245" title="1 of 4 branches missed.">            if (completed &amp;&amp; configured) {</span>
+<span class="fc" id="L246">                boolean generated=&quot;HSM_GENERATED&quot;.equals(parse(pin.get(&quot;switch_pin_profile&quot;).toString()).path(&quot;establishment&quot;).asText());</span>
+<span class="fc" id="L247">                db.update(&quot;&quot;&quot;</span>
+                        update cms_v2.pin_data set switch_policy_version=?,switch_pin_sync_status=?,
+                          switch_pin_confirmed_at=now(),updated_at=now(),version=version+1 where pin_data_id=?
+<span class="pc bpc" id="L250" title="1 of 2 branches missed.">                        &quot;&quot;&quot;,op.get(&quot;policy_version&quot;),generated?&quot;UNSUPPORTED&quot;:&quot;READY&quot;,pin.get(&quot;pin_data_id&quot;));</span>
+<span class="pc bpc" id="L251" title="1 of 2 branches missed.">                if (generated) {</span>
+<span class="nc" id="L252">                    UUID generation=UUID.randomUUID();</span>
+<span class="nc" id="L253">                    insert(generation,(UUID)op.get(&quot;institution_id&quot;),(UUID)op.get(&quot;card_id&quot;),(UUID)op.get(&quot;pan_family_id&quot;),</span>
+<span class="nc" id="L254">                            &quot;GENERATE_INITIAL_PIN&quot;,number(op,&quot;policy_version&quot;),0,fingerprint(&quot;unsupported-generation:&quot;+generation),</span>
+                            &quot;switch-pin-worker&quot;,&quot;UNSUPPORTED&quot;);
+<span class="nc" id="L256">                    db.update(&quot;update cms_v2.switch_pin_operation set failure_code='GENERATED_PIN_MAILER_UNSUPPORTED' where operation_id=?&quot;,generation);</span>
+                }
+<span class="pc bpc" id="L258" title="2 of 4 branches missed.">            } else if (completed &amp;&amp; pinVersion&gt;=number(pin,&quot;switch_pin_version&quot;)) {</span>
+<span class="pc bpc" id="L259" title="1 of 2 branches missed.">                String resulting=&quot;CLOSED&quot;.equals(pin.get(&quot;pin_status&quot;)) ? &quot;CLOSED&quot;</span>
+<span class="pc bpc" id="L260" title="1 of 2 branches missed.">                        : &quot;GENERATE_INITIAL_PIN&quot;.equals(op.get(&quot;operation&quot;)) ? &quot;PENDING_DELIVERY&quot; : &quot;ACTIVE&quot;;</span>
+<span class="fc" id="L261">                db.update(&quot;&quot;&quot;</span>
+                        update cms_v2.pin_data set switch_pin_version=?,switch_pin_sync_status='READY',pin_status=?,
+                          pin_mailer_reference=?,switch_pin_confirmed_at=now(),last_changed_at=?,updated_at=now(),
+                          updated_by=?,version=version+1 where pin_data_id=?
+<span class="fc" id="L265">                        &quot;&quot;&quot;,pinVersion,resulting,mailer,java.sql.Timestamp.from(receiptTime(receipt.get(&quot;updatedAt&quot;))),op.get(&quot;actor&quot;),pin.get(&quot;pin_data_id&quot;));</span>
+<span class="fc" id="L266">                history(op,pin,resulting,true);</span>
+<span class="pc bnc" id="L267" title="All 4 branches missed.">            } else if (!completed &amp;&amp; &quot;CHANGE_PIN&quot;.equals(op.get(&quot;operation&quot;))) {</span>
+<span class="nc" id="L268">                history(op,pin,pin.get(&quot;pin_status&quot;).toString(),false);</span>
+            }
+            // Failed PIN verification does not infer retry count/block state from a receipt lacking those fields.
+<span class="fc" id="L271">        });</span>
+<span class="fc" id="L272">    }</span>
+
+    static void validateReceipt(Map&lt;String,Object&gt; op, JsonNode receipt) {
+<span class="pc bpc" id="L275" title="2 of 4 branches missed.">        if (receipt==null || !receipt.isObject()) throw new IllegalStateException(&quot;Invalid Switch PIN receipt&quot;);</span>
+<span class="fc bfc" id="L276" title="All 2 branches covered.">        for(var entry:Map.of(&quot;operationId&quot;,&quot;operation_id&quot;,&quot;institutionId&quot;,&quot;institution_id&quot;,</span>
+<span class="fc" id="L277">                &quot;panFamilyReference&quot;,&quot;pan_family_id&quot;,&quot;operation&quot;,&quot;operation&quot;).entrySet())</span>
+<span class="fc bfc" id="L278" title="All 2 branches covered.">            if (!op.get(entry.getValue()).toString().equals(receipt.path(entry.getKey()).asText()))</span>
+<span class="fc" id="L279">                throw new IllegalStateException(&quot;Mismatched Switch PIN receipt&quot;);</span>
+<span class="fc" id="L280">        String status=receipt.path(&quot;status&quot;).asText();</span>
+<span class="fc bfc" id="L281" title="All 2 branches covered.">        if (!Set.of(&quot;COMPLETED&quot;,&quot;FAILED&quot;,&quot;PENDING&quot;).contains(status)</span>
+<span class="pc bpc" id="L282" title="1 of 2 branches missed.">                || !receipt.path(&quot;policyProfileVersion&quot;).isIntegralNumber()</span>
+<span class="pc bpc" id="L283" title="1 of 2 branches missed.">                || !receipt.path(&quot;policyProfileVersion&quot;).canConvertToLong()</span>
+<span class="pc bpc" id="L284" title="1 of 2 branches missed.">                || receipt.path(&quot;policyProfileVersion&quot;).longValue()!=number(op,&quot;policy_version&quot;)</span>
+<span class="pc bpc" id="L285" title="1 of 4 branches missed.">                || !receipt.path(&quot;pinVersion&quot;).isIntegralNumber() || !receipt.path(&quot;pinVersion&quot;).canConvertToLong())</span>
+<span class="fc" id="L286">            throw new IllegalStateException(&quot;Invalid Switch PIN receipt version/status&quot;);</span>
+<span class="fc" id="L287">        long expected=number(op,&quot;expected_pin_version&quot;);</span>
+<span class="pc bpc" id="L288" title="1 of 4 branches missed.">        if (&quot;COMPLETED&quot;.equals(status) &amp;&amp; !&quot;CONFIGURE_PIN_PROFILE&quot;.equals(op.get(&quot;operation&quot;))) expected=Math.addExact(expected,1);</span>
+<span class="fc bfc" id="L289" title="All 2 branches covered.">        if (receipt.path(&quot;pinVersion&quot;).longValue()!=expected) throw new IllegalStateException(&quot;Unexpected Switch PIN version&quot;);</span>
+<span class="pc bpc" id="L290" title="1 of 4 branches missed.">        if (&quot;COMPLETED&quot;.equals(status) &amp;&amp; &quot;GENERATE_INITIAL_PIN&quot;.equals(op.get(&quot;operation&quot;))</span>
+<span class="pc bpc" id="L291" title="1 of 4 branches missed.">                &amp;&amp; (!receipt.path(&quot;mailerReference&quot;).isTextual() || receipt.path(&quot;mailerReference&quot;).asText().isBlank()</span>
+<span class="pc bpc" id="L292" title="1 of 2 branches missed.">                    || receipt.path(&quot;mailerReference&quot;).asText().length()&gt;300))</span>
+<span class="fc" id="L293">            throw new IllegalStateException(&quot;Missing Switch mailer reference&quot;);</span>
+<span class="fc" id="L294">        receiptTime(receipt.get(&quot;updatedAt&quot;));</span>
+<span class="fc" id="L295">    }</span>
+
+    static Instant receiptTime(JsonNode value) {
+<span class="fc bfc" id="L298" title="All 2 branches covered.">        if (value==null) throw new IllegalStateException(&quot;Missing receipt time&quot;);</span>
+<span class="fc bfc" id="L299" title="All 2 branches covered.">        if (value.isTextual()) return Instant.parse(value.asText());</span>
+<span class="fc bfc" id="L300" title="All 2 branches covered.">        if (value.isNumber()) {</span>
+<span class="fc" id="L301">            var seconds=value.decimalValue();</span>
+<span class="fc" id="L302">            long whole=seconds.setScale(0,java.math.RoundingMode.FLOOR).longValueExact();</span>
+<span class="fc" id="L303">            long nanos=seconds.subtract(java.math.BigDecimal.valueOf(whole)).movePointRight(9).longValueExact();</span>
+<span class="fc" id="L304">            return Instant.ofEpochSecond(whole,nanos);</span>
+        }
+<span class="fc" id="L306">        throw new IllegalStateException(&quot;Invalid receipt time&quot;);</span>
+    }
+
+    private void history(Map&lt;String,Object&gt; op,Map&lt;String,Object&gt; pin,String resulting,boolean success) {
+<span class="pc bpc" id="L310" title="4 of 6 branches missed.">        String type=!success ? &quot;PIN_CHANGE_FAILED&quot; : switch(op.get(&quot;operation&quot;).toString()) {</span>
+<span class="nc" id="L311">            case &quot;INITIALIZE_SELECTED_PIN&quot; -&gt; &quot;INITIALIZED&quot;;</span>
+<span class="fc" id="L312">            case &quot;CHANGE_PIN&quot; -&gt; &quot;PIN_CHANGED&quot;;</span>
+<span class="nc" id="L313">            case &quot;RESET_PIN&quot; -&gt; &quot;PIN_RESET&quot;;</span>
+<span class="nc" id="L314">            default -&gt; &quot;GENERATED&quot;;</span>
+        };
+<span class="fc" id="L316">        db.update(&quot;&quot;&quot;</span>
+                insert into cms_v2.pin_history(pin_history_id,institution_id,card_id,pin_data_id,operation_type,
+                  previous_status,resulting_status,occurred_at,actor_reference,correlation_id,operation_reason)
+                values(?,?,?,?,?,?,?,now(),?,?, 'SWITCH_CONFIRMED')
+<span class="fc" id="L320">                &quot;&quot;&quot;,UUID.randomUUID(),op.get(&quot;institution_id&quot;),op.get(&quot;card_id&quot;),pin.get(&quot;pin_data_id&quot;),type,</span>
+<span class="fc" id="L321">                pin.get(&quot;pin_status&quot;),resulting,op.get(&quot;actor&quot;),op.get(&quot;operation_id&quot;));</span>
+<span class="fc" id="L322">    }</span>
+
+    private void validateRequest(Map&lt;String,Object&gt; pin,String operation,SelectedPinRequest request) {
+<span class="pc bpc" id="L325" title="2 of 4 branches missed.">        if (!&quot;SWITCH&quot;.equals(pin.get(&quot;pin_authority&quot;)) || pin.get(&quot;switch_pin_profile&quot;)==null)</span>
+<span class="nc" id="L326">            throw new BusinessRuleViolationException(&quot;PIN family requires explicit Switch enrollment&quot;);</span>
+<span class="pc bpc" id="L327" title="2 of 4 branches missed.">        if (!&quot;ACTIVE&quot;.equals(pin.get(&quot;policy_status&quot;)) || !Boolean.TRUE.equals(pin.get(&quot;pin_required&quot;)))</span>
+<span class="nc" id="L328">            throw new BusinessRuleViolationException(&quot;An active PIN policy is required&quot;);</span>
+<span class="pc bpc" id="L329" title="2 of 4 branches missed.">        if (!Set.of(&quot;PENDING&quot;,&quot;ACTIVE&quot;).contains(pin.get(&quot;card_status&quot;)) || pin.get(&quot;security_hold_reason&quot;)!=null</span>
+<span class="pc bpc" id="L330" title="2 of 4 branches missed.">                || pin.get(&quot;retired_at&quot;)!=null || &quot;CLOSED&quot;.equals(pin.get(&quot;pin_status&quot;)))</span>
+<span class="nc" id="L331">            throw new BusinessRuleViolationException(&quot;Card is not eligible for PIN operations&quot;);</span>
+<span class="pc bpc" id="L332" title="1 of 3 branches missed.">        String flag=switch(operation) {</span>
+<span class="nc" id="L333">            case &quot;INITIALIZE_SELECTED_PIN&quot; -&gt; &quot;customer_pin_selection_allowed&quot;;</span>
+<span class="fc" id="L334">            case &quot;CHANGE_PIN&quot; -&gt; &quot;pin_change_allowed&quot;;</span>
+<span class="fc" id="L335">            default -&gt; &quot;pin_reset_allowed&quot;;</span>
+        };
+<span class="pc bpc" id="L337" title="1 of 2 branches missed.">        if (!Boolean.TRUE.equals(pin.get(flag))) throw new BusinessRuleViolationException(&quot;PIN operation is disabled by product policy&quot;);</span>
+<span class="pc bpc" id="L338" title="2 of 4 branches missed.">        if (number(pin,&quot;applied_revision&quot;)&lt;1 || number(pin,&quot;switch_policy_version&quot;)!=request.policyProfileVersion())</span>
+<span class="nc" id="L339">            throw new ResourceVersionConflictException(&quot;Switch PIN profile is not confirmed at the requested policy version&quot;);</span>
+<span class="pc bpc" id="L340" title="1 of 2 branches missed.">        if (request.expectedPinVersion()&lt;number(pin,&quot;switch_pin_version&quot;))</span>
+<span class="nc" id="L341">            throw new ResourceVersionConflictException(&quot;PIN version is older than the last confirmed Switch version&quot;);</span>
+<span class="pc bpc" id="L342" title="1 of 2 branches missed.">        if (&quot;INITIALIZE_SELECTED_PIN&quot;.equals(operation)) {</span>
+<span class="nc bnc" id="L343" title="All 4 branches missed.">            if (request.expectedPinVersion()!=0 || !&quot;CUSTOMER_SELECTED&quot;.equals(parse(pin.get(&quot;switch_pin_profile&quot;).toString()).path(&quot;establishment&quot;).asText()))</span>
+<span class="nc" id="L344">                throw new BusinessRuleViolationException(&quot;Initial selection requires an unestablished customer-selected profile&quot;);</span>
+<span class="pc bpc" id="L345" title="1 of 2 branches missed.">        } else if (request.expectedPinVersion()==0) throw new BusinessRuleViolationException(&quot;Change/reset requires an established PIN&quot;);</span>
+<span class="fc" id="L346">    }</span>
+
+    private Map&lt;String,Object&gt; cardPin(UUID tenant,UUID card,boolean lock) {
+<span class="fc" id="L349">        var rows=db.queryForList(&quot;&quot;&quot;</span>
+                select p.*, c.card_status,c.security_hold_reason,c.retired_at,
+                  policy.policy_status,policy.pin_required,policy.customer_pin_selection_allowed,
+                  policy.pin_change_allowed,policy.pin_reset_allowed,coalesce(s.applied_revision,0) as applied_revision
+                from cms_v2.card c join cms_v2.pin_data p on p.institution_id=c.institution_id and p.pin_data_id=c.pin_data_ref
+                join cms_v2.product_pin_policy policy on policy.institution_id=c.institution_id and policy.product_version_id=c.product_version_id
+                left join cms_v2.switch_card_sync s on s.institution_id=c.institution_id and s.card_id=c.card_id
+                where c.institution_id=? and c.card_id=?
+<span class="fc bfc" id="L357" title="All 2 branches covered.">                &quot;&quot;&quot;+(lock?&quot; for update of p&quot;:&quot;&quot;),tenant,card);</span>
+<span class="pc bpc" id="L358" title="1 of 2 branches missed.">        if(rows.isEmpty()) throw new ResourceNotFoundException(&quot;Card PIN profile&quot;,card.toString());</span>
+<span class="fc" id="L359">        return rows.getFirst();</span>
+    }
+    private void requireNoPending(UUID tenant,UUID family) {
+<span class="pc bpc" id="L362" title="1 of 2 branches missed.">        if (Boolean.TRUE.equals(db.queryForObject(&quot;&quot;&quot;</span>
+                select exists(select 1 from cms_v2.switch_pin_operation where institution_id=? and pan_family_id=?
+                  and status in ('PREPARED','UNKNOWN'))
+                &quot;&quot;&quot;,Boolean.class,tenant,family)))
+<span class="nc" id="L366">            throw new ResourceVersionConflictException(&quot;A PIN operation is pending reconciliation for this PAN family&quot;);</span>
+<span class="fc" id="L367">    }</span>
+    private void insert(UUID id,UUID tenant,UUID card,UUID family,String operation,long policy,long expected,
+            String fingerprint,String actor,String status) {
+<span class="fc" id="L370">        db.update(&quot;&quot;&quot;</span>
+                insert into cms_v2.switch_pin_operation(operation_id,institution_id,card_id,pan_family_id,operation,
+                  policy_version,expected_pin_version,request_fingerprint,status,actor) values(?,?,?,?,?,?,?,?,?,?)
+<span class="fc" id="L373">                &quot;&quot;&quot;,id,tenant,card,family,operation,policy,expected,fingerprint,status,actor);</span>
+<span class="fc" id="L374">    }</span>
+    private Map&lt;String,Object&gt; find(UUID id) {
+<span class="fc" id="L376">        var rows=db.queryForList(&quot;select * from cms_v2.switch_pin_operation where operation_id=?&quot;,id);</span>
+<span class="fc bfc" id="L377" title="All 2 branches covered.">        return rows.isEmpty()?null:rows.getFirst();</span>
+    }
+    private ObjectNode command(Map&lt;String,Object&gt; op) {
+<span class="fc" id="L380">        return json.createObjectNode().put(&quot;operationId&quot;,op.get(&quot;operation_id&quot;).toString())</span>
+<span class="fc" id="L381">                .put(&quot;institutionId&quot;,op.get(&quot;institution_id&quot;).toString()).put(&quot;panFamilyReference&quot;,op.get(&quot;pan_family_id&quot;).toString())</span>
+<span class="fc" id="L382">                .put(&quot;policyProfileVersion&quot;,number(op,&quot;policy_version&quot;)).put(&quot;expectedPinVersion&quot;,number(op,&quot;expected_pin_version&quot;))</span>
+<span class="fc" id="L383">                .put(&quot;operation&quot;,op.get(&quot;operation&quot;).toString());</span>
+    }
+    private OperationResult result(Map&lt;String,Object&gt; op) {
+<span class="fc" id="L386">        return new OperationResult((UUID)op.get(&quot;operation_id&quot;),(UUID)op.get(&quot;institution_id&quot;),(UUID)op.get(&quot;pan_family_id&quot;),</span>
+<span class="fc" id="L387">                (String)op.get(&quot;operation&quot;),(String)op.get(&quot;status&quot;),number(op,&quot;policy_version&quot;),number(op,&quot;expected_pin_version&quot;),</span>
+<span class="fc bfc" id="L388" title="All 2 branches covered.">                op.get(&quot;result_pin_version&quot;)==null?null:number(op,&quot;result_pin_version&quot;),(String)op.get(&quot;mailer_reference&quot;),(String)op.get(&quot;failure_code&quot;));</span>
+    }
+    private void rejectPrepared(UUID id,String code) {
+<span class="fc" id="L391">        db.update(&quot;update cms_v2.switch_pin_operation set status='REJECTED',failure_code=?,updated_at=now() where operation_id=? and status='PREPARED'&quot;,code,id);</span>
+<span class="fc" id="L392">    }</span>
+    private void reject(UUID id,String code) {
+<span class="nc" id="L394">        tx.executeWithoutResult(s -&gt; {</span>
+<span class="nc" id="L395">            var op=find(id);</span>
+<span class="nc" id="L396">            var pin=cardPin((UUID)op.get(&quot;institution_id&quot;),(UUID)op.get(&quot;card_id&quot;),true);</span>
+<span class="nc" id="L397">            int changed=db.update(&quot;update cms_v2.switch_pin_operation set status='REJECTED',failure_code=?,updated_at=now() where operation_id=? and status='UNKNOWN'&quot;,code,id);</span>
+<span class="nc bnc" id="L398" title="All 2 branches missed.">            if(changed==1) db.update(&quot;&quot;&quot;</span>
+                    update cms_v2.pin_data set switch_pin_sync_status='RECONCILIATION_REQUIRED',version=version+1
+                    where pin_data_id=?
+<span class="nc" id="L401">                    &quot;&quot;&quot;,pin.get(&quot;pin_data_id&quot;));</span>
+<span class="nc" id="L402">        });</span>
+<span class="nc" id="L403">    }</span>
+    private void uncertain(UUID id,String code) {
+<span class="fc" id="L405">        db.update(&quot;&quot;&quot;</span>
+                update cms_v2.switch_pin_operation set failure_code=?,updated_at=now(),next_lookup_at=now()+interval '60 seconds'
+                where operation_id=? and status='UNKNOWN'
+                &quot;&quot;&quot;,code,id);
+<span class="fc" id="L409">    }</span>
+    private SwitchSyncTransport requireTransport() {
+<span class="fc bfc" id="L411" title="All 2 branches covered.">        var transport=enabled?transports.getIfAvailable():null;</span>
+<span class="fc bfc" id="L412" title="All 2 branches covered.">        if(transport==null) throw new BusinessRuleViolationException(&quot;Switch PIN integration is not enabled&quot;);</span>
+<span class="fc" id="L413">        return transport;</span>
+    }
+    private static void outsideTransaction() {
+<span class="pc bpc" id="L416" title="1 of 2 branches missed.">        if(TransactionSynchronizationManager.isActualTransactionActive()) throw new IllegalStateException(&quot;PIN network operation must run outside a database transaction&quot;);</span>
+<span class="fc" id="L417">    }</span>
+<span class="pc" id="L418">    private JsonNode parse(String value) { try { return json.readTree(value); } catch(Exception ex) { throw new IllegalStateException(&quot;Invalid PIN profile metadata&quot;); } }</span>
+<span class="pc" id="L419">    private String encode(Object value) { try { return json.writeValueAsString(value); } catch(Exception ex) { throw new IllegalArgumentException(&quot;Invalid PIN request&quot;); } }</span>
+<span class="fc" id="L420">    private static long number(Map&lt;String,Object&gt; row,String key) { return ((Number)row.get(key)).longValue(); }</span>
+    private static String fingerprint(String value) {
+<span class="fc" id="L422">        try { return HexFormat.of().formatHex(MessageDigest.getInstance(&quot;SHA-256&quot;).digest(value.getBytes(StandardCharsets.UTF_8))); }</span>
+<span class="nc" id="L423">        catch(Exception ex) { throw new IllegalStateException(&quot;Fingerprint unavailable&quot;); }</span>
+    }
+    private static String safeFailure(String code) {
+<span class="nc bnc" id="L426" title="All 2 branches missed.">        return Set.of(&quot;INVALID_PIN&quot;,&quot;PIN_BLOCKED&quot;).contains(code)?code:&quot;SWITCH_EXECUTION_FAILED&quot;;</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.15.202606040825</span></div></body></html>

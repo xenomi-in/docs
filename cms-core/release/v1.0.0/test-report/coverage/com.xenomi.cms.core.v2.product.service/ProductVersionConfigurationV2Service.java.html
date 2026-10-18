@@ -1,0 +1,232 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>ProductVersionConfigurationV2Service.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">CMS Core Service</a> &gt; <a href="index.source.html" class="el_package">com.xenomi.cms.core.v2.product.service</a> &gt; <span class="el_source">ProductVersionConfigurationV2Service.java</span></div><h1>ProductVersionConfigurationV2Service.java</h1><pre class="source lang-java linenums">package com.xenomi.cms.core.v2.product.service;
+
+import java.util.UUID;
+
+import com.xenomi.cms.core.exception.ResourceNotFoundException;
+import com.xenomi.cms.core.v2.common.DatabaseUuidV7Generator;
+import com.xenomi.cms.core.v2.product.dto.CreateProductCardLimitV2Request;
+import com.xenomi.cms.core.v2.product.dto.ProductCardLimitV2Response;
+import com.xenomi.cms.core.v2.product.dto.ProductDefaultControlsV2Response;
+import com.xenomi.cms.core.v2.product.dto.UpdateProductCardLimitV2Request;
+import com.xenomi.cms.core.v2.product.dto.UpsertProductDefaultControlsV2Request;
+import com.xenomi.cms.core.v2.product.entity.ProductCardLimitV2;
+import com.xenomi.cms.core.v2.product.entity.ProductDefaultControlsV2;
+import com.xenomi.cms.core.v2.product.entity.ProductVersionV2;
+import com.xenomi.cms.core.v2.product.model.ProductLimitStatus;
+import com.xenomi.cms.core.v2.product.model.ProductVersionStatus;
+import com.xenomi.cms.core.v2.product.model.LimitPeriodType;
+import com.xenomi.cms.core.v2.product.repository.ProductCardLimitV2Repository;
+import com.xenomi.cms.core.v2.product.repository.ProductDefaultControlsV2Repository;
+import com.xenomi.cms.core.v2.product.repository.ProductVersionV2Repository;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
+import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
+
+@Service
+public class ProductVersionConfigurationV2Service {
+    private final ProductVersionV2Repository versionRepository;
+    private final ProductDefaultControlsV2Repository controlsRepository;
+    private final ProductCardLimitV2Repository limitRepository;
+    private final DatabaseUuidV7Generator uuidGenerator;
+
+    public ProductVersionConfigurationV2Service(
+            ProductVersionV2Repository versionRepository,
+            ProductDefaultControlsV2Repository controlsRepository,
+            ProductCardLimitV2Repository limitRepository,
+<span class="fc" id="L37">            DatabaseUuidV7Generator uuidGenerator) {</span>
+<span class="fc" id="L38">        this.versionRepository = versionRepository;</span>
+<span class="fc" id="L39">        this.controlsRepository = controlsRepository;</span>
+<span class="fc" id="L40">        this.limitRepository = limitRepository;</span>
+<span class="fc" id="L41">        this.uuidGenerator = uuidGenerator;</span>
+<span class="fc" id="L42">    }</span>
+
+    @Transactional(readOnly = true)
+    public ProductDefaultControlsV2Response getControls(
+            UUID institutionId, UUID productId, UUID versionId) {
+<span class="fc" id="L47">        requireVersion(institutionId, productId, versionId);</span>
+<span class="fc" id="L48">        return controlsRepository.findByProductVersionIdAndInstitutionId(versionId, institutionId)</span>
+<span class="fc" id="L49">                .map(this::toControlsResponse)</span>
+<span class="fc" id="L50">                .orElseThrow(() -&gt; new ResourceNotFoundException(&quot;Product default controls&quot;, versionId.toString()));</span>
+    }
+
+    @Transactional
+    public ProductDefaultControlsV2Response putControls(UUID institutionId, UUID productId,
+            UUID versionId, UpsertProductDefaultControlsV2Request request, String actorId) {
+<span class="fc" id="L56">        requireDraftVersion(institutionId, productId, versionId);</span>
+<span class="fc" id="L57">        validateControlCapabilities(request);</span>
+<span class="fc" id="L58">        ProductDefaultControlsV2 entity = controlsRepository</span>
+<span class="fc" id="L59">                .findByProductVersionIdAndInstitutionId(versionId, institutionId)</span>
+<span class="fc" id="L60">                .orElseGet(() -&gt; ProductDefaultControlsV2.builder()</span>
+<span class="fc" id="L61">                        .productVersionId(versionId).institutionId(institutionId).build());</span>
+<span class="fc" id="L62">        entity.setDomesticAtmEnabled(request.domesticAtmEnabled());</span>
+<span class="fc" id="L63">        entity.setDomesticAtmAllowed(request.domesticAtmAllowed());</span>
+<span class="fc" id="L64">        entity.setDomesticPosEnabled(request.domesticPosEnabled());</span>
+<span class="fc" id="L65">        entity.setDomesticPosAllowed(request.domesticPosAllowed());</span>
+<span class="fc" id="L66">        entity.setDomesticEcommerceEnabled(request.domesticEcommerceEnabled());</span>
+<span class="fc" id="L67">        entity.setDomesticEcommerceAllowed(request.domesticEcommerceAllowed());</span>
+<span class="fc" id="L68">        entity.setDomesticMotoEnabled(request.domesticMotoEnabled());</span>
+<span class="fc" id="L69">        entity.setDomesticMotoAllowed(request.domesticMotoAllowed());</span>
+<span class="fc" id="L70">        entity.setDomesticContactlessEnabled(request.domesticContactlessEnabled());</span>
+<span class="fc" id="L71">        entity.setDomesticContactlessAllowed(request.domesticContactlessAllowed());</span>
+<span class="fc" id="L72">        entity.setDomesticCashWithdrawalEnabled(request.domesticCashWithdrawalEnabled());</span>
+<span class="fc" id="L73">        entity.setInternationalEnabled(request.internationalEnabled());</span>
+<span class="fc" id="L74">        entity.setInternationalAtmEnabled(request.internationalAtmEnabled());</span>
+<span class="fc" id="L75">        entity.setInternationalAtmAllowed(request.internationalAtmAllowed());</span>
+<span class="fc" id="L76">        entity.setInternationalPosEnabled(request.internationalPosEnabled());</span>
+<span class="fc" id="L77">        entity.setInternationalPosAllowed(request.internationalPosAllowed());</span>
+<span class="fc" id="L78">        entity.setInternationalEcommerceEnabled(request.internationalEcommerceEnabled());</span>
+<span class="fc" id="L79">        entity.setInternationalEcommerceAllowed(request.internationalEcommerceAllowed());</span>
+<span class="fc" id="L80">        entity.setInternationalMotoEnabled(request.internationalMotoEnabled());</span>
+<span class="fc" id="L81">        entity.setInternationalMotoAllowed(request.internationalMotoAllowed());</span>
+<span class="fc" id="L82">        entity.setInternationalContactlessEnabled(request.internationalContactlessEnabled());</span>
+<span class="fc" id="L83">        entity.setInternationalContactlessAllowed(request.internationalContactlessAllowed());</span>
+<span class="fc" id="L84">        entity.setInternationalCashWithdrawalEnabled(request.internationalCashWithdrawalEnabled());</span>
+<span class="fc" id="L85">        entity.setUpdatedBy(actorId.trim());</span>
+<span class="fc" id="L86">        return toControlsResponse(controlsRepository.save(entity));</span>
+    }
+
+    private static void validateControlCapabilities(UpsertProductDefaultControlsV2Request request) {
+<span class="fc" id="L90">        requireAllowed(request.domesticAtmEnabled(), request.domesticAtmAllowed(), &quot;DOMESTIC ATM&quot;);</span>
+<span class="fc" id="L91">        requireAllowed(request.domesticPosEnabled(), request.domesticPosAllowed(), &quot;DOMESTIC POS&quot;);</span>
+<span class="fc" id="L92">        requireAllowed(request.domesticEcommerceEnabled(), request.domesticEcommerceAllowed(), &quot;DOMESTIC ECOM&quot;);</span>
+<span class="fc" id="L93">        requireAllowed(request.domesticMotoEnabled(), request.domesticMotoAllowed(), &quot;DOMESTIC MOTO&quot;);</span>
+<span class="fc" id="L94">        requireAllowed(request.domesticContactlessEnabled(), request.domesticContactlessAllowed(),</span>
+                &quot;DOMESTIC CONTACTLESS POS&quot;);
+<span class="fc" id="L96">        requireAllowed(request.internationalAtmEnabled(), request.internationalAtmAllowed(),</span>
+                &quot;INTERNATIONAL ATM&quot;);
+<span class="fc" id="L98">        requireAllowed(request.internationalPosEnabled(), request.internationalPosAllowed(),</span>
+                &quot;INTERNATIONAL POS&quot;);
+<span class="fc" id="L100">        requireAllowed(request.internationalEcommerceEnabled(), request.internationalEcommerceAllowed(),</span>
+                &quot;INTERNATIONAL ECOM&quot;);
+<span class="fc" id="L102">        requireAllowed(request.internationalMotoEnabled(), request.internationalMotoAllowed(),</span>
+                &quot;INTERNATIONAL MOTO&quot;);
+<span class="fc" id="L104">        requireAllowed(request.internationalContactlessEnabled(),</span>
+<span class="fc" id="L105">                request.internationalContactlessAllowed(), &quot;INTERNATIONAL CONTACTLESS POS&quot;);</span>
+<span class="fc bfc" id="L106" title="All 2 branches covered.">        if (!request.internationalEnabled()</span>
+<span class="pc bpc" id="L107" title="3 of 4 branches missed.">                &amp;&amp; (request.internationalAtmEnabled() || request.internationalPosEnabled()</span>
+<span class="nc bnc" id="L108" title="All 4 branches missed.">                    || request.internationalEcommerceEnabled() || request.internationalMotoEnabled()</span>
+<span class="nc bnc" id="L109" title="All 2 branches missed.">                    || request.internationalContactlessEnabled())) {</span>
+<span class="fc" id="L110">            throw new IllegalArgumentException(</span>
+                    &quot;International transaction defaults must be disabled when internationalEnabled is false&quot;);
+        }
+<span class="fc" id="L113">    }</span>
+
+    private static void requireAllowed(boolean enabled, boolean allowed, String dimension) {
+<span class="fc bfc" id="L116" title="All 4 branches covered.">        if (enabled &amp;&amp; !allowed) {</span>
+<span class="fc" id="L117">            throw new IllegalArgumentException(</span>
+                    dimension + &quot; cannot be enabled when isAllowed is false&quot;);
+        }
+<span class="fc" id="L120">    }</span>
+
+    @Transactional
+    public ProductCardLimitV2Response createLimit(UUID institutionId, UUID productId,
+            UUID versionId, CreateProductCardLimitV2Request request) {
+<span class="fc" id="L125">        requireDraftVersion(institutionId, productId, versionId);</span>
+<span class="fc" id="L126">        validateSupportedPeriod(request.periodType());</span>
+<span class="fc" id="L127">        validateAmounts(request.defaultAmountMinor(), request.maximumAmountMinor());</span>
+<span class="fc bfc" id="L128" title="All 2 branches covered.">        if (limitRepository.existsByInstitutionIdAndProductVersionIdAndLimitTypeAndPeriodType(</span>
+<span class="fc" id="L129">                institutionId, versionId, request.limitType(), request.periodType())) {</span>
+<span class="fc" id="L130">            throw new IllegalArgumentException(&quot;A limit already exists for this limitType and periodType&quot;);</span>
+        }
+<span class="fc" id="L132">        ProductCardLimitV2 entity = ProductCardLimitV2.builder()</span>
+<span class="fc" id="L133">                .productCardLimitId(uuidGenerator.generate())</span>
+<span class="fc" id="L134">                .institutionId(institutionId)</span>
+<span class="fc" id="L135">                .productVersionId(versionId)</span>
+<span class="fc" id="L136">                .limitType(request.limitType())</span>
+<span class="fc" id="L137">                .periodType(request.periodType())</span>
+<span class="fc" id="L138">                .defaultAmountMinor(request.defaultAmountMinor())</span>
+<span class="fc" id="L139">                .maximumAmountMinor(request.maximumAmountMinor())</span>
+<span class="pc bpc" id="L140" title="1 of 2 branches missed.">                .limitStatus(request.limitStatus() == null ? ProductLimitStatus.ACTIVE : request.limitStatus())</span>
+<span class="fc" id="L141">                .build();</span>
+<span class="fc" id="L142">        return toLimitResponse(limitRepository.save(entity));</span>
+    }
+
+    @Transactional(readOnly = true)
+    public Page&lt;ProductCardLimitV2Response&gt; listLimits(
+            UUID institutionId, UUID productId, UUID versionId, Pageable pageable) {
+<span class="fc" id="L148">        requireVersion(institutionId, productId, versionId);</span>
+<span class="fc" id="L149">        return limitRepository.findByInstitutionIdAndProductVersionId(institutionId, versionId, pageable)</span>
+<span class="fc" id="L150">                .map(this::toLimitResponse);</span>
+    }
+
+    @Transactional(readOnly = true)
+    public ProductCardLimitV2Response getLimit(UUID institutionId, UUID productId,
+            UUID versionId, UUID limitId) {
+<span class="fc" id="L156">        requireVersion(institutionId, productId, versionId);</span>
+<span class="fc" id="L157">        return toLimitResponse(findLimit(institutionId, versionId, limitId));</span>
+    }
+
+    @Transactional
+    public ProductCardLimitV2Response updateLimit(UUID institutionId, UUID productId,
+            UUID versionId, UUID limitId, UpdateProductCardLimitV2Request request) {
+<span class="fc" id="L163">        requireDraftVersion(institutionId, productId, versionId);</span>
+<span class="fc" id="L164">        ProductCardLimitV2 entity = findLimit(institutionId, versionId, limitId);</span>
+<span class="fc bfc" id="L165" title="All 2 branches covered.">        long defaultAmount = request.defaultAmountMinor() == null</span>
+<span class="fc" id="L166">                ? entity.getDefaultAmountMinor() : request.defaultAmountMinor();</span>
+<span class="pc bpc" id="L167" title="1 of 2 branches missed.">        Long maximumAmount = request.maximumAmountMinor() == null</span>
+<span class="pc" id="L168">                ? entity.getMaximumAmountMinor() : request.maximumAmountMinor();</span>
+<span class="fc" id="L169">        validateAmounts(defaultAmount, maximumAmount);</span>
+<span class="fc" id="L170">        entity.setDefaultAmountMinor(defaultAmount);</span>
+<span class="fc" id="L171">        entity.setMaximumAmountMinor(maximumAmount);</span>
+<span class="pc bpc" id="L172" title="1 of 2 branches missed.">        if (request.limitStatus() != null) entity.setLimitStatus(request.limitStatus());</span>
+<span class="fc" id="L173">        return toLimitResponse(limitRepository.save(entity));</span>
+    }
+
+    private ProductVersionV2 requireVersion(UUID institutionId, UUID productId, UUID versionId) {
+<span class="fc" id="L177">        return versionRepository.findByProductVersionIdAndInstitutionIdAndProductId(</span>
+                        versionId, institutionId, productId)
+<span class="pc" id="L179">                .orElseThrow(() -&gt; new ResourceNotFoundException(&quot;Product version&quot;, versionId.toString()));</span>
+    }
+
+    private void requireDraftVersion(UUID institutionId, UUID productId, UUID versionId) {
+<span class="fc bfc" id="L183" title="All 2 branches covered.">        if (requireVersion(institutionId, productId, versionId).getVersionStatus() != ProductVersionStatus.DRAFT) {</span>
+<span class="fc" id="L184">            throw new IllegalArgumentException(&quot;Product version policies can be changed only while DRAFT&quot;);</span>
+        }
+<span class="fc" id="L186">    }</span>
+
+    private ProductCardLimitV2 findLimit(UUID institutionId, UUID versionId, UUID limitId) {
+<span class="fc" id="L189">        return limitRepository.findByProductCardLimitIdAndInstitutionIdAndProductVersionId(</span>
+                        limitId, institutionId, versionId)
+<span class="pc" id="L191">                .orElseThrow(() -&gt; new ResourceNotFoundException(&quot;Product card limit&quot;, limitId.toString()));</span>
+    }
+
+    private static void validateAmounts(long defaultAmount, Long maximumAmount) {
+<span class="fc bfc" id="L195" title="All 2 branches covered.">        if (defaultAmount &lt; 0) throw new IllegalArgumentException(&quot;defaultAmountMinor must not be negative&quot;);</span>
+<span class="pc bpc" id="L196" title="1 of 4 branches missed.">        if (maximumAmount != null &amp;&amp; maximumAmount &lt; defaultAmount) {</span>
+<span class="fc" id="L197">            throw new IllegalArgumentException(&quot;maximumAmountMinor must be greater than or equal to defaultAmountMinor&quot;);</span>
+        }
+<span class="fc" id="L199">    }</span>
+
+    private static void validateSupportedPeriod(LimitPeriodType periodType) {
+<span class="fc bfc" id="L202" title="All 2 branches covered.">        if (periodType != LimitPeriodType.PER_TRANSACTION) {</span>
+<span class="fc" id="L203">            throw new IllegalArgumentException(</span>
+                    &quot;Only PER_TRANSACTION is currently supported for product card limits&quot;);
+        }
+<span class="fc" id="L206">    }</span>
+
+    private ProductDefaultControlsV2Response toControlsResponse(ProductDefaultControlsV2 entity) {
+<span class="fc" id="L209">        return new ProductDefaultControlsV2Response(</span>
+<span class="fc" id="L210">                entity.getProductVersionId(), entity.getInstitutionId(),</span>
+<span class="fc" id="L211">                entity.isDomesticAtmEnabled(), entity.isDomesticPosEnabled(),</span>
+<span class="fc" id="L212">                entity.isDomesticEcommerceEnabled(), entity.isDomesticContactlessEnabled(),</span>
+<span class="fc" id="L213">                entity.isDomesticCashWithdrawalEnabled(), entity.isInternationalAtmEnabled(),</span>
+<span class="fc" id="L214">                entity.isInternationalPosEnabled(), entity.isInternationalEcommerceEnabled(),</span>
+<span class="fc" id="L215">                entity.isInternationalContactlessEnabled(), entity.isInternationalCashWithdrawalEnabled(),</span>
+<span class="fc" id="L216">                entity.getUpdatedAt(), entity.getUpdatedBy(), entity.isInternationalEnabled(),</span>
+<span class="fc" id="L217">                entity.isDomesticAtmAllowed(), entity.isDomesticPosAllowed(),</span>
+<span class="fc" id="L218">                entity.isDomesticEcommerceAllowed(), entity.isDomesticMotoEnabled(),</span>
+<span class="fc" id="L219">                entity.isDomesticMotoAllowed(), entity.isDomesticContactlessAllowed(),</span>
+<span class="fc" id="L220">                entity.isInternationalAtmAllowed(), entity.isInternationalPosAllowed(),</span>
+<span class="fc" id="L221">                entity.isInternationalEcommerceAllowed(), entity.isInternationalMotoEnabled(),</span>
+<span class="fc" id="L222">                entity.isInternationalMotoAllowed(), entity.isInternationalContactlessAllowed());</span>
+    }
+
+    private ProductCardLimitV2Response toLimitResponse(ProductCardLimitV2 entity) {
+<span class="fc" id="L226">        return new ProductCardLimitV2Response(</span>
+<span class="fc" id="L227">                entity.getProductCardLimitId(), entity.getInstitutionId(), entity.getProductVersionId(),</span>
+<span class="fc" id="L228">                entity.getLimitType(), entity.getPeriodType(), entity.getDefaultAmountMinor(),</span>
+<span class="fc" id="L229">                entity.getMaximumAmountMinor(), entity.getLimitStatus());</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.15.202606040825</span></div></body></html>

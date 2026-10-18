@@ -1,0 +1,70 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>OutboxEventCommand.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">CMS Core Service</a> &gt; <a href="index.source.html" class="el_package">com.xenomi.cms.core.v2.event.model</a> &gt; <span class="el_source">OutboxEventCommand.java</span></div><h1>OutboxEventCommand.java</h1><pre class="source lang-java linenums">package com.xenomi.cms.core.v2.event.model;
+
+import java.util.Map;
+import java.util.Objects;
+import java.util.UUID;
+
+/**
+ * Everything the outbox writer needs to persist one Falcon notification.
+ *
+ * &lt;p&gt;{@code idempotencyKey} must be derived from the &lt;em&gt;domain&lt;/em&gt; identity of the
+ * event (card_event id, replacement request id, product id + updatedAt, ...), never from
+ * transport metadata such as the HTTP request id. Two business operations that produce
+ * the same key are, by definition, the same event.
+ */
+public record OutboxEventCommand(
+        UUID institutionId,
+        String eventType,
+        String aggregateType,
+        String aggregateId,
+        String customerId,
+        String correlationId,
+        NotificationPriority priority,
+        UUID idempotencyKey,
+        Map&lt;String, Object&gt; payload) {
+
+<span class="fc" id="L26">    public OutboxEventCommand {</span>
+<span class="fc" id="L27">        Objects.requireNonNull(institutionId, &quot;institutionId&quot;);</span>
+<span class="fc" id="L28">        Objects.requireNonNull(eventType, &quot;eventType&quot;);</span>
+<span class="fc" id="L29">        Objects.requireNonNull(aggregateType, &quot;aggregateType&quot;);</span>
+<span class="fc" id="L30">        Objects.requireNonNull(aggregateId, &quot;aggregateId&quot;);</span>
+<span class="fc" id="L31">        Objects.requireNonNull(idempotencyKey, &quot;idempotencyKey&quot;);</span>
+<span class="pc bpc" id="L32" title="1 of 2 branches missed.">        priority = priority == null ? NotificationPriority.MEDIUM : priority;</span>
+<span class="pc bpc" id="L33" title="1 of 2 branches missed.">        payload = payload == null ? Map.of() : payload;</span>
+<span class="fc" id="L34">    }</span>
+
+    public static Builder builder() {
+<span class="fc" id="L37">        return new Builder();</span>
+    }
+
+    public static final class Builder {
+        private UUID institutionId;
+        private String eventType;
+        private String aggregateType;
+        private String aggregateId;
+        private String customerId;
+        private String correlationId;
+<span class="fc" id="L47">        private NotificationPriority priority = NotificationPriority.MEDIUM;</span>
+        private UUID idempotencyKey;
+<span class="fc" id="L49">        private Map&lt;String, Object&gt; payload = Map.of();</span>
+
+<span class="fc" id="L51">        private Builder() {</span>
+<span class="fc" id="L52">        }</span>
+
+<span class="fc" id="L54">        public Builder institutionId(UUID value) { this.institutionId = value; return this; }</span>
+<span class="fc" id="L55">        public Builder eventType(String value) { this.eventType = value; return this; }</span>
+<span class="fc" id="L56">        public Builder aggregateType(String value) { this.aggregateType = value; return this; }</span>
+<span class="pc bpc" id="L57" title="1 of 2 branches missed.">        public Builder aggregateId(UUID value) { this.aggregateId = value == null ? null : value.toString(); return this; }</span>
+<span class="fc" id="L58">        public Builder customerId(String value) { this.customerId = value; return this; }</span>
+<span class="fc" id="L59">        public Builder correlationId(String value) { this.correlationId = value; return this; }</span>
+<span class="fc" id="L60">        public Builder priority(NotificationPriority value) { this.priority = value; return this; }</span>
+<span class="fc" id="L61">        public Builder idempotencyKey(UUID value) { this.idempotencyKey = value; return this; }</span>
+<span class="fc" id="L62">        public Builder payload(Map&lt;String, Object&gt; value) { this.payload = value; return this; }</span>
+
+        public OutboxEventCommand build() {
+<span class="fc" id="L65">            return new OutboxEventCommand(institutionId, eventType, aggregateType, aggregateId,</span>
+                    customerId, correlationId, priority, idempotencyKey, payload);
+        }
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.15.202606040825</span></div></body></html>

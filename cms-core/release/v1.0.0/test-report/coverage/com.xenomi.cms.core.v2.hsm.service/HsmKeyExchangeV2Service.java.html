@@ -1,0 +1,383 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>HsmKeyExchangeV2Service.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">CMS Core Service</a> &gt; <a href="index.source.html" class="el_package">com.xenomi.cms.core.v2.hsm.service</a> &gt; <span class="el_source">HsmKeyExchangeV2Service.java</span></div><h1>HsmKeyExchangeV2Service.java</h1><pre class="source lang-java linenums">package com.xenomi.cms.core.v2.hsm.service;
+
+import java.nio.charset.StandardCharsets;
+import java.security.MessageDigest;
+import java.security.NoSuchAlgorithmException;
+import java.time.LocalDate;
+import java.time.OffsetDateTime;
+import java.util.Locale;
+import java.util.Optional;
+import java.util.Set;
+import java.util.UUID;
+
+import com.xenomi.cms.core.exception.BusinessRuleViolationException;
+import com.xenomi.cms.core.exception.ResourceAlreadyExistsException;
+import com.xenomi.cms.core.exception.ResourceNotFoundException;
+import com.xenomi.cms.core.keymanagement.client.HsmKeyGenerationException;
+import com.xenomi.cms.core.keymanagement.exchange.HsmKeyExchangeClient;
+import com.xenomi.cms.core.keymanagement.exchange.ImportKeyUnderKekRequest;
+import com.xenomi.cms.core.keymanagement.exchange.ImportedKeyResult;
+import com.xenomi.cms.core.v2.common.DatabaseUuidV7Generator;
+import com.xenomi.cms.core.v2.hsm.dto.BinHsmKeyAssignmentV2Response;
+import com.xenomi.cms.core.v2.hsm.dto.CreateBinHsmKeyAssignmentV2Request;
+import com.xenomi.cms.core.v2.hsm.dto.ImportHsmKeyV2Request;
+import com.xenomi.cms.core.v2.hsm.dto.ImportHsmKeyV2Response;
+import com.xenomi.cms.core.v2.hsm.entity.KeyExchangeEventV2;
+import com.xenomi.cms.core.v2.hsm.model.HsmKeyScheme;
+import com.xenomi.cms.core.v2.hsm.model.HsmKeyScope;
+import com.xenomi.cms.core.v2.hsm.model.HsmKeyStatus;
+import com.xenomi.cms.core.v2.hsm.model.HsmKeyType;
+import com.xenomi.cms.core.v2.hsm.model.KeyExchangeDirection;
+import com.xenomi.cms.core.v2.hsm.model.KeyExchangeStatus;
+import com.xenomi.cms.core.v2.hsm.model.KeyPurpose;
+import com.xenomi.cms.core.v2.hsm.model.DataClassification;
+import com.xenomi.cms.core.v2.hsm.repository.KeyExchangeEventV2Repository;
+import com.xenomi.cms.core.v2.institution.dto.CreateDataKeyAssignmentV2Request;
+import com.xenomi.cms.core.v2.institution.dto.DataKeyAssignmentV2Response;
+import com.xenomi.cms.core.v2.institution.entity.HsmKeyReferenceV2;
+import com.xenomi.cms.core.v2.institution.repository.HsmKeyReferenceV2Repository;
+import com.xenomi.cms.core.v2.institution.service.InstitutionDataKeyAssignmentV2Service;
+
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
+
+@Service
+public class HsmKeyExchangeV2Service {
+
+<span class="fc" id="L49">    private static final Logger log = LoggerFactory.getLogger(HsmKeyExchangeV2Service.class);</span>
+<span class="fc" id="L50">    private static final Set&lt;HsmKeyScope&gt; EXTERNAL_KEK_SCOPES = Set.of(</span>
+            HsmKeyScope.ACS, HsmKeyScope.CARD_VENDOR, HsmKeyScope.STAKEHOLDER);
+
+    private final HsmKeyReferenceV2Repository keyRepository;
+    private final KeyExchangeEventV2Repository eventRepository;
+    private final HsmKeyExchangeClient exchangeClient;
+    private final InstitutionDataKeyAssignmentV2Service institutionAssignmentService;
+    private final BinHsmKeyAssignmentV2Service binAssignmentService;
+    private final KeyExchangeEventAuditV2Service auditService;
+    private final DatabaseUuidV7Generator uuidGenerator;
+
+    public HsmKeyExchangeV2Service(HsmKeyReferenceV2Repository keyRepository,
+            KeyExchangeEventV2Repository eventRepository,
+            HsmKeyExchangeClient exchangeClient,
+            InstitutionDataKeyAssignmentV2Service institutionAssignmentService,
+            BinHsmKeyAssignmentV2Service binAssignmentService,
+            KeyExchangeEventAuditV2Service auditService,
+<span class="fc" id="L67">            DatabaseUuidV7Generator uuidGenerator) {</span>
+<span class="fc" id="L68">        this.keyRepository = keyRepository;</span>
+<span class="fc" id="L69">        this.eventRepository = eventRepository;</span>
+<span class="fc" id="L70">        this.exchangeClient = exchangeClient;</span>
+<span class="fc" id="L71">        this.institutionAssignmentService = institutionAssignmentService;</span>
+<span class="fc" id="L72">        this.binAssignmentService = binAssignmentService;</span>
+<span class="fc" id="L73">        this.auditService = auditService;</span>
+<span class="fc" id="L74">        this.uuidGenerator = uuidGenerator;</span>
+<span class="fc" id="L75">    }</span>
+
+    @Transactional
+    public ImportHsmKeyV2Response importKey(UUID institutionId,
+            ImportHsmKeyV2Request request, String idempotencyKey, String actorId) {
+<span class="fc" id="L80">        validateRequest(request);</span>
+<span class="fc" id="L81">        String actor = actorId.trim();</span>
+<span class="fc" id="L82">        KeyPurpose purpose = request.getKeyPurpose();</span>
+<span class="fc" id="L83">        String expectedKcv = normalize(request.getExpectedKeyCheckValue());</span>
+<span class="fc" id="L84">        String idempotencyHash = sha256(idempotencyKey.trim());</span>
+<span class="fc" id="L85">        String fingerprint = fingerprint(request, purpose, expectedKcv);</span>
+
+<span class="fc" id="L87">        Optional&lt;KeyExchangeEventV2&gt; existing = eventRepository</span>
+<span class="fc" id="L88">                .findByInstitutionIdAndIdempotencyKeyHash(institutionId, idempotencyHash);</span>
+<span class="fc bfc" id="L89" title="All 2 branches covered.">        if (existing.isEmpty()) {</span>
+<span class="fc" id="L90">            existing = eventRepository.findByInstitutionIdAndExternalRequestId(</span>
+<span class="fc" id="L91">                    institutionId, request.getExternalRequestId());</span>
+        }
+<span class="fc bfc" id="L93" title="All 2 branches covered.">        if (existing.isPresent()) {</span>
+<span class="fc" id="L94">            return replay(existing.get(), fingerprint, institutionId);</span>
+        }
+
+<span class="fc" id="L97">        HsmKeyReferenceV2 kek = keyRepository.findByKeyIdAndInstitutionId(</span>
+<span class="fc" id="L98">                request.getKekKeyId(), institutionId)</span>
+<span class="pc" id="L99">                .orElseThrow(() -&gt; new ResourceNotFoundException(</span>
+<span class="nc" id="L100">                        &quot;KEK&quot;, request.getKekKeyId().toString()));</span>
+<span class="fc" id="L101">        validateKek(kek);</span>
+
+        ImportedKeyResult imported;
+        try {
+<span class="fc" id="L105">            imported = exchangeClient.importKeyUnderKek(ImportKeyUnderKekRequest.builder()</span>
+<span class="fc" id="L106">                    .kekProtectedKeyBlock(kek.getEncryptedKeyBlock())</span>
+<span class="fc" id="L107">                    .transportedWorkingKeyBlock(request.getTransportedKeyBlock())</span>
+<span class="fc" id="L108">                    .workingKeyType(request.getKeyType().name())</span>
+<span class="fc" id="L109">                    .keyScheme(request.getKeyScheme().name())</span>
+<span class="fc" id="L110">                    .keyLengthBits(request.getKeyLengthBits())</span>
+<span class="pc bpc" id="L111" title="1 of 2 branches missed.">                    .tr31(request.getKeyScheme() == HsmKeyScheme.TR31)</span>
+<span class="fc" id="L112">                    .tr31KeyUsage(normalizeNullable(request.getTr31KeyUsage()))</span>
+<span class="fc" id="L113">                    .tr31Algorithm(normalizeNullable(request.getTr31Algorithm()))</span>
+<span class="fc" id="L114">                    .tr31ModeOfUse(normalizeNullable(request.getTr31ModeOfUse()))</span>
+<span class="fc" id="L115">                    .build());</span>
+<span class="nc" id="L116">        } catch (HsmKeyGenerationException e) {</span>
+<span class="nc" id="L117">            recordFailureSafely(institutionId, request, idempotencyHash, fingerprint,</span>
+                    purpose, expectedKcv, null, KeyExchangeStatus.FAILED,
+                    &quot;HSM_IMPORT_FAILED&quot;, actor);
+<span class="nc" id="L120">            throw e;</span>
+<span class="fc" id="L121">        }</span>
+        try {
+<span class="pc bpc" id="L123" title="1 of 2 branches missed.">            validateImportedResult(imported, request.getKeyScheme() == HsmKeyScheme.TR31);</span>
+<span class="nc" id="L124">        } catch (HsmKeyGenerationException e) {</span>
+<span class="nc" id="L125">            recordFailureSafely(institutionId, request, idempotencyHash, fingerprint,</span>
+                    purpose, expectedKcv, null, KeyExchangeStatus.FAILED,
+                    &quot;INVALID_HSM_RESPONSE&quot;, actor);
+<span class="nc" id="L128">            throw e;</span>
+<span class="fc" id="L129">        }</span>
+<span class="fc" id="L130">        String calculatedKcv = normalize(imported.getKeyCheckValue());</span>
+<span class="fc bfc" id="L131" title="All 2 branches covered.">        if (!expectedKcv.equals(calculatedKcv)) {</span>
+<span class="fc" id="L132">            recordFailureSafely(institutionId, request, idempotencyHash, fingerprint,</span>
+                    purpose, expectedKcv, calculatedKcv, KeyExchangeStatus.KCV_MISMATCH,
+                    &quot;KCV_MISMATCH&quot;, actor);
+<span class="fc" id="L135">            throw new BusinessRuleViolationException(</span>
+                    &quot;The imported key check value does not match the expected value&quot;);
+        }
+
+<span class="fc" id="L139">        UUID keyId = uuidGenerator.generate();</span>
+<span class="fc" id="L140">        String keyIndex = &quot;IMP_&quot; + request.getKeyType() + &quot;_&quot;</span>
+<span class="fc" id="L141">                + keyId.toString().replace(&quot;-&quot;, &quot;&quot;).substring(0, 8).toUpperCase(Locale.ROOT);</span>
+<span class="fc" id="L142">        HsmKeyReferenceV2 importedKey = HsmKeyReferenceV2.builder()</span>
+<span class="fc" id="L143">                .keyId(keyId).institutionId(institutionId)</span>
+<span class="fc" id="L144">                .keyType(request.getKeyType()).keyIndex(keyIndex)</span>
+<span class="fc" id="L145">                .keyLabel(trimToNull(request.getKeyLabel()))</span>
+<span class="fc" id="L146">                .keyCheckValue(calculatedKcv).keyVersion(1)</span>
+<span class="fc" id="L147">                .keyScope(request.getTargetScope())</span>
+<span class="fc" id="L148">                .scheme(request.getKeyScheme()).keyLengthBits(request.getKeyLengthBits())</span>
+<span class="fc" id="L149">                .tr31(imported.isTr31())</span>
+<span class="fc" id="L150">                .tr31KeyUsage(normalizeNullable(request.getTr31KeyUsage()))</span>
+<span class="fc" id="L151">                .tr31Algorithm(normalizeNullable(request.getTr31Algorithm()))</span>
+<span class="fc" id="L152">                .tr31ModeOfUse(normalizeNullable(request.getTr31ModeOfUse()))</span>
+<span class="fc" id="L153">                .hsmIdentifier(trimToNull(imported.getHsmIdentifier()))</span>
+<span class="fc" id="L154">                .hsmPartition(trimToNull(imported.getHsmPartition()))</span>
+<span class="fc" id="L155">                .effectiveFrom(request.getEffectiveFrom().toLocalDate())</span>
+<span class="fc" id="L156">                .expiryDate(request.getExpiryDate())</span>
+<span class="fc" id="L157">                .status(HsmKeyStatus.PENDING_APPROVAL)</span>
+<span class="pc bpc" id="L158" title="1 of 2 branches missed.">                .binId(request.getTargetScope() == HsmKeyScope.BIN ? request.getBinId() : null)</span>
+<span class="fc" id="L159">                .encryptedKeyBlock(imported.getCmsProtectedKeyBlock())</span>
+<span class="fc" id="L160">                .importedViaKekId(kek.getKeyId())</span>
+<span class="fc" id="L161">                .externalRequestId(request.getExternalRequestId())</span>
+<span class="fc" id="L162">                .createdBy(actor).updatedBy(actor).build();</span>
+<span class="fc" id="L163">        keyRepository.save(importedKey);</span>
+
+<span class="fc" id="L165">        UUID assignmentId = createAssignment(</span>
+                institutionId, importedKey, request, purpose, actor);
+<span class="fc" id="L167">        KeyExchangeEventV2 event = eventRepository.save(KeyExchangeEventV2.builder()</span>
+<span class="fc" id="L168">                .exchangeEventId(uuidGenerator.generate())</span>
+<span class="fc" id="L169">                .institutionId(institutionId).kekKeyId(kek.getKeyId())</span>
+<span class="fc" id="L170">                .externalRequestId(request.getExternalRequestId())</span>
+<span class="fc" id="L171">                .idempotencyKeyHash(idempotencyHash).requestFingerprint(fingerprint)</span>
+<span class="fc" id="L172">                .direction(KeyExchangeDirection.INBOUND)</span>
+<span class="fc" id="L173">                .workingKeyType(request.getKeyType()).targetScope(request.getTargetScope())</span>
+<span class="fc" id="L174">                .keyPurpose(purpose).expectedKcv(expectedKcv).calculatedKcv(calculatedKcv)</span>
+<span class="fc" id="L175">                .resultingKeyId(keyId).assignmentId(assignmentId)</span>
+<span class="fc" id="L176">                .exchangeStatus(KeyExchangeStatus.IMPORTED)</span>
+<span class="fc" id="L177">                .completedAt(OffsetDateTime.now(java.time.ZoneOffset.UTC)).createdBy(actor).build());</span>
+<span class="fc" id="L178">        return response(event, importedKey, false);</span>
+    }
+
+    private UUID createAssignment(UUID institutionId, HsmKeyReferenceV2 key,
+            ImportHsmKeyV2Request request, KeyPurpose purpose, String actor) {
+<span class="pc bpc" id="L183" title="1 of 2 branches missed.">        if (request.getTargetScope() == HsmKeyScope.BIN) {</span>
+<span class="nc" id="L184">            BinHsmKeyAssignmentV2Response assignment = binAssignmentService.create(</span>
+<span class="nc" id="L185">                    institutionId, request.getBinId(),</span>
+<span class="nc" id="L186">                    CreateBinHsmKeyAssignmentV2Request.builder()</span>
+<span class="nc" id="L187">                            .hsmKeyId(key.getKeyId()).keyPurpose(purpose)</span>
+<span class="nc" id="L188">                            .effectiveFrom(request.getEffectiveFrom())</span>
+<span class="nc" id="L189">                            .rotationGroup(trimToNull(request.getRotationGroup()))</span>
+<span class="nc" id="L190">                            .approvalRequestId(request.getApprovalRequestId()).build(),</span>
+                    actor);
+<span class="nc" id="L192">            return assignment.getAssignmentId();</span>
+        }
+<span class="fc" id="L194">        DataKeyAssignmentV2Response assignment = institutionAssignmentService.create(</span>
+<span class="fc" id="L195">                institutionId, CreateDataKeyAssignmentV2Request.builder()</span>
+<span class="fc" id="L196">                        .hsmKeyId(key.getKeyId()).keyPurpose(purpose)</span>
+<span class="fc" id="L197">                        .dataClassification(defaultClassification(request.getDataClassification()))</span>
+<span class="fc" id="L198">                        .effectiveFrom(request.getEffectiveFrom())</span>
+<span class="fc" id="L199">                        .rotationPolicyReference(</span>
+<span class="fc" id="L200">                                trimToNull(request.getRotationPolicyReference()))</span>
+<span class="fc" id="L201">                        .build(), actor);</span>
+<span class="fc" id="L202">        return assignment.getAssignmentId();</span>
+    }
+
+    private ImportHsmKeyV2Response replay(KeyExchangeEventV2 event,
+            String fingerprint, UUID institutionId) {
+<span class="pc bpc" id="L207" title="1 of 2 branches missed.">        if (!event.getRequestFingerprint().equals(fingerprint)) {</span>
+<span class="nc" id="L208">            throw new ResourceAlreadyExistsException(</span>
+<span class="nc" id="L209">                    &quot;Idempotency key or external request&quot;, event.getExternalRequestId());</span>
+        }
+<span class="pc bpc" id="L211" title="1 of 2 branches missed.">        if (event.getExchangeStatus() != KeyExchangeStatus.IMPORTED</span>
+<span class="pc bpc" id="L212" title="1 of 2 branches missed.">                || event.getResultingKeyId() == null) {</span>
+<span class="nc" id="L213">            throw new ResourceAlreadyExistsException(</span>
+<span class="nc" id="L214">                    &quot;Failed key-exchange request&quot;, event.getExternalRequestId());</span>
+        }
+<span class="fc" id="L216">        HsmKeyReferenceV2 key = keyRepository.findByKeyIdAndInstitutionId(</span>
+<span class="fc" id="L217">                event.getResultingKeyId(), institutionId)</span>
+<span class="pc" id="L218">                .orElseThrow(() -&gt; new ResourceNotFoundException(</span>
+<span class="nc" id="L219">                        &quot;Imported HSM key&quot;, event.getResultingKeyId().toString()));</span>
+<span class="fc" id="L220">        return response(event, key, true);</span>
+    }
+
+    private static ImportHsmKeyV2Response response(KeyExchangeEventV2 event,
+            HsmKeyReferenceV2 key, boolean replayed) {
+<span class="fc" id="L225">        return ImportHsmKeyV2Response.builder()</span>
+<span class="fc" id="L226">                .exchangeEventId(event.getExchangeEventId())</span>
+<span class="fc" id="L227">                .exchangeStatus(event.getExchangeStatus())</span>
+<span class="fc" id="L228">                .hsmKey(HsmKeyV2Service.toResponse(key))</span>
+<span class="fc" id="L229">                .assignmentId(event.getAssignmentId())</span>
+<span class="fc" id="L230">                .assignmentScope(event.getTargetScope())</span>
+<span class="fc" id="L231">                .replayed(replayed).build();</span>
+    }
+
+    private static void validateRequest(ImportHsmKeyV2Request request) {
+<span class="pc bpc" id="L235" title="1 of 2 branches missed.">        if (request.getKeyType() == HsmKeyType.KEK) {</span>
+<span class="nc" id="L236">            throw new IllegalArgumentException(</span>
+                    &quot;KEK cannot be imported as an operational working key&quot;);
+        }
+<span class="fc" id="L239">        if (!Set.of(HsmKeyScope.INSTITUTION, HsmKeyScope.BIN)</span>
+<span class="pc bpc" id="L240" title="1 of 2 branches missed.">                .contains(request.getTargetScope())) {</span>
+<span class="nc" id="L241">            throw new IllegalArgumentException(</span>
+                    &quot;targetScope must be INSTITUTION or BIN&quot;);
+        }
+<span class="pc bpc" id="L244" title="3 of 6 branches missed.">        if ((request.getTargetScope() == HsmKeyScope.BIN) != (request.getBinId() != null)) {</span>
+<span class="nc" id="L245">            throw new IllegalArgumentException(</span>
+                    &quot;binId is required only when targetScope=BIN&quot;);
+        }
+<span class="pc bpc" id="L248" title="1 of 2 branches missed.">        if (request.getKeyPurpose().scope() != request.getTargetScope()) {</span>
+<span class="nc" id="L249">            throw new IllegalArgumentException(</span>
+                    &quot;keyPurpose is not approved for the requested targetScope&quot;);
+        }
+<span class="pc bpc" id="L252" title="1 of 2 branches missed.">        if (!request.getExpiryDate().isAfter(request.getEffectiveFrom().toLocalDate())) {</span>
+<span class="nc" id="L253">            throw new IllegalArgumentException(</span>
+                    &quot;expiryDate must be later than effectiveFrom&quot;);
+        }
+<span class="fc" id="L256">        validateFormat(request);</span>
+<span class="fc" id="L257">    }</span>
+
+    private static void validateFormat(ImportHsmKeyV2Request request) {
+<span class="pc bpc" id="L260" title="1 of 2 branches missed.">        boolean hasTr31Metadata = !isBlank(request.getTr31KeyUsage())</span>
+<span class="nc bnc" id="L261" title="All 2 branches missed.">                || !isBlank(request.getTr31Algorithm())</span>
+<span class="pc bnc" id="L262" title="All 2 branches missed.">                || !isBlank(request.getTr31ModeOfUse());</span>
+<span class="pc bpc" id="L263" title="3 of 4 branches missed.">        switch (request.getKeyScheme()) {</span>
+            case TDES -&gt; {
+<span class="nc bnc" id="L265" title="All 2 branches missed.">                if (!Set.of(112, 168).contains(request.getKeyLengthBits())) {</span>
+<span class="nc" id="L266">                    throw new IllegalArgumentException(</span>
+                            &quot;TDES import requires keyLengthBits of 112 or 168&quot;);
+                }
+<span class="nc bnc" id="L269" title="All 2 branches missed.">                if (hasTr31Metadata) throw tr31MetadataError();</span>
+            }
+            case AES -&gt; {
+<span class="nc bnc" id="L272" title="All 2 branches missed.">                if (!Set.of(128, 192, 256).contains(request.getKeyLengthBits())) {</span>
+<span class="nc" id="L273">                    throw new IllegalArgumentException(</span>
+                            &quot;AES import requires keyLengthBits of 128, 192, or 256&quot;);
+                }
+<span class="nc bnc" id="L276" title="All 2 branches missed.">                if (hasTr31Metadata) throw tr31MetadataError();</span>
+            }
+            case TR31 -&gt; {
+<span class="pc bpc" id="L279" title="1 of 2 branches missed.">                if (!Set.of(112, 128, 168, 192, 256).contains(request.getKeyLengthBits())</span>
+<span class="pc bpc" id="L280" title="1 of 2 branches missed.">                        || isBlank(request.getTr31KeyUsage())</span>
+<span class="pc bpc" id="L281" title="1 of 2 branches missed.">                        || isBlank(request.getTr31Algorithm())</span>
+<span class="pc bpc" id="L282" title="1 of 2 branches missed.">                        || isBlank(request.getTr31ModeOfUse())) {</span>
+<span class="nc" id="L283">                    throw new IllegalArgumentException(</span>
+                            &quot;TR-31 import requires a valid key length, usage, algorithm, and modeOfUse&quot;);
+                }
+            }
+        }
+<span class="fc" id="L288">    }</span>
+
+    private static IllegalArgumentException tr31MetadataError() {
+<span class="nc" id="L291">        return new IllegalArgumentException(</span>
+                &quot;TR-31 metadata is allowed only when keyScheme=TR31&quot;);
+    }
+
+    private static void validateKek(HsmKeyReferenceV2 kek) {
+<span class="fc" id="L296">        LocalDate today = LocalDate.now();</span>
+<span class="fc bfc" id="L297" title="All 2 branches covered.">        if (kek.getKeyType() != HsmKeyType.KEK</span>
+<span class="pc bpc" id="L298" title="1 of 2 branches missed.">                || !EXTERNAL_KEK_SCOPES.contains(kek.getKeyScope())) {</span>
+<span class="fc" id="L299">            throw new IllegalArgumentException(</span>
+                    &quot;kekKeyId must reference an external-stakeholder KEK&quot;);
+        }
+<span class="pc bpc" id="L302" title="1 of 2 branches missed.">        if (kek.getStatus() != HsmKeyStatus.ACTIVE</span>
+<span class="pc bpc" id="L303" title="1 of 2 branches missed.">                || kek.getEffectiveFrom().isAfter(today)</span>
+<span class="pc bpc" id="L304" title="1 of 2 branches missed.">                || !kek.getExpiryDate().isAfter(today)) {</span>
+<span class="nc" id="L305">            throw new IllegalArgumentException(</span>
+                    &quot;kekKeyId must reference an active KEK within its cryptoperiod&quot;);
+        }
+<span class="pc bpc" id="L308" title="1 of 2 branches missed.">        if (isBlank(kek.getEncryptedKeyBlock())) {</span>
+<span class="nc" id="L309">            throw new IllegalArgumentException(</span>
+                    &quot;The KEK has no CMS-HSM-protected key block&quot;);
+        }
+<span class="fc" id="L312">    }</span>
+
+    private static void validateImportedResult(ImportedKeyResult result,
+            boolean tr31Expected) {
+<span class="pc bpc" id="L316" title="2 of 4 branches missed.">        if (result == null || isBlank(result.getCmsProtectedKeyBlock())</span>
+<span class="pc bpc" id="L317" title="1 of 2 branches missed.">                || isBlank(result.getKeyCheckValue())</span>
+<span class="pc bpc" id="L318" title="1 of 2 branches missed.">                || !result.getKeyCheckValue().matches(&quot;[0-9A-Fa-f]{4,16}&quot;)) {</span>
+<span class="nc" id="L319">            throw new HsmKeyGenerationException(</span>
+                    &quot;HSM returned an invalid key-import response&quot;);
+        }
+<span class="pc bpc" id="L322" title="1 of 2 branches missed.">        if (result.isTr31() != tr31Expected) {</span>
+<span class="nc" id="L323">            throw new HsmKeyGenerationException(</span>
+                    &quot;HSM import response format does not match the request&quot;);
+        }
+<span class="fc" id="L326">    }</span>
+
+    private void recordFailureSafely(UUID institutionId, ImportHsmKeyV2Request request,
+            String idempotencyHash, String fingerprint, KeyPurpose purpose,
+            String expectedKcv, String calculatedKcv, KeyExchangeStatus status,
+            String failureCode, String actor) {
+        try {
+<span class="fc" id="L333">            auditService.recordFailure(institutionId, request.getKekKeyId(),</span>
+<span class="fc" id="L334">                    request.getExternalRequestId(), idempotencyHash, fingerprint,</span>
+<span class="fc" id="L335">                    request.getKeyType(), request.getTargetScope(), purpose,</span>
+                    expectedKcv, calculatedKcv, status, failureCode, actor);
+<span class="nc" id="L337">        } catch (RuntimeException auditFailure) {</span>
+<span class="nc" id="L338">            log.error(&quot;Could not persist sanitized key-exchange failure audit&quot;, auditFailure);</span>
+<span class="fc" id="L339">        }</span>
+<span class="fc" id="L340">    }</span>
+
+    private static String fingerprint(ImportHsmKeyV2Request request,
+            KeyPurpose purpose, String expectedKcv) {
+<span class="fc" id="L344">        String value = String.join(&quot;|&quot;, request.getExternalRequestId(),</span>
+<span class="fc" id="L345">                request.getKekKeyId().toString(), request.getKeyType().name(),</span>
+<span class="fc" id="L346">                request.getKeyScheme().name(), request.getKeyLengthBits().toString(),</span>
+<span class="fc" id="L347">                request.getTransportedKeyBlock(), expectedKcv,</span>
+<span class="fc" id="L348">                request.getTargetScope().name(), String.valueOf(request.getBinId()),</span>
+<span class="fc" id="L349">                purpose.name(), request.getEffectiveFrom().toString(),</span>
+<span class="fc" id="L350">                request.getExpiryDate().toString(),</span>
+<span class="fc" id="L351">                String.valueOf(request.getTr31KeyUsage()),</span>
+<span class="fc" id="L352">                String.valueOf(request.getTr31Algorithm()),</span>
+<span class="fc" id="L353">                String.valueOf(request.getTr31ModeOfUse()));</span>
+<span class="fc" id="L354">        return sha256(value);</span>
+    }
+
+    private static String sha256(String value) {
+        try {
+<span class="fc" id="L359">            byte[] digest = MessageDigest.getInstance(&quot;SHA-256&quot;)</span>
+<span class="fc" id="L360">                    .digest(value.getBytes(StandardCharsets.UTF_8));</span>
+<span class="fc" id="L361">            return java.util.HexFormat.of().formatHex(digest);</span>
+<span class="nc" id="L362">        } catch (NoSuchAlgorithmException e) {</span>
+<span class="nc" id="L363">            throw new IllegalStateException(&quot;SHA-256 is unavailable&quot;, e);</span>
+        }
+    }
+
+    private static DataClassification defaultClassification(DataClassification value) {
+<span class="pc bpc" id="L368" title="1 of 2 branches missed.">        return value == null ? DataClassification.RESTRICTED : value;</span>
+    }
+    private static String normalize(String value) {
+<span class="fc" id="L371">        return value.trim().toUpperCase(Locale.ROOT);</span>
+    }
+    private static String normalizeNullable(String value) {
+<span class="pc bpc" id="L374" title="1 of 2 branches missed.">        return isBlank(value) ? null : normalize(value);</span>
+    }
+    private static String trimToNull(String value) {
+<span class="fc bfc" id="L377" title="All 2 branches covered.">        return isBlank(value) ? null : value.trim();</span>
+    }
+    private static boolean isBlank(String value) {
+<span class="pc bpc" id="L380" title="1 of 4 branches missed.">        return value == null || value.isBlank();</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.15.202606040825</span></div></body></html>

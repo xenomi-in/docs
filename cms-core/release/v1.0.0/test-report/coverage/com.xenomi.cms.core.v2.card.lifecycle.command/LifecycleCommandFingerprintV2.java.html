@@ -1,0 +1,46 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>LifecycleCommandFingerprintV2.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">CMS Core Service</a> &gt; <a href="index.source.html" class="el_package">com.xenomi.cms.core.v2.card.lifecycle.command</a> &gt; <span class="el_source">LifecycleCommandFingerprintV2.java</span></div><h1>LifecycleCommandFingerprintV2.java</h1><pre class="source lang-java linenums">package com.xenomi.cms.core.v2.card.lifecycle.command;
+
+import com.fasterxml.jackson.databind.JsonNode;
+import com.fasterxml.jackson.databind.ObjectMapper;
+import com.fasterxml.jackson.databind.node.JsonNodeFactory;
+import java.nio.ByteBuffer;
+import java.nio.charset.StandardCharsets;
+import java.security.MessageDigest;
+import java.security.NoSuchAlgorithmException;
+import java.util.HexFormat;
+import java.util.TreeMap;
+
+final class LifecycleCommandFingerprintV2 {
+    private LifecycleCommandFingerprintV2() {}
+    static String hash(String value) {
+<span class="fc" id="L16">        try { return HexFormat.of().formatHex(MessageDigest.getInstance(&quot;SHA-256&quot;).digest(value.getBytes(StandardCharsets.UTF_8))); }</span>
+<span class="nc" id="L17">        catch (NoSuchAlgorithmException impossible) { throw new IllegalStateException(impossible); }</span>
+    }
+<span class="fc" id="L19">    static long lockKey(String scope) { return ByteBuffer.wrap(HexFormat.of().parseHex(hash(scope))).getLong(); }</span>
+    static String request(ObjectMapper mapper, String kind, LifecycleCommandRequestV2 request,
+            LifecycleCommandAuthorizerV2.Actor actor, Object typedPayload) {
+<span class="fc" id="L22">        var tree = mapper.createObjectNode();</span>
+<span class="fc" id="L23">        tree.put(&quot;kind&quot;, kind).put(&quot;institutionId&quot;, request.institutionId().toString())</span>
+<span class="fc" id="L24">                .put(&quot;accountReferenceId&quot;, request.accountReferenceId().toString())</span>
+<span class="fc" id="L25">                .put(&quot;actor&quot;, actor.reference()).put(&quot;actorType&quot;, actor.type().name());</span>
+<span class="fc" id="L26">        tree.set(&quot;targetCardId&quot;, mapper.valueToTree(request.targetCardId()));</span>
+<span class="fc" id="L27">        tree.set(&quot;expectedVersion&quot;, mapper.valueToTree(request.expectedVersion()));</span>
+<span class="fc" id="L28">        tree.set(&quot;expectedFamilyRevisions&quot;, mapper.valueToTree(request.expectedFamilyRevisions()));</span>
+<span class="fc" id="L29">        tree.set(&quot;payload&quot;, mapper.valueToTree(typedPayload));</span>
+        // Correlation IDs are transport metadata, not logical request identity.
+<span class="fc" id="L31">        return hash(canonical(tree).toString());</span>
+    }
+    static JsonNode canonical(JsonNode node) {
+<span class="fc bfc" id="L34" title="All 2 branches covered.">        if (node.isObject()) {</span>
+<span class="fc" id="L35">            var sorted = new TreeMap&lt;String, JsonNode&gt;();</span>
+<span class="fc" id="L36">            node.fields().forEachRemaining(e -&gt; sorted.put(e.getKey(), canonical(e.getValue())));</span>
+<span class="fc" id="L37">            var result = JsonNodeFactory.instance.objectNode(); sorted.forEach(result::set); return result;</span>
+        }
+<span class="pc bpc" id="L39" title="1 of 2 branches missed.">        if (node.isArray()) {</span>
+<span class="nc" id="L40">            var result = JsonNodeFactory.instance.arrayNode(); node.forEach(n -&gt; result.add(canonical(n))); return result;</span>
+        }
+<span class="pc bpc" id="L42" title="1 of 2 branches missed.">        if (node.isFloatingPointNumber()) return JsonNodeFactory.instance.numberNode(node.decimalValue().stripTrailingZeros());</span>
+<span class="fc" id="L43">        return node;</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.15.202606040825</span></div></body></html>

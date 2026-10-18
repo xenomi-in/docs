@@ -1,0 +1,37 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>CMS_V2_ACS_CONTACT | Xenomi Engineering Hub</title>
+  <style>
+    * { box-sizing: border-box; }
+    body { font: 16px/1.65 system-ui, sans-serif; margin: 0; background: #f5f7fb; color: #1e293b; overflow-wrap: anywhere; }
+    main { max-width: 1100px; margin: 32px auto; padding: 32px; background: white; border: 1px solid #e2e8f0; border-radius: 10px; }
+    nav { margin-bottom: 24px; }
+    a { color: #2563eb; }
+    h1, h2, h3 { line-height: 1.25; color: #1e3a8a; }
+    h2 { margin-top: 2em; border-bottom: 1px solid #e2e8f0; padding-bottom: .4em; }
+    table { display: block; width: 100%; overflow-x: auto; border-collapse: collapse; margin: 20px 0; }
+    th, td { border: 1px solid #cbd5e1; padding: 10px 12px; text-align: left; vertical-align: top; }
+    th { background: #edf2f7; }
+    code { background: #f1f5f9; padding: 2px 5px; border-radius: 3px; }
+    pre { background: #f1f5f9; padding: 16px; overflow-x: auto; }
+    pre code { padding: 0; }
+    @media (max-width: 640px) { main { margin: 0; padding: 20px; border: 0; border-radius: 0; } }
+  </style>
+</head>
+<body>
+  <main>
+    <nav><a href="../../../../index.html">Xenomi Engineering Hub</a></nav>
+    <article><h1>ACS cardholder contact lookup</h1>
+<p><code>POST /cms/api/v2/acs/cardholder-contact</code> accepts a JSON body with <code>cardNumber</code> (12–19 digits, valid Luhn). It returns the standard success envelope with <code>data.mobile</code> and <code>data.email</code>. A missing channel is null; no available contact, unknown card or unknown range returns 404. Ambiguous institutions or PAN identities are rejected. The PAN is never echoed.</p>
+<p>The caller must present a valid CMS bearer JWT with a subject listed in <code>cms.security.acs.allowed-subjects</code> (comma-separated), <code>platform_access: true</code>, and permission <code>cms:acs-contact:read</code>. Configure the allowlist to the identity provider&#39;s dedicated ACS service-account subject. Provision this permission only to that service account. Ordinary card-read/manage and platform access alone are insufficient. An empty allowlist denies all calls. Institution-only tokens cannot use this platform lookup.</p>
+<p>This is a read-only POST. No Idempotency-Key is required and no idempotency response is stored. Successful responses use <code>Cache-Control: no-store</code>. Do not enable body logging at the gateway for this route.</p>
+<p>Migration 038 adds nullable <code>registered_mobile</code>, <code>registered_email</code>, and <code>contact_updated_at</code> to <code>cms_v2.customer_reference</code>. Accounting is the source of these contacts; the transport/synchronization workflow is intentionally deferred pending the client agreement. Its eventual writer must update the correct institution-scoped customer and timestamp. No public contact-write API is introduced. Existing customers remain available for issuance; lookup returns 404 until contact data is populated.</p>
+<p>Institution resolution uses full PAN intervals, including historical/closed ranges. The actual issued-card family is verified with effective PAN lookup HMAC identities, including legacy hashes and historical HMAC keys. Multiple same-PAN renewal/replacement rows must belong to one customer. This endpoint retrieves contact data; it does not authorize a payment or decide card eligibility.</p>
+<p>Migration 038 also adds a PostgreSQL GiST exclusion constraint reserving non-overlapping PAN intervals across the platform, including six/eight-digit BIN prefix intersections. PAN lengths are treated separately. Closed ranges remain reserved because historical cards still need deterministic ownership. Existing overlaps must be resolved before migration; the migration does not delete/reassign data. Exact BIN uniqueness continues to be enforced by migration 034. Migration should be run through the existing V2 Liquibase changelog before deploying the new entity fields.</p>
+</article>
+  </main>
+</body>
+</html>

@@ -1,0 +1,111 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>BinEventSink.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">CMS Core Service</a> &gt; <a href="index.source.html" class="el_package">com.xenomi.cms.core.v2.event.catalog</a> &gt; <span class="el_source">BinEventSink.java</span></div><h1>BinEventSink.java</h1><pre class="source lang-java linenums">package com.xenomi.cms.core.v2.event.catalog;
+
+import com.xenomi.cms.core.v2.bin.dto.BinConfigurationV2Response;
+import com.xenomi.cms.core.v2.bin.dto.BinRangeV2Response;
+import com.xenomi.cms.core.v2.event.mapper.PayloadValues;
+import com.xenomi.cms.core.v2.event.model.EventTypes;
+import com.xenomi.cms.core.v2.event.model.IdempotencyKeys;
+import com.xenomi.cms.core.v2.event.model.NotificationPriority;
+import com.xenomi.cms.core.v2.event.model.OutboxEventCommand;
+import com.xenomi.cms.core.v2.event.writer.OutboxEventWriter;
+import org.springframework.stereotype.Component;
+
+@Component
+public class BinEventSink {
+
+    private final OutboxEventWriter writer;
+
+<span class="fc" id="L18">    public BinEventSink(OutboxEventWriter writer) {</span>
+<span class="fc" id="L19">        this.writer = writer;</span>
+<span class="fc" id="L20">    }</span>
+
+    public void onBinCreated(BinConfigurationV2Response bin, String correlationId) {
+<span class="pc bpc" id="L23" title="1 of 2 branches missed.">        if (bin == null) {</span>
+<span class="nc" id="L24">            return;</span>
+        }
+<span class="fc" id="L26">        enqueueBin(bin, EventTypes.BIN_CREATED, correlationId,</span>
+<span class="fc" id="L27">                IdempotencyKeys.of(bin.getInstitutionId(), EventTypes.BIN_CREATED, bin.getBinId()));</span>
+<span class="fc" id="L28">    }</span>
+
+    public void onBinUpdated(BinConfigurationV2Response bin, String correlationId) {
+<span class="pc bpc" id="L31" title="1 of 2 branches missed.">        if (bin == null) {</span>
+<span class="nc" id="L32">            return;</span>
+        }
+        // The BIN PUT contract bumps the optimistic-lock version on every applied update.
+<span class="fc" id="L35">        enqueueBin(bin, EventTypes.BIN_UPDATED, correlationId,</span>
+<span class="fc" id="L36">                IdempotencyKeys.of(bin.getInstitutionId(), EventTypes.BIN_UPDATED, bin.getBinId(), bin.getVersion()));</span>
+<span class="fc" id="L37">    }</span>
+
+    public void onRangeCreated(BinRangeV2Response range, String correlationId) {
+<span class="nc bnc" id="L40" title="All 2 branches missed.">        if (range == null) {</span>
+<span class="nc" id="L41">            return;</span>
+        }
+<span class="nc" id="L43">        enqueueRange(range, EventTypes.BIN_RANGE_CREATED, correlationId,</span>
+<span class="nc" id="L44">                IdempotencyKeys.of(range.getInstitutionId(), EventTypes.BIN_RANGE_CREATED, range.getBinRangeId()));</span>
+<span class="nc" id="L45">    }</span>
+
+    public void onRangeUpdated(BinRangeV2Response range, String correlationId) {
+<span class="nc bnc" id="L48" title="All 2 branches missed.">        if (range == null) {</span>
+<span class="nc" id="L49">            return;</span>
+        }
+<span class="nc" id="L51">        enqueueRange(range, EventTypes.BIN_RANGE_UPDATED, correlationId,</span>
+<span class="nc" id="L52">                IdempotencyKeys.of(range.getInstitutionId(), EventTypes.BIN_RANGE_UPDATED,</span>
+<span class="nc" id="L53">                        range.getBinRangeId(), PayloadValues.instant(range.getUpdatedAt())));</span>
+<span class="nc" id="L54">    }</span>
+
+    private void enqueueBin(BinConfigurationV2Response bin, String eventType, String correlationId,
+            java.util.UUID idempotencyKey) {
+<span class="fc" id="L58">        writer.enqueue(OutboxEventCommand.builder()</span>
+<span class="fc" id="L59">                .institutionId(bin.getInstitutionId())</span>
+<span class="fc" id="L60">                .eventType(eventType)</span>
+<span class="fc" id="L61">                .aggregateType(EventTypes.AGGREGATE_BIN)</span>
+<span class="fc" id="L62">                .aggregateId(bin.getBinId())</span>
+<span class="fc" id="L63">                .correlationId(correlationId)</span>
+<span class="fc" id="L64">                .priority(NotificationPriority.MEDIUM)</span>
+<span class="fc" id="L65">                .idempotencyKey(idempotencyKey)</span>
+<span class="fc" id="L66">                .payload(PayloadValues.entries(</span>
+<span class="fc" id="L67">                        &quot;binId&quot;, PayloadValues.uuid(bin.getBinId()),</span>
+<span class="fc" id="L68">                        &quot;institutionId&quot;, PayloadValues.uuid(bin.getInstitutionId()),</span>
+<span class="fc" id="L69">                        &quot;binNumber&quot;, bin.getBinNumber(),</span>
+<span class="fc" id="L70">                        &quot;binLength&quot;, bin.getBinLength(),</span>
+<span class="fc" id="L71">                        &quot;cardNetwork&quot;, PayloadValues.name(bin.getCardNetwork()),</span>
+<span class="fc" id="L72">                        &quot;binType&quot;, PayloadValues.name(bin.getBinType()),</span>
+<span class="fc" id="L73">                        &quot;binStatus&quot;, PayloadValues.name(bin.getBinStatus()),</span>
+<span class="fc" id="L74">                        &quot;effectiveFrom&quot;, PayloadValues.date(bin.getEffectiveFrom()),</span>
+<span class="fc" id="L75">                        &quot;effectiveTo&quot;, PayloadValues.date(bin.getEffectiveTo()),</span>
+<span class="fc" id="L76">                        &quot;version&quot;, bin.getVersion(),</span>
+<span class="fc" id="L77">                        &quot;updatedBy&quot;, bin.getUpdatedBy(),</span>
+<span class="fc" id="L78">                        &quot;updatedAt&quot;, PayloadValues.instant(bin.getUpdatedAt())))</span>
+<span class="fc" id="L79">                .build());</span>
+<span class="fc" id="L80">    }</span>
+
+    private void enqueueRange(BinRangeV2Response range, String eventType, String correlationId,
+            java.util.UUID idempotencyKey) {
+<span class="nc" id="L84">        writer.enqueue(OutboxEventCommand.builder()</span>
+<span class="nc" id="L85">                .institutionId(range.getInstitutionId())</span>
+<span class="nc" id="L86">                .eventType(eventType)</span>
+<span class="nc" id="L87">                .aggregateType(EventTypes.AGGREGATE_BIN_RANGE)</span>
+<span class="nc" id="L88">                .aggregateId(range.getBinRangeId())</span>
+<span class="nc" id="L89">                .correlationId(correlationId)</span>
+<span class="nc" id="L90">                .priority(NotificationPriority.MEDIUM)</span>
+<span class="nc" id="L91">                .idempotencyKey(idempotencyKey)</span>
+<span class="nc" id="L92">                .payload(PayloadValues.entries(</span>
+<span class="nc" id="L93">                        &quot;binRangeId&quot;, PayloadValues.uuid(range.getBinRangeId()),</span>
+<span class="nc" id="L94">                        &quot;binId&quot;, PayloadValues.uuid(range.getBinId()),</span>
+<span class="nc" id="L95">                        &quot;institutionId&quot;, PayloadValues.uuid(range.getInstitutionId()),</span>
+<span class="nc" id="L96">                        &quot;rangeStart&quot;, range.getRangeStart(),</span>
+<span class="nc" id="L97">                        &quot;rangeEnd&quot;, range.getRangeEnd(),</span>
+<span class="nc" id="L98">                        &quot;allocationStrategy&quot;, PayloadValues.name(range.getAllocationStrategy()),</span>
+<span class="nc" id="L99">                        &quot;usableCapacity&quot;, range.getUsableCapacity(),</span>
+<span class="nc" id="L100">                        &quot;exhaustionThreshold&quot;, range.getExhaustionThreshold(),</span>
+<span class="nc" id="L101">                        &quot;issuedPanCount&quot;, range.getIssuedPanCount(),</span>
+<span class="nc" id="L102">                        &quot;remainingPanCapacity&quot;, range.getRemainingPanCapacity(),</span>
+<span class="nc" id="L103">                        &quot;rangeStatus&quot;, PayloadValues.name(range.getRangeStatus()),</span>
+<span class="nc" id="L104">                        &quot;effectiveFrom&quot;, PayloadValues.instant(range.getEffectiveFrom()),</span>
+<span class="nc" id="L105">                        &quot;effectiveTo&quot;, PayloadValues.instant(range.getEffectiveTo()),</span>
+<span class="nc" id="L106">                        &quot;updatedBy&quot;, range.getUpdatedBy(),</span>
+<span class="nc" id="L107">                        &quot;updatedAt&quot;, PayloadValues.instant(range.getUpdatedAt())))</span>
+<span class="nc" id="L108">                .build());</span>
+<span class="nc" id="L109">    }</span>
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.15.202606040825</span></div></body></html>

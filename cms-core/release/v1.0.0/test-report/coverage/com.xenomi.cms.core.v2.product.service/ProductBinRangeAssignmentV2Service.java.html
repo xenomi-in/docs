@@ -1,0 +1,194 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>ProductBinRangeAssignmentV2Service.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">CMS Core Service</a> &gt; <a href="index.source.html" class="el_package">com.xenomi.cms.core.v2.product.service</a> &gt; <span class="el_source">ProductBinRangeAssignmentV2Service.java</span></div><h1>ProductBinRangeAssignmentV2Service.java</h1><pre class="source lang-java linenums">package com.xenomi.cms.core.v2.product.service;
+
+import java.time.OffsetDateTime;
+import java.util.UUID;
+
+import com.xenomi.cms.core.exception.ResourceNotFoundException;
+import com.xenomi.cms.core.v2.bin.entity.BinConfigurationV2;
+import com.xenomi.cms.core.v2.bin.entity.BinRangeV2;
+import com.xenomi.cms.core.v2.bin.model.BinRangeStatus;
+import com.xenomi.cms.core.v2.bin.repository.BinConfigurationV2Repository;
+import com.xenomi.cms.core.v2.bin.repository.BinRangeV2Repository;
+import com.xenomi.cms.core.v2.common.DatabaseUuidV7Generator;
+import com.xenomi.cms.core.v2.product.dto.CreateProductBinRangeAssignmentV2Request;
+import com.xenomi.cms.core.v2.product.dto.ProductBinRangeAssignmentV2Response;
+import com.xenomi.cms.core.v2.product.dto.UpdateProductBinRangeAssignmentV2Request;
+import com.xenomi.cms.core.v2.product.entity.CardProductV2;
+import com.xenomi.cms.core.v2.product.entity.ProductBinRangeAssignmentV2;
+import com.xenomi.cms.core.v2.product.model.ProductBinAssignmentStatus;
+import com.xenomi.cms.core.v2.product.model.ProductStatus;
+import com.xenomi.cms.core.v2.product.repository.CardProductV2Repository;
+import com.xenomi.cms.core.v2.product.repository.ProductBinRangeAssignmentV2Repository;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
+import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
+
+@Service
+public class ProductBinRangeAssignmentV2Service {
+    private final ProductBinRangeAssignmentV2Repository repository;
+    private final CardProductV2Repository productRepository;
+    private final BinRangeV2Repository rangeRepository;
+    private final BinConfigurationV2Repository binRepository;
+    private final DatabaseUuidV7Generator uuidGenerator;
+
+    public ProductBinRangeAssignmentV2Service(
+            ProductBinRangeAssignmentV2Repository repository,
+            CardProductV2Repository productRepository,
+            BinRangeV2Repository rangeRepository,
+            BinConfigurationV2Repository binRepository,
+<span class="fc" id="L40">            DatabaseUuidV7Generator uuidGenerator) {</span>
+<span class="fc" id="L41">        this.repository = repository;</span>
+<span class="fc" id="L42">        this.productRepository = productRepository;</span>
+<span class="fc" id="L43">        this.rangeRepository = rangeRepository;</span>
+<span class="fc" id="L44">        this.binRepository = binRepository;</span>
+<span class="fc" id="L45">        this.uuidGenerator = uuidGenerator;</span>
+<span class="fc" id="L46">    }</span>
+
+    @Transactional
+    public ProductBinRangeAssignmentV2Response create(UUID institutionId, UUID productId,
+            CreateProductBinRangeAssignmentV2Request request, String actorId) {
+<span class="fc" id="L51">        CardProductV2 product = requireProduct(institutionId, productId);</span>
+<span class="pc bpc" id="L52" title="1 of 2 branches missed.">        if (product.getProductStatus() == ProductStatus.RETIRED) {</span>
+<span class="nc" id="L53">            throw new IllegalArgumentException(&quot;BIN ranges cannot be assigned to a RETIRED product&quot;);</span>
+        }
+<span class="fc" id="L55">        BinRangeV2 range = requireRange(institutionId, request.binRangeId());</span>
+<span class="fc" id="L56">        validateProductNetwork(product, range);</span>
+<span class="fc" id="L57">        validateDates(request.effectiveFrom(), request.effectiveTo());</span>
+<span class="pc bpc" id="L58" title="1 of 2 branches missed.">        if (repository.existsByInstitutionIdAndProductIdAndBinRangeIdAndAssignmentStatusNot(</span>
+<span class="fc" id="L59">                institutionId, productId, request.binRangeId(), ProductBinAssignmentStatus.CLOSED)) {</span>
+<span class="nc" id="L60">            throw new IllegalArgumentException(&quot;This BIN range already has an open assignment to the product&quot;);</span>
+        }
+<span class="fc" id="L62">        ProductBinRangeAssignmentV2 entity = ProductBinRangeAssignmentV2.builder()</span>
+<span class="fc" id="L63">                .assignmentId(uuidGenerator.generate())</span>
+<span class="fc" id="L64">                .institutionId(institutionId)</span>
+<span class="fc" id="L65">                .productId(productId)</span>
+<span class="fc" id="L66">                .binRangeId(request.binRangeId())</span>
+<span class="pc bpc" id="L67" title="1 of 2 branches missed.">                .priority(request.priority() == null ? 100 : request.priority())</span>
+<span class="fc" id="L68">                .allocationWeight(request.allocationWeight())</span>
+<span class="fc" id="L69">                .serviceCodeOverride(request.serviceCodeOverride())</span>
+<span class="fc" id="L70">                .assignmentStatus(ProductBinAssignmentStatus.DRAFT)</span>
+<span class="fc" id="L71">                .effectiveFrom(request.effectiveFrom())</span>
+<span class="fc" id="L72">                .effectiveTo(request.effectiveTo())</span>
+<span class="fc" id="L73">                .createdBy(actorId.trim())</span>
+<span class="fc" id="L74">                .updatedBy(actorId.trim())</span>
+<span class="fc" id="L75">                .build();</span>
+<span class="fc" id="L76">        return toResponse(repository.save(entity));</span>
+    }
+
+    @Transactional(readOnly = true)
+    public Page&lt;ProductBinRangeAssignmentV2Response&gt; list(
+            UUID institutionId, UUID productId, Pageable pageable) {
+<span class="nc" id="L82">        requireProduct(institutionId, productId);</span>
+<span class="nc" id="L83">        return repository.findByInstitutionIdAndProductId(institutionId, productId, pageable)</span>
+<span class="nc" id="L84">                .map(this::toResponse);</span>
+    }
+
+    @Transactional(readOnly = true)
+    public ProductBinRangeAssignmentV2Response get(
+            UUID institutionId, UUID productId, UUID assignmentId) {
+<span class="nc" id="L90">        return toResponse(find(institutionId, productId, assignmentId));</span>
+    }
+
+    @Transactional
+    public ProductBinRangeAssignmentV2Response update(UUID institutionId, UUID productId,
+            UUID assignmentId, UpdateProductBinRangeAssignmentV2Request request, String actorId) {
+<span class="nc" id="L96">        CardProductV2 product = requireProduct(institutionId, productId);</span>
+<span class="nc" id="L97">        ProductBinRangeAssignmentV2 entity = find(institutionId, productId, assignmentId);</span>
+<span class="nc bnc" id="L98" title="All 2 branches missed.">        boolean configurationChange = request.priority() != null</span>
+<span class="nc bnc" id="L99" title="All 2 branches missed.">                || request.allocationWeight() != null</span>
+<span class="nc bnc" id="L100" title="All 2 branches missed.">                || request.serviceCodeOverride() != null</span>
+<span class="nc bnc" id="L101" title="All 2 branches missed.">                || request.effectiveFrom() != null</span>
+<span class="nc bnc" id="L102" title="All 2 branches missed.">                || request.effectiveTo() != null;</span>
+<span class="nc bnc" id="L103" title="All 4 branches missed.">        if (configurationChange &amp;&amp; entity.getAssignmentStatus() != ProductBinAssignmentStatus.DRAFT) {</span>
+<span class="nc" id="L104">            throw new IllegalArgumentException(&quot;Assignment configuration can be changed only while DRAFT&quot;);</span>
+        }
+<span class="nc bnc" id="L106" title="All 2 branches missed.">        if (request.priority() != null) entity.setPriority(request.priority());</span>
+<span class="nc bnc" id="L107" title="All 2 branches missed.">        if (request.allocationWeight() != null) entity.setAllocationWeight(request.allocationWeight());</span>
+<span class="nc bnc" id="L108" title="All 2 branches missed.">        if (request.serviceCodeOverride() != null) entity.setServiceCodeOverride(request.serviceCodeOverride());</span>
+<span class="nc bnc" id="L109" title="All 2 branches missed.">        if (request.effectiveFrom() != null) entity.setEffectiveFrom(request.effectiveFrom());</span>
+<span class="nc bnc" id="L110" title="All 2 branches missed.">        if (request.effectiveTo() != null) entity.setEffectiveTo(request.effectiveTo());</span>
+<span class="nc bnc" id="L111" title="All 2 branches missed.">        if (request.approvalRequestId() != null) entity.setApprovalRequestId(request.approvalRequestId());</span>
+
+<span class="nc bnc" id="L113" title="All 2 branches missed.">        if (request.assignmentStatus() != null</span>
+<span class="nc bnc" id="L114" title="All 2 branches missed.">                &amp;&amp; request.assignmentStatus() != entity.getAssignmentStatus()) {</span>
+<span class="nc" id="L115">            validateTransition(entity.getAssignmentStatus(), request.assignmentStatus());</span>
+<span class="nc bnc" id="L116" title="All 2 branches missed.">            if (request.assignmentStatus() == ProductBinAssignmentStatus.ACTIVE) {</span>
+<span class="nc bnc" id="L117" title="All 2 branches missed.">                if (product.getProductStatus() != ProductStatus.ACTIVE) {</span>
+<span class="nc" id="L118">                    throw new IllegalArgumentException(&quot;The product must be ACTIVE before activating a BIN assignment&quot;);</span>
+                }
+<span class="nc" id="L120">                BinRangeV2 range = requireRange(institutionId, entity.getBinRangeId());</span>
+<span class="nc bnc" id="L121" title="All 2 branches missed.">                if (range.getRangeStatus() != BinRangeStatus.ACTIVE) {</span>
+<span class="nc" id="L122">                    throw new IllegalArgumentException(&quot;The BIN range must be ACTIVE before activating its assignment&quot;);</span>
+                }
+            }
+<span class="nc" id="L125">            entity.setAssignmentStatus(request.assignmentStatus());</span>
+        }
+<span class="nc" id="L127">        validateDates(entity.getEffectiveFrom(), entity.getEffectiveTo());</span>
+<span class="nc" id="L128">        entity.setUpdatedBy(actorId.trim());</span>
+<span class="nc" id="L129">        entity.setUpdatedAt(OffsetDateTime.now(java.time.ZoneOffset.UTC));</span>
+<span class="nc" id="L130">        return toResponse(repository.save(entity));</span>
+    }
+
+    private CardProductV2 requireProduct(UUID institutionId, UUID productId) {
+<span class="fc" id="L134">        return productRepository.findByProductIdAndInstitutionId(productId, institutionId)</span>
+<span class="pc" id="L135">                .orElseThrow(() -&gt; new ResourceNotFoundException(&quot;Card product&quot;, productId.toString()));</span>
+    }
+
+    private BinRangeV2 requireRange(UUID institutionId, UUID rangeId) {
+<span class="fc" id="L139">        return rangeRepository.findById(rangeId)</span>
+<span class="fc" id="L140">                .filter(range -&gt; institutionId.equals(range.getInstitutionId()))</span>
+<span class="pc" id="L141">                .orElseThrow(() -&gt; new ResourceNotFoundException(&quot;BIN range&quot;, rangeId.toString()));</span>
+    }
+
+    private void validateProductNetwork(CardProductV2 product, BinRangeV2 range) {
+<span class="fc" id="L145">        BinConfigurationV2 bin = binRepository.findByBinIdAndInstitutionId(</span>
+<span class="fc" id="L146">                        range.getBinId(), range.getInstitutionId())</span>
+<span class="pc" id="L147">                .orElseThrow(() -&gt; new ResourceNotFoundException(&quot;BIN&quot;, range.getBinId().toString()));</span>
+<span class="fc bfc" id="L148" title="All 2 branches covered.">        if (bin.getCardNetwork() != product.getCardNetwork()) {</span>
+<span class="fc" id="L149">            throw new IllegalArgumentException(&quot;Product and BIN range must use the same card network&quot;);</span>
+        }
+<span class="fc" id="L151">    }</span>
+
+    private ProductBinRangeAssignmentV2 find(UUID institutionId, UUID productId, UUID assignmentId) {
+<span class="nc" id="L154">        return repository.findByAssignmentIdAndInstitutionIdAndProductId(</span>
+                        assignmentId, institutionId, productId)
+<span class="nc" id="L156">                .orElseThrow(() -&gt; new ResourceNotFoundException(</span>
+<span class="nc" id="L157">                        &quot;Product BIN range assignment&quot;, assignmentId.toString()));</span>
+    }
+
+    private static void validateDates(OffsetDateTime from, OffsetDateTime to) {
+<span class="pc bpc" id="L161" title="3 of 4 branches missed.">        if (to != null &amp;&amp; !to.isAfter(from)) {</span>
+<span class="nc" id="L162">            throw new IllegalArgumentException(&quot;effectiveTo must be after effectiveFrom&quot;);</span>
+        }
+<span class="fc" id="L164">    }</span>
+
+    private static void validateTransition(ProductBinAssignmentStatus current,
+            ProductBinAssignmentStatus target) {
+<span class="nc bnc" id="L168" title="All 5 branches missed.">        boolean allowed = switch (current) {</span>
+<span class="nc bnc" id="L169" title="All 4 branches missed.">            case DRAFT -&gt; target == ProductBinAssignmentStatus.PENDING_APPROVAL</span>
+                    || target == ProductBinAssignmentStatus.CLOSED;
+<span class="nc bnc" id="L171" title="All 6 branches missed.">            case PENDING_APPROVAL -&gt; target == ProductBinAssignmentStatus.DRAFT</span>
+                    || target == ProductBinAssignmentStatus.ACTIVE
+                    || target == ProductBinAssignmentStatus.CLOSED;
+<span class="nc bnc" id="L174" title="All 4 branches missed.">            case ACTIVE -&gt; target == ProductBinAssignmentStatus.SUSPENDED</span>
+                    || target == ProductBinAssignmentStatus.CLOSED;
+<span class="nc bnc" id="L176" title="All 4 branches missed.">            case SUSPENDED -&gt; target == ProductBinAssignmentStatus.ACTIVE</span>
+                    || target == ProductBinAssignmentStatus.CLOSED;
+<span class="nc" id="L178">            case CLOSED -&gt; false;</span>
+        };
+<span class="nc bnc" id="L180" title="All 2 branches missed.">        if (!allowed) {</span>
+<span class="nc" id="L181">            throw new IllegalArgumentException(&quot;Invalid BIN assignment status transition: &quot; + current + &quot; -&gt; &quot; + target);</span>
+        }
+<span class="nc" id="L183">    }</span>
+
+    private ProductBinRangeAssignmentV2Response toResponse(ProductBinRangeAssignmentV2 entity) {
+<span class="fc" id="L186">        return new ProductBinRangeAssignmentV2Response(</span>
+<span class="fc" id="L187">                entity.getAssignmentId(), entity.getInstitutionId(), entity.getProductId(),</span>
+<span class="fc" id="L188">                entity.getBinRangeId(), entity.getPriority(), entity.getAllocationWeight(),</span>
+<span class="fc" id="L189">                entity.getServiceCodeOverride(), entity.getAssignmentStatus(),</span>
+<span class="fc" id="L190">                entity.getEffectiveFrom(), entity.getEffectiveTo(), entity.getApprovalRequestId(),</span>
+<span class="fc" id="L191">                entity.getCreatedAt(), entity.getUpdatedAt(), entity.getCreatedBy(), entity.getUpdatedBy());</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.15.202606040825</span></div></body></html>

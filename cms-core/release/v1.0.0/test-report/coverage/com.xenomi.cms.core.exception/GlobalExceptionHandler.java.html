@@ -1,0 +1,278 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>GlobalExceptionHandler.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">CMS Core Service</a> &gt; <a href="index.source.html" class="el_package">com.xenomi.cms.core.exception</a> &gt; <span class="el_source">GlobalExceptionHandler.java</span></div><h1>GlobalExceptionHandler.java</h1><pre class="source lang-java linenums">package com.xenomi.cms.core.exception;
+
+import com.xenomi.cms.core.api.ApiErrorEnvelope;
+import com.xenomi.cms.core.api.ApiErrorCode;
+import com.xenomi.cms.core.api.ApiResponseHelper;
+import jakarta.servlet.http.HttpServletRequest;
+import lombok.extern.slf4j.Slf4j;
+import org.springframework.http.HttpStatus;
+import org.springframework.http.ResponseEntity;
+import org.springframework.http.converter.HttpMessageNotReadableException;
+import org.springframework.orm.ObjectOptimisticLockingFailureException;
+import org.springframework.validation.FieldError;
+import org.springframework.web.bind.MethodArgumentNotValidException;
+import org.springframework.web.bind.MissingRequestHeaderException;
+import org.springframework.web.bind.annotation.ExceptionHandler;
+import org.springframework.web.bind.annotation.RestControllerAdvice;
+import org.springframework.web.method.annotation.HandlerMethodValidationException;
+import org.springframework.web.method.annotation.MethodArgumentTypeMismatchException;
+
+import com.xenomi.cms.core.keymanagement.client.HsmKeyGenerationException;
+import com.xenomi.cms.core.v2.card.lifecycle.client.CardLifecycleSwitchException;
+import com.xenomi.cms.core.v2.card.security.CardSecurityException;
+
+import jakarta.validation.ConstraintViolationException;
+
+import java.util.List;
+import java.util.Map;
+import java.util.stream.Collectors;
+
+/**
+ * Global exception handler for the CMS Core Service.
+ * Centralizes exception handling across all controllers and converts exceptions
+ * to standardized API error responses using ApiErrorEnvelope.
+ * Handles validation errors, resource not found, conflicts, and generic exceptions.
+ *
+ * @author LogicPoint Systems
+ * @version 1.0.0
+ * @since 2026-01-21
+ */
+<span class="fc" id="L40">@Slf4j</span>
+@RestControllerAdvice
+<span class="fc" id="L42">public class GlobalExceptionHandler {</span>
+
+    @ExceptionHandler(ResourceNotFoundException.class)
+    public ResponseEntity&lt;ApiErrorEnvelope&gt; handleResourceNotFoundException(
+            ResourceNotFoundException ex, HttpServletRequest request) {
+<span class="fc" id="L47">        log.error(&quot;Resource not found: {}&quot;, ex.getMessage());</span>
+<span class="fc" id="L48">        ApiErrorEnvelope body = ApiResponseHelper.error(request, ApiErrorCode.NOT_FOUND, ex.getMessage(), null);</span>
+<span class="fc" id="L49">        return ResponseEntity.status(HttpStatus.NOT_FOUND).body(body);</span>
+    }
+
+    @ExceptionHandler(ResourceAlreadyExistsException.class)
+    public ResponseEntity&lt;ApiErrorEnvelope&gt; handleResourceAlreadyExistsException(
+            ResourceAlreadyExistsException ex, HttpServletRequest request) {
+<span class="fc" id="L55">        log.error(&quot;Resource already exists: {}&quot;, ex.getMessage());</span>
+<span class="fc" id="L56">        ApiErrorEnvelope body = ApiResponseHelper.error(request, ApiErrorCode.CONFLICT, ex.getMessage(), null);</span>
+<span class="fc" id="L57">        return ResponseEntity.status(HttpStatus.CONFLICT).body(body);</span>
+    }
+
+    @ExceptionHandler(ObjectOptimisticLockingFailureException.class)
+    public ResponseEntity&lt;ApiErrorEnvelope&gt; handleOptimisticLockingFailure(
+            ObjectOptimisticLockingFailureException ex, HttpServletRequest request) {
+<span class="fc" id="L63">        ApiErrorEnvelope body = ApiResponseHelper.error(request, ApiErrorCode.CONFLICT,</span>
+                &quot;The resource was updated by another request; reload and retry&quot;, null);
+<span class="fc" id="L65">        return ResponseEntity.status(HttpStatus.CONFLICT).body(body);</span>
+    }
+
+    @ExceptionHandler(com.xenomi.cms.core.v2.card.lifecycle.command.LifecycleCommandConflictV2.class)
+    public ResponseEntity&lt;ApiErrorEnvelope&gt; handleLifecycleCommandConflict(
+            com.xenomi.cms.core.v2.card.lifecycle.command.LifecycleCommandConflictV2 ex,
+            HttpServletRequest request) {
+<span class="fc bfc" id="L72" title="All 2 branches covered.">        ApiErrorCode code = ex.code() == com.xenomi.cms.core.v2.card.lifecycle.command.LifecycleCommandConflictV2.Code.IDEMPOTENCY_CONFLICT</span>
+<span class="fc" id="L73">                ? ApiErrorCode.IDEMPOTENCY_CONFLICT : ApiErrorCode.VERSION_CONFLICT;</span>
+<span class="fc" id="L74">        return ResponseEntity.status(code.status()).body(ApiResponseHelper.error(request, code, ex.getMessage(), null));</span>
+    }
+
+    @ExceptionHandler(org.springframework.security.access.AccessDeniedException.class)
+    public ResponseEntity&lt;ApiErrorEnvelope&gt; handleCommandAccessDenied(
+            org.springframework.security.access.AccessDeniedException ex, HttpServletRequest request) {
+<span class="fc" id="L80">        return ResponseEntity.status(HttpStatus.FORBIDDEN).body(</span>
+<span class="fc" id="L81">                ApiResponseHelper.error(request, ApiErrorCode.ACCESS_DENIED, ex.getMessage(), null));</span>
+    }
+
+    @ExceptionHandler(ResourceVersionConflictException.class)
+    public ResponseEntity&lt;ApiErrorEnvelope&gt; handleResourceVersionConflict(
+            ResourceVersionConflictException ex, HttpServletRequest request) {
+<span class="fc" id="L87">        ApiErrorEnvelope body = ApiResponseHelper.error(request, ApiErrorCode.CONFLICT,</span>
+<span class="fc" id="L88">                ex.getMessage(), null);</span>
+<span class="fc" id="L89">        return ResponseEntity.status(HttpStatus.CONFLICT).body(body);</span>
+    }
+
+    @ExceptionHandler(ImmutableFieldException.class)
+    public ResponseEntity&lt;ApiErrorEnvelope&gt; handleImmutableField(
+            ImmutableFieldException ex, HttpServletRequest request) {
+<span class="fc" id="L95">        List&lt;Object&gt; details = ex.getFields().stream()</span>
+<span class="fc" id="L96">                .map(field -&gt; (Object) Map.of(&quot;field&quot;, field, &quot;message&quot;, &quot;Field is immutable&quot;))</span>
+<span class="fc" id="L97">                .toList();</span>
+<span class="fc" id="L98">        ApiErrorEnvelope body = ApiResponseHelper.error(request, ApiErrorCode.IMMUTABLE_FIELD,</span>
+<span class="fc" id="L99">                ex.getMessage(), details);</span>
+<span class="fc" id="L100">        return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(body);</span>
+    }
+
+    @ExceptionHandler(UnknownRequestFieldException.class)
+    public ResponseEntity&lt;ApiErrorEnvelope&gt; handleUnknownRequestField(
+            UnknownRequestFieldException ex, HttpServletRequest request) {
+<span class="fc" id="L106">        List&lt;Object&gt; details = ex.getFields().stream()</span>
+<span class="fc" id="L107">                .map(field -&gt; (Object) Map.of(&quot;field&quot;, field, &quot;message&quot;, &quot;Field is not supported&quot;))</span>
+<span class="fc" id="L108">                .toList();</span>
+<span class="fc" id="L109">        ApiErrorEnvelope body = ApiResponseHelper.error(request, ApiErrorCode.VALIDATION_ERROR,</span>
+<span class="fc" id="L110">                ex.getMessage(), details);</span>
+<span class="fc" id="L111">        return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(body);</span>
+    }
+
+    @ExceptionHandler(InvalidOperationException.class)
+    public ResponseEntity&lt;ApiErrorEnvelope&gt; handleInvalidOperationException(
+            InvalidOperationException ex, HttpServletRequest request) {
+<span class="fc" id="L117">        log.error(&quot;Invalid operation: {}&quot;, ex.getMessage());</span>
+<span class="fc" id="L118">        ApiErrorEnvelope body = ApiResponseHelper.error(request, ApiErrorCode.BAD_REQUEST, ex.getMessage(), null);</span>
+<span class="fc" id="L119">        return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(body);</span>
+    }
+
+    @ExceptionHandler(BusinessRuleViolationException.class)
+    public ResponseEntity&lt;ApiErrorEnvelope&gt; handleBusinessRuleViolation(
+            BusinessRuleViolationException ex, HttpServletRequest request) {
+<span class="fc" id="L125">        log.error(&quot;Business rule violation: {}&quot;, ex.getMessage());</span>
+<span class="fc" id="L126">        ApiErrorEnvelope body = ApiResponseHelper.error(</span>
+<span class="fc" id="L127">                request, ApiErrorCode.BUSINESS_RULE_VIOLATION, ex.getMessage(), null);</span>
+<span class="fc" id="L128">        return ResponseEntity.status(HttpStatus.UNPROCESSABLE_ENTITY).body(body);</span>
+    }
+
+    @ExceptionHandler(HsmKeyGenerationException.class)
+    public ResponseEntity&lt;ApiErrorEnvelope&gt; handleHsmKeyGenerationException(
+            HsmKeyGenerationException ex, HttpServletRequest request) {
+<span class="fc" id="L134">        log.error(&quot;HSM key processing failed&quot;, ex);</span>
+<span class="fc" id="L135">        ApiErrorEnvelope body = ApiResponseHelper.error(request, ApiErrorCode.INTERNAL_ERROR,</span>
+                &quot;HSM key processing failed. Please try again later.&quot;, null);
+<span class="fc" id="L137">        return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(body);</span>
+    }
+
+    @ExceptionHandler(CardLifecycleSwitchException.class)
+    public ResponseEntity&lt;ApiErrorEnvelope&gt; handleCardLifecycleSwitchException(
+            CardLifecycleSwitchException ex, HttpServletRequest request) {
+<span class="fc" id="L143">        log.error(&quot;Card lifecycle switch processing failed&quot;, ex);</span>
+<span class="fc" id="L144">        ApiErrorEnvelope body = ApiResponseHelper.error(request, ApiErrorCode.INTERNAL_ERROR,</span>
+                &quot;The card could not be hot-listed at the authorization switch. Please retry.&quot;, null);
+<span class="fc" id="L146">        return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(body);</span>
+    }
+
+    @ExceptionHandler(CardSecurityException.class)
+    public ResponseEntity&lt;ApiErrorEnvelope&gt; handleCardSecurityException(
+            CardSecurityException ex, HttpServletRequest request) {
+<span class="fc" id="L152">        log.error(&quot;HSM-backed card security processing failed&quot;, ex);</span>
+<span class="fc" id="L153">        ApiErrorEnvelope body = ApiResponseHelper.error(request, ApiErrorCode.INTERNAL_ERROR,</span>
+                &quot;Secure card-data processing failed. Please retry.&quot;, null);
+<span class="fc" id="L155">        return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(body);</span>
+    }
+
+    @ExceptionHandler(MethodArgumentNotValidException.class)
+    public ResponseEntity&lt;ApiErrorEnvelope&gt; handleValidationException(
+            MethodArgumentNotValidException ex, HttpServletRequest request) {
+        // Binding exception messages include rejected values (including encrypted PIN blocks).
+<span class="fc" id="L162">        log.warn(&quot;Request validation failed fields={}&quot;, ex.getBindingResult().getErrorCount());</span>
+<span class="fc" id="L163">        List&lt;Object&gt; details = ex.getBindingResult().getAllErrors().stream()</span>
+<span class="fc" id="L164">                .map(err -&gt; {</span>
+<span class="pc bpc" id="L165" title="1 of 2 branches missed.">                    if (err instanceof FieldError fe) {</span>
+<span class="fc" id="L166">                        String msg = fe.getDefaultMessage();</span>
+<span class="pc bpc" id="L167" title="1 of 2 branches missed.">                        return Map.&lt;String, Object&gt;of(&quot;field&quot;, fe.getField(), &quot;message&quot;, msg != null ? msg : &quot;&quot;);</span>
+                    }
+<span class="nc" id="L169">                    String msg = err.getDefaultMessage();</span>
+<span class="nc bnc" id="L170" title="All 2 branches missed.">                    return Map.&lt;String, Object&gt;of(&quot;message&quot;, msg != null ? msg : &quot;&quot;);</span>
+                })
+<span class="fc" id="L172">                .collect(Collectors.toList());</span>
+<span class="fc" id="L173">        ApiErrorEnvelope body = ApiResponseHelper.error(request, ApiErrorCode.VALIDATION_ERROR,</span>
+                &quot;Request validation failed&quot;, details);
+<span class="fc" id="L175">        return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(body);</span>
+    }
+
+    @ExceptionHandler(HttpMessageNotReadableException.class)
+    public ResponseEntity&lt;ApiErrorEnvelope&gt; handleUnreadableMessage(
+            HttpMessageNotReadableException ex, HttpServletRequest request) {
+<span class="fc" id="L181">        ApiErrorEnvelope body = ApiResponseHelper.error(request, ApiErrorCode.BAD_REQUEST,</span>
+                &quot;Malformed or unreadable JSON request&quot;, null);
+<span class="fc" id="L183">        return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(body);</span>
+    }
+
+    @ExceptionHandler(MethodArgumentTypeMismatchException.class)
+    public ResponseEntity&lt;ApiErrorEnvelope&gt; handleTypeMismatchException(
+            MethodArgumentTypeMismatchException ex, HttpServletRequest request) {
+<span class="nc" id="L189">        log.error(&quot;Type mismatch error: {}&quot;, ex.getMessage());</span>
+<span class="nc" id="L190">        String msg = String.format(&quot;Invalid value '%s' for parameter '%s'&quot;, ex.getValue(), ex.getName());</span>
+<span class="nc" id="L191">        ApiErrorEnvelope body = ApiResponseHelper.error(request, ApiErrorCode.BAD_REQUEST, msg, null);</span>
+<span class="nc" id="L192">        return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(body);</span>
+    }
+
+    @ExceptionHandler(MissingRequestHeaderException.class)
+    public ResponseEntity&lt;ApiErrorEnvelope&gt; handleMissingRequestHeader(
+            MissingRequestHeaderException ex, HttpServletRequest request) {
+<span class="fc" id="L198">        ApiErrorEnvelope body = ApiResponseHelper.error(request, ApiErrorCode.BAD_REQUEST,</span>
+<span class="fc" id="L199">                &quot;Missing required header: &quot; + ex.getHeaderName(), null);</span>
+<span class="fc" id="L200">        return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(body);</span>
+    }
+
+    @ExceptionHandler({HandlerMethodValidationException.class, ConstraintViolationException.class})
+    public ResponseEntity&lt;ApiErrorEnvelope&gt; handleMethodValidation(
+            Exception ex, HttpServletRequest request) {
+<span class="fc" id="L206">        ApiErrorEnvelope body = ApiResponseHelper.error(request, ApiErrorCode.VALIDATION_ERROR,</span>
+                &quot;Request parameter validation failed&quot;, null);
+<span class="fc" id="L208">        return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(body);</span>
+    }
+
+    @ExceptionHandler(IllegalArgumentException.class)
+    public ResponseEntity&lt;ApiErrorEnvelope&gt; handleIllegalArgumentException(
+            IllegalArgumentException ex, HttpServletRequest request) {
+<span class="fc" id="L214">        log.error(&quot;Invalid argument: {}&quot;, ex.getMessage());</span>
+<span class="fc" id="L215">        ApiErrorEnvelope body = ApiResponseHelper.error(request, ApiErrorCode.BAD_REQUEST, ex.getMessage(), null);</span>
+<span class="fc" id="L216">        return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(body);</span>
+    }
+
+    @ExceptionHandler(InvalidControlTokenException.class)
+    public ResponseEntity&lt;ApiErrorEnvelope&gt; handleInvalidControlToken(
+            InvalidControlTokenException ex, HttpServletRequest request) {
+<span class="fc" id="L222">        log.debug(&quot;Invalid control token: {}&quot;, ex.getMessage());</span>
+<span class="fc" id="L223">        ApiErrorEnvelope body = ApiResponseHelper.error(request, ApiErrorCode.INVALID_TOKEN,</span>
+                &quot;Invalid or expired control token.&quot;, null);
+<span class="fc" id="L225">        return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(body);</span>
+    }
+
+    @ExceptionHandler(PinChangeNotAllowedException.class)
+    public ResponseEntity&lt;ApiErrorEnvelope&gt; handlePinChangeNotAllowed(
+            PinChangeNotAllowedException ex, HttpServletRequest request) {
+<span class="fc" id="L231">        log.debug(&quot;PIN change not allowed: {}&quot;, ex.getMessage());</span>
+<span class="fc" id="L232">        ApiErrorEnvelope body = ApiResponseHelper.error(request, ApiErrorCode.PIN_CHANGE_NOT_ALLOWED,</span>
+                &quot;PIN change not allowed.&quot;, null);
+<span class="fc" id="L234">        return ResponseEntity.status(HttpStatus.UNPROCESSABLE_ENTITY).body(body);</span>
+    }
+
+    @ExceptionHandler(InvalidCurrentPinException.class)
+    public ResponseEntity&lt;ApiErrorEnvelope&gt; handleInvalidCurrentPin(
+            InvalidCurrentPinException ex, HttpServletRequest request) {
+<span class="fc" id="L240">        log.warn(&quot;Current PIN verification failed&quot;);</span>
+<span class="fc" id="L241">        ApiErrorEnvelope body = ApiResponseHelper.error(request, ApiErrorCode.INVALID_CURRENT_PIN,</span>
+                &quot;Current PIN could not be verified.&quot;, null);
+<span class="fc" id="L243">        return ResponseEntity.status(HttpStatus.UNPROCESSABLE_ENTITY).body(body);</span>
+    }
+
+    @ExceptionHandler(InstitutionAccessDeniedException.class)
+    public ResponseEntity&lt;ApiErrorEnvelope&gt; handleInstitutionAccessDenied(
+            InstitutionAccessDeniedException ex, HttpServletRequest request) {
+<span class="fc" id="L249">        log.warn(&quot;Institution access denied: {}&quot;, ex.getLogDetail());</span>
+<span class="fc" id="L250">        ApiErrorEnvelope body = ApiResponseHelper.error(request, ApiErrorCode.ACCESS_DENIED, ex.getMessage(), null);</span>
+<span class="fc" id="L251">        return ResponseEntity.status(HttpStatus.FORBIDDEN).body(body);</span>
+    }
+
+    @ExceptionHandler(IllegalStateException.class)
+    public ResponseEntity&lt;ApiErrorEnvelope&gt; handleIllegalStateException(
+            IllegalStateException ex, HttpServletRequest request) {
+<span class="fc" id="L257">        log.error(&quot;Illegal state: {}&quot;, ex.getMessage());</span>
+<span class="fc" id="L258">        ApiErrorEnvelope body = ApiResponseHelper.error(request, ApiErrorCode.BAD_REQUEST, ex.getMessage(), null);</span>
+<span class="fc" id="L259">        return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(body);</span>
+    }
+
+    @ExceptionHandler(org.springframework.web.HttpMediaTypeNotSupportedException.class)
+    public ResponseEntity&lt;ApiErrorEnvelope&gt; handleUnsupportedMediaType(
+            org.springframework.web.HttpMediaTypeNotSupportedException ex, HttpServletRequest request) {
+<span class="fc" id="L265">        ApiErrorEnvelope body = ApiResponseHelper.error(request, ApiErrorCode.UNSUPPORTED_MEDIA_TYPE,</span>
+                &quot;Unsupported content type&quot;, null);
+<span class="fc" id="L267">        return ResponseEntity.status(HttpStatus.UNSUPPORTED_MEDIA_TYPE).body(body);</span>
+    }
+
+    @ExceptionHandler(Exception.class)
+    public ResponseEntity&lt;ApiErrorEnvelope&gt; handleGenericException(Exception ex, HttpServletRequest request) {
+<span class="fc" id="L272">        log.error(&quot;Unexpected error occurred: &quot;, ex);</span>
+<span class="fc" id="L273">        ApiErrorEnvelope body = ApiResponseHelper.error(request, ApiErrorCode.INTERNAL_ERROR,</span>
+                &quot;An unexpected error occurred. Please try again later.&quot;, null);
+<span class="fc" id="L275">        return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(body);</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.15.202606040825</span></div></body></html>

@@ -1,0 +1,127 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>ProductPinPolicyV2Service.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">CMS Core Service</a> &gt; <a href="index.source.html" class="el_package">com.xenomi.cms.core.v2.product.service</a> &gt; <span class="el_source">ProductPinPolicyV2Service.java</span></div><h1>ProductPinPolicyV2Service.java</h1><pre class="source lang-java linenums">package com.xenomi.cms.core.v2.product.service;
+
+import java.util.UUID;
+
+import com.xenomi.cms.core.exception.ResourceNotFoundException;
+import com.xenomi.cms.core.v2.product.dto.ProductPinPolicyV2Response;
+import com.xenomi.cms.core.v2.product.dto.UpsertProductPinPolicyV2Request;
+import com.xenomi.cms.core.v2.product.entity.ProductPinPolicyV2;
+import com.xenomi.cms.core.v2.product.entity.ProductVersionV2;
+import com.xenomi.cms.core.v2.product.model.PinDeliveryMethod;
+import com.xenomi.cms.core.v2.product.model.PinGenerationMethod;
+import com.xenomi.cms.core.v2.product.model.ProductPolicyStatus;
+import com.xenomi.cms.core.v2.product.model.ProductVersionStatus;
+import com.xenomi.cms.core.v2.product.repository.ProductPinPolicyV2Repository;
+import com.xenomi.cms.core.v2.product.repository.ProductVersionV2Repository;
+import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
+
+@Service
+public class ProductPinPolicyV2Service {
+    private final ProductPinPolicyV2Repository repository;
+    private final ProductVersionV2Repository versionRepository;
+
+    public ProductPinPolicyV2Service(
+            ProductPinPolicyV2Repository repository,
+<span class="fc" id="L26">            ProductVersionV2Repository versionRepository) {</span>
+<span class="fc" id="L27">        this.repository = repository;</span>
+<span class="fc" id="L28">        this.versionRepository = versionRepository;</span>
+<span class="fc" id="L29">    }</span>
+
+    @Transactional(readOnly = true)
+    public ProductPinPolicyV2Response get(UUID institutionId, UUID productId, UUID versionId) {
+<span class="nc" id="L33">        requireVersion(institutionId, productId, versionId);</span>
+<span class="nc" id="L34">        return repository.findByProductVersionIdAndInstitutionId(versionId, institutionId)</span>
+<span class="nc" id="L35">                .map(this::toResponse)</span>
+<span class="nc" id="L36">                .orElseThrow(() -&gt; new ResourceNotFoundException(&quot;Product PIN policy&quot;, versionId.toString()));</span>
+    }
+
+    @Transactional
+    public ProductPinPolicyV2Response put(UUID institutionId, UUID productId, UUID versionId,
+            UpsertProductPinPolicyV2Request request) {
+<span class="fc" id="L42">        requireDraftVersion(institutionId, productId, versionId);</span>
+<span class="fc" id="L43">        validateConsistency(request);</span>
+<span class="fc" id="L44">        ProductPinPolicyV2 entity = repository</span>
+<span class="fc" id="L45">                .findByProductVersionIdAndInstitutionId(versionId, institutionId)</span>
+<span class="fc" id="L46">                .orElseGet(() -&gt; ProductPinPolicyV2.builder()</span>
+<span class="fc" id="L47">                        .productVersionId(versionId)</span>
+<span class="fc" id="L48">                        .institutionId(institutionId)</span>
+<span class="fc" id="L49">                        .build());</span>
+<span class="fc" id="L50">        entity.setPinRequired(request.pinRequired());</span>
+<span class="fc" id="L51">        entity.setPinLength(request.pinLength());</span>
+<span class="fc" id="L52">        entity.setGenerationMethod(request.generationMethod());</span>
+<span class="fc" id="L53">        entity.setDeliveryMethod(request.deliveryMethod());</span>
+<span class="fc" id="L54">        entity.setCustomerPinSelectionAllowed(request.customerPinSelectionAllowed());</span>
+<span class="fc" id="L55">        entity.setPinChangeAllowed(request.pinChangeAllowed());</span>
+<span class="fc" id="L56">        entity.setPinResetAllowed(request.pinResetAllowed());</span>
+<span class="fc" id="L57">        entity.setMaximumAttempts(request.maximumAttempts());</span>
+<span class="fc" id="L58">        entity.setGreenPinEnabled(request.greenPinEnabled());</span>
+<span class="fc" id="L59">        entity.setPinMailerEnabled(request.pinMailerEnabled());</span>
+<span class="fc" id="L60">        entity.setAtmPinChangeEnabled(request.atmPinChangeEnabled());</span>
+<span class="fc" id="L61">        entity.setRandomPinGenerationEnabled(request.randomPinGenerationEnabled());</span>
+<span class="fc" id="L62">        entity.setOfflinePinSupported(request.offlinePinSupported());</span>
+<span class="fc" id="L63">        entity.setOnlinePinSupported(request.onlinePinSupported());</span>
+<span class="fc" id="L64">        entity.setUnblockMethod(request.unblockMethod());</span>
+<span class="fc" id="L65">        entity.setHsmPinProfileReference(normalize(request.hsmPinProfileReference()));</span>
+<span class="fc" id="L66">        entity.setPolicyStatus(ProductPolicyStatus.DRAFT);</span>
+<span class="fc" id="L67">        return toResponse(repository.save(entity));</span>
+    }
+
+    private ProductVersionV2 requireVersion(UUID institutionId, UUID productId, UUID versionId) {
+<span class="fc" id="L71">        return versionRepository.findByProductVersionIdAndInstitutionIdAndProductId(</span>
+                        versionId, institutionId, productId)
+<span class="pc" id="L73">                .orElseThrow(() -&gt; new ResourceNotFoundException(&quot;Product version&quot;, versionId.toString()));</span>
+    }
+
+    private void requireDraftVersion(UUID institutionId, UUID productId, UUID versionId) {
+<span class="fc bfc" id="L77" title="All 2 branches covered.">        if (requireVersion(institutionId, productId, versionId).getVersionStatus() != ProductVersionStatus.DRAFT) {</span>
+<span class="fc" id="L78">            throw new IllegalArgumentException(&quot;Product PIN policy can be changed only while the version is DRAFT&quot;);</span>
+        }
+<span class="fc" id="L80">    }</span>
+
+    private static void validateConsistency(UpsertProductPinPolicyV2Request request) {
+<span class="pc bpc" id="L83" title="1 of 2 branches missed.">        if (!request.pinRequired()) return;</span>
+<span class="pc bpc" id="L84" title="1 of 4 branches missed.">        if (!request.onlinePinSupported() &amp;&amp; !request.offlinePinSupported()) {</span>
+<span class="fc" id="L85">            throw new IllegalArgumentException(</span>
+                    &quot;At least one of onlinePinSupported or offlinePinSupported must be enabled when PIN is required&quot;);
+        }
+<span class="pc bpc" id="L88" title="1 of 2 branches missed.">        if (request.generationMethod() == PinGenerationMethod.CUSTOMER_SELECTED</span>
+<span class="nc bnc" id="L89" title="All 2 branches missed.">                &amp;&amp; !request.customerPinSelectionAllowed()) {</span>
+<span class="nc" id="L90">            throw new IllegalArgumentException(</span>
+                    &quot;customerPinSelectionAllowed must be enabled for CUSTOMER_SELECTED generation&quot;);
+        }
+<span class="pc bpc" id="L93" title="1 of 2 branches missed.">        if (request.generationMethod() != PinGenerationMethod.CUSTOMER_SELECTED</span>
+<span class="pc bpc" id="L94" title="1 of 2 branches missed.">                &amp;&amp; !request.randomPinGenerationEnabled()) {</span>
+<span class="nc" id="L95">            throw new IllegalArgumentException(</span>
+                    &quot;randomPinGenerationEnabled must be true for HSM-generated or temporary PINs&quot;);
+        }
+<span class="pc bpc" id="L98" title="1 of 4 branches missed.">        if (request.deliveryMethod() == PinDeliveryMethod.GREEN_PIN_OTP &amp;&amp; !request.greenPinEnabled()) {</span>
+<span class="fc" id="L99">            throw new IllegalArgumentException(&quot;greenPinEnabled must be true for GREEN_PIN_OTP delivery&quot;);</span>
+        }
+<span class="pc bpc" id="L101" title="3 of 4 branches missed.">        if (request.deliveryMethod() == PinDeliveryMethod.PIN_MAILER &amp;&amp; !request.pinMailerEnabled()) {</span>
+<span class="nc" id="L102">            throw new IllegalArgumentException(&quot;pinMailerEnabled must be true for PIN_MAILER delivery&quot;);</span>
+        }
+<span class="pc bpc" id="L104" title="2 of 4 branches missed.">        if (request.atmPinChangeEnabled() &amp;&amp; !request.pinChangeAllowed()) {</span>
+<span class="nc" id="L105">            throw new IllegalArgumentException(</span>
+                    &quot;pinChangeAllowed must be true when ATM PIN change is enabled&quot;);
+        }
+<span class="fc" id="L108">    }</span>
+
+    private static String normalize(String value) {
+<span class="pc bpc" id="L111" title="2 of 4 branches missed.">        if (value == null || value.isBlank()) return null;</span>
+<span class="fc" id="L112">        return value.trim();</span>
+    }
+
+    private ProductPinPolicyV2Response toResponse(ProductPinPolicyV2 entity) {
+<span class="fc" id="L116">        return new ProductPinPolicyV2Response(</span>
+<span class="fc" id="L117">                entity.getProductVersionId(), entity.getInstitutionId(), entity.isPinRequired(),</span>
+<span class="fc" id="L118">                entity.getPinLength(), entity.getGenerationMethod(), entity.getDeliveryMethod(),</span>
+<span class="fc" id="L119">                entity.isCustomerPinSelectionAllowed(), entity.isPinChangeAllowed(),</span>
+<span class="fc" id="L120">                entity.isPinResetAllowed(), entity.getMaximumAttempts(), entity.isGreenPinEnabled(),</span>
+<span class="fc" id="L121">                entity.isPinMailerEnabled(), entity.isAtmPinChangeEnabled(),</span>
+<span class="fc" id="L122">                entity.isRandomPinGenerationEnabled(), entity.isOfflinePinSupported(),</span>
+<span class="fc" id="L123">                entity.isOnlinePinSupported(), entity.getUnblockMethod(),</span>
+<span class="fc" id="L124">                entity.getHsmPinProfileReference(), entity.getPolicyStatus());</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.15.202606040825</span></div></body></html>

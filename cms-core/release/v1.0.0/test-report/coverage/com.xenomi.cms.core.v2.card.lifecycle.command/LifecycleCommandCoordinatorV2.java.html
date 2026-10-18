@@ -1,0 +1,170 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>LifecycleCommandCoordinatorV2.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">CMS Core Service</a> &gt; <a href="index.source.html" class="el_package">com.xenomi.cms.core.v2.card.lifecycle.command</a> &gt; <span class="el_source">LifecycleCommandCoordinatorV2.java</span></div><h1>LifecycleCommandCoordinatorV2.java</h1><pre class="source lang-java linenums">package com.xenomi.cms.core.v2.card.lifecycle.command;
+
+import com.fasterxml.jackson.databind.DeserializationFeature;
+import com.fasterxml.jackson.databind.ObjectMapper;
+import com.xenomi.cms.core.exception.ResourceNotFoundException;
+import com.xenomi.cms.core.v2.card.entity.CardV2;
+import com.xenomi.cms.core.v2.card.entity.PanAllocationV2;
+import com.xenomi.cms.core.v2.card.lifecycle.entity.CardLifecycleOperationV2;
+import com.xenomi.cms.core.v2.card.model.LifecycleOperationStatusV2;
+import jakarta.persistence.EntityManager;
+import jakarta.persistence.LockModeType;
+import jakarta.validation.ConstraintViolationException;
+import jakarta.validation.Validator;
+import org.springframework.stereotype.Service;
+import org.springframework.transaction.PlatformTransactionManager;
+import org.springframework.transaction.support.TransactionSynchronizationManager;
+import org.springframework.transaction.support.TransactionTemplate;
+import java.time.OffsetDateTime;
+import java.time.ZoneOffset;
+import java.util.*;
+
+import static com.xenomi.cms.core.v2.card.lifecycle.command.LifecycleCommandConflictV2.Code.*;
+
+@Service
+public class LifecycleCommandCoordinatorV2 {
+    private final EntityManager em;
+    private final ObjectMapper mapper;
+    private final Validator validator;
+    private final LifecycleCommandAuthorizerV2 authorizer;
+    private final Map&lt;String, LifecycleCommandHandlerV2&lt;?&gt;&gt; handlers;
+    private final TransactionTemplate transaction;
+
+    public LifecycleCommandCoordinatorV2(EntityManager em, ObjectMapper mapper, Validator validator,
+            LifecycleCommandAuthorizerV2 authorizer, PlatformTransactionManager transactionManager,
+<span class="fc" id="L35">            List&lt;LifecycleCommandHandlerV2&lt;?&gt;&gt; handlers) {</span>
+<span class="fc" id="L36">        this.em = em; this.mapper = mapper.copy().enable(DeserializationFeature.FAIL_ON_UNKNOWN_PROPERTIES);</span>
+<span class="fc" id="L37">        this.validator = validator; this.authorizer = authorizer;</span>
+<span class="fc" id="L38">        this.handlers = new HashMap&lt;&gt;();</span>
+<span class="fc bfc" id="L39" title="All 2 branches covered.">        for (var handler : handlers) {</span>
+<span class="fc bfc" id="L40" title="All 4 branches covered.">            if (!handler.kind().matches(&quot;[A-Z][A-Z0-9_]{1,59}&quot;) || handler.permission().isBlank()</span>
+<span class="fc bfc" id="L41" title="All 4 branches covered.">                    || handler.actors().isEmpty() || !handler.payloadType().isRecord()) {</span>
+<span class="fc" id="L42">                throw new IllegalArgumentException(&quot;Invalid lifecycle handler definition&quot;);</span>
+            }
+<span class="fc bfc" id="L44" title="All 2 branches covered.">            if (this.handlers.putIfAbsent(handler.kind(), handler) != null) throw new IllegalArgumentException(&quot;Duplicate lifecycle command kind&quot;);</span>
+<span class="fc" id="L45">        }</span>
+<span class="fc" id="L46">        transaction = new TransactionTemplate(transactionManager);</span>
+<span class="fc" id="L47">        transaction.setTimeout(30);</span>
+<span class="fc" id="L48">    }</span>
+
+    public LifecycleCommandReceiptV2 execute(String kind, LifecycleCommandRequestV2 request) {
+<span class="fc bfc" id="L51" title="All 6 branches covered.">        if (request == null || request.institutionId() == null || request.accountReferenceId() == null) {</span>
+<span class="fc" id="L52">            throw new IllegalArgumentException(&quot;Institution and canonical account are required&quot;);</span>
+        }
+<span class="fc bfc" id="L54" title="All 2 branches covered.">        if (TransactionSynchronizationManager.isActualTransactionActive()) {</span>
+<span class="fc" id="L55">            throw new IllegalStateException(&quot;Lifecycle commands must own their transaction; invoke outside an existing transaction&quot;);</span>
+        }
+<span class="fc" id="L57">        var handler = handlers.get(kind);</span>
+<span class="fc bfc" id="L58" title="All 2 branches covered.">        if (handler == null) throw new IllegalArgumentException(&quot;Unsupported lifecycle command&quot;);</span>
+<span class="fc" id="L59">        var actor = authorizer.require(request.institutionId(), handler);</span>
+<span class="fc" id="L60">        validateEnvelope(request, handler.versionRequirement());</span>
+<span class="fc" id="L61">        return executeTyped(handler, request, actor);</span>
+    }
+
+    private &lt;P&gt; LifecycleCommandReceiptV2 executeTyped(LifecycleCommandHandlerV2&lt;P&gt; handler,
+            LifecycleCommandRequestV2 request, LifecycleCommandAuthorizerV2.Actor actor) {
+        final P payload;
+<span class="fc" id="L67">        try { payload = mapper.treeToValue(request.payload(), handler.payloadType()); }</span>
+<span class="fc" id="L68">        catch (com.fasterxml.jackson.core.JsonProcessingException invalid) {</span>
+            // Do not echo raw request values (or Jackson source snippets) into logs/responses.
+<span class="fc" id="L70">            throw new IllegalArgumentException(&quot;Invalid lifecycle payload&quot;);</span>
+<span class="fc" id="L71">        }</span>
+<span class="fc" id="L72">        var violations = validator.validate(payload);</span>
+<span class="fc bfc" id="L73" title="All 2 branches covered.">        if (!violations.isEmpty()) throw new ConstraintViolationException(violations);</span>
+<span class="fc" id="L74">        String keyHash = LifecycleCommandFingerprintV2.hash(request.idempotencyKey());</span>
+<span class="fc" id="L75">        String fingerprint = LifecycleCommandFingerprintV2.request(mapper, handler.kind(), request, actor, payload);</span>
+<span class="fc" id="L76">        return transaction.execute(status -&gt; {</span>
+            // Explicit PostgreSQL transaction setting also works with plain JPA transaction managers.
+<span class="fc" id="L78">            em.createNativeQuery(&quot;set transaction isolation level read committed&quot;).executeUpdate();</span>
+            // Serializes equal idempotency keys even when no operation row exists yet.
+            // Hash collisions only serialize unrelated work; uniqueness is still enforced by the full DB key.
+<span class="fc" id="L81">            long lock = LifecycleCommandFingerprintV2.lockKey(request.institutionId() + &quot;:&quot; + handler.kind() + &quot;:&quot; + keyHash);</span>
+<span class="fc" id="L82">            em.createNativeQuery(&quot;select 1 from pg_advisory_xact_lock(:key)&quot;).setParameter(&quot;key&quot;, lock).getSingleResult();</span>
+<span class="fc" id="L83">            var existing = em.createQuery(&quot;select o from CardLifecycleOperationV2 o where o.institutionId = :tenant and o.operationKind = :kind and o.idempotencyKeyHash = :hash&quot;, CardLifecycleOperationV2.class)</span>
+<span class="fc" id="L84">                    .setParameter(&quot;tenant&quot;, request.institutionId()).setParameter(&quot;kind&quot;, handler.kind()).setParameter(&quot;hash&quot;, keyHash).getResultList();</span>
+<span class="fc bfc" id="L85" title="All 2 branches covered.">            if (!existing.isEmpty()) {</span>
+<span class="fc" id="L86">                var saved = existing.get(0);</span>
+<span class="fc bfc" id="L87" title="All 2 branches covered.">                if (!saved.getRequestFingerprint().equals(fingerprint)) {</span>
+<span class="fc" id="L88">                    throw new LifecycleCommandConflictV2(IDEMPOTENCY_CONFLICT, &quot;Idempotency key was already used for another logical command&quot;);</span>
+                }
+<span class="fc" id="L90">                return receipt(saved, true); // Includes PENDING/UNKNOWN; never dispatches external work on replay.</span>
+            }
+<span class="fc" id="L92">            var accounts = em.createQuery(&quot;select a from ExternalAccountReferenceV2 a where a.institutionId = :tenant and a.externalAccountReferenceId = :account&quot;)</span>
+<span class="fc" id="L93">                    .setParameter(&quot;tenant&quot;, request.institutionId()).setParameter(&quot;account&quot;, request.accountReferenceId())</span>
+<span class="fc" id="L94">                    .setLockMode(LockModeType.PESSIMISTIC_WRITE).getResultList();</span>
+<span class="pc bpc" id="L95" title="1 of 2 branches missed.">            if (accounts.isEmpty()) throw new ResourceNotFoundException(&quot;Account&quot;, request.accountReferenceId().toString());</span>
+<span class="nc" id="L96">            var plan = Objects.requireNonNull(handler.plan(request, payload));</span>
+<span class="nc" id="L97">            var families = new LinkedHashMap&lt;UUID, PanAllocationV2&gt;();</span>
+<span class="nc bnc" id="L98" title="All 2 branches missed.">            for (UUID id : sorted(plan.familyIds())) {</span>
+<span class="nc" id="L99">                var rows = em.createQuery(&quot;select f from PanAllocationV2 f where f.institutionId = :tenant and f.panAllocationId = :id and f.accountReferenceId = :account&quot;, PanAllocationV2.class)</span>
+<span class="nc" id="L100">                        .setParameter(&quot;tenant&quot;, request.institutionId()).setParameter(&quot;id&quot;, id).setParameter(&quot;account&quot;, request.accountReferenceId())</span>
+<span class="nc" id="L101">                        .setLockMode(LockModeType.PESSIMISTIC_WRITE).getResultList();</span>
+<span class="nc bnc" id="L102" title="All 2 branches missed.">                if (rows.isEmpty()) throw new ResourceNotFoundException(&quot;PAN family&quot;, id.toString());</span>
+<span class="nc" id="L103">                em.refresh(rows.get(0)); families.put(id, rows.get(0));</span>
+<span class="nc" id="L104">            }</span>
+<span class="nc" id="L105">            var cards = new LinkedHashMap&lt;UUID, CardV2&gt;();</span>
+<span class="nc bnc" id="L106" title="All 2 branches missed.">            for (UUID id : sorted(plan.cardIds())) {</span>
+<span class="nc" id="L107">                var rows = em.createQuery(&quot;select c from CardV2 c where c.institutionId = :tenant and c.cardId = :id&quot;, CardV2.class)</span>
+<span class="nc" id="L108">                        .setParameter(&quot;tenant&quot;, request.institutionId()).setParameter(&quot;id&quot;, id)</span>
+<span class="nc" id="L109">                        .setLockMode(LockModeType.PESSIMISTIC_WRITE).getResultList();</span>
+<span class="nc bnc" id="L110" title="All 2 branches missed.">                if (rows.isEmpty()) throw new ResourceNotFoundException(&quot;Card&quot;, id.toString());</span>
+<span class="nc" id="L111">                CardV2 card = rows.get(0); em.refresh(card);</span>
+<span class="nc bnc" id="L112" title="All 2 branches missed.">                if (!families.containsKey(card.getPanAllocationId())) throw new IllegalArgumentException(&quot;Card family is missing from command lock plan&quot;);</span>
+<span class="nc" id="L113">                cards.put(id, card);</span>
+<span class="nc" id="L114">            }</span>
+<span class="nc" id="L115">            checkVersions(handler.versionRequirement(), request, families, cards);</span>
+<span class="nc" id="L116">            var operation = CardLifecycleOperationV2.builder()</span>
+<span class="nc" id="L117">                    .operationId((UUID) em.createNativeQuery(&quot;select uuidv7()&quot;, UUID.class).getSingleResult())</span>
+<span class="nc" id="L118">                    .institutionId(request.institutionId()).operationKind(handler.kind()).idempotencyKeyHash(keyHash)</span>
+<span class="nc" id="L119">                    .requestFingerprint(fingerprint).targetCardId(request.targetCardId()).expectedVersion(request.expectedVersion())</span>
+<span class="nc" id="L120">                    .actorReference(actor.reference()).actorType(actor.type()).build();</span>
+<span class="nc" id="L121">            em.persist(operation);</span>
+<span class="nc" id="L122">            var context = new LifecycleCommandContextV2(em, mapper, request, operation, actor, families, cards);</span>
+<span class="nc" id="L123">            handler.apply(context, payload);</span>
+<span class="nc" id="L124">            operation.setResultPayload(context.result()); operation.setOperationStatus(context.status());</span>
+<span class="nc bnc" id="L125" title="All 2 branches missed.">            if (operation.getOperationStatus() == LifecycleOperationStatusV2.CONFIRMED) operation.setCompletedAt(OffsetDateTime.now(ZoneOffset.UTC));</span>
+<span class="nc" id="L126">            em.flush();</span>
+<span class="nc" id="L127">            return receipt(operation, false);</span>
+        });
+    }
+
+    private LifecycleCommandReceiptV2 receipt(CardLifecycleOperationV2 operation, boolean replay) {
+<span class="fc" id="L132">        return new LifecycleCommandReceiptV2(operation.getOperationId(), operation.getOperationStatus(), replay,</span>
+<span class="fc" id="L133">                mapper.valueToTree(operation.getResultPayload()));</span>
+    }
+
+    private static List&lt;UUID&gt; sorted(Set&lt;UUID&gt; ids) {
+        // Lexical UUID order matches PostgreSQL's unsigned byte ordering for all writers.
+<span class="nc" id="L138">        return ids.stream().sorted(Comparator.comparing(UUID::toString)).toList();</span>
+    }
+
+    private static void validateEnvelope(LifecycleCommandRequestV2 r, LifecycleCommandHandlerV2.VersionRequirement version) {
+<span class="pc bpc" id="L142" title="1 of 6 branches missed.">        if (r.idempotencyKey() == null || r.idempotencyKey().isBlank() || r.idempotencyKey().length() &gt; 128</span>
+<span class="fc bfc" id="L143" title="All 4 branches covered.">                || r.payload() == null || !r.payload().isObject()) throw new IllegalArgumentException(&quot;Invalid lifecycle command envelope&quot;);</span>
+<span class="fc bfc" id="L144" title="All 6 branches covered.">        if (r.expectedVersion() != null &amp;&amp; (r.expectedVersion() &lt;= 0 || r.targetCardId() == null)) throw new IllegalArgumentException(&quot;Invalid expected card version&quot;);</span>
+<span class="pc bpc" id="L145" title="1 of 4 branches missed.">        if (r.expectedFamilyRevisions().values().stream().anyMatch(v -&gt; v &lt;= 0)) throw new IllegalArgumentException(&quot;Invalid expected family revision&quot;);</span>
+<span class="pc bpc" id="L146" title="1 of 4 branches missed.">        switch (version) {</span>
+<span class="pc bpc" id="L147" title="3 of 4 branches missed.">            case CARD -&gt; { if (r.targetCardId() == null || r.expectedVersion() == null) throw new IllegalArgumentException(&quot;Target card and expected version are required&quot;); }</span>
+<span class="pc bpc" id="L148" title="1 of 2 branches missed.">            case FAMILY -&gt; { if (r.expectedFamilyRevisions().isEmpty()) throw new IllegalArgumentException(&quot;Expected family revisions are required&quot;); }</span>
+<span class="pc bpc" id="L149" title="1 of 4 branches missed.">            case CREATE -&gt; { if (r.targetCardId() != null || r.expectedVersion() != null) throw new IllegalArgumentException(&quot;Creation has no existing target card version&quot;); }</span>
+        }
+<span class="fc" id="L151">    }</span>
+
+    private static void checkVersions(LifecycleCommandHandlerV2.VersionRequirement requirement,
+            LifecycleCommandRequestV2 r, Map&lt;UUID, PanAllocationV2&gt; families, Map&lt;UUID, CardV2&gt; cards) {
+<span class="nc bnc" id="L155" title="All 2 branches missed.">        if (r.targetCardId() != null) {</span>
+<span class="nc" id="L156">            var target = cards.get(r.targetCardId());</span>
+<span class="nc bnc" id="L157" title="All 2 branches missed.">            if (target == null) throw new IllegalArgumentException(&quot;Target card is missing from command lock plan&quot;);</span>
+<span class="nc bnc" id="L158" title="All 4 branches missed.">            if (r.expectedVersion() != null &amp;&amp; !r.expectedVersion().equals(target.getLifecycleVersion())) {</span>
+<span class="nc" id="L159">                throw new LifecycleCommandConflictV2(VERSION_CONFLICT, &quot;Card version changed; reload before issuing a new command&quot;);</span>
+            }
+        }
+<span class="nc bnc" id="L162" title="All 2 branches missed.">        if (requirement == LifecycleCommandHandlerV2.VersionRequirement.FAMILY</span>
+<span class="nc bnc" id="L163" title="All 2 branches missed.">                &amp;&amp; !r.expectedFamilyRevisions().keySet().equals(families.keySet())) throw new IllegalArgumentException(&quot;Expected revisions must cover the entire family lock plan&quot;);</span>
+<span class="nc" id="L164">        r.expectedFamilyRevisions().forEach((id, revision) -&gt; {</span>
+<span class="nc bnc" id="L165" title="All 2 branches missed.">            if (!families.containsKey(id)) throw new IllegalArgumentException(&quot;Unexpected family version&quot;);</span>
+<span class="nc bnc" id="L166" title="All 2 branches missed.">            if (families.get(id).getFamilyRevision() != revision) throw new LifecycleCommandConflictV2(VERSION_CONFLICT, &quot;Family revision changed; reload before issuing a new command&quot;);</span>
+<span class="nc" id="L167">        });</span>
+<span class="nc" id="L168">    }</span>
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.15.202606040825</span></div></body></html>

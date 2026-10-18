@@ -1,0 +1,51 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>CardControlProfileV2.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">CMS Core Service</a> &gt; <a href="index.source.html" class="el_package">com.xenomi.cms.core.v2.cardcontrol.entity</a> &gt; <span class="el_source">CardControlProfileV2.java</span></div><h1>CardControlProfileV2.java</h1><pre class="source lang-java linenums">package com.xenomi.cms.core.v2.cardcontrol.entity;
+
+import java.time.OffsetDateTime;
+import java.util.UUID;
+
+import com.xenomi.cms.core.v2.cardcontrol.model.ControlProfileStatus;
+import jakarta.persistence.Column;
+import jakarta.persistence.Entity;
+import jakarta.persistence.EnumType;
+import jakarta.persistence.Enumerated;
+import jakarta.persistence.Id;
+import jakarta.persistence.PrePersist;
+import jakarta.persistence.PreUpdate;
+import jakarta.persistence.Table;
+import lombok.AllArgsConstructor;
+import lombok.Builder;
+import lombok.Data;
+import lombok.NoArgsConstructor;
+
+@Entity(name = &quot;CardControlProfileV2&quot;)
+@Table(name = &quot;card_control_profile&quot;, schema = &quot;cms_v2&quot;)
+@Data @Builder @NoArgsConstructor @AllArgsConstructor
+public class CardControlProfileV2 {
+    @Id @Column(name = &quot;card_control_profile_id&quot;, nullable = false, updatable = false)
+    private UUID cardControlProfileId;
+    @Column(name = &quot;institution_id&quot;, nullable = false, updatable = false)
+    private UUID institutionId;
+    @Column(name = &quot;card_id&quot;, nullable = false, updatable = false)
+    private UUID cardId;
+    @Column(name = &quot;control_version&quot;, nullable = false)
+    private int controlVersion;
+    @Column(name = &quot;international_enabled&quot;, nullable = false)
+    private boolean internationalEnabled;
+    @Enumerated(EnumType.STRING)
+    @Column(name = &quot;profile_status&quot;, nullable = false)
+    private ControlProfileStatus profileStatus;
+    @Column(name = &quot;updated_at&quot;, nullable = false)
+    private OffsetDateTime updatedAt;
+    @Column(name = &quot;updated_by&quot;, nullable = false)
+    private String updatedBy;
+
+    @lombok.Builder.Default
+    @Column(name = &quot;family_revision&quot;, nullable = false)
+    private long familyRevision = 1L;
+
+    @PrePersist @PreUpdate
+    void touch() {
+<span class="nc" id="L48">        updatedAt = OffsetDateTime.now(java.time.ZoneOffset.UTC);</span>
+<span class="nc" id="L49">    }</span>
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.15.202606040825</span></div></body></html>

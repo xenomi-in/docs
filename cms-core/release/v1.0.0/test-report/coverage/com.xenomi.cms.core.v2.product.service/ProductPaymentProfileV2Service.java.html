@@ -1,0 +1,335 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>ProductPaymentProfileV2Service.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">CMS Core Service</a> &gt; <a href="index.source.html" class="el_package">com.xenomi.cms.core.v2.product.service</a> &gt; <span class="el_source">ProductPaymentProfileV2Service.java</span></div><h1>ProductPaymentProfileV2Service.java</h1><pre class="source lang-java linenums">package com.xenomi.cms.core.v2.product.service;
+
+import java.time.OffsetDateTime;
+import java.util.HashSet;
+import java.util.List;
+import java.util.Set;
+import java.util.UUID;
+
+import com.xenomi.cms.core.exception.ResourceNotFoundException;
+import com.xenomi.cms.core.v2.common.DatabaseUuidV7Generator;
+import com.xenomi.cms.core.v2.product.dto.CreateProductCvmProfileV2Request;
+import com.xenomi.cms.core.v2.product.dto.CreateProductTechnologyProfileV2Request;
+import com.xenomi.cms.core.v2.product.dto.CvmRuleV2Request;
+import com.xenomi.cms.core.v2.product.dto.CvmRuleV2Response;
+import com.xenomi.cms.core.v2.product.dto.ProductCvmProfileV2Response;
+import com.xenomi.cms.core.v2.product.dto.ProductTechnologyProfileV2Response;
+import com.xenomi.cms.core.v2.product.dto.UpdateProductCvmProfileV2Request;
+import com.xenomi.cms.core.v2.product.dto.UpdateProductTechnologyProfileV2Request;
+import com.xenomi.cms.core.v2.product.entity.CvmRuleV2;
+import com.xenomi.cms.core.v2.product.entity.ProductCardFormPolicyV2;
+import com.xenomi.cms.core.v2.product.entity.ProductCardTechnologyProfileV2;
+import com.xenomi.cms.core.v2.product.entity.ProductCvmProfileV2;
+import com.xenomi.cms.core.v2.product.entity.ProductPersonalisationPolicyV2;
+import com.xenomi.cms.core.v2.product.entity.ProductPinPolicyV2;
+import com.xenomi.cms.core.v2.product.entity.ProductVersionV2;
+import com.xenomi.cms.core.v2.product.model.CardInterface;
+import com.xenomi.cms.core.v2.product.model.CardIssuanceMode;
+import com.xenomi.cms.core.v2.product.model.CvmMethod;
+import com.xenomi.cms.core.v2.product.model.ProductProfileStatus;
+import com.xenomi.cms.core.v2.product.model.ProductVersionStatus;
+import com.xenomi.cms.core.v2.product.repository.CvmRuleV2Repository;
+import com.xenomi.cms.core.v2.product.repository.ProductCardFormPolicyV2Repository;
+import com.xenomi.cms.core.v2.product.repository.ProductCardTechnologyProfileV2Repository;
+import com.xenomi.cms.core.v2.product.repository.ProductCvmProfileV2Repository;
+import com.xenomi.cms.core.v2.product.repository.ProductPersonalisationPolicyV2Repository;
+import com.xenomi.cms.core.v2.product.repository.ProductPinPolicyV2Repository;
+import com.xenomi.cms.core.v2.product.repository.ProductVersionV2Repository;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
+import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
+
+@Service
+public class ProductPaymentProfileV2Service {
+    private final ProductVersionV2Repository versionRepository;
+    private final ProductCardTechnologyProfileV2Repository technologyRepository;
+    private final ProductCvmProfileV2Repository cvmRepository;
+    private final CvmRuleV2Repository ruleRepository;
+    private final ProductCardFormPolicyV2Repository cardFormRepository;
+    private final ProductPersonalisationPolicyV2Repository personalisationRepository;
+    private final ProductPinPolicyV2Repository pinPolicyRepository;
+    private final DatabaseUuidV7Generator uuidGenerator;
+
+    public ProductPaymentProfileV2Service(ProductVersionV2Repository versionRepository,
+            ProductCardTechnologyProfileV2Repository technologyRepository,
+            ProductCvmProfileV2Repository cvmRepository, CvmRuleV2Repository ruleRepository,
+            ProductCardFormPolicyV2Repository cardFormRepository,
+            ProductPersonalisationPolicyV2Repository personalisationRepository,
+<span class="fc" id="L59">            ProductPinPolicyV2Repository pinPolicyRepository, DatabaseUuidV7Generator uuidGenerator) {</span>
+<span class="fc" id="L60">        this.versionRepository = versionRepository;</span>
+<span class="fc" id="L61">        this.technologyRepository = technologyRepository;</span>
+<span class="fc" id="L62">        this.cvmRepository = cvmRepository;</span>
+<span class="fc" id="L63">        this.ruleRepository = ruleRepository;</span>
+<span class="fc" id="L64">        this.cardFormRepository = cardFormRepository;</span>
+<span class="fc" id="L65">        this.personalisationRepository = personalisationRepository;</span>
+<span class="fc" id="L66">        this.pinPolicyRepository = pinPolicyRepository;</span>
+<span class="fc" id="L67">        this.uuidGenerator = uuidGenerator;</span>
+<span class="fc" id="L68">    }</span>
+
+    @Transactional
+    public ProductTechnologyProfileV2Response createTechnology(UUID institutionId, UUID productId,
+            UUID versionId, CreateProductTechnologyProfileV2Request request) {
+<span class="fc" id="L73">        requireDraftVersion(institutionId, productId, versionId);</span>
+<span class="fc" id="L74">        validateTechnology(institutionId, versionId, request.magneticStripeEnabled(),</span>
+<span class="fc" id="L75">                request.emvContactEnabled(), request.emvContactlessEnabled());</span>
+<span class="fc" id="L76">        validateDates(request.effectiveFrom(), request.effectiveTo());</span>
+<span class="fc" id="L77">        ProductCardTechnologyProfileV2 entity = ProductCardTechnologyProfileV2.builder()</span>
+<span class="fc" id="L78">                .technologyProfileId(uuidGenerator.generate()).institutionId(institutionId)</span>
+<span class="fc" id="L79">                .productVersionId(versionId).profileVersion(technologyRepository.findMaximumVersion(versionId) + 1)</span>
+<span class="fc" id="L80">                .magneticStripeEnabled(request.magneticStripeEnabled())</span>
+<span class="fc" id="L81">                .emvContactEnabled(request.emvContactEnabled())</span>
+<span class="fc" id="L82">                .emvContactlessEnabled(request.emvContactlessEnabled())</span>
+<span class="fc" id="L83">                .chipProfileReference(normalize(request.chipProfileReference()))</span>
+<span class="fc" id="L84">                .contactlessProfileReference(normalize(request.contactlessProfileReference()))</span>
+<span class="fc" id="L85">                .applicationProfileReference(normalize(request.applicationProfileReference()))</span>
+<span class="fc" id="L86">                .profileStatus(ProductProfileStatus.DRAFT)</span>
+<span class="fc" id="L87">                .effectiveFrom(request.effectiveFrom()).effectiveTo(request.effectiveTo()).build();</span>
+<span class="fc" id="L88">        return toTechnologyResponse(technologyRepository.save(entity));</span>
+    }
+
+    @Transactional(readOnly = true)
+    public Page&lt;ProductTechnologyProfileV2Response&gt; listTechnology(UUID institutionId, UUID productId,
+            UUID versionId, Pageable pageable) {
+<span class="nc" id="L94">        requireVersion(institutionId, productId, versionId);</span>
+<span class="nc" id="L95">        return technologyRepository.findByInstitutionIdAndProductVersionId(institutionId, versionId, pageable)</span>
+<span class="nc" id="L96">                .map(this::toTechnologyResponse);</span>
+    }
+
+    @Transactional(readOnly = true)
+    public ProductTechnologyProfileV2Response getTechnology(UUID institutionId, UUID productId,
+            UUID versionId, UUID profileId) {
+<span class="nc" id="L102">        requireVersion(institutionId, productId, versionId);</span>
+<span class="nc" id="L103">        return toTechnologyResponse(findTechnology(institutionId, versionId, profileId));</span>
+    }
+
+    @Transactional
+    public ProductTechnologyProfileV2Response updateTechnology(UUID institutionId, UUID productId,
+            UUID versionId, UUID profileId, UpdateProductTechnologyProfileV2Request request) {
+<span class="fc" id="L109">        requireDraftVersion(institutionId, productId, versionId);</span>
+<span class="fc" id="L110">        ProductCardTechnologyProfileV2 entity = findTechnology(institutionId, versionId, profileId);</span>
+<span class="pc bpc" id="L111" title="1 of 4 branches missed.">        boolean config = request.magneticStripeEnabled() != null || request.emvContactEnabled() != null</span>
+<span class="pc bpc" id="L112" title="2 of 4 branches missed.">                || request.emvContactlessEnabled() != null || request.chipProfileReference() != null</span>
+<span class="pc bpc" id="L113" title="2 of 4 branches missed.">                || request.contactlessProfileReference() != null || request.applicationProfileReference() != null</span>
+<span class="pc bpc" id="L114" title="2 of 4 branches missed.">                || request.effectiveFrom() != null || request.effectiveTo() != null;</span>
+<span class="pc bpc" id="L115" title="1 of 4 branches missed.">        if (config &amp;&amp; entity.getProfileStatus() != ProductProfileStatus.DRAFT) {</span>
+<span class="fc" id="L116">            throw new IllegalArgumentException(&quot;Technology profile configuration can be changed only while DRAFT&quot;);</span>
+        }
+<span class="pc bpc" id="L118" title="1 of 2 branches missed.">        if (request.magneticStripeEnabled() != null) entity.setMagneticStripeEnabled(request.magneticStripeEnabled());</span>
+<span class="pc bpc" id="L119" title="1 of 2 branches missed.">        if (request.emvContactEnabled() != null) entity.setEmvContactEnabled(request.emvContactEnabled());</span>
+<span class="pc bpc" id="L120" title="1 of 2 branches missed.">        if (request.emvContactlessEnabled() != null) entity.setEmvContactlessEnabled(request.emvContactlessEnabled());</span>
+<span class="pc bpc" id="L121" title="1 of 2 branches missed.">        if (request.chipProfileReference() != null) entity.setChipProfileReference(normalize(request.chipProfileReference()));</span>
+<span class="pc bpc" id="L122" title="1 of 2 branches missed.">        if (request.contactlessProfileReference() != null) entity.setContactlessProfileReference(normalize(request.contactlessProfileReference()));</span>
+<span class="pc bpc" id="L123" title="1 of 2 branches missed.">        if (request.applicationProfileReference() != null) entity.setApplicationProfileReference(normalize(request.applicationProfileReference()));</span>
+<span class="pc bpc" id="L124" title="1 of 2 branches missed.">        if (request.effectiveFrom() != null) entity.setEffectiveFrom(request.effectiveFrom());</span>
+<span class="pc bpc" id="L125" title="1 of 2 branches missed.">        if (request.effectiveTo() != null) entity.setEffectiveTo(request.effectiveTo());</span>
+<span class="pc bpc" id="L126" title="2 of 4 branches missed.">        if (request.profileStatus() != null &amp;&amp; request.profileStatus() != entity.getProfileStatus()) {</span>
+<span class="fc" id="L127">            validateProfileTransition(entity.getProfileStatus(), request.profileStatus());</span>
+<span class="pc bpc" id="L128" title="1 of 2 branches missed.">            if (request.profileStatus() == ProductProfileStatus.ACTIVE</span>
+<span class="pc bpc" id="L129" title="1 of 2 branches missed.">                    &amp;&amp; technologyRepository.existsByInstitutionIdAndProductVersionIdAndProfileStatus(</span>
+                            institutionId, versionId, ProductProfileStatus.ACTIVE)) {
+<span class="fc" id="L131">                throw new IllegalArgumentException(&quot;The product version already has an ACTIVE technology profile&quot;);</span>
+            }
+<span class="nc" id="L133">            entity.setProfileStatus(request.profileStatus());</span>
+        }
+<span class="nc" id="L135">        validateTechnology(institutionId, versionId, entity.isMagneticStripeEnabled(),</span>
+<span class="nc" id="L136">                entity.isEmvContactEnabled(), entity.isEmvContactlessEnabled());</span>
+<span class="nc" id="L137">        validateDates(entity.getEffectiveFrom(), entity.getEffectiveTo());</span>
+<span class="nc" id="L138">        return toTechnologyResponse(technologyRepository.save(entity));</span>
+    }
+
+    @Transactional
+    public ProductCvmProfileV2Response createCvm(UUID institutionId, UUID productId, UUID versionId,
+            CreateProductCvmProfileV2Request request) {
+<span class="fc" id="L144">        requireDraftVersion(institutionId, productId, versionId);</span>
+<span class="fc" id="L145">        validateDates(request.effectiveFrom(), request.effectiveTo());</span>
+<span class="fc" id="L146">        validateCvmHeader(request.contactlessCvmLimitMinor(), request.currencyCode());</span>
+<span class="fc" id="L147">        validateRules(institutionId, versionId, request.rules());</span>
+<span class="fc" id="L148">        UUID profileId = uuidGenerator.generate();</span>
+<span class="fc" id="L149">        ProductCvmProfileV2 profile = ProductCvmProfileV2.builder()</span>
+<span class="fc" id="L150">                .cvmProfileId(profileId).institutionId(institutionId).productVersionId(versionId)</span>
+<span class="fc" id="L151">                .profileVersion(cvmRepository.findMaximumVersion(versionId) + 1)</span>
+<span class="fc" id="L152">                .contactlessCvmLimitMinor(request.contactlessCvmLimitMinor())</span>
+<span class="fc" id="L153">                .currencyCode(normalizeCurrency(request.currencyCode()))</span>
+<span class="fc" id="L154">                .profileStatus(ProductProfileStatus.DRAFT)</span>
+<span class="fc" id="L155">                .effectiveFrom(request.effectiveFrom()).effectiveTo(request.effectiveTo()).build();</span>
+<span class="fc" id="L156">        cvmRepository.save(profile);</span>
+<span class="fc" id="L157">        saveRules(institutionId, profileId, request.rules());</span>
+<span class="fc" id="L158">        return toCvmResponse(profile);</span>
+    }
+
+    @Transactional(readOnly = true)
+    public Page&lt;ProductCvmProfileV2Response&gt; listCvm(UUID institutionId, UUID productId,
+            UUID versionId, Pageable pageable) {
+<span class="nc" id="L164">        requireVersion(institutionId, productId, versionId);</span>
+<span class="nc" id="L165">        return cvmRepository.findByInstitutionIdAndProductVersionId(institutionId, versionId, pageable)</span>
+<span class="nc" id="L166">                .map(this::toCvmResponse);</span>
+    }
+
+    @Transactional(readOnly = true)
+    public ProductCvmProfileV2Response getCvm(UUID institutionId, UUID productId,
+            UUID versionId, UUID profileId) {
+<span class="fc" id="L172">        requireVersion(institutionId, productId, versionId);</span>
+<span class="fc" id="L173">        return toCvmResponse(findCvm(institutionId, versionId, profileId));</span>
+    }
+
+    @Transactional
+    public ProductCvmProfileV2Response updateCvm(UUID institutionId, UUID productId, UUID versionId,
+            UUID profileId, UpdateProductCvmProfileV2Request request) {
+<span class="fc" id="L179">        requireDraftVersion(institutionId, productId, versionId);</span>
+<span class="fc" id="L180">        ProductCvmProfileV2 entity = findCvm(institutionId, versionId, profileId);</span>
+<span class="pc bpc" id="L181" title="2 of 4 branches missed.">        boolean config = request.contactlessCvmLimitMinor() != null || request.currencyCode() != null</span>
+<span class="pc bpc" id="L182" title="3 of 6 branches missed.">                || request.effectiveFrom() != null || request.effectiveTo() != null || request.rules() != null;</span>
+<span class="pc bpc" id="L183" title="2 of 4 branches missed.">        if (config &amp;&amp; entity.getProfileStatus() != ProductProfileStatus.DRAFT) {</span>
+<span class="nc" id="L184">            throw new IllegalArgumentException(&quot;CVM profile configuration can be changed only while DRAFT&quot;);</span>
+        }
+<span class="pc bpc" id="L186" title="1 of 2 branches missed.">        if (request.contactlessCvmLimitMinor() != null) entity.setContactlessCvmLimitMinor(request.contactlessCvmLimitMinor());</span>
+<span class="pc bpc" id="L187" title="1 of 2 branches missed.">        if (request.currencyCode() != null) entity.setCurrencyCode(normalizeCurrency(request.currencyCode()));</span>
+<span class="pc bpc" id="L188" title="1 of 2 branches missed.">        if (request.effectiveFrom() != null) entity.setEffectiveFrom(request.effectiveFrom());</span>
+<span class="pc bpc" id="L189" title="1 of 2 branches missed.">        if (request.effectiveTo() != null) entity.setEffectiveTo(request.effectiveTo());</span>
+<span class="pc bpc" id="L190" title="3 of 4 branches missed.">        if (request.profileStatus() != null &amp;&amp; request.profileStatus() != entity.getProfileStatus()) {</span>
+<span class="nc" id="L191">            validateProfileTransition(entity.getProfileStatus(), request.profileStatus());</span>
+<span class="nc bnc" id="L192" title="All 2 branches missed.">            if (request.profileStatus() == ProductProfileStatus.ACTIVE</span>
+<span class="nc bnc" id="L193" title="All 2 branches missed.">                    &amp;&amp; cvmRepository.existsByInstitutionIdAndProductVersionIdAndProfileStatus(</span>
+                            institutionId, versionId, ProductProfileStatus.ACTIVE)) {
+<span class="nc" id="L195">                throw new IllegalArgumentException(&quot;The product version already has an ACTIVE CVM profile&quot;);</span>
+            }
+<span class="nc" id="L197">            entity.setProfileStatus(request.profileStatus());</span>
+        }
+<span class="fc" id="L199">        validateCvmHeader(entity.getContactlessCvmLimitMinor(), entity.getCurrencyCode());</span>
+<span class="fc" id="L200">        validateDates(entity.getEffectiveFrom(), entity.getEffectiveTo());</span>
+<span class="pc bpc" id="L201" title="1 of 2 branches missed.">        if (request.rules() != null) {</span>
+<span class="pc bpc" id="L202" title="1 of 2 branches missed.">            if (request.rules().isEmpty()) throw new IllegalArgumentException(&quot;CVM profile must contain at least one rule&quot;);</span>
+<span class="fc" id="L203">            validateRules(institutionId, versionId, request.rules());</span>
+<span class="fc" id="L204">            ruleRepository.deleteByInstitutionIdAndCvmProfileId(institutionId, profileId);</span>
+<span class="fc" id="L205">            saveRules(institutionId, profileId, request.rules());</span>
+        }
+<span class="fc" id="L207">        return toCvmResponse(cvmRepository.save(entity));</span>
+    }
+
+    private void validateTechnology(UUID institutionId, UUID versionId, boolean magnetic,
+            boolean contact, boolean contactless) {
+<span class="pc bpc" id="L212" title="2 of 6 branches missed.">        if (!magnetic &amp;&amp; !contact &amp;&amp; !contactless) {</span>
+<span class="nc" id="L213">            throw new IllegalArgumentException(&quot;At least one physical card technology must be enabled&quot;);</span>
+        }
+<span class="fc" id="L215">        ProductCardFormPolicyV2 form = cardFormRepository</span>
+<span class="fc" id="L216">                .findByProductVersionIdAndInstitutionId(versionId, institutionId)</span>
+<span class="pc" id="L217">                .orElseThrow(() -&gt; new IllegalArgumentException(&quot;Configure card-form policy before technology profile&quot;));</span>
+<span class="fc bfc" id="L218" title="All 2 branches covered.">        if (form.getIssuanceMode() == CardIssuanceMode.VIRTUAL_ONLY) {</span>
+<span class="fc" id="L219">            throw new IllegalArgumentException(&quot;VIRTUAL_ONLY products cannot have a physical technology profile&quot;);</span>
+        }
+<span class="fc" id="L221">        ProductPersonalisationPolicyV2 p = personalisationRepository</span>
+<span class="fc" id="L222">                .findByProductVersionIdAndInstitutionId(versionId, institutionId)</span>
+<span class="pc" id="L223">                .orElseThrow(() -&gt; new IllegalArgumentException(&quot;Configure personalisation policy before technology profile&quot;));</span>
+<span class="pc bpc" id="L224" title="1 of 2 branches missed.">        if (magnetic != p.isEncodeMagneticStripe()) {</span>
+<span class="nc" id="L225">            throw new IllegalArgumentException(&quot;Magnetic-stripe technology must match personalisation encoding&quot;);</span>
+        }
+<span class="pc bpc" id="L227" title="3 of 4 branches missed.">        boolean chipEnabled = contact || contactless;</span>
+<span class="pc bpc" id="L228" title="1 of 2 branches missed.">        if (chipEnabled != p.isPersonaliseEmvChip()) {</span>
+<span class="nc" id="L229">            throw new IllegalArgumentException(&quot;EMV technology must match chip personalisation&quot;);</span>
+        }
+<span class="fc" id="L231">    }</span>
+
+    private void validateRules(UUID institutionId, UUID versionId, List&lt;CvmRuleV2Request&gt; rules) {
+<span class="fc" id="L234">        Set&lt;Integer&gt; sequences = new HashSet&lt;&gt;();</span>
+<span class="fc" id="L235">        ProductCardTechnologyProfileV2 tech = technologyRepository</span>
+<span class="fc" id="L236">                .findTopByInstitutionIdAndProductVersionIdOrderByProfileVersionDesc(institutionId, versionId)</span>
+<span class="fc" id="L237">                .orElse(null);</span>
+<span class="fc" id="L238">        ProductPinPolicyV2 pin = pinPolicyRepository</span>
+<span class="fc" id="L239">                .findByProductVersionIdAndInstitutionId(versionId, institutionId).orElse(null);</span>
+<span class="fc bfc" id="L240" title="All 2 branches covered.">        for (CvmRuleV2Request rule : rules) {</span>
+<span class="fc bfc" id="L241" title="All 2 branches covered.">            if (!sequences.add(rule.ruleSequence())) {</span>
+<span class="fc" id="L242">                throw new IllegalArgumentException(&quot;CVM ruleSequence values must be unique&quot;);</span>
+            }
+<span class="pc bpc" id="L244" title="1 of 4 branches missed.">            if (rule.minimumAmountMinor() != null &amp;&amp; rule.maximumAmountMinor() != null</span>
+<span class="fc bfc" id="L245" title="All 2 branches covered.">                    &amp;&amp; rule.maximumAmountMinor() &lt; rule.minimumAmountMinor()) {</span>
+<span class="fc" id="L246">                throw new IllegalArgumentException(&quot;CVM maximumAmountMinor must be greater than or equal to minimumAmountMinor&quot;);</span>
+            }
+<span class="fc bfc" id="L248" title="All 4 branches covered.">            if (rule.cardInterface() != CardInterface.ECOMMERCE &amp;&amp; tech == null) {</span>
+<span class="fc" id="L249">                throw new IllegalArgumentException(&quot;A technology profile is required for physical CVM interfaces&quot;);</span>
+            }
+<span class="fc bfc" id="L251" title="All 2 branches covered.">            if (tech != null) validateInterface(rule.cardInterface(), tech);</span>
+<span class="pc bpc" id="L252" title="2 of 6 branches missed.">            if (rule.cvmMethod() == CvmMethod.ONLINE_PIN &amp;&amp; (pin == null || !pin.isOnlinePinSupported())) {</span>
+<span class="fc" id="L253">                throw new IllegalArgumentException(&quot;ONLINE_PIN CVM requires onlinePinSupported in PIN policy&quot;);</span>
+            }
+<span class="pc bpc" id="L255" title="2 of 6 branches missed.">            if (rule.cvmMethod() == CvmMethod.OFFLINE_PIN &amp;&amp; (pin == null || !pin.isOfflinePinSupported())) {</span>
+<span class="fc" id="L256">                throw new IllegalArgumentException(&quot;OFFLINE_PIN CVM requires offlinePinSupported in PIN policy&quot;);</span>
+            }
+<span class="pc bpc" id="L258" title="1 of 4 branches missed.">            if (rule.cvmMethod() == CvmMethod.CDCVM &amp;&amp; rule.cardInterface() != CardInterface.CONTACTLESS) {</span>
+<span class="fc" id="L259">                throw new IllegalArgumentException(&quot;CDCVM is supported only for CONTACTLESS rules&quot;);</span>
+            }
+<span class="fc" id="L261">        }</span>
+<span class="fc" id="L262">    }</span>
+
+    private static void validateInterface(CardInterface cardInterface, ProductCardTechnologyProfileV2 tech) {
+<span class="pc bpc" id="L265" title="2 of 4 branches missed.">        if (cardInterface == CardInterface.CONTACT &amp;&amp; !tech.isEmvContactEnabled())</span>
+<span class="nc" id="L266">            throw new IllegalArgumentException(&quot;CONTACT CVM requires EMV contact technology&quot;);</span>
+<span class="pc bpc" id="L267" title="3 of 4 branches missed.">        if (cardInterface == CardInterface.CONTACTLESS &amp;&amp; !tech.isEmvContactlessEnabled())</span>
+<span class="nc" id="L268">            throw new IllegalArgumentException(&quot;CONTACTLESS CVM requires EMV contactless technology&quot;);</span>
+<span class="pc bpc" id="L269" title="3 of 4 branches missed.">        if (cardInterface == CardInterface.MAGSTRIPE &amp;&amp; !tech.isMagneticStripeEnabled())</span>
+<span class="nc" id="L270">            throw new IllegalArgumentException(&quot;MAGSTRIPE CVM requires magnetic-stripe technology&quot;);</span>
+<span class="fc" id="L271">    }</span>
+
+    private void saveRules(UUID institutionId, UUID profileId, List&lt;CvmRuleV2Request&gt; requests) {
+<span class="fc" id="L274">        List&lt;CvmRuleV2&gt; rules = requests.stream().map(r -&gt; CvmRuleV2.builder()</span>
+<span class="fc" id="L275">                .cvmRuleId(uuidGenerator.generate()).institutionId(institutionId).cvmProfileId(profileId)</span>
+<span class="fc" id="L276">                .ruleSequence(r.ruleSequence()).cardInterface(r.cardInterface()).cvmMethod(r.cvmMethod())</span>
+<span class="fc" id="L277">                .cvmCondition(r.cvmCondition()).continueOnFailure(r.continueOnFailure())</span>
+<span class="fc" id="L278">                .transactionType(normalize(r.transactionType())).minimumAmountMinor(r.minimumAmountMinor())</span>
+<span class="fc" id="L279">                .maximumAmountMinor(r.maximumAmountMinor()).currencyCode(normalizeCurrency(r.currencyCode()))</span>
+<span class="fc" id="L280">                .build()).toList();</span>
+<span class="fc" id="L281">        ruleRepository.saveAll(rules);</span>
+<span class="fc" id="L282">    }</span>
+
+    private ProductVersionV2 requireVersion(UUID institutionId, UUID productId, UUID versionId) {
+<span class="fc" id="L285">        return versionRepository.findByProductVersionIdAndInstitutionIdAndProductId(versionId, institutionId, productId)</span>
+<span class="fc" id="L286">                .orElseThrow(() -&gt; new ResourceNotFoundException(&quot;Product version&quot;, versionId.toString()));</span>
+    }
+    private void requireDraftVersion(UUID institutionId, UUID productId, UUID versionId) {
+<span class="fc bfc" id="L289" title="All 2 branches covered.">        if (requireVersion(institutionId, productId, versionId).getVersionStatus() != ProductVersionStatus.DRAFT)</span>
+<span class="fc" id="L290">            throw new IllegalArgumentException(&quot;Payment profiles can be changed only while the version is DRAFT&quot;);</span>
+<span class="fc" id="L291">    }</span>
+    private ProductCardTechnologyProfileV2 findTechnology(UUID institutionId, UUID versionId, UUID profileId) {
+<span class="fc" id="L293">        return technologyRepository.findByTechnologyProfileIdAndInstitutionIdAndProductVersionId(profileId, institutionId, versionId)</span>
+<span class="pc" id="L294">                .orElseThrow(() -&gt; new ResourceNotFoundException(&quot;Technology profile&quot;, profileId.toString()));</span>
+    }
+    private ProductCvmProfileV2 findCvm(UUID institutionId, UUID versionId, UUID profileId) {
+<span class="fc" id="L297">        return cvmRepository.findByCvmProfileIdAndInstitutionIdAndProductVersionId(profileId, institutionId, versionId)</span>
+<span class="pc" id="L298">                .orElseThrow(() -&gt; new ResourceNotFoundException(&quot;CVM profile&quot;, profileId.toString()));</span>
+    }
+    private static void validateDates(OffsetDateTime from, OffsetDateTime to) {
+<span class="pc bpc" id="L301" title="1 of 4 branches missed.">        if (to != null &amp;&amp; !to.isAfter(from)) throw new IllegalArgumentException(&quot;effectiveTo must be after effectiveFrom&quot;);</span>
+<span class="fc" id="L302">    }</span>
+    private static void validateCvmHeader(Long limit, String currency) {
+<span class="pc bpc" id="L304" title="1 of 8 branches missed.">        if ((limit == null) != (currency == null || currency.isBlank())) {</span>
+<span class="fc" id="L305">            throw new IllegalArgumentException(&quot;contactlessCvmLimitMinor and currencyCode must be provided together&quot;);</span>
+        }
+<span class="fc" id="L307">    }</span>
+    private static void validateProfileTransition(ProductProfileStatus current, ProductProfileStatus target) {
+<span class="pc bpc" id="L309" title="1 of 2 branches missed.">        boolean allowed = current == ProductProfileStatus.DRAFT</span>
+<span class="pc bpc" id="L310" title="3 of 4 branches missed.">                ? target == ProductProfileStatus.ACTIVE || target == ProductProfileStatus.RETIRED</span>
+<span class="pc bnc" id="L311" title="All 4 branches missed.">                : current == ProductProfileStatus.ACTIVE &amp;&amp; target == ProductProfileStatus.RETIRED;</span>
+<span class="pc bpc" id="L312" title="1 of 2 branches missed.">        if (!allowed) throw new IllegalArgumentException(&quot;Invalid profile status transition: &quot; + current + &quot; -&gt; &quot; + target);</span>
+<span class="fc" id="L313">    }</span>
+<span class="pc bpc" id="L314" title="1 of 4 branches missed.">    private static String normalize(String value) { return value == null || value.isBlank() ? null : value.trim(); }</span>
+<span class="pc bpc" id="L315" title="1 of 4 branches missed.">    private static String normalizeCurrency(String value) { return value == null || value.isBlank() ? null : value.trim().toUpperCase(); }</span>
+    private ProductTechnologyProfileV2Response toTechnologyResponse(ProductCardTechnologyProfileV2 p) {
+<span class="fc" id="L317">        return new ProductTechnologyProfileV2Response(p.getTechnologyProfileId(), p.getInstitutionId(),</span>
+<span class="fc" id="L318">                p.getProductVersionId(), p.getProfileVersion(), p.isMagneticStripeEnabled(),</span>
+<span class="fc" id="L319">                p.isEmvContactEnabled(), p.isEmvContactlessEnabled(), p.getChipProfileReference(),</span>
+<span class="fc" id="L320">                p.getContactlessProfileReference(), p.getApplicationProfileReference(), p.getProfileStatus(),</span>
+<span class="fc" id="L321">                p.getEffectiveFrom(), p.getEffectiveTo());</span>
+    }
+    private ProductCvmProfileV2Response toCvmResponse(ProductCvmProfileV2 p) {
+<span class="fc" id="L324">        List&lt;CvmRuleV2Response&gt; rules = ruleRepository</span>
+<span class="fc" id="L325">                .findByInstitutionIdAndCvmProfileIdOrderByRuleSequence(p.getInstitutionId(), p.getCvmProfileId())</span>
+<span class="fc" id="L326">                .stream().map(r -&gt; new CvmRuleV2Response(r.getCvmRuleId(), r.getRuleSequence(),</span>
+<span class="fc" id="L327">                        r.getCardInterface(), r.getCvmMethod(), r.getCvmCondition(), r.isContinueOnFailure(),</span>
+<span class="fc" id="L328">                        r.getTransactionType(), r.getMinimumAmountMinor(), r.getMaximumAmountMinor(),</span>
+<span class="fc" id="L329">                        r.getCurrencyCode())).toList();</span>
+<span class="fc" id="L330">        return new ProductCvmProfileV2Response(p.getCvmProfileId(), p.getInstitutionId(),</span>
+<span class="fc" id="L331">                p.getProductVersionId(), p.getProfileVersion(), p.getContactlessCvmLimitMinor(),</span>
+<span class="fc" id="L332">                p.getCurrencyCode(), p.getProfileStatus(), p.getEffectiveFrom(), p.getEffectiveTo(), rules);</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.15.202606040825</span></div></body></html>

@@ -1,0 +1,38 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>ActivationPolicyVersionV2.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">CMS Core Service</a> &gt; <a href="index.source.html" class="el_package">com.xenomi.cms.core.v2.card.lifecycle.entity</a> &gt; <span class="el_source">ActivationPolicyVersionV2.java</span></div><h1>ActivationPolicyVersionV2.java</h1><pre class="source lang-java linenums">package com.xenomi.cms.core.v2.card.lifecycle.entity;
+
+import jakarta.persistence.*;
+import lombok.*;
+import java.util.UUID;
+import java.util.Map;
+import java.time.OffsetDateTime;
+import com.xenomi.cms.core.v2.card.model.*;
+
+@org.hibernate.annotations.Immutable
+@Entity(name = &quot;ActivationPolicyVersionV2&quot;)
+@Table(name = &quot;activation_policy_version&quot;, schema = &quot;cms_v2&quot;)
+@Data @Builder @NoArgsConstructor @AllArgsConstructor
+public class ActivationPolicyVersionV2 {
+    @Id
+    @Column(name = &quot;activation_policy_version_id&quot;, nullable = false, updatable = false)
+    private UUID activationPolicyVersionId;
+    @Column(name = &quot;institution_id&quot;, nullable = false, updatable = false)
+    private UUID institutionId;
+    @Column(name = &quot;policy_reference&quot;, length = 200, nullable = false, updatable = false)
+    private String policyReference;
+    @Column(name = &quot;version&quot;, nullable = false, updatable = false)
+    private Integer version;
+    @Column(name = &quot;calendar_reference&quot;, length = 200, nullable = false, updatable = false)
+    private String calendarReference;
+    @Column(name = &quot;expiry_timezone&quot;, length = 60, nullable = false, updatable = false)
+    private String expiryTimezone;
+    @Column(name = &quot;policy_document_reference&quot;, length = 500, nullable = false, updatable = false)
+    private String policyDocumentReference;
+    @Column(name = &quot;effective_from&quot;, nullable = false, updatable = false)
+    private OffsetDateTime effectiveFrom;
+    @PrePersist
+    void beforeInsert() {
+<span class="nc bnc" id="L34" title="All 2 branches missed.">        if (expiryTimezone == null) expiryTimezone = &quot;Asia/Kolkata&quot;;</span>
+<span class="nc" id="L35">    }</span>
+
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.15.202606040825</span></div></body></html>

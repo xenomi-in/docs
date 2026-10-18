@@ -1,0 +1,287 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>PinLifecycleV2Service.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">CMS Core Service</a> &gt; <a href="index.source.html" class="el_package">com.xenomi.cms.core.v2.card.pin</a> &gt; <span class="el_source">PinLifecycleV2Service.java</span></div><h1>PinLifecycleV2Service.java</h1><pre class="source lang-java linenums">package com.xenomi.cms.core.v2.card.pin;
+
+import java.time.LocalDate;
+import java.time.OffsetDateTime;
+import java.time.ZoneOffset;
+import java.util.List;
+import java.util.Set;
+import java.util.UUID;
+
+import com.xenomi.cms.core.exception.BusinessRuleViolationException;
+import com.xenomi.cms.core.v2.bin.entity.BinConfigurationV2;
+import com.xenomi.cms.core.v2.bin.repository.BinConfigurationV2Repository;
+import com.xenomi.cms.core.v2.card.entity.CardV2;
+import com.xenomi.cms.core.v2.card.pin.entity.PinDataV2;
+import com.xenomi.cms.core.v2.card.pin.entity.PinHistoryV2;
+import com.xenomi.cms.core.v2.card.pin.model.PinOperationTypeV2;
+import com.xenomi.cms.core.v2.card.pin.model.PinStatusV2;
+import com.xenomi.cms.core.v2.card.pin.repository.PinDataV2Repository;
+import com.xenomi.cms.core.v2.card.pin.repository.PinHistoryV2Repository;
+import com.xenomi.cms.core.v2.card.security.CardSecurityException;
+import com.xenomi.cms.core.v2.card.security.CmsCardSecurityService;
+import com.xenomi.cms.core.v2.common.DatabaseUuidV7Generator;
+import com.xenomi.cms.core.v2.hsm.entity.BinHsmKeyAssignmentV2;
+import com.xenomi.cms.core.v2.hsm.model.BinHsmKeyAssignmentStatus;
+import com.xenomi.cms.core.v2.hsm.model.HsmKeyScope;
+import com.xenomi.cms.core.v2.hsm.model.HsmKeyStatus;
+import com.xenomi.cms.core.v2.hsm.model.HsmKeyType;
+import com.xenomi.cms.core.v2.hsm.model.KeyPurpose;
+import com.xenomi.cms.core.v2.hsm.repository.BinHsmKeyAssignmentV2Repository;
+import com.xenomi.cms.core.v2.institution.entity.HsmKeyReferenceV2;
+import com.xenomi.cms.core.v2.institution.repository.HsmKeyReferenceV2Repository;
+import com.xenomi.cms.core.v2.product.entity.ProductPinPolicyV2;
+import com.xenomi.cms.core.v2.product.model.PinGenerationMethod;
+import com.xenomi.cms.core.v2.product.model.ReplacementPinStrategy;
+import com.xenomi.cms.core.v2.product.repository.ProductPinPolicyV2Repository;
+import org.springframework.stereotype.Service;
+
+/** Initializes card PIN state and delegates random PIN generation entirely to the HSM. */
+@Service
+public class PinLifecycleV2Service {
+    @org.springframework.beans.factory.annotation.Value(&quot;${cms.switch.pin.enabled:${cms.switch.sync.enabled:false}}&quot;)
+    private boolean switchPinEnabled;
+    @org.springframework.beans.factory.annotation.Value(&quot;${cms.switch.sync.enabled:false}&quot;)
+    private boolean switchSyncEnabled;
+    @org.springframework.beans.factory.annotation.Autowired
+    private com.xenomi.cms.core.v2.card.pin.switchpin.SwitchPinPolicyResolver switchPolicy;
+<span class="fc" id="L47">    private static final Set&lt;HsmKeyStatus&gt; USABLE_KEY_STATUSES =</span>
+<span class="fc" id="L48">            Set.of(HsmKeyStatus.ACTIVE);</span>
+
+    private final ProductPinPolicyV2Repository policyRepository;
+    private final BinConfigurationV2Repository binRepository;
+    private final BinHsmKeyAssignmentV2Repository assignmentRepository;
+    private final HsmKeyReferenceV2Repository keyRepository;
+    private final PinDataV2Repository pinRepository;
+    private final PinHistoryV2Repository historyRepository;
+    private final CmsCardSecurityService cardSecurityService;
+    private final PinHsmOperations hsm;
+    private final DatabaseUuidV7Generator uuidGenerator;
+
+    public PinLifecycleV2Service(ProductPinPolicyV2Repository policyRepository,
+            BinConfigurationV2Repository binRepository,
+            BinHsmKeyAssignmentV2Repository assignmentRepository,
+            HsmKeyReferenceV2Repository keyRepository,
+            PinDataV2Repository pinRepository,
+            PinHistoryV2Repository historyRepository,
+            CmsCardSecurityService cardSecurityService,
+            PinHsmOperations hsm,
+<span class="fc" id="L68">            DatabaseUuidV7Generator uuidGenerator) {</span>
+<span class="fc" id="L69">        this.policyRepository = policyRepository;</span>
+<span class="fc" id="L70">        this.binRepository = binRepository;</span>
+<span class="fc" id="L71">        this.assignmentRepository = assignmentRepository;</span>
+<span class="fc" id="L72">        this.keyRepository = keyRepository;</span>
+<span class="fc" id="L73">        this.pinRepository = pinRepository;</span>
+<span class="fc" id="L74">        this.historyRepository = historyRepository;</span>
+<span class="fc" id="L75">        this.cardSecurityService = cardSecurityService;</span>
+<span class="fc" id="L76">        this.hsm = hsm;</span>
+<span class="fc" id="L77">        this.uuidGenerator = uuidGenerator;</span>
+<span class="fc" id="L78">    }</span>
+
+    public PinDataV2 initializeForIssuance(CardV2 card, String actor) {
+<span class="nc" id="L81">        return initialize(card, null, actor);</span>
+    }
+
+    /** Reject missing policy/key configuration before staging any provider work. */
+    public ProductPinPolicyV2 validateOriginalConfiguration(CardV2 card) {
+<span class="fc" id="L86">        var policy=policyRepository.findByProductVersionIdAndInstitutionId(card.getProductVersionId(),card.getInstitutionId())</span>
+<span class="pc bpc" id="L87" title="1 of 2 branches missed.">                .filter(p-&gt;p.getPolicyStatus()==com.xenomi.cms.core.v2.product.model.ProductPolicyStatus.ACTIVE)</span>
+<span class="pc" id="L88">                .orElseThrow(()-&gt;new BusinessRuleViolationException(&quot;An active PIN policy is required&quot;));</span>
+<span class="fc" id="L89">        var bin=binRepository.findByBinIdAndInstitutionId(card.getBinId(),card.getInstitutionId()).orElseThrow();</span>
+<span class="fc" id="L90">        requireSwitchAuthority(policy);</span>
+<span class="pc bpc" id="L91" title="1 of 2 branches missed.">        if (switchPinEnabled) {</span>
+<span class="fc" id="L92">            switchPolicy.resolve(card.getInstitutionId(), policy, bin, null);</span>
+<span class="fc" id="L93">            return policy;</span>
+        }
+<span class="nc bnc" id="L95" title="All 4 branches missed.">        if(policy.isPinRequired() &amp;&amp; policy.getGenerationMethod()!=PinGenerationMethod.CUSTOMER_SELECTED) {</span>
+<span class="nc" id="L96">            validateGenerationPolicy(policy,bin); requirePvki(bin);</span>
+<span class="nc" id="L97">            activeBinKey(card,KeyPurpose.PIN_GENERATION,HsmKeyType.PVK);</span>
+<span class="nc" id="L98">            activeBinKey(card,KeyPurpose.PIN_BLOCK_ENCRYPTION,HsmKeyType.ZPK);</span>
+        }
+<span class="nc" id="L100">        return policy;</span>
+    }
+
+    public PinDataV2 initializeForReplacement(
+            CardV2 card, ReplacementPinStrategy strategy, String actor) {
+<span class="nc" id="L105">        return initialize(card, strategy, actor);</span>
+    }
+
+    private PinDataV2 initialize(CardV2 card, ReplacementPinStrategy replacementStrategy,
+            String actor) {
+<span class="nc" id="L110">        com.xenomi.cms.core.v2.card.lifecycle.service.LifecycleCommandPendingV2.reject(&quot;initialize PIN aggregate&quot;);</span>
+<span class="nc" id="L111">        return null;</span>
+    }
+
+    /** Prepares verification metadata only. Persist it before CARD in the finalization transaction. */
+    public PinDataV2 prepareOriginal(CardV2 card, String actor, ProductPinPolicyV2 expectedPolicy) {
+<span class="fc" id="L116">        return prepare(card, actor, expectedPolicy, null);</span>
+    }
+
+    /** Prepares a new PAN's PIN aggregate while applying the replacement policy's PIN decision. */
+    public PinDataV2 prepareReplacement(CardV2 card, String actor,
+            ProductPinPolicyV2 expectedPolicy, ReplacementPinStrategy replacementStrategy) {
+<span class="fc bfc" id="L122" title="All 2 branches covered.">        if (replacementStrategy == null) {</span>
+<span class="fc" id="L123">            throw new BusinessRuleViolationException(&quot;Replacement PIN strategy is required&quot;);</span>
+        }
+<span class="fc" id="L125">        return prepare(card, actor, expectedPolicy, replacementStrategy);</span>
+    }
+
+    private PinDataV2 prepare(CardV2 card, String actor, ProductPinPolicyV2 expectedPolicy,
+            ReplacementPinStrategy replacementStrategy) {
+<span class="pc bpc" id="L130" title="1 of 2 branches missed.">        if (org.springframework.transaction.support.TransactionSynchronizationManager.isActualTransactionActive()) {</span>
+<span class="nc" id="L131">            throw new IllegalStateException(&quot;PIN preparation must run outside a database transaction&quot;);</span>
+        }
+<span class="fc bfc" id="L133" title="All 2 branches covered.">        if (pinRepository.findByInstitutionIdAndPanAllocationId(card.getInstitutionId(), card.getPanAllocationId()).isPresent()) {</span>
+<span class="fc" id="L134">            throw new IllegalStateException(&quot;PIN state already exists for card &quot; + card.getCardId());</span>
+        }
+<span class="fc" id="L136">        ProductPinPolicyV2 policy = policyRepository</span>
+<span class="fc" id="L137">                .findByProductVersionIdAndInstitutionId(</span>
+<span class="fc" id="L138">                        card.getProductVersionId(), card.getInstitutionId())</span>
+<span class="pc bpc" id="L139" title="1 of 2 branches missed.">                .filter(p -&gt; p.getPolicyStatus() == com.xenomi.cms.core.v2.product.model.ProductPolicyStatus.ACTIVE)</span>
+<span class="pc" id="L140">                .orElseThrow(() -&gt; new BusinessRuleViolationException(&quot;An active PIN policy is required&quot;));</span>
+<span class="fc bfc" id="L141" title="All 2 branches covered.">        if (!policy.equals(expectedPolicy)) throw new BusinessRuleViolationException(&quot;PIN policy changed after issuance acceptance&quot;);</span>
+<span class="fc" id="L142">        requireSwitchAuthority(policy);</span>
+<span class="fc" id="L143">        BinConfigurationV2 bin = binRepository</span>
+<span class="fc" id="L144">                .findByBinIdAndInstitutionId(card.getBinId(), card.getInstitutionId())</span>
+<span class="pc" id="L145">                .orElseThrow(() -&gt; new BusinessRuleViolationException(</span>
+                        &quot;BIN configuration is required before PIN initialization&quot;));
+
+<span class="fc bfc" id="L148" title="All 2 branches covered.">        if (switchPinEnabled) {</span>
+<span class="fc" id="L149">            var profile = switchPolicy.resolve(card.getInstitutionId(), policy, bin, replacementStrategy);</span>
+<span class="fc bfc" id="L150" title="All 4 branches covered.">            boolean selected = profile != null &amp;&amp; &quot;CUSTOMER_SELECTED&quot;.equals(profile.get(&quot;establishment&quot;));</span>
+<span class="fc" id="L151">            return PinDataV2.builder().pinDataId(card.getPinDataRef()).panAllocationId(card.getPanAllocationId())</span>
+<span class="fc" id="L152">                    .institutionId(card.getInstitutionId()).pinAuthority(&quot;SWITCH&quot;).switchPinProfile(profile)</span>
+<span class="fc bfc" id="L153" title="All 2 branches covered.">                    .pinStatus(selected ? PinStatusV2.RESET_REQUIRED : PinStatusV2.NOT_SET)</span>
+<span class="fc" id="L154">                    .failedAttemptCount(0).pinMethod(bin.getPinMethod()).pinLength((int) policy.getPinLength())</span>
+<span class="fc" id="L155">                    .pvki(bin.getPvki()).maximumAttempts((int) policy.getMaximumAttempts())</span>
+<span class="fc bfc" id="L156" title="All 2 branches covered.">                    .generationMethod(selected ? PinGenerationMethod.CUSTOMER_SELECTED : policy.getGenerationMethod())</span>
+<span class="fc" id="L157">                    .deliveryMethod(policy.getDeliveryMethod()).updatedAt(OffsetDateTime.now(ZoneOffset.UTC))</span>
+<span class="fc" id="L158">                    .updatedBy(actor).build();</span>
+        }
+
+<span class="fc" id="L161">        PinStatusV2 status = PinStatusV2.NOT_SET;</span>
+<span class="fc" id="L162">        PinOperationTypeV2 operation = PinOperationTypeV2.INITIALIZED;</span>
+<span class="fc" id="L163">        String offset = null;</span>
+<span class="fc" id="L164">        UUID verificationKeyId = null;</span>
+<span class="fc" id="L165">        UUID pinBlockKeyId = null;</span>
+
+<span class="pc bpc" id="L167" title="1 of 6 branches missed.">        boolean resetRequired = policy != null &amp;&amp; policy.isPinRequired()</span>
+                &amp;&amp; (replacementStrategy == ReplacementPinStrategy.CUSTOMER_RESET_REQUIRED
+<span class="pc bpc" id="L169" title="1 of 2 branches missed.">                    || policy.getGenerationMethod() == PinGenerationMethod.CUSTOMER_SELECTED);</span>
+<span class="pc bpc" id="L170" title="4 of 10 branches missed.">        boolean generate = policy != null &amp;&amp; policy.isPinRequired() &amp;&amp; !resetRequired</span>
+                &amp;&amp; (replacementStrategy == null
+                    || replacementStrategy == ReplacementPinStrategy.GENERATE_NEW_PIN);
+<span class="fc bfc" id="L173" title="All 2 branches covered.">        if (resetRequired) {</span>
+<span class="fc" id="L174">            status = PinStatusV2.RESET_REQUIRED;</span>
+<span class="fc" id="L175">            operation = PinOperationTypeV2.RESET_REQUIRED;</span>
+<span class="fc bfc" id="L176" title="All 2 branches covered.">        } else if (generate) {</span>
+<span class="fc" id="L177">            validateGenerationPolicy(policy, bin);</span>
+<span class="fc" id="L178">            HsmKeyReferenceV2 verificationKey = activeBinKey(</span>
+                    card, KeyPurpose.PIN_GENERATION, HsmKeyType.PVK);
+<span class="fc" id="L180">            HsmKeyReferenceV2 pinBlockKey = activeBinKey(</span>
+                    card, KeyPurpose.PIN_BLOCK_ENCRYPTION, HsmKeyType.ZPK);
+<span class="fc" id="L182">            offset = cardSecurityService.withDecryptedPan(card.getInstitutionId(), card,</span>
+<span class="fc" id="L183">                    pan -&gt; hsm.generateRandomPinOffset(pan, bin.getPinMethod(),</span>
+<span class="fc" id="L184">                            policy.getPinLength(), requirePvki(bin),</span>
+                            verificationKey, pinBlockKey));
+<span class="fc" id="L186">            verificationKeyId = verificationKey.getKeyId();</span>
+<span class="fc" id="L187">            pinBlockKeyId = pinBlockKey.getKeyId();</span>
+<span class="fc" id="L188">            status = PinStatusV2.PENDING_DELIVERY;</span>
+<span class="fc" id="L189">            operation = PinOperationTypeV2.GENERATED;</span>
+        }
+
+<span class="fc" id="L192">        OffsetDateTime now = OffsetDateTime.now(ZoneOffset.UTC);</span>
+<span class="fc" id="L193">        return PinDataV2.builder()</span>
+<span class="fc" id="L194">                .pinDataId(card.getPinDataRef()).panAllocationId(card.getPanAllocationId())</span>
+<span class="fc" id="L195">                .institutionId(card.getInstitutionId())</span>
+<span class="fc" id="L196">                .pinStatus(status)</span>
+<span class="fc" id="L197">                .failedAttemptCount(0)</span>
+<span class="fc" id="L198">                .pinOffset(offset)</span>
+<span class="fc" id="L199">                .pinMethod(bin.getPinMethod())</span>
+<span class="pc bpc" id="L200" title="1 of 2 branches missed.">                .pinLength(policy == null ? bin.getPinLength() : (int) policy.getPinLength())</span>
+<span class="fc" id="L201">                .pvki(bin.getPvki())</span>
+<span class="pc bpc" id="L202" title="1 of 2 branches missed.">                .maximumAttempts(policy == null ? null : (int) policy.getMaximumAttempts())</span>
+<span class="pc bpc" id="L203" title="1 of 2 branches missed.">                .generationMethod(policy == null ? null : policy.getGenerationMethod())</span>
+<span class="pc bpc" id="L204" title="1 of 2 branches missed.">                .deliveryMethod(policy == null ? null : policy.getDeliveryMethod())</span>
+<span class="fc bfc" id="L205" title="All 2 branches covered.">                .lastChangedAt(generate ? now : null)</span>
+<span class="fc" id="L206">                .hsmKeyId(verificationKeyId)</span>
+<span class="fc" id="L207">                .pinBlockKeyId(pinBlockKeyId)</span>
+<span class="fc" id="L208">                .updatedAt(now)</span>
+<span class="fc" id="L209">                .updatedBy(actor)</span>
+<span class="fc" id="L210">                .build();</span>
+    }
+
+    public void recordOriginalHistory(CardV2 card, PinDataV2 pin, UUID operationId, String actor) {
+<span class="pc bpc" id="L214" title="1 of 2 branches missed.">        PinOperationTypeV2 operation = pin.getPinOffset() != null ? PinOperationTypeV2.GENERATED :</span>
+<span class="pc bnc" id="L215" title="All 2 branches missed.">                pin.getPinStatus() == PinStatusV2.RESET_REQUIRED ? PinOperationTypeV2.RESET_REQUIRED : PinOperationTypeV2.INITIALIZED;</span>
+<span class="fc" id="L216">        historyRepository.save(PinHistoryV2.builder()</span>
+<span class="fc" id="L217">                .pinHistoryId(uuidGenerator.generate())</span>
+<span class="fc" id="L218">                .institutionId(card.getInstitutionId())</span>
+<span class="fc" id="L219">                .cardId(card.getCardId()).pinDataId(card.getPinDataRef())</span>
+<span class="fc" id="L220">                .operationType(operation)</span>
+<span class="fc" id="L221">                .resultingStatus(pin.getPinStatus())</span>
+<span class="fc" id="L222">                .hsmKeyId(pin.getHsmKeyId())</span>
+<span class="fc" id="L223">                .occurredAt(OffsetDateTime.now(ZoneOffset.UTC))</span>
+<span class="fc" id="L224">                .actorReference(actor)</span>
+<span class="fc" id="L225">                .correlationId(operationId)</span>
+<span class="fc" id="L226">                .build());</span>
+<span class="fc" id="L227">    }</span>
+
+    private static void validateGenerationPolicy(
+            ProductPinPolicyV2 policy, BinConfigurationV2 bin) {
+<span class="pc bpc" id="L231" title="1 of 2 branches missed.">        if (!policy.isRandomPinGenerationEnabled()) {</span>
+<span class="nc" id="L232">            throw new BusinessRuleViolationException(</span>
+                    &quot;randomPinGenerationEnabled must be true for HSM PIN generation&quot;);
+        }
+<span class="fc bfc" id="L235" title="All 2 branches covered.">        if (policy.getPinLength() != bin.getPinLength()) {</span>
+<span class="fc" id="L236">            throw new BusinessRuleViolationException(</span>
+                    &quot;Product PIN length must match the BIN PIN length&quot;);
+        }
+<span class="fc" id="L239">    }</span>
+
+    private void requireSwitchAuthority(ProductPinPolicyV2 policy) {
+<span class="pc bpc" id="L242" title="1 of 6 branches missed.">        if (switchSyncEnabled &amp;&amp; !switchPinEnabled &amp;&amp; policy.isPinRequired())</span>
+<span class="fc" id="L243">            throw new BusinessRuleViolationException(&quot;Switch card synchronization requires Switch PIN integration for PIN-required issuance&quot;);</span>
+<span class="fc" id="L244">    }</span>
+
+    private HsmKeyReferenceV2 activeBinKey(
+            CardV2 card, KeyPurpose purpose, HsmKeyType requiredType) {
+<span class="fc" id="L248">        OffsetDateTime now = OffsetDateTime.now(ZoneOffset.UTC);</span>
+<span class="fc" id="L249">        List&lt;BinHsmKeyAssignmentV2&gt; assignments = assignmentRepository.findEffective(</span>
+<span class="fc" id="L250">                card.getInstitutionId(), card.getBinId(), purpose,</span>
+                BinHsmKeyAssignmentStatus.ACTIVE, now);
+<span class="fc bfc" id="L252" title="All 2 branches covered.">        if (assignments.size() != 1) {</span>
+<span class="fc" id="L253">            throw new CardSecurityException(</span>
+                    &quot;Exactly one active BIN &quot; + purpose + &quot; assignment is required&quot;);
+        }
+<span class="fc" id="L256">        HsmKeyReferenceV2 key = keyRepository</span>
+<span class="fc" id="L257">                .findByKeyIdAndInstitutionId(</span>
+<span class="fc" id="L258">                        assignments.get(0).getHsmKeyId(), card.getInstitutionId())</span>
+<span class="fc" id="L259">                .filter(value -&gt; USABLE_KEY_STATUSES.contains(value.getStatus()))</span>
+<span class="pc bpc" id="L260" title="1 of 2 branches missed.">                .filter(value -&gt; value.getKeyType() == requiredType)</span>
+<span class="fc" id="L261">                .filter(value -&gt; scopeMatches(value, card.getBinId()))</span>
+<span class="fc" id="L262">                .filter(value -&gt; effective(value, LocalDate.now(ZoneOffset.UTC)))</span>
+<span class="pc bpc" id="L263" title="1 of 2 branches missed.">                .filter(value -&gt; value.getEncryptedKeyBlock() != null</span>
+<span class="pc bpc" id="L264" title="1 of 2 branches missed.">                        &amp;&amp; !value.getEncryptedKeyBlock().isBlank())</span>
+<span class="pc" id="L265">                .orElseThrow(() -&gt; new CardSecurityException(</span>
+                        &quot;Assigned &quot; + requiredType + &quot; key is not active, effective, or HSM-protected&quot;));
+<span class="fc" id="L267">        return key;</span>
+    }
+
+    private static boolean scopeMatches(HsmKeyReferenceV2 key, UUID binId) {
+<span class="fc bfc" id="L271" title="All 2 branches covered.">        return key.getKeyScope() == HsmKeyScope.INSTITUTION</span>
+<span class="pc bpc" id="L272" title="2 of 4 branches missed.">                || (key.getKeyScope() == HsmKeyScope.BIN &amp;&amp; binId.equals(key.getBinId()));</span>
+    }
+
+    private static boolean effective(HsmKeyReferenceV2 key, LocalDate today) {
+<span class="pc bpc" id="L276" title="2 of 4 branches missed.">        return !today.isBefore(key.getEffectiveFrom()) &amp;&amp; today.isBefore(key.getExpiryDate());</span>
+    }
+
+    private static int requirePvki(BinConfigurationV2 bin) {
+<span class="pc bpc" id="L280" title="3 of 6 branches missed.">        if (bin.getPvki() == null || bin.getPvki() &lt; 0 || bin.getPvki() &gt; 9) {</span>
+<span class="nc" id="L281">            throw new BusinessRuleViolationException(</span>
+                    &quot;BIN PVKI must be configured between 0 and 9 for PIN generation&quot;);
+        }
+<span class="fc" id="L284">        return bin.getPvki();</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.15.202606040825</span></div></body></html>

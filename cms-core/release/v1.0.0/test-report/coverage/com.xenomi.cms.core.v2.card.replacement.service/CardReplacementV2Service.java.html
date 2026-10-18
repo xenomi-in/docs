@@ -1,0 +1,273 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>CardReplacementV2Service.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">CMS Core Service</a> &gt; <a href="index.source.html" class="el_package">com.xenomi.cms.core.v2.card.replacement.service</a> &gt; <span class="el_source">CardReplacementV2Service.java</span></div><h1>CardReplacementV2Service.java</h1><pre class="source lang-java linenums">package com.xenomi.cms.core.v2.card.replacement.service;
+
+import java.nio.charset.StandardCharsets;
+import java.util.EnumSet;
+import java.util.UUID;
+
+import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
+
+import com.xenomi.cms.core.exception.BusinessRuleViolationException;
+import com.xenomi.cms.core.exception.ResourceNotFoundException;
+import com.xenomi.cms.core.v2.bin.repository.BinConfigurationV2Repository;
+import com.xenomi.cms.core.v2.bin.repository.BinRangeV2Repository;
+import com.xenomi.cms.core.v2.card.entity.CardProductionRequestV2;
+import com.xenomi.cms.core.v2.card.entity.CardV2;
+import com.xenomi.cms.core.v2.card.lifecycle.model.CardHotlistCallerType;
+import com.xenomi.cms.core.v2.card.lifecycle.repository.CardEventV2Repository;
+import com.xenomi.cms.core.v2.card.lifecycle.service.CardHotlistV2Service;
+import com.xenomi.cms.core.v2.card.model.CardFormV2;
+import com.xenomi.cms.core.v2.card.model.CardStatusV2;
+import com.xenomi.cms.core.v2.card.pin.PinLifecycleV2Service;
+import com.xenomi.cms.core.v2.card.replacement.dto.CardReplacementV2Response;
+import com.xenomi.cms.core.v2.card.replacement.dto.CreateCardReplacementV2Request;
+import com.xenomi.cms.core.v2.card.replacement.dto.ReplacementDecisionV2Request;
+import com.xenomi.cms.core.v2.card.replacement.entity.CardReplacementRequestV2;
+import com.xenomi.cms.core.v2.card.replacement.model.CardReplacementPanStrategy;
+import com.xenomi.cms.core.v2.card.replacement.repository.CardReplacementRequestV2Repository;
+import com.xenomi.cms.core.v2.card.repository.AddressReferenceV2Repository;
+import com.xenomi.cms.core.v2.card.repository.CardAccountLinkV2Repository;
+import com.xenomi.cms.core.v2.card.repository.CardProductionRequestV2Repository;
+import com.xenomi.cms.core.v2.card.repository.CardV2Repository;
+import com.xenomi.cms.core.v2.card.repository.CardVendorV2Repository;
+import com.xenomi.cms.core.v2.card.repository.PanAllocationV2Repository;
+import com.xenomi.cms.core.v2.card.repository.PersonalisationBatchConfigurationV2Repository;
+import com.xenomi.cms.core.v2.card.security.CmsCardSecurityService;
+import com.xenomi.cms.core.v2.cardcontrol.client.AccountingCardLimitClient;
+import com.xenomi.cms.core.v2.cardcontrol.service.CardControlProfileInitializerV2;
+import com.xenomi.cms.core.v2.common.DatabaseUuidV7Generator;
+import com.xenomi.cms.core.v2.event.catalog.CardEventSink;
+import com.xenomi.cms.core.v2.event.correlation.CorrelationIdResolver;
+import com.xenomi.cms.core.v2.institution.repository.InstitutionV2Repository;
+import com.xenomi.cms.core.v2.product.entity.ProductReplacementPolicyV2;
+import com.xenomi.cms.core.v2.product.model.ProductPolicyStatus;
+import com.xenomi.cms.core.v2.product.model.ReplacementPanStrategy;
+import com.xenomi.cms.core.v2.product.model.ReplacementReason;
+import com.xenomi.cms.core.v2.product.model.ReplacementRequestChannel;
+import com.xenomi.cms.core.v2.product.repository.ProductPersonalisationPolicyV2Repository;
+import com.xenomi.cms.core.v2.product.repository.ProductReplacementPolicyV2Repository;
+import com.xenomi.cms.core.v2.product.repository.ProductVersionV2Repository;
+
+/**
+ * Replacement read model and compatibility boundary.
+ *
+ * &lt;p&gt;Supported same-PAN renewal and permanent-security replacement commands are owned by
+ * {@code SamePanRenewalApiV2} and {@code SecurityReplacementApiV2}. This service retains the
+ * existing public signatures for request lookup and for explicit rejection of replacement
+ * reasons that have not yet been migrated to a lifecycle command.&lt;/p&gt;
+ */
+@Service
+public class CardReplacementV2Service {
+<span class="fc" id="L61">    private static final EnumSet&lt;ReplacementReason&gt; PHYSICAL_ONLY_REASONS = EnumSet.of(</span>
+            ReplacementReason.DAMAGED, ReplacementReason.CHIP_FAILURE,
+            ReplacementReason.MAGSTRIPE_FAILURE);
+<span class="fc" id="L64">    private static final EnumSet&lt;ReplacementReason&gt; SECURITY_REPLACEMENT_REASONS = EnumSet.of(</span>
+            ReplacementReason.LOST, ReplacementReason.STOLEN, ReplacementReason.COMPROMISED);
+
+    private final CardV2Repository cardRepository;
+    private final CardReplacementRequestV2Repository requestRepository;
+    private final ProductReplacementPolicyV2Repository policyRepository;
+    private final InstitutionV2Repository institutionRepository;
+    private final CardProductionRequestV2Repository productionRepository;
+    private final CardEventSink eventSink;
+    private final CorrelationIdResolver correlationIdResolver;
+
+    /** Keeps the wiring signature stable while legacy collaborators are removed from callers. */
+    public CardReplacementV2Service(CardV2Repository cardRepository,
+            CardReplacementRequestV2Repository requestRepository,
+            ProductReplacementPolicyV2Repository policyRepository,
+            ProductVersionV2Repository versionRepository,
+            InstitutionV2Repository institutionRepository,
+            PanAllocationV2Repository panAllocationRepository,
+            BinRangeV2Repository binRangeRepository,
+            BinConfigurationV2Repository binRepository,
+            AddressReferenceV2Repository addressRepository,
+            CardAccountLinkV2Repository accountLinkRepository,
+            ProductPersonalisationPolicyV2Repository personalisationPolicyRepository,
+            CardVendorV2Repository vendorRepository,
+            PersonalisationBatchConfigurationV2Repository batchRepository,
+            CardProductionRequestV2Repository productionRepository,
+            CardEventV2Repository eventRepository,
+            CardControlProfileInitializerV2 controlInitializer,
+            AccountingCardLimitClient accountingClient,
+            CardHotlistV2Service hotlistService,
+            CmsCardSecurityService cardSecurityService,
+            PinLifecycleV2Service pinLifecycleService,
+            DatabaseUuidV7Generator uuidGenerator,
+            CardEventSink eventSink,
+<span class="fc" id="L98">            CorrelationIdResolver correlationIdResolver) {</span>
+<span class="fc" id="L99">        this.cardRepository = cardRepository;</span>
+<span class="fc" id="L100">        this.requestRepository = requestRepository;</span>
+<span class="fc" id="L101">        this.policyRepository = policyRepository;</span>
+<span class="fc" id="L102">        this.institutionRepository = institutionRepository;</span>
+<span class="fc" id="L103">        this.productionRepository = productionRepository;</span>
+<span class="fc" id="L104">        this.eventSink = eventSink;</span>
+<span class="fc" id="L105">        this.correlationIdResolver = correlationIdResolver;</span>
+<span class="fc" id="L106">    }</span>
+
+    @Transactional
+    public CardReplacementV2Response create(UUID institutionId, UUID sourceCardId,
+            CreateCardReplacementV2Request input, CardHotlistCallerType callerType,
+            String idempotencyKey, String requestId, String actorId) {
+<span class="fc" id="L112">        UUID domainIdempotency = deterministicId(institutionId, &quot;REPLACEMENT:&quot; + idempotencyKey);</span>
+<span class="fc" id="L113">        CardReplacementRequestV2 existing = requestRepository</span>
+<span class="fc" id="L114">                .findByInstitutionIdAndIdempotencyKey(institutionId, domainIdempotency)</span>
+<span class="fc" id="L115">                .orElse(null);</span>
+<span class="fc bfc" id="L116" title="All 2 branches covered.">        if (existing != null) {</span>
+<span class="fc" id="L117">            CardReplacementV2Response response = response(existing);</span>
+<span class="fc" id="L118">            eventSink.onReplacementRequested(response, correlationIdResolver.resolve(requestId));</span>
+<span class="fc" id="L119">            return response;</span>
+        }
+
+<span class="fc" id="L122">        actorId.trim();</span>
+<span class="fc" id="L123">        correlationIdResolver.resolve(requestId);</span>
+<span class="fc" id="L124">        CardV2 source = cardRepository.findForUpdate(institutionId, sourceCardId)</span>
+<span class="fc" id="L125">                .orElseThrow(() -&gt; new ResourceNotFoundException(&quot;Card&quot;, sourceCardId.toString()));</span>
+<span class="fc bfc" id="L126" title="All 2 branches covered.">        if (source.getCardStatus() == CardStatusV2.CLOSED) {</span>
+<span class="fc" id="L127">            throw new BusinessRuleViolationException(&quot;A closed card cannot be replaced&quot;);</span>
+        }
+<span class="fc bfc" id="L129" title="All 2 branches covered.">        if (requestRepository.existsByInstitutionIdAndSourceCardId(institutionId, sourceCardId)) {</span>
+<span class="fc" id="L130">            throw new BusinessRuleViolationException(</span>
+                    &quot;A replacement request already exists for the source card&quot;);
+        }
+<span class="fc" id="L133">        validateReasonForCard(source, input.getReplacementReason());</span>
+<span class="fc" id="L134">        institutionRepository.findById(institutionId)</span>
+<span class="fc" id="L135">                .orElseThrow(() -&gt; new ResourceNotFoundException(</span>
+<span class="fc" id="L136">                        &quot;Institution&quot;, institutionId.toString()));</span>
+<span class="fc" id="L137">        ProductReplacementPolicyV2 policy = policyRepository</span>
+<span class="fc" id="L138">                .findByInstitutionIdAndProductVersionIdAndReplacementReasonAndPolicyStatus(</span>
+<span class="fc" id="L139">                        institutionId, source.getProductVersionId(), input.getReplacementReason(),</span>
+                        ProductPolicyStatus.ACTIVE)
+<span class="fc" id="L141">                .orElseThrow(() -&gt; new BusinessRuleViolationException(</span>
+                        &quot;No ACTIVE replacement policy exists for the requested reason&quot;));
+<span class="fc bfc" id="L143" title="All 2 branches covered.">        if (!policy.isReplacementAllowed()) {</span>
+<span class="fc" id="L144">            throw new BusinessRuleViolationException(</span>
+                    &quot;Replacement is disabled by the active product policy&quot;);
+        }
+<span class="fc" id="L147">        ReplacementRequestChannel requestChannel =</span>
+<span class="fc" id="L148">                ReplacementRequestChannel.valueOf(callerType.name());</span>
+<span class="fc bfc" id="L149" title="All 2 branches covered.">        if (!policy.getPermittedChannels().contains(requestChannel)) {</span>
+<span class="fc" id="L150">            throw new BusinessRuleViolationException(</span>
+                    &quot;Replacement is not permitted through the authenticated &quot;
+                            + requestChannel + &quot; channel&quot;);
+        }
+<span class="fc" id="L154">        CardReplacementPanStrategy resolved = resolvePanStrategy(policy, input);</span>
+<span class="pc bpc" id="L155" title="1 of 4 branches missed.">        if (SECURITY_REPLACEMENT_REASONS.contains(input.getReplacementReason())</span>
+                &amp;&amp; resolved != CardReplacementPanStrategy.GENERATE_NEW_PAN) {
+<span class="fc" id="L157">            throw new BusinessRuleViolationException(</span>
+<span class="fc" id="L158">                    input.getReplacementReason() + &quot; replacement must generate a new PAN&quot;);</span>
+        }
+<span class="fc" id="L160">        throw lifecycleCommandPending(&quot;create&quot;);</span>
+    }
+
+    @Transactional(readOnly = true)
+    public CardReplacementV2Response get(UUID institutionId, UUID sourceCardId,
+            UUID replacementRequestId) {
+<span class="fc" id="L166">        CardReplacementRequestV2 request = requestRepository</span>
+<span class="fc" id="L167">                .findByReplacementRequestIdAndInstitutionId(replacementRequestId, institutionId)</span>
+<span class="fc" id="L168">                .orElseThrow(() -&gt; new ResourceNotFoundException(</span>
+<span class="fc" id="L169">                        &quot;Card replacement request&quot;, replacementRequestId.toString()));</span>
+<span class="fc" id="L170">        requireSourceCard(request, sourceCardId);</span>
+<span class="fc" id="L171">        return response(request);</span>
+    }
+
+    @Transactional
+    public CardReplacementV2Response approve(UUID institutionId, UUID sourceCardId,
+            UUID replacementRequestId, ReplacementDecisionV2Request input,
+            String requestId, String actorId) {
+<span class="fc" id="L178">        throw lifecycleCommandPending(&quot;approve&quot;);</span>
+    }
+
+    @Transactional
+    public CardReplacementV2Response reject(UUID institutionId, UUID sourceCardId,
+            UUID replacementRequestId, ReplacementDecisionV2Request input,
+            String requestId, String actorId) {
+<span class="fc" id="L185">        throw lifecycleCommandPending(&quot;reject&quot;);</span>
+    }
+
+    @Transactional
+    public CardReplacementV2Response complete(UUID institutionId, UUID sourceCardId,
+            UUID replacementRequestId, String idempotencyKey,
+            String requestId, String actorId) {
+<span class="fc" id="L192">        throw lifecycleCommandPending(&quot;complete&quot;);</span>
+    }
+
+    private static void requireSourceCard(CardReplacementRequestV2 request, UUID sourceCardId) {
+<span class="fc bfc" id="L196" title="All 2 branches covered.">        if (!sourceCardId.equals(request.getSourceCardId())) {</span>
+<span class="fc" id="L197">            throw new ResourceNotFoundException(</span>
+<span class="fc" id="L198">                    &quot;Card replacement request&quot;, request.getReplacementRequestId().toString());</span>
+        }
+<span class="fc" id="L200">    }</span>
+
+    private CardReplacementV2Response response(CardReplacementRequestV2 request) {
+<span class="fc" id="L203">        CardStatusV2 sourceStatus = cardRepository</span>
+<span class="fc" id="L204">                .findByCardIdAndInstitutionId(request.getSourceCardId(), request.getInstitutionId())</span>
+<span class="fc" id="L205">                .map(CardV2::getCardStatus).orElse(null);</span>
+<span class="fc bfc" id="L206" title="All 2 branches covered.">        CardStatusV2 replacementStatus = request.getReplacementCardId() == null ? null</span>
+<span class="fc" id="L207">                : cardRepository.findByCardIdAndInstitutionId(</span>
+<span class="fc" id="L208">                        request.getReplacementCardId(), request.getInstitutionId())</span>
+<span class="fc" id="L209">                        .map(CardV2::getCardStatus).orElse(null);</span>
+<span class="fc bfc" id="L210" title="All 2 branches covered.">        UUID productionId = request.getReplacementCardId() == null ? null</span>
+<span class="fc" id="L211">                : productionRepository.findByInstitutionIdAndCardId(</span>
+<span class="fc" id="L212">                        request.getInstitutionId(), request.getReplacementCardId())</span>
+<span class="fc" id="L213">                        .map(CardProductionRequestV2::getProductionRequestId).orElse(null);</span>
+<span class="fc" id="L214">        return CardReplacementV2Response.builder()</span>
+<span class="fc" id="L215">                .replacementRequestId(request.getReplacementRequestId())</span>
+<span class="fc" id="L216">                .institutionId(request.getInstitutionId())</span>
+<span class="fc" id="L217">                .sourceCardId(request.getSourceCardId())</span>
+<span class="fc" id="L218">                .replacementCardId(request.getReplacementCardId())</span>
+<span class="fc" id="L219">                .replacementReason(request.getReplacementReason())</span>
+<span class="fc" id="L220">                .policyPanStrategy(request.getPolicyPanStrategy())</span>
+<span class="fc" id="L221">                .requestedPanStrategy(request.getRequestedPanStrategy())</span>
+<span class="fc" id="L222">                .resolvedPanStrategy(request.getResolvedPanStrategy())</span>
+<span class="fc" id="L223">                .requestStatus(request.getRequestStatus())</span>
+<span class="fc" id="L224">                .sourceCardStatus(sourceStatus)</span>
+<span class="fc" id="L225">                .replacementCardStatus(replacementStatus)</span>
+<span class="fc" id="L226">                .productionRequestId(productionId)</span>
+<span class="fc" id="L227">                .requestedAt(request.getRequestedAt())</span>
+<span class="fc" id="L228">                .completedAt(request.getCompletedAt())</span>
+<span class="fc" id="L229">                .build();</span>
+    }
+
+    private static CardReplacementPanStrategy resolvePanStrategy(
+            ProductReplacementPolicyV2 policy, CreateCardReplacementV2Request input) {
+<span class="fc" id="L234">        CardReplacementPanStrategy requested = input.getRequestedPanStrategy();</span>
+<span class="fc bfc" id="L235" title="All 3 branches covered.">        CardReplacementPanStrategy deterministic = switch (policy.getPanStrategy()) {</span>
+<span class="fc" id="L236">            case PRESERVE_EXISTING_PAN -&gt; CardReplacementPanStrategy.PRESERVE_EXISTING_PAN;</span>
+<span class="fc" id="L237">            case GENERATE_NEW_PAN -&gt; CardReplacementPanStrategy.GENERATE_NEW_PAN;</span>
+<span class="fc" id="L238">            case RISK_BASED, MANUAL_DECISION -&gt; null;</span>
+        };
+<span class="fc bfc" id="L240" title="All 2 branches covered.">        if (deterministic != null) {</span>
+<span class="pc bpc" id="L241" title="1 of 4 branches missed.">            if (requested != null &amp;&amp; requested != deterministic) {</span>
+<span class="fc" id="L242">                throw new BusinessRuleViolationException(</span>
+                        &quot;requestedPanStrategy conflicts with the active replacement policy&quot;);
+            }
+<span class="fc" id="L245">            return deterministic;</span>
+        }
+<span class="pc bpc" id="L247" title="2 of 4 branches missed.">        if (requested == null || input.getOverrideReason() == null</span>
+<span class="pc bpc" id="L248" title="1 of 2 branches missed.">                || input.getOverrideReason().isBlank()) {</span>
+<span class="nc" id="L249">            throw new BusinessRuleViolationException(</span>
+                    &quot;Risk/manual replacement requires requestedPanStrategy and overrideReason&quot;);
+        }
+<span class="fc" id="L252">        return requested;</span>
+    }
+
+    private static void validateReasonForCard(CardV2 source, ReplacementReason reason) {
+<span class="fc bfc" id="L256" title="All 2 branches covered.">        if (source.getCardForm() == CardFormV2.VIRTUAL</span>
+<span class="pc bpc" id="L257" title="1 of 2 branches missed.">                &amp;&amp; PHYSICAL_ONLY_REASONS.contains(reason)) {</span>
+<span class="nc" id="L258">            throw new BusinessRuleViolationException(</span>
+                    reason + &quot; is not applicable to a virtual-only card&quot;);
+        }
+<span class="fc" id="L261">    }</span>
+
+    private static UUID deterministicId(UUID institutionId, String value) {
+<span class="fc" id="L264">        return UUID.nameUUIDFromBytes((institutionId + &quot;:&quot; + value)</span>
+<span class="fc" id="L265">                .getBytes(StandardCharsets.UTF_8));</span>
+    }
+
+    private static BusinessRuleViolationException lifecycleCommandPending(String operation) {
+<span class="fc" id="L269">        return new BusinessRuleViolationException(</span>
+                &quot;V2 lifecycle command implementation pending: &quot; + operation);
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.15.202606040825</span></div></body></html>

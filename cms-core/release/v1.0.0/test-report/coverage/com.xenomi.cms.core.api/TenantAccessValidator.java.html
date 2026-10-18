@@ -1,0 +1,54 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>TenantAccessValidator.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">CMS Core Service</a> &gt; <a href="index.source.html" class="el_package">com.xenomi.cms.core.api</a> &gt; <span class="el_source">TenantAccessValidator.java</span></div><h1>TenantAccessValidator.java</h1><pre class="source lang-java linenums">package com.xenomi.cms.core.api;
+
+import com.xenomi.cms.core.exception.InstitutionAccessDeniedException;
+
+/**
+ * Shared tenant ownership checks for institution-scoped resources.
+ * &lt;p&gt;
+ * {@code X-Institution-Id: 0} is reserved for platform / cross-tenant admin (e.g. dashboard):
+ * listing and resolving institutions is allowed without matching a concrete tenant row.
+ */
+public final class TenantAccessValidator {
+
+    private TenantAccessValidator() {
+    }
+
+    /**
+     * {@code true} when the gateway sent platform scope ({@code 0}) — not a real institution PK.
+     */
+    public static boolean isPlatformScope(Long headerInstitutionId) {
+<span class="nc bnc" id="L20" title="All 4 branches missed.">        return headerInstitutionId != null &amp;&amp; headerInstitutionId == 0L;</span>
+    }
+
+    public static void requireInstitution(Long headerInstitutionId) {
+<span class="nc bnc" id="L24" title="All 2 branches missed.">        if (headerInstitutionId == null) {</span>
+<span class="nc" id="L25">            throw new IllegalStateException(&quot;Missing required header: &quot; + TenantContext.HEADER_INSTITUTION_ID);</span>
+        }
+<span class="nc" id="L27">    }</span>
+
+    /**
+     * Requires a real tenant institution id (non-null and not platform sentinel {@code 0}).
+     */
+    public static void requireTenantInstitution(Long headerInstitutionId) {
+<span class="nc" id="L33">        requireInstitution(headerInstitutionId);</span>
+<span class="nc bnc" id="L34" title="All 2 branches missed.">        if (headerInstitutionId == 0L) {</span>
+<span class="nc" id="L35">            throw new IllegalStateException(</span>
+                    &quot;Invalid tenant header: &quot; + TenantContext.HEADER_INSTITUTION_ID
+                            + &quot; must be a positive institution id for this operation&quot;);
+        }
+<span class="nc" id="L39">    }</span>
+
+    public static void validateInstitutionAccess(Long resourceInstitutionId,
+                                                 Long headerInstitutionId,
+                                                 String resourceType,
+                                                 Object resourceId) {
+<span class="nc bnc" id="L45" title="All 2 branches missed.">        if (isPlatformScope(headerInstitutionId)) {</span>
+<span class="nc" id="L46">            return;</span>
+        }
+<span class="nc" id="L48">        requireTenantInstitution(headerInstitutionId);</span>
+<span class="nc bnc" id="L49" title="All 4 branches missed.">        if (resourceInstitutionId == null || !headerInstitutionId.equals(resourceInstitutionId)) {</span>
+<span class="nc" id="L50">            throw new InstitutionAccessDeniedException(resourceType, resourceId);</span>
+        }
+<span class="nc" id="L52">    }</span>
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.15.202606040825</span></div></body></html>

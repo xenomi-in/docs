@@ -1,0 +1,68 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>HttpAccountingCardLimitClient.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">CMS Core Service</a> &gt; <a href="index.source.html" class="el_package">com.xenomi.cms.core.v2.cardcontrol.client</a> &gt; <span class="el_source">HttpAccountingCardLimitClient.java</span></div><h1>HttpAccountingCardLimitClient.java</h1><pre class="source lang-java linenums">package com.xenomi.cms.core.v2.cardcontrol.client;
+
+import java.time.OffsetDateTime;
+import java.time.ZoneOffset;
+import java.util.UUID;
+
+import org.springframework.beans.factory.annotation.Value;
+import org.springframework.stereotype.Component;
+import org.springframework.web.client.RestClient;
+import org.springframework.web.client.RestClientException;
+import org.springframework.http.client.SimpleClientHttpRequestFactory;
+
+@Component
+public class HttpAccountingCardLimitClient implements AccountingCardLimitClient {
+    private final RestClient restClient;
+    private final String baseUrl;
+    private final long freshnessSeconds;
+
+    public HttpAccountingCardLimitClient(RestClient.Builder builder,
+            @Value(&quot;${cms.accounting.base-url:}&quot;) String baseUrl,
+            @Value(&quot;${cms.accounting.limit-freshness-seconds:60}&quot;) long freshnessSeconds,
+<span class="fc" id="L22">            @Value(&quot;${cms.accounting.timeout-ms:3000}&quot;) int timeoutMs) {</span>
+<span class="fc" id="L23">        SimpleClientHttpRequestFactory requestFactory = new SimpleClientHttpRequestFactory();</span>
+<span class="fc" id="L24">        requestFactory.setConnectTimeout(timeoutMs);</span>
+<span class="fc" id="L25">        requestFactory.setReadTimeout(timeoutMs);</span>
+<span class="fc" id="L26">        this.restClient = builder.requestFactory(requestFactory).build();</span>
+<span class="fc bfc" id="L27" title="All 2 branches covered.">        this.baseUrl = baseUrl == null ? &quot;&quot; : baseUrl.trim();</span>
+<span class="fc" id="L28">        this.freshnessSeconds = freshnessSeconds;</span>
+<span class="fc" id="L29">    }</span>
+
+    @Override
+    public AccountingCardLimit getAssignedLimit(
+            UUID institutionId, UUID accountReferenceId, UUID cardId, String requestId) {
+<span class="fc bfc" id="L34" title="All 2 branches covered.">        if (baseUrl.isBlank()) {</span>
+<span class="fc" id="L35">            throw new IllegalStateException(&quot;Accounting card-limit wrapper is not configured&quot;);</span>
+        }
+        try {
+<span class="fc" id="L38">            AccountingCardLimit result = restClient.get()</span>
+<span class="fc" id="L39">                    .uri(baseUrl + &quot;/internal/v1/institutions/{institutionId}/accounts/{accountId}/card-limit?cardId={cardId}&quot;,</span>
+                            institutionId, accountReferenceId, cardId)
+<span class="fc" id="L41">                    .header(&quot;X-Request-Id&quot;, requestId)</span>
+<span class="fc" id="L42">                    .retrieve()</span>
+<span class="fc" id="L43">                    .body(AccountingCardLimit.class);</span>
+<span class="fc" id="L44">            validate(result);</span>
+<span class="fc" id="L45">            return result;</span>
+<span class="fc" id="L46">        } catch (RestClientException ex) {</span>
+<span class="fc" id="L47">            throw new IllegalStateException(&quot;Accounting card-limit lookup failed&quot;, ex);</span>
+        }
+    }
+
+    private void validate(AccountingCardLimit result) {
+<span class="fc" id="L52">        OffsetDateTime now = OffsetDateTime.now(ZoneOffset.UTC);</span>
+<span class="fc bfc" id="L53" title="All 4 branches covered.">        if (result == null || result.assignedLimitMinor() &lt; 0</span>
+<span class="fc bfc" id="L54" title="All 2 branches covered.">                || result.currencyCode() == null</span>
+<span class="fc bfc" id="L55" title="All 2 branches covered.">                || !result.currencyCode().matches(&quot;[A-Z]{3}&quot;)</span>
+<span class="fc bfc" id="L56" title="All 4 branches covered.">                || result.availableAmountMinor() != null &amp;&amp; result.availableAmountMinor() &lt; 0</span>
+<span class="pc bpc" id="L57" title="1 of 4 branches missed.">                || result.sourceSystem() != null &amp;&amp; result.sourceSystem().length() &gt; 50</span>
+<span class="pc bpc" id="L58" title="1 of 4 branches missed.">                || result.sourceVersion() != null &amp;&amp; result.sourceVersion().length() &gt; 120</span>
+<span class="fc bfc" id="L59" title="All 4 branches covered.">                || result.retrievedAt() == null || result.expiresAt() == null</span>
+<span class="fc bfc" id="L60" title="All 2 branches covered.">                || result.retrievedAt().isAfter(now.plusSeconds(5))</span>
+<span class="fc bfc" id="L61" title="All 2 branches covered.">                || !result.expiresAt().isAfter(result.retrievedAt())</span>
+<span class="pc bpc" id="L62" title="1 of 2 branches missed.">                || !result.expiresAt().isAfter(now)</span>
+<span class="fc bfc" id="L63" title="All 2 branches covered.">                || result.retrievedAt().isBefore(now.minusSeconds(freshnessSeconds))) {</span>
+<span class="fc" id="L64">            throw new IllegalStateException(&quot;Accounting returned an invalid or stale card limit&quot;);</span>
+        }
+<span class="fc" id="L66">    }</span>
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.15.202606040825</span></div></body></html>

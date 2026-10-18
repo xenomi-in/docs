@@ -8,12 +8,12 @@ title: "ISO8583 TCP Listener — v1.0.0"
 **Version:** `1.0.0` — initial release candidate, not yet distributed to the client.
 **Planned tag:** `v1.0.0`; the existing tag still points to `a4c085c` and must be refreshed after the reviewed changes are committed.
 
-## Falcon deployment summary
+## Deployment summary
 
 | Item | Status |
 | --- | --- |
 | Version | Maven `1.0.0`; executable `switch-1.0.0.jar` |
-| Build identity | Local candidate identity and results: [verification evidence](VERIFICATION_v1.0.0.html). Committed CI build remains pending |
+| Build identity | Local candidate identity and results: [verification evidence](VERIFICATION_v1.0.0.html). |
 | Switch Core requirement | Requires authenticated mandate-revocation calls; minimum compatible release is **not yet confirmed**. Reviewed source `a33b3a4` does not attach a token |
 | RuPay requirement | Production requires a TLS/mTLS endpoint; NPCI/Falcon link confirmation remains outstanding (T-TCP-10) |
 | UAT / production readiness | **Not approved by the available evidence**; complete service compatibility and environment acceptance remain open |
@@ -57,13 +57,6 @@ These are implemented security controls, not a statement of PCI DSS certificatio
 - Separated ISO response mapping and network-message processing from the RuPay client handler. Legacy `RuPayClientChannel`, `ISOClientChannel`, and `TestClient` classes remain outside the active connector path.
 - Expanded automated coverage for message mapping, channel framing, security configuration, transport validation, connector lifecycle, routing, and error paths.
 
-## Pre-release build corrections
-
-- Align Maven metadata and executable JAR name with version 1.0.0.
-- Generate the container health-check script with `printf` to preserve its shebang and executable HTTP probe.
-- Set Compose maximum heap to 2 GB within its 4 GB memory limit; representative load testing remains required.
-- Add Maven coverage reporting during `verify`, and CI that builds the release image from the exact tested JAR, compares its checksum inside the image, and smoke-tests startup/health.
-- Prepare checksums, build manifest, test/coverage reports and JAR/image archives as workflow artifacts and draft GitHub Release attachments. Remove generated reports from the documentation tree.
 
 ## JUnit test results
 

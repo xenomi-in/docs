@@ -1,0 +1,136 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>OutboxAdminV2Service.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">CMS Core Service</a> &gt; <a href="index.source.html" class="el_package">com.xenomi.cms.core.v2.event.admin</a> &gt; <span class="el_source">OutboxAdminV2Service.java</span></div><h1>OutboxAdminV2Service.java</h1><pre class="source lang-java linenums">package com.xenomi.cms.core.v2.event.admin;
+
+import java.util.List;
+import java.util.Objects;
+import java.util.UUID;
+
+import com.xenomi.cms.core.exception.BusinessRuleViolationException;
+import com.xenomi.cms.core.exception.ResourceNotFoundException;
+import com.xenomi.cms.core.v2.event.entity.OutboxEventV2;
+import com.xenomi.cms.core.v2.event.model.OutboxPublicationStatus;
+import com.xenomi.cms.core.v2.event.repository.OutboxEventV2Repository;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageRequest;
+import org.springframework.data.domain.Pageable;
+import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
+
+/** Operator tooling for the outbox: inspect and replay dead-lettered events. */
+@Service
+public class OutboxAdminV2Service {
+
+<span class="fc" id="L24">    private static final Logger log = LoggerFactory.getLogger(OutboxAdminV2Service.class);</span>
+    private static final String REPLAY_ONE = &quot;REPLAY_ONE&quot;;
+    private static final String REPLAY_BATCH = &quot;REPLAY_BATCH&quot;;
+
+    private final OutboxEventV2Repository repository;
+    private final OutboxAdminCommandV2Repository commandRepository;
+
+    public OutboxAdminV2Service(
+            OutboxEventV2Repository repository,
+<span class="fc" id="L33">            OutboxAdminCommandV2Repository commandRepository) {</span>
+<span class="fc" id="L34">        this.repository = repository;</span>
+<span class="fc" id="L35">        this.commandRepository = commandRepository;</span>
+<span class="fc" id="L36">    }</span>
+
+    @Transactional(readOnly = true)
+    public Page&lt;OutboxEventV2Response&gt; list(UUID institutionId, OutboxPublicationStatus status, Pageable pageable) {
+<span class="nc" id="L40">        return repository.findByInstitutionIdAndPublicationStatus(institutionId, status, pageable)</span>
+<span class="nc" id="L41">                .map(OutboxEventV2Response::from);</span>
+    }
+
+    @Transactional(readOnly = true)
+    public OutboxEventV2Response get(UUID institutionId, UUID outboxEventId) {
+<span class="nc" id="L46">        return OutboxEventV2Response.from(find(institutionId, outboxEventId));</span>
+    }
+
+    /** Returns a DEAD_LETTER event to PENDING so the dispatcher picks it up on the next cycle. */
+    @Transactional
+    public OutboxEventV2Response replay(
+            UUID institutionId, UUID outboxEventId, String idempotencyKey, String actorId) {
+<span class="fc" id="L53">        idempotencyKey = required(idempotencyKey, &quot;Idempotency-Key&quot;);</span>
+<span class="fc" id="L54">        actorId = required(actorId, &quot;X-Actor-Id&quot;);</span>
+<span class="pc bpc" id="L55" title="1 of 2 branches missed.">        if (!registerCommand(institutionId, idempotencyKey, REPLAY_ONE, outboxEventId, actorId)) {</span>
+<span class="fc" id="L56">            return OutboxEventV2Response.from(find(institutionId, outboxEventId));</span>
+        }
+<span class="nc" id="L58">        OutboxEventV2 event = repository.findForUpdate(institutionId, outboxEventId)</span>
+<span class="nc" id="L59">                .orElseThrow(() -&gt; new ResourceNotFoundException(</span>
+<span class="nc" id="L60">                        &quot;Outbox event&quot;, outboxEventId.toString()));</span>
+<span class="nc bnc" id="L61" title="All 2 branches missed.">        if (event.getPublicationStatus() != OutboxPublicationStatus.DEAD_LETTER) {</span>
+<span class="nc" id="L62">            throw new BusinessRuleViolationException(</span>
+<span class="nc" id="L63">                    &quot;Only DEAD_LETTER outbox events can be replayed; current status is &quot; + event.getPublicationStatus());</span>
+        }
+<span class="nc" id="L65">        reset(event);</span>
+<span class="nc" id="L66">        log.warn(&quot;Outbox event {} ({}) replayed by {}&quot;, outboxEventId, event.getEventType(), actorId);</span>
+<span class="nc" id="L67">        return OutboxEventV2Response.from(event);</span>
+    }
+
+    /** Replays one bounded batch, e.g. after a hub contract fix. */
+    @Transactional
+    public int replayAllDeadLetters(
+            UUID institutionId, String idempotencyKey, String actorId, int limit) {
+<span class="pc bpc" id="L74" title="1 of 4 branches missed.">        if (limit &lt; 1 || limit &gt; 1_000) {</span>
+<span class="fc" id="L75">            throw new BusinessRuleViolationException(&quot;Replay limit must be between 1 and 1000&quot;);</span>
+        }
+<span class="fc" id="L77">        idempotencyKey = required(idempotencyKey, &quot;Idempotency-Key&quot;);</span>
+<span class="fc" id="L78">        actorId = required(actorId, &quot;X-Actor-Id&quot;);</span>
+<span class="pc bpc" id="L79" title="1 of 2 branches missed.">        if (!registerCommand(institutionId, idempotencyKey, REPLAY_BATCH, null, actorId)) {</span>
+<span class="nc" id="L80">            return commandRepository.findByInstitutionIdAndIdempotencyKey(institutionId, idempotencyKey)</span>
+<span class="nc" id="L81">                    .orElseThrow().getReplayedCount();</span>
+        }
+<span class="fc" id="L83">        List&lt;OutboxEventV2&gt; deadLetters = repository.findDeadLettersForUpdate(</span>
+<span class="fc" id="L84">                institutionId, OutboxPublicationStatus.DEAD_LETTER, PageRequest.of(0, limit));</span>
+<span class="fc" id="L85">        deadLetters.forEach(OutboxAdminV2Service::reset);</span>
+<span class="fc" id="L86">        OutboxAdminCommandV2 command = commandRepository</span>
+<span class="fc" id="L87">                .findByInstitutionIdAndIdempotencyKey(institutionId, idempotencyKey)</span>
+<span class="fc" id="L88">                .orElseThrow();</span>
+<span class="fc" id="L89">        command.setReplayedCount(deadLetters.size());</span>
+<span class="fc" id="L90">        log.warn(&quot;{} dead-lettered outbox events for institution {} replayed by {}&quot;,</span>
+<span class="fc" id="L91">                deadLetters.size(), institutionId, actorId);</span>
+<span class="fc" id="L92">        return deadLetters.size();</span>
+    }
+
+    private boolean registerCommand(UUID institutionId, String idempotencyKey, String operation,
+            UUID outboxEventId, String actorId) {
+<span class="fc" id="L97">        int inserted = commandRepository.insertIfAbsent(</span>
+<span class="fc" id="L98">                UUID.randomUUID(), institutionId, idempotencyKey, operation, outboxEventId, actorId);</span>
+<span class="fc bfc" id="L99" title="All 2 branches covered.">        if (inserted == 1) {</span>
+<span class="fc" id="L100">            return true;</span>
+        }
+<span class="fc" id="L102">        OutboxAdminCommandV2 existing = commandRepository</span>
+<span class="fc" id="L103">                .findByInstitutionIdAndIdempotencyKey(institutionId, idempotencyKey)</span>
+<span class="fc" id="L104">                .orElseThrow();</span>
+<span class="pc bpc" id="L105" title="1 of 2 branches missed.">        if (!operation.equals(existing.getOperation())</span>
+<span class="pc bpc" id="L106" title="1 of 2 branches missed.">                || !Objects.equals(outboxEventId, existing.getOutboxEventId())) {</span>
+<span class="nc" id="L107">            throw new BusinessRuleViolationException(</span>
+                    &quot;Idempotency-Key was already used for a different outbox replay operation&quot;);
+        }
+<span class="fc" id="L110">        return false;</span>
+    }
+
+    private static String required(String value, String name) {
+<span class="pc bpc" id="L114" title="2 of 4 branches missed.">        if (value == null || value.isBlank()) {</span>
+<span class="nc" id="L115">            throw new BusinessRuleViolationException(name + &quot; is required&quot;);</span>
+        }
+<span class="fc" id="L117">        return value.trim();</span>
+    }
+
+    private static void reset(OutboxEventV2 event) {
+<span class="fc" id="L121">        event.setPublicationStatus(OutboxPublicationStatus.PENDING);</span>
+<span class="fc" id="L122">        event.setRetryCount(0);</span>
+<span class="fc" id="L123">        event.setFirstFailedAt(null);</span>
+<span class="fc" id="L124">        event.setNextRetryAt(null);</span>
+<span class="fc" id="L125">        event.setLockedUntil(null);</span>
+<span class="fc" id="L126">        event.setLockedBy(null);</span>
+<span class="fc" id="L127">        event.setLastError(null);</span>
+<span class="fc" id="L128">    }</span>
+
+    private OutboxEventV2 find(UUID institutionId, UUID outboxEventId) {
+<span class="fc" id="L131">        return repository.findById(outboxEventId)</span>
+<span class="fc" id="L132">                .filter(event -&gt; institutionId.equals(event.getInstitutionId()))</span>
+<span class="pc" id="L133">                .orElseThrow(() -&gt; new ResourceNotFoundException(&quot;Outbox event&quot;, outboxEventId.toString()));</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.15.202606040825</span></div></body></html>

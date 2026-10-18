@@ -1,0 +1,396 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>CMS Core Service — Code Coverage | Xenomi Engineering Hub</title>
+  <style>
+    * { box-sizing: border-box; }
+    body { font: 16px/1.65 system-ui, sans-serif; margin: 0; background: #f5f7fb; color: #1e293b; overflow-wrap: anywhere; }
+    main { max-width: 1100px; margin: 32px auto; padding: 32px; background: white; border: 1px solid #e2e8f0; border-radius: 10px; }
+    nav { margin-bottom: 24px; }
+    a { color: #2563eb; }
+    h1, h2, h3 { line-height: 1.25; color: #1e3a8a; }
+    h2 { margin-top: 2em; border-bottom: 1px solid #e2e8f0; padding-bottom: .4em; }
+    table { display: block; width: 100%; overflow-x: auto; border-collapse: collapse; margin: 20px 0; }
+    th, td { border: 1px solid #cbd5e1; padding: 10px 12px; text-align: left; vertical-align: top; }
+    th { background: #edf2f7; }
+    code { background: #f1f5f9; padding: 2px 5px; border-radius: 3px; }
+    pre { background: #f1f5f9; padding: 16px; overflow-x: auto; }
+    pre code { padding: 0; }
+    @media (max-width: 640px) { main { margin: 0; padding: 20px; border: 0; border-radius: 0; } }
+  </style>
+</head>
+<body>
+  <main>
+    <nav><a href="../../../index.html">Xenomi Engineering Hub</a></nav>
+    <article><h1>Code Coverage Documentation</h1>
+<h2>Overview</h2>
+<p>This project uses <strong>JaCoCo (Java Code Coverage)</strong> to measure and report code coverage for the CMS Core Service application.</p>
+<h2>Coverage Configuration</h2>
+<h3>Coverage Goal and Current Build Gates</h3>
+<p>The release-quality goal is <strong>80% overall line coverage</strong> for the V2 application and its supported shared runtime packages.</p>
+<p>The current non-regression gates configured in <code>pom.xml</code> are:</p>
+<ul>
+<li><strong>Line coverage</strong>: minimum 80%</li>
+<li><strong>Branch coverage</strong>: minimum 25%</li>
+</ul>
+<p>The overall line target is now enforced by the build. The branch floor remains a baseline and should be raised incrementally as validation, security, retry, and recovery paths gain coverage.</p>
+<p>The coverage scope intentionally includes V2 and the shared components called directly by V2. Legacy V1 APIs and services are outside this release-quality gate.</p>
+<h2>Generating Coverage Reports</h2>
+<h3>Option 1: Using the Script (Recommended)</h3>
+<pre><code class="language-bash"># Generate full coverage report (clean, test, report, check)
+./generate-coverage.sh
+
+# Or run individual steps
+./generate-coverage.sh clean    # Clean previous builds
+./generate-coverage.sh report   # Generate report (after tests)
+./generate-coverage.sh check    # Check coverage thresholds
+</code></pre>
+<h3>Option 2: Using Maven Commands</h3>
+<pre><code class="language-bash"># Run tests with coverage
+mvn clean test
+
+# Generate HTML report
+mvn jacoco:report
+
+# Check coverage thresholds using the configured Maven execution
+mvn jacoco:check@check
+</code></pre>
+<h2>Viewing Coverage Reports</h2>
+<p>After generating the report, open the HTML report:</p>
+<pre><code class="language-bash"># On macOS
+open target/site/jacoco/index.html
+
+# On Linux
+xdg-open target/site/jacoco/index.html
+
+# On Windows
+start target/site/jacoco/index.html
+</code></pre>
+<h2>Report Locations</h2>
+<ul>
+<li><strong>HTML Report</strong>: <code>target/site/jacoco/index.html</code> - Interactive HTML report</li>
+<li><strong>XML Report</strong>: <code>target/site/jacoco/jacoco.xml</code> - For CI/CD integration</li>
+<li><strong>CSV Report</strong>: <code>target/site/jacoco/jacoco.csv</code> - For spreadsheet analysis</li>
+</ul>
+<h2>Coverage Metrics</h2>
+<p>JaCoCo provides several coverage metrics:</p>
+<ol>
+<li><strong>Line Coverage</strong>: Percentage of lines executed</li>
+<li><strong>Branch Coverage</strong>: Percentage of branches (if/else) executed</li>
+<li><strong>Method Coverage</strong>: Percentage of methods executed</li>
+<li><strong>Class Coverage</strong>: Percentage of classes with at least one executed method</li>
+<li><strong>Instruction Coverage</strong>: Percentage of bytecode instructions executed</li>
+</ol>
+<h2>Current Coverage Status</h2>
+<p>Latest verified Java 25 / Spring Boot 4.1.1 snapshot, generated on <strong>2026-10-15</strong>, from:</p>
+<pre><code class="language-bash">mvn -q clean -Dtest=&#39;*Test,!OutboxPostgresIntegrationTest&#39; test
+</code></pre>
+<p>The PostgreSQL integration suite is excluded by the current test policy.</p>
+<table>
+<thead>
+<tr>
+<th>Metric</th>
+<th align="right">Covered</th>
+<th align="right">Total</th>
+<th align="right">Coverage</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>Instructions</td>
+<td align="right">39,147</td>
+<td align="right">48,717</td>
+<td align="right"><strong>80.36%</strong></td>
+</tr>
+<tr>
+<td>Lines</td>
+<td align="right">7,355</td>
+<td align="right">8,986</td>
+<td align="right"><strong>81.85%</strong></td>
+</tr>
+<tr>
+<td>Branches</td>
+<td align="right">2,400</td>
+<td align="right">4,334</td>
+<td align="right"><strong>55.38%</strong></td>
+</tr>
+<tr>
+<td>Methods</td>
+<td align="right">1,281</td>
+<td align="right">1,625</td>
+<td align="right"><strong>78.83%</strong></td>
+</tr>
+<tr>
+<td>Classes</td>
+<td align="right">316</td>
+<td align="right">366</td>
+<td align="right"><strong>86.34%</strong></td>
+</tr>
+</tbody></table>
+<p>Test execution status: <strong>563 discovered tests</strong>, <strong>512 passed</strong>, 0 failures, 0 errors, and 51 skipped. <code>OutboxPostgresIntegrationTest</code> remains excluded from this verification run.</p>
+<p>The <strong>80% overall line-coverage goal is achieved</strong> and is now protected by the JaCoCo build gate.</p>
+<h3>Current V2 Package Highlights</h3>
+<table>
+<thead>
+<tr>
+<th>Package</th>
+<th align="right">Lines covered</th>
+<th align="right">Line coverage</th>
+<th align="right">Branch coverage</th>
+<th>Status</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><code>com.xenomi.cms.core.hms.service</code></td>
+<td align="right">237 / 264</td>
+<td align="right"><strong>89.77%</strong></td>
+<td align="right">70.59%</td>
+<td>Line target achieved</td>
+</tr>
+<tr>
+<td><code>com.xenomi.cms.core.v2.switchsync</code></td>
+<td align="right">191 / 237</td>
+<td align="right"><strong>80.59%</strong></td>
+<td align="right">58.33%</td>
+<td>Line target achieved</td>
+</tr>
+<tr>
+<td><code>com.xenomi.cms.core.v2.product.controller</code></td>
+<td align="right">86 / 86</td>
+<td align="right"><strong>100.00%</strong></td>
+<td align="right">n/a</td>
+<td>Line target achieved</td>
+</tr>
+<tr>
+<td><code>com.xenomi.cms.core.v2.card.lifecycle.command</code></td>
+<td align="right">1,013 / 1,252</td>
+<td align="right"><strong>80.91%</strong></td>
+<td align="right">64.44%</td>
+<td>Line target achieved</td>
+</tr>
+<tr>
+<td><code>com.xenomi.cms.core.v2.card.pin.switchpin</code></td>
+<td align="right">264 / 319</td>
+<td align="right"><strong>82.76%</strong></td>
+<td align="right">55.35%</td>
+<td>Line target achieved</td>
+</tr>
+<tr>
+<td><code>com.xenomi.cms.core.v2.card.replacement.service</code></td>
+<td align="right">104 / 106</td>
+<td align="right"><strong>98.11%</strong></td>
+<td align="right">84.62%</td>
+<td>Line and branch targets achieved</td>
+</tr>
+<tr>
+<td><code>com.xenomi.cms.core.v2.product.service</code></td>
+<td align="right">834 / 1,016</td>
+<td align="right"><strong>82.09%</strong></td>
+<td align="right">45.90%</td>
+<td>Line target achieved</td>
+</tr>
+<tr>
+<td><code>com.xenomi.cms.core.v2.card.service</code></td>
+<td align="right">382 / 450</td>
+<td align="right"><strong>84.89%</strong></td>
+<td align="right">38.98%</td>
+<td>Line target achieved</td>
+</tr>
+<tr>
+<td><code>com.xenomi.cms.core.v2.hsm.service</code></td>
+<td align="right">517 / 642</td>
+<td align="right"><strong>80.53%</strong></td>
+<td align="right">44.35%</td>
+<td>Line target achieved</td>
+</tr>
+<tr>
+<td><code>com.xenomi.cms.core.v2.card.pin</code></td>
+<td align="right">188 / 208</td>
+<td align="right"><strong>90.38%</strong></td>
+<td align="right">66.39%</td>
+<td>Line target achieved</td>
+</tr>
+</tbody></table>
+<h3>V2 Controller Coverage</h3>
+<table>
+<thead>
+<tr>
+<th>Controller package</th>
+<th align="right">Lines covered</th>
+<th align="right">Line coverage</th>
+<th align="right">Branch coverage</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><code>com.xenomi.cms.core.v2.card.controller</code></td>
+<td align="right">13 / 13</td>
+<td align="right"><strong>100.00%</strong></td>
+<td align="right">n/a</td>
+</tr>
+<tr>
+<td><code>com.xenomi.cms.core.v2.card.replacement.controller</code></td>
+<td align="right">27 / 27</td>
+<td align="right"><strong>100.00%</strong></td>
+<td align="right">81.25%</td>
+</tr>
+<tr>
+<td><code>com.xenomi.cms.core.v2.institution.controller</code></td>
+<td align="right">28 / 28</td>
+<td align="right"><strong>100.00%</strong></td>
+<td align="right">n/a</td>
+</tr>
+<tr>
+<td><code>com.xenomi.cms.core.v2.cardcontrol.controller</code></td>
+<td align="right">5 / 5</td>
+<td align="right"><strong>100.00%</strong></td>
+<td align="right">n/a</td>
+</tr>
+<tr>
+<td><code>com.xenomi.cms.core.v2.product.controller</code></td>
+<td align="right">86 / 86</td>
+<td align="right"><strong>100.00%</strong></td>
+<td align="right">n/a</td>
+</tr>
+<tr>
+<td><code>com.xenomi.cms.core.v2.card.lifecycle.controller</code></td>
+<td align="right">38 / 38</td>
+<td align="right"><strong>100.00%</strong></td>
+<td align="right">83.33%</td>
+</tr>
+<tr>
+<td><code>com.xenomi.cms.core.v2.hsm.controller</code></td>
+<td align="right">34 / 34</td>
+<td align="right"><strong>100.00%</strong></td>
+<td align="right">75.00%</td>
+</tr>
+<tr>
+<td><code>com.xenomi.cms.core.v2.bin.controller</code></td>
+<td align="right">29 / 29</td>
+<td align="right"><strong>100.00%</strong></td>
+<td align="right">n/a</td>
+</tr>
+</tbody></table>
+<p>Controller coverage includes response-status contracts, one-based pagination and sorting delegation, lifecycle command envelopes, authority-derived caller types, asynchronous issuance/replacement routing, HSM import replay behavior, and unauthorized caller rejection.</p>
+<p><code>CardReplacementV2Service</code> now contains only its active compatibility responsibilities: request lookup, idempotent replay, replacement eligibility validation, PAN-strategy resolution, and the explicit lifecycle-command boundary. The unreachable duplicate successor-card orchestration was removed because supported renewal and security-replacement execution is owned by the V2 lifecycle-command APIs.</p>
+<p><code>NettyHsmService</code> now exposes only the HSM operations used by V2: protected-key exchange, protected PIN-block processing, random PIN offset generation, CVV generation, protected MAC/data operations, health checks, and client delegation. Unreferenced legacy clear-PIN and permanently-null local key lookup paths were removed. Switch synchronization coverage includes registration/update preparation, authenticated transport, receipt lookup, retry classification, pagination-independent queue processing, and Spring Boot 4 JSON compatibility.</p>
+<p>The latest tranche covers card issuance draft finalization, BIN HSM-key assignment creation and reads, HSM replacement-key activation rollover, and PIN audit-history/controller behavior. Local PIN mutations were removed from <code>PinManagementV2Service</code> because supported V2 initialize/change/reset operations are owned by <code>SwitchPinService</code>; the service now contains only its active CMS audit-history responsibility.</p>
+<p>To check current coverage:</p>
+<pre><code class="language-bash"># Run tests and generate report
+mvn clean test jacoco:report
+
+# View summary in console or open HTML report
+</code></pre>
+<h2>Improving Coverage</h2>
+<h3>Areas to Focus On</h3>
+<ol>
+<li><strong>Controllers</strong>: Test all REST endpoints</li>
+<li><strong>Services</strong>: Test business logic and edge cases</li>
+<li><strong>Repositories</strong>: Test custom queries</li>
+<li><strong>Mappers</strong>: Test entity-DTO conversions</li>
+<li><strong>Exception Handlers</strong>: Test error scenarios</li>
+</ol>
+<h3>Test Structure</h3>
+<p>Tests should be organized in <code>src/test/java</code> mirroring the main source structure:</p>
+<pre><code>src/test/java/
+└── com/xenomi/cms/core/
+    ├── institution/
+    │   ├── controller/
+    │   ├── service/
+    │   └── repository/
+    ├── product/
+    ├── card/
+    ├── bin/
+    └── cardcontrols/
+</code></pre>
+<h2>CI/CD Integration</h2>
+<h3>GitHub Actions Example</h3>
+<pre><code class="language-yaml">name: Code Coverage
+
+on: [push, pull_request]
+
+jobs:
+  coverage:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v3
+      - name: Set up JDK 25
+        uses: actions/setup-java@v4
+        with:
+          java-version: &#39;25&#39;
+          distribution: &#39;temurin&#39;
+      - name: Run tests with coverage
+        run: mvn clean test jacoco:report
+      - name: Upload coverage to Codecov
+        uses: codecov/codecov-action@v3
+        with:
+          file: target/site/jacoco/jacoco.xml
+</code></pre>
+<h2>Coverage Goals</h2>
+<h3>Target</h3>
+<ul>
+<li><strong>Overall line coverage</strong>: 80%+</li>
+<li><strong>Critical V2 business services</strong>: 80%+ where the code is active and unit-testable</li>
+<li><strong>Branch coverage</strong>: increase alongside line coverage, with emphasis on rejection, security, validation, retry, and recovery paths</li>
+<li><strong>Regression policy</strong>: do not lower existing coverage or exclude production code solely to improve the reported percentage</li>
+</ul>
+<p>The 80% goal applies to the configured V2 and supported shared-runtime scope. PostgreSQL integration coverage should be reported separately when those suites are enabled.</p>
+<h2>Excluding Code from Coverage</h2>
+<p>To exclude specific classes or packages from coverage:</p>
+<pre><code class="language-xml">&lt;plugin&gt;
+    &lt;groupId&gt;org.jacoco&lt;/groupId&gt;
+    &lt;artifactId&gt;jacoco-maven-plugin&lt;/artifactId&gt;
+    &lt;configuration&gt;
+        &lt;excludes&gt;
+            &lt;exclude&gt;**/dto/**&lt;/exclude&gt;
+            &lt;exclude&gt;**/entity/**&lt;/exclude&gt;
+            &lt;exclude&gt;**/config/**&lt;/exclude&gt;
+        &lt;/excludes&gt;
+    &lt;/configuration&gt;
+&lt;/plugin&gt;
+</code></pre>
+<h2>Troubleshooting</h2>
+<h3>Report Not Generated</h3>
+<ol>
+<li>Ensure tests are run first: <code>mvn test</code></li>
+<li>Check for compilation errors: <code>mvn clean compile</code></li>
+<li>Verify JaCoCo plugin is configured in <code>pom.xml</code></li>
+</ol>
+<h3>Coverage Shows 0%</h3>
+<ol>
+<li>Ensure tests are actually executing: Check test output</li>
+<li>Verify test classes follow naming convention: <code>*Test.java</code> or <code>*Tests.java</code></li>
+<li>Check that tests are in <code>src/test/java</code> directory</li>
+</ol>
+<h3>Threshold Check Failing</h3>
+<ol>
+<li>Review coverage report to identify low-coverage areas</li>
+<li>Add tests for uncovered code</li>
+<li>Adjust thresholds if needed (temporarily) in <code>pom.xml</code></li>
+</ol>
+<h2>Best Practices</h2>
+<ol>
+<li><strong>Run coverage regularly</strong>: Before committing code</li>
+<li><strong>Aim for meaningful coverage</strong>: Focus on business logic, not just numbers</li>
+<li><strong>Review coverage reports</strong>: Identify untested edge cases</li>
+<li><strong>Maintain test quality</strong>: Good tests are more important than high coverage</li>
+<li><strong>Update thresholds gradually</strong>: Increase as coverage improves</li>
+</ol>
+<h2>Resources</h2>
+<ul>
+<li><a href="https://www.jacoco.org/jacoco/trunk/doc/">JaCoCo Documentation</a></li>
+<li><a href="https://www.jacoco.org/jacoco/trunk/doc/maven.html">JaCoCo Maven Plugin</a></li>
+<li><a href="https://docs.spring.io/spring-boot/docs/current/reference/html/features.html#features.testing">Spring Boot Testing Guide</a></li>
+</ul>
+<h2>Bundled verification reports — 15 October 2026</h2>
+<ul>
+<li><a href="test-report/JUnit_Test_Report.html">JUnit test results</a></li>
+<li><a href="test-report/coverage/index.html">JaCoCo coverage report</a></li>
+<li><a href="test-report/junit-results.xml">JUnit XML results</a></li>
+<li><a href="test-report/test-suites.csv">Test suites CSV</a></li>
+<li><a href="test-report/test-cases.csv">Test cases CSV</a></li>
+</ul>
+</article>
+  </main>
+</body>
+</html>

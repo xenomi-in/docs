@@ -1,0 +1,136 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>EventV2Config.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">CMS Core Service</a> &gt; <a href="index.source.html" class="el_package">com.xenomi.cms.core.v2.event.config</a> &gt; <span class="el_source">EventV2Config.java</span></div><h1>EventV2Config.java</h1><pre class="source lang-java linenums">package com.xenomi.cms.core.v2.event.config;
+
+import java.util.concurrent.TimeUnit;
+
+import com.xenomi.cms.core.v2.event.publisher.RetryPolicy;
+import com.xenomi.cms.core.v2.event.publisher.auth.ClientCredentialsProvider;
+import com.xenomi.cms.core.v2.event.publisher.auth.HubCredentialsProvider;
+import com.xenomi.cms.core.v2.event.publisher.auth.StaticBearerCredentialsProvider;
+import io.github.resilience4j.circuitbreaker.CircuitBreaker;
+import io.github.resilience4j.circuitbreaker.CircuitBreakerConfig;
+import org.apache.hc.client5.http.config.ConnectionConfig;
+import org.apache.hc.client5.http.config.RequestConfig;
+import org.apache.hc.client5.http.impl.classic.CloseableHttpClient;
+import org.apache.hc.client5.http.impl.classic.HttpClients;
+import org.apache.hc.client5.http.impl.io.PoolingHttpClientConnectionManager;
+import org.apache.hc.client5.http.impl.io.PoolingHttpClientConnectionManagerBuilder;
+import org.apache.hc.core5.util.TimeValue;
+import org.apache.hc.core5.util.Timeout;
+import org.springframework.context.annotation.Bean;
+import org.springframework.context.annotation.Configuration;
+import org.springframework.beans.factory.annotation.Qualifier;
+import org.springframework.http.client.HttpComponentsClientHttpRequestFactory;
+import org.springframework.scheduling.concurrent.ThreadPoolTaskScheduler;
+import org.springframework.web.client.RestClient;
+
+/**
+ * Wiring for the v2 outbox publisher. Everything here is private to the event module; the
+ * application's scheduling and HTTP configuration for other integrations is untouched.
+ */
+@Configuration
+<span class="fc" id="L31">public class EventV2Config {</span>
+
+    public static final String OUTBOX_SCHEDULER = &quot;outboxTaskScheduler&quot;;
+    public static final String HUB_REST_CLIENT = &quot;cmsNotificationRestClient&quot;;
+    public static final String HUB_CIRCUIT_BREAKER = &quot;cmsNotificationCircuitBreaker&quot;;
+
+    @Bean(name = OUTBOX_SCHEDULER)
+    ThreadPoolTaskScheduler outboxTaskScheduler() {
+<span class="nc" id="L39">        ThreadPoolTaskScheduler scheduler = new ThreadPoolTaskScheduler();</span>
+<span class="nc" id="L40">        scheduler.setPoolSize(2);</span>
+<span class="nc" id="L41">        scheduler.setThreadNamePrefix(&quot;cms-outbox-&quot;);</span>
+<span class="nc" id="L42">        scheduler.setDaemon(true);</span>
+<span class="nc" id="L43">        scheduler.setWaitForTasksToCompleteOnShutdown(true);</span>
+<span class="nc" id="L44">        scheduler.setAwaitTerminationSeconds(35);</span>
+<span class="nc" id="L45">        scheduler.initialize();</span>
+<span class="nc" id="L46">        return scheduler;</span>
+    }
+
+    @Bean(destroyMethod = &quot;close&quot;)
+    CloseableHttpClient cmsNotificationHttpClient(
+            CmsNotificationProperties properties,
+            OutboxV2Properties outboxProperties) {
+<span class="nc" id="L53">        properties.validateSecureTransport();</span>
+<span class="nc" id="L54">        outboxProperties.validateAgainst(properties);</span>
+<span class="nc" id="L55">        CmsNotificationProperties.Pool pool = properties.getPool();</span>
+<span class="nc" id="L56">        PoolingHttpClientConnectionManager connectionManager = PoolingHttpClientConnectionManagerBuilder.create()</span>
+<span class="nc" id="L57">                .setMaxConnTotal(pool.getMaxTotal())</span>
+<span class="nc" id="L58">                .setMaxConnPerRoute(pool.getMaxPerRoute())</span>
+<span class="nc" id="L59">                .setDefaultConnectionConfig(ConnectionConfig.custom()</span>
+<span class="nc" id="L60">                        .setConnectTimeout(Timeout.ofMilliseconds(properties.getConnectTimeout().toMillis()))</span>
+<span class="nc" id="L61">                        .setSocketTimeout(Timeout.ofMilliseconds(properties.getReadTimeout().toMillis()))</span>
+<span class="nc" id="L62">                        .setValidateAfterInactivity(TimeValue.ofSeconds(5))</span>
+<span class="nc" id="L63">                        .build())</span>
+<span class="nc" id="L64">                .build();</span>
+<span class="nc" id="L65">        return HttpClients.custom()</span>
+<span class="nc" id="L66">                .setConnectionManager(connectionManager)</span>
+<span class="nc" id="L67">                .setDefaultRequestConfig(RequestConfig.custom()</span>
+<span class="nc" id="L68">                        .setResponseTimeout(Timeout.ofMilliseconds(properties.getReadTimeout().toMillis()))</span>
+<span class="nc" id="L69">                        .setConnectionRequestTimeout(Timeout.ofMilliseconds(properties.getConnectTimeout().toMillis()))</span>
+<span class="nc" id="L70">                        .build())</span>
+<span class="nc" id="L71">                .evictIdleConnections(TimeValue.of(pool.getIdleEviction().toMillis(), TimeUnit.MILLISECONDS))</span>
+<span class="nc" id="L72">                .evictExpiredConnections()</span>
+<span class="nc" id="L73">                .disableAutomaticRetries()</span>
+<span class="nc" id="L74">                .build();</span>
+    }
+
+    @Bean(name = HUB_REST_CLIENT)
+    RestClient cmsNotificationRestClient(
+            RestClient.Builder builder,
+            CmsNotificationProperties properties,
+            @Qualifier(&quot;cmsNotificationHttpClient&quot;) CloseableHttpClient httpClient) {
+<span class="nc" id="L82">        return builder.clone()</span>
+<span class="nc" id="L83">                .baseUrl(properties.getBaseUrl().trim())</span>
+<span class="nc" id="L84">                .requestFactory(requestFactory(httpClient))</span>
+<span class="nc" id="L85">                .build();</span>
+    }
+
+    @Bean(name = &quot;cmsNotificationTokenRestClient&quot;)
+    RestClient cmsNotificationTokenRestClient(
+            RestClient.Builder builder,
+            @Qualifier(&quot;cmsNotificationHttpClient&quot;) CloseableHttpClient httpClient) {
+<span class="nc" id="L92">        return builder.clone()</span>
+<span class="nc" id="L93">                .requestFactory(requestFactory(httpClient))</span>
+<span class="nc" id="L94">                .build();</span>
+    }
+
+    @Bean
+    HubCredentialsProvider hubCredentialsProvider(
+            CmsNotificationProperties properties,
+            @Qualifier(&quot;cmsNotificationTokenRestClient&quot;) RestClient tokenClient) {
+<span class="pc bpc" id="L101" title="1 of 2 branches missed.">        if (!properties.isEnabled()) {</span>
+<span class="fc" id="L102">            return java.util.Optional::empty;</span>
+        }
+<span class="nc" id="L104">        CmsNotificationProperties.Auth auth = properties.getAuth();</span>
+<span class="nc bnc" id="L105" title="All 3 branches missed.">        return switch (auth.getMode()) {</span>
+<span class="nc" id="L106">            case NONE -&gt; java.util.Optional::empty;</span>
+<span class="nc" id="L107">            case STATIC_BEARER -&gt; new StaticBearerCredentialsProvider(auth.getStaticToken());</span>
+<span class="nc" id="L108">            case OAUTH2_CLIENT_CREDENTIALS -&gt; new ClientCredentialsProvider(tokenClient, auth);</span>
+        };
+    }
+
+    @Bean(name = HUB_CIRCUIT_BREAKER)
+    CircuitBreaker cmsNotificationCircuitBreaker(OutboxV2Properties properties) {
+<span class="nc" id="L114">        OutboxV2Properties.CircuitBreaker cb = properties.getCircuitBreaker();</span>
+<span class="nc" id="L115">        return CircuitBreaker.of(HUB_CIRCUIT_BREAKER, CircuitBreakerConfig.custom()</span>
+<span class="nc" id="L116">                .slidingWindowType(CircuitBreakerConfig.SlidingWindowType.COUNT_BASED)</span>
+<span class="nc" id="L117">                .slidingWindowSize(cb.getSlidingWindowSize())</span>
+<span class="nc" id="L118">                .minimumNumberOfCalls(cb.getMinimumNumberOfCalls())</span>
+<span class="nc" id="L119">                .failureRateThreshold(cb.getFailureRateThreshold())</span>
+<span class="nc" id="L120">                .waitDurationInOpenState(cb.getWaitDurationInOpenState())</span>
+<span class="nc" id="L121">                .permittedNumberOfCallsInHalfOpenState(cb.getPermittedNumberOfCallsInHalfOpenState())</span>
+<span class="nc" id="L122">                .automaticTransitionFromOpenToHalfOpenEnabled(true)</span>
+<span class="nc" id="L123">                .build());</span>
+    }
+
+    @Bean
+    RetryPolicy outboxRetryPolicy(OutboxV2Properties properties) {
+<span class="nc" id="L128">        return new RetryPolicy(properties.getRetry());</span>
+    }
+
+    private static HttpComponentsClientHttpRequestFactory requestFactory(
+            CloseableHttpClient httpClient) {
+<span class="nc" id="L133">        return new HttpComponentsClientHttpRequestFactory(httpClient);</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.15.202606040825</span></div></body></html>

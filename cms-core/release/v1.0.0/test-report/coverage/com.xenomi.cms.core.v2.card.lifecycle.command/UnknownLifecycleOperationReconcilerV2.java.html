@@ -1,0 +1,140 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>UnknownLifecycleOperationReconcilerV2.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">CMS Core Service</a> &gt; <a href="index.source.html" class="el_package">com.xenomi.cms.core.v2.card.lifecycle.command</a> &gt; <span class="el_source">UnknownLifecycleOperationReconcilerV2.java</span></div><h1>UnknownLifecycleOperationReconcilerV2.java</h1><pre class="source lang-java linenums">package com.xenomi.cms.core.v2.card.lifecycle.command;
+
+import com.xenomi.cms.core.v2.card.lifecycle.entity.CardExternalOperationV2;
+import com.xenomi.cms.core.v2.card.lifecycle.entity.CardLifecycleOperationV2;
+import com.xenomi.cms.core.v2.card.model.LifecycleOperationStatusV2;
+import com.xenomi.cms.core.v2.card.replacement.entity.CardReplacementRequestV2;
+import com.xenomi.cms.core.v2.card.replacement.model.CardReplacementRequestStatus;
+import jakarta.persistence.EntityManager;
+import jakarta.persistence.LockModeType;
+import java.time.Duration;
+import java.time.OffsetDateTime;
+import java.time.ZoneOffset;
+import java.util.LinkedHashMap;
+import java.util.List;
+import java.util.Map;
+import java.util.UUID;
+import org.springframework.beans.factory.annotation.Value;
+import org.springframework.stereotype.Service;
+import org.springframework.transaction.PlatformTransactionManager;
+import org.springframework.transaction.support.TransactionTemplate;
+
+/**
+ * Terminates lifecycle commands whose external provider outcome stayed uncertain
+ * beyond the configured reconciliation window.
+ *
+ * &lt;p&gt;The external operation deliberately remains UNKNOWN: FAILED would incorrectly
+ * claim that the provider did not perform the operation. The parent lifecycle
+ * command becomes FAILED so clients do not poll forever. Its reserved credential
+ * candidate remains quarantined and is never returned to the available pool.&lt;/p&gt;
+ */
+@Service
+public class UnknownLifecycleOperationReconcilerV2 {
+    public static final String FAILURE_CODE = &quot;PROVIDER_OUTCOME_UNRESOLVED&quot;;
+    private static final int BATCH_SIZE = 100;
+
+    private final EntityManager entityManager;
+    private final TransactionTemplate transaction;
+    private final Duration uncertaintyTimeout;
+
+    public UnknownLifecycleOperationReconcilerV2(
+            EntityManager entityManager,
+            PlatformTransactionManager transactionManager,
+            @Value(&quot;${cms.lifecycle.external.unknown-timeout:PT15M}&quot;)
+<span class="fc" id="L44">            Duration uncertaintyTimeout) {</span>
+<span class="fc bfc" id="L45" title="All 4 branches covered.">        if (uncertaintyTimeout == null || uncertaintyTimeout.isZero()</span>
+<span class="fc bfc" id="L46" title="All 2 branches covered.">                || uncertaintyTimeout.isNegative()) {</span>
+<span class="fc" id="L47">            throw new IllegalArgumentException(</span>
+                    &quot;cms.lifecycle.external.unknown-timeout must be positive&quot;);
+        }
+<span class="fc" id="L50">        this.entityManager = entityManager;</span>
+<span class="fc" id="L51">        this.transaction = new TransactionTemplate(transactionManager);</span>
+<span class="fc" id="L52">        this.transaction.setTimeout(30);</span>
+<span class="fc" id="L53">        this.uncertaintyTimeout = uncertaintyTimeout;</span>
+<span class="fc" id="L54">    }</span>
+
+    public int reconcileStale() {
+<span class="fc" id="L57">        OffsetDateTime now = OffsetDateTime.now(ZoneOffset.UTC);</span>
+<span class="fc" id="L58">        OffsetDateTime cutoff = now.minus(uncertaintyTimeout);</span>
+<span class="fc" id="L59">        List&lt;UUID&gt; candidates = transaction.execute(status -&gt; entityManager.createQuery(</span>
+                        &quot;select e.externalOperationId &quot;
+                                + &quot;from CardExternalOperationV2 e, CardLifecycleOperationV2 o &quot;
+                                + &quot;where e.institutionId=o.institutionId &quot;
+                                + &quot;and e.operationId=o.operationId &quot;
+                                + &quot;and e.operationStatus=:unknown &quot;
+                                + &quot;and o.operationStatus=:unknown &quot;
+                                + &quot;and e.dispatchedAt is not null &quot;
+                                + &quot;and e.dispatchedAt&lt;=:cutoff &quot;
+                                + &quot;order by e.dispatchedAt,e.externalOperationId&quot;,
+                        UUID.class)
+<span class="fc" id="L70">                .setParameter(&quot;unknown&quot;, LifecycleOperationStatusV2.UNKNOWN)</span>
+<span class="fc" id="L71">                .setParameter(&quot;cutoff&quot;, cutoff)</span>
+<span class="fc" id="L72">                .setMaxResults(BATCH_SIZE)</span>
+<span class="fc" id="L73">                .getResultList());</span>
+<span class="pc bpc" id="L74" title="1 of 4 branches missed.">        if (candidates == null || candidates.isEmpty()) return 0;</span>
+
+<span class="fc" id="L76">        int reconciled = 0;</span>
+<span class="fc bfc" id="L77" title="All 2 branches covered.">        for (UUID externalOperationId : candidates) {</span>
+<span class="fc" id="L78">            Boolean changed = transaction.execute(status -&gt;</span>
+<span class="fc" id="L79">                    failParentIfStillUnknown(externalOperationId, now));</span>
+<span class="fc bfc" id="L80" title="All 2 branches covered.">            if (Boolean.TRUE.equals(changed)) reconciled++;</span>
+<span class="fc" id="L81">        }</span>
+<span class="fc" id="L82">        return reconciled;</span>
+    }
+
+    private boolean failParentIfStillUnknown(
+            UUID externalOperationId, OffsetDateTime now) {
+<span class="fc" id="L87">        CardExternalOperationV2 external = entityManager.find(</span>
+                CardExternalOperationV2.class, externalOperationId,
+                LockModeType.PESSIMISTIC_WRITE);
+<span class="fc bfc" id="L90" title="All 2 branches covered.">        if (external == null</span>
+<span class="pc bpc" id="L91" title="1 of 2 branches missed.">                || external.getOperationStatus() != LifecycleOperationStatusV2.UNKNOWN</span>
+<span class="pc bpc" id="L92" title="1 of 2 branches missed.">                || external.getDispatchedAt() == null</span>
+<span class="pc bpc" id="L93" title="1 of 2 branches missed.">                || external.getDispatchedAt().isAfter(now.minus(uncertaintyTimeout))) {</span>
+<span class="fc" id="L94">            return false;</span>
+        }
+
+<span class="fc" id="L97">        CardLifecycleOperationV2 operation = entityManager.find(</span>
+<span class="fc" id="L98">                CardLifecycleOperationV2.class, external.getOperationId(),</span>
+                LockModeType.PESSIMISTIC_WRITE);
+<span class="pc bpc" id="L100" title="1 of 2 branches missed.">        if (operation == null</span>
+<span class="fc bfc" id="L101" title="All 2 branches covered.">                || operation.getOperationStatus() != LifecycleOperationStatusV2.UNKNOWN</span>
+<span class="pc bpc" id="L102" title="1 of 2 branches missed.">                || !operation.getInstitutionId().equals(external.getInstitutionId())) {</span>
+<span class="fc" id="L103">            return false;</span>
+        }
+
+<span class="fc" id="L106">        Map&lt;String, Object&gt; result = new LinkedHashMap&lt;&gt;(</span>
+<span class="pc bpc" id="L107" title="1 of 2 branches missed.">                operation.getResultPayload() == null</span>
+<span class="pc" id="L108">                        ? Map.of() : operation.getResultPayload());</span>
+<span class="fc" id="L109">        result.put(&quot;failure&quot;, Map.of(</span>
+                &quot;code&quot;, FAILURE_CODE,
+                &quot;stage&quot;, &quot;EXTERNAL_PROVIDER&quot;,
+<span class="fc" id="L112">                &quot;externalOperationId&quot;, externalOperationId.toString(),</span>
+<span class="fc" id="L113">                &quot;failedAt&quot;, now.toString()));</span>
+<span class="fc" id="L114">        operation.setResultPayload(result);</span>
+<span class="fc" id="L115">        operation.setOperationStatus(LifecycleOperationStatusV2.FAILED);</span>
+<span class="fc" id="L116">        operation.setCompletedAt(now);</span>
+
+        // Replacement requests share the lifecycle operation ID. If present,
+        // expose the same terminal business state to replacement polling.
+<span class="fc" id="L120">        List&lt;CardReplacementRequestV2&gt; replacements = entityManager.createQuery(</span>
+                        &quot;select r from CardReplacementRequestV2 r &quot;
+                                + &quot;where r.institutionId=:tenant &quot;
+                                + &quot;and r.operationId=:operation&quot;,
+                        CardReplacementRequestV2.class)
+<span class="fc" id="L125">                .setParameter(&quot;tenant&quot;, external.getInstitutionId())</span>
+<span class="fc" id="L126">                .setParameter(&quot;operation&quot;, operation.getOperationId())</span>
+<span class="fc" id="L127">                .setLockMode(LockModeType.PESSIMISTIC_WRITE)</span>
+<span class="fc" id="L128">                .getResultList();</span>
+<span class="fc bfc" id="L129" title="All 2 branches covered.">        for (CardReplacementRequestV2 replacement : replacements) {</span>
+<span class="fc bfc" id="L130" title="All 2 branches covered.">            if (replacement.getRequestStatus()</span>
+                    == CardReplacementRequestStatus.PROCESSING) {
+<span class="fc" id="L132">                replacement.setRequestStatus(CardReplacementRequestStatus.FAILED);</span>
+<span class="fc" id="L133">                replacement.setCompletedAt(now);</span>
+            }
+<span class="fc" id="L135">        }</span>
+<span class="fc" id="L136">        entityManager.flush();</span>
+<span class="fc" id="L137">        return true;</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.15.202606040825</span></div></body></html>

@@ -1,0 +1,87 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>CardLifecycleV2Controller.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">CMS Core Service</a> &gt; <a href="index.source.html" class="el_package">com.xenomi.cms.core.v2.card.lifecycle.controller</a> &gt; <span class="el_source">CardLifecycleV2Controller.java</span></div><h1>CardLifecycleV2Controller.java</h1><pre class="source lang-java linenums">package com.xenomi.cms.core.v2.card.lifecycle.controller;
+
+import java.util.UUID;
+
+import com.xenomi.cms.core.api.ApiResponseEnvelope;
+import com.xenomi.cms.core.api.ApiResponseHelper;
+import com.xenomi.cms.core.v2.card.lifecycle.dto.CardLifecycleActionV2Request;
+import com.xenomi.cms.core.v2.card.lifecycle.dto.CardLifecycleActionV2Response;
+import com.xenomi.cms.core.v2.card.lifecycle.service.CardLifecycleV2Service;
+import io.swagger.v3.oas.annotations.Operation;
+import io.swagger.v3.oas.annotations.tags.Tag;
+import jakarta.validation.Valid;
+import jakarta.validation.constraints.NotBlank;
+import jakarta.validation.constraints.Size;
+import org.springframework.http.ResponseEntity;
+import org.springframework.validation.annotation.Validated;
+import org.springframework.web.bind.annotation.PathVariable;
+import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.RequestBody;
+import org.springframework.web.bind.annotation.RequestHeader;
+import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RestController;
+
+@Validated
+@RestController
+@RequestMapping(&quot;/cms/api/v2/institutions/{institutionId}/cards/{cardId}/actions&quot;)
+@Tag(name = &quot;V2 - Cards&quot;, description = &quot;Tenant-scoped card issuance and lifecycle&quot;)
+public class CardLifecycleV2Controller {
+    private final CardLifecycleV2Service service;
+
+<span class="fc" id="L31">    public CardLifecycleV2Controller(CardLifecycleV2Service service) {</span>
+<span class="fc" id="L32">        this.service = service;</span>
+<span class="fc" id="L33">    }</span>
+
+    @PostMapping(&quot;/activate&quot;)
+    @Operation(summary = &quot;Activate a newly issued card&quot;,
+            description = &quot;Transitions READY to ACTIVE and synchronously updates the authorization switch before committing the CMS status.&quot;)
+    public ResponseEntity&lt;ApiResponseEnvelope&lt;CardLifecycleActionV2Response&gt;&gt; activate(
+            @PathVariable UUID institutionId, @PathVariable UUID cardId,
+            @Valid @RequestBody CardLifecycleActionV2Request request,
+            @RequestHeader(&quot;Idempotency-Key&quot;) @NotBlank @Size(max = 128) String idempotencyKey,
+            @RequestHeader(value = &quot;X-Request-Id&quot;, required = false) @Size(max = 128) String requestId,
+            @RequestHeader(&quot;X-Actor-Id&quot;) @NotBlank @Size(max = 100) String actorId) {
+<span class="fc" id="L44">        return ApiResponseHelper.ok(service.activate(</span>
+                institutionId, cardId, request, idempotencyKey, requestId, actorId));
+    }
+
+    @PostMapping(&quot;/suspend&quot;)
+    @Operation(summary = &quot;Suspend an active card&quot;,
+            description = &quot;Deprecated compatibility wrapper. Delegates to the canonical hold placement command; use /holds/place.&quot;)
+    public ResponseEntity&lt;ApiResponseEnvelope&lt;CardLifecycleActionV2Response&gt;&gt; suspend(
+            @PathVariable UUID institutionId, @PathVariable UUID cardId,
+            @Valid @RequestBody CardLifecycleActionV2Request request,
+            @RequestHeader(&quot;Idempotency-Key&quot;) @NotBlank @Size(max = 128) String idempotencyKey,
+            @RequestHeader(value = &quot;X-Request-Id&quot;, required = false) @Size(max = 128) String requestId,
+            @RequestHeader(&quot;X-Actor-Id&quot;) @NotBlank @Size(max = 100) String actorId) {
+<span class="fc" id="L57">        return ApiResponseHelper.ok(service.suspend(</span>
+                institutionId, cardId, request, idempotencyKey, requestId, actorId));
+    }
+
+    @PostMapping(&quot;/unblock&quot;)
+    @Operation(summary = &quot;Unblock or resume a card&quot;,
+            description = &quot;Deprecated compatibility wrapper. Delegates to the canonical hold release command; use /holds/release.&quot;)
+    public ResponseEntity&lt;ApiResponseEnvelope&lt;CardLifecycleActionV2Response&gt;&gt; unblock(
+            @PathVariable UUID institutionId, @PathVariable UUID cardId,
+            @Valid @RequestBody CardLifecycleActionV2Request request,
+            @RequestHeader(&quot;Idempotency-Key&quot;) @NotBlank @Size(max = 128) String idempotencyKey,
+            @RequestHeader(value = &quot;X-Request-Id&quot;, required = false) @Size(max = 128) String requestId,
+            @RequestHeader(&quot;X-Actor-Id&quot;) @NotBlank @Size(max = 100) String actorId) {
+<span class="fc" id="L70">        return ApiResponseHelper.ok(service.unblock(</span>
+                institutionId, cardId, request, idempotencyKey, requestId, actorId));
+    }
+
+    @PostMapping(&quot;/close&quot;)
+    @Operation(summary = &quot;Permanently close a card&quot;,
+            description = &quot;Transitions any non-closed card to the terminal CLOSED state and synchronously updates the authorization switch. Closed cards cannot be reactivated.&quot;)
+    public ResponseEntity&lt;ApiResponseEnvelope&lt;CardLifecycleActionV2Response&gt;&gt; close(
+            @PathVariable UUID institutionId, @PathVariable UUID cardId,
+            @Valid @RequestBody CardLifecycleActionV2Request request,
+            @RequestHeader(&quot;Idempotency-Key&quot;) @NotBlank @Size(max = 128) String idempotencyKey,
+            @RequestHeader(value = &quot;X-Request-Id&quot;, required = false) @Size(max = 128) String requestId,
+            @RequestHeader(&quot;X-Actor-Id&quot;) @NotBlank @Size(max = 100) String actorId) {
+<span class="fc" id="L83">        return ApiResponseHelper.ok(service.close(</span>
+                institutionId, cardId, request, idempotencyKey, requestId, actorId));
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.15.202606040825</span></div></body></html>

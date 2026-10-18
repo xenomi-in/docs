@@ -1,0 +1,53 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>PayloadValues.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">CMS Core Service</a> &gt; <a href="index.source.html" class="el_package">com.xenomi.cms.core.v2.event.mapper</a> &gt; <span class="el_source">PayloadValues.java</span></div><h1>PayloadValues.java</h1><pre class="source lang-java linenums">package com.xenomi.cms.core.v2.event.mapper;
+
+import java.time.Instant;
+import java.time.LocalDate;
+import java.time.OffsetDateTime;
+import java.time.ZoneOffset;
+import java.time.format.DateTimeFormatter;
+import java.util.LinkedHashMap;
+import java.util.Map;
+import java.util.UUID;
+
+/** Formats payload values per the Falcon contract: ISO-8601 UTC instants, ISO dates, UUID strings, enum names. */
+public final class PayloadValues {
+
+    private PayloadValues() {
+    }
+
+    /**
+     * Builds an insertion-ordered payload from key/value pairs. Unlike {@link Map#of}, null
+     * values are kept so the envelope serialises absent fields explicitly as {@code null}.
+     */
+    public static Map&lt;String, Object&gt; entries(Object... keyValues) {
+<span class="pc bpc" id="L23" title="1 of 2 branches missed.">        if (keyValues.length % 2 != 0) {</span>
+<span class="nc" id="L24">            throw new IllegalArgumentException(&quot;Payload entries must be key/value pairs&quot;);</span>
+        }
+<span class="fc" id="L26">        Map&lt;String, Object&gt; payload = new LinkedHashMap&lt;&gt;();</span>
+<span class="fc bfc" id="L27" title="All 2 branches covered.">        for (int i = 0; i &lt; keyValues.length; i += 2) {</span>
+<span class="fc" id="L28">            payload.put((String) keyValues[i], keyValues[i + 1]);</span>
+        }
+<span class="fc" id="L30">        return payload;</span>
+    }
+
+    public static String instant(OffsetDateTime value) {
+<span class="fc bfc" id="L34" title="All 2 branches covered.">        if (value == null) {</span>
+<span class="fc" id="L35">            return null;</span>
+        }
+<span class="fc" id="L37">        Instant utc = value.withOffsetSameInstant(ZoneOffset.UTC).toInstant();</span>
+<span class="fc" id="L38">        return DateTimeFormatter.ISO_INSTANT.format(utc);</span>
+    }
+
+    public static String date(LocalDate value) {
+<span class="fc bfc" id="L42" title="All 2 branches covered.">        return value == null ? null : value.toString();</span>
+    }
+
+    public static String uuid(UUID value) {
+<span class="fc bfc" id="L46" title="All 2 branches covered.">        return value == null ? null : value.toString();</span>
+    }
+
+    public static String name(Enum&lt;?&gt; value) {
+<span class="fc bfc" id="L50" title="All 2 branches covered.">        return value == null ? null : value.name();</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.15.202606040825</span></div></body></html>

@@ -1,0 +1,71 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>InstitutionSecurityPolicyV2.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">CMS Core Service</a> &gt; <a href="index.source.html" class="el_package">com.xenomi.cms.core.v2.institution.entity</a> &gt; <span class="el_source">InstitutionSecurityPolicyV2.java</span></div><h1>InstitutionSecurityPolicyV2.java</h1><pre class="source lang-java linenums">package com.xenomi.cms.core.v2.institution.entity;
+
+import java.time.OffsetDateTime;
+import java.util.LinkedHashMap;
+import java.util.Map;
+import java.util.UUID;
+
+import org.hibernate.annotations.JdbcTypeCode;
+import org.hibernate.type.SqlTypes;
+
+import jakarta.persistence.Column;
+import jakarta.persistence.Entity;
+import jakarta.persistence.Id;
+import jakarta.persistence.PrePersist;
+import jakarta.persistence.PreUpdate;
+import jakarta.persistence.Table;
+import jakarta.persistence.Version;
+import lombok.AllArgsConstructor;
+import lombok.Builder;
+import lombok.Data;
+import lombok.NoArgsConstructor;
+
+@Entity(name = &quot;InstitutionSecurityPolicyV2&quot;)
+@Table(name = &quot;institution_security_policy&quot;, schema = &quot;cms_v2&quot;)
+@Data
+@Builder
+@NoArgsConstructor
+@AllArgsConstructor
+public class InstitutionSecurityPolicyV2 {
+
+    @Id
+    @Column(name = &quot;institution_id&quot;, nullable = false, updatable = false)
+    private UUID institutionId;
+
+    @Column(name = &quot;maker_checker_enabled&quot;, nullable = false)
+    private boolean makerCheckerEnabled;
+
+    @Column(name = &quot;mfa_required&quot;, nullable = false)
+    private boolean mfaRequired;
+
+    @Column(name = &quot;maximum_login_attempts&quot;, nullable = false)
+    private int maximumLoginAttempts;
+
+    @Column(name = &quot;password_policy_reference&quot;, length = 200)
+    private String passwordPolicyReference;
+
+    @JdbcTypeCode(SqlTypes.JSON)
+    @Column(name = &quot;data_masking_policy&quot;, nullable = false, columnDefinition = &quot;jsonb&quot;)
+    @Builder.Default
+    private Map&lt;String, Object&gt; dataMaskingPolicy = new LinkedHashMap&lt;&gt;();
+
+    @Column(name = &quot;audit_retention_days&quot;, nullable = false)
+    private int auditRetentionDays;
+
+    @Version
+    @Column(name = &quot;policy_version&quot;, nullable = false)
+    private int policyVersion;
+
+    @Column(name = &quot;updated_at&quot;, nullable = false)
+    private OffsetDateTime updatedAt;
+
+    @Column(name = &quot;updated_by&quot;, nullable = false, length = 100)
+    private String updatedBy;
+
+    @PrePersist
+    @PreUpdate
+    void touch() {
+<span class="nc" id="L68">        updatedAt = OffsetDateTime.now(java.time.ZoneOffset.UTC);</span>
+<span class="nc" id="L69">    }</span>
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.15.202606040825</span></div></body></html>

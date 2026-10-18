@@ -1,0 +1,35 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>CustomerSecurityReplacementHandlerV2.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">CMS Core Service</a> &gt; <a href="index.source.html" class="el_package">com.xenomi.cms.core.v2.card.lifecycle.command</a> &gt; <span class="el_source">CustomerSecurityReplacementHandlerV2.java</span></div><h1>CustomerSecurityReplacementHandlerV2.java</h1><pre class="source lang-java linenums">package com.xenomi.cms.core.v2.card.lifecycle.command;
+
+import com.xenomi.cms.core.v2.card.model.LifecycleActorTypeV2;
+import com.xenomi.cms.core.v2.product.model.ReplacementRequestChannel;
+import java.util.Set;
+import org.springframework.stereotype.Component;
+
+@Component
+public class CustomerSecurityReplacementHandlerV2
+        implements LifecycleCommandHandlerV2&lt;SecurityReplacementHandlerV2.Payload&gt; {
+    private final SecurityReplacementWorkV2 work;
+
+<span class="fc" id="L13">    public CustomerSecurityReplacementHandlerV2(SecurityReplacementWorkV2 work) {</span>
+<span class="fc" id="L14">        this.work = work;</span>
+<span class="fc" id="L15">    }</span>
+
+<span class="nc" id="L17">    @Override public String kind() { return &quot;REPLACE_SECURITY_NEW_PAN_CUSTOMER&quot;; }</span>
+<span class="nc" id="L18">    @Override public String permission() { return &quot;cms:card-replace:customer&quot;; }</span>
+    @Override public Set&lt;LifecycleActorTypeV2&gt; actors() {
+<span class="fc" id="L20">        return Set.of(LifecycleActorTypeV2.CUSTOMER);</span>
+    }
+    @Override public Class&lt;SecurityReplacementHandlerV2.Payload&gt; payloadType() {
+<span class="nc" id="L23">        return SecurityReplacementHandlerV2.Payload.class;</span>
+    }
+<span class="nc" id="L25">    @Override public VersionRequirement versionRequirement() { return VersionRequirement.CREATE; }</span>
+    @Override public LockPlan plan(LifecycleCommandRequestV2 request,
+            SecurityReplacementHandlerV2.Payload payload) {
+<span class="nc" id="L28">        return work.plan(request, payload);</span>
+    }
+    @Override public void apply(LifecycleCommandContextV2 context,
+            SecurityReplacementHandlerV2.Payload payload) {
+<span class="fc" id="L32">        work.stage(context, payload, ReplacementRequestChannel.CUSTOMER);</span>
+<span class="fc" id="L33">    }</span>
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.15.202606040825</span></div></body></html>

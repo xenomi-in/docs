@@ -1,0 +1,150 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>ApiIdempotencyRepository.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">CMS Core Service</a> &gt; <a href="index.source.html" class="el_package">com.xenomi.cms.core.api.idempotency</a> &gt; <span class="el_source">ApiIdempotencyRepository.java</span></div><h1>ApiIdempotencyRepository.java</h1><pre class="source lang-java linenums">package com.xenomi.cms.core.api.idempotency;
+
+import org.springframework.beans.factory.annotation.Value;
+import org.springframework.jdbc.core.JdbcTemplate;
+import org.springframework.stereotype.Repository;
+
+import java.sql.ResultSet;
+import java.sql.SQLException;
+import java.time.OffsetDateTime;
+import java.util.List;
+import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicLong;
+
+@Repository
+public class ApiIdempotencyRepository {
+
+    private final JdbcTemplate jdbcTemplate;
+    private final long retentionHours;
+<span class="fc" id="L19">    private final AtomicLong nextCleanupAt = new AtomicLong();</span>
+
+    public ApiIdempotencyRepository(
+            JdbcTemplate jdbcTemplate,
+<span class="fc" id="L23">            @Value(&quot;${cms.idempotency.retention-hours:24}&quot;) long retentionHours) {</span>
+<span class="fc" id="L24">        this.jdbcTemplate = jdbcTemplate;</span>
+<span class="fc" id="L25">        this.retentionHours = retentionHours;</span>
+<span class="fc" id="L26">    }</span>
+
+    public ClaimResult claim(RequestIdentity identity, String requestHash) {
+<span class="nc" id="L29">        cleanupExpiredPeriodically();</span>
+<span class="nc" id="L30">        int inserted = jdbcTemplate.update(&quot;&quot;&quot;</span>
+                INSERT INTO cms_v2.api_idempotency_record
+                    (tenant_scope, actor_id, http_method, request_path,
+                     idempotency_key_hash, request_hash, expires_at)
+                VALUES (?, ?, ?, ?, ?, ?, ?)
+                ON CONFLICT (tenant_scope, actor_id, http_method, request_path, idempotency_key_hash)
+                DO NOTHING
+                &quot;&quot;&quot;,
+<span class="nc" id="L38">                identity.tenantScope(), identity.actorId(), identity.httpMethod(),</span>
+<span class="nc" id="L39">                identity.requestPath(), identity.idempotencyKeyHash(), requestHash,</span>
+<span class="nc" id="L40">                OffsetDateTime.now().plusHours(retentionHours));</span>
+<span class="nc bnc" id="L41" title="All 2 branches missed.">        if (inserted == 1) {</span>
+<span class="nc" id="L42">            return ClaimResult.started();</span>
+        }
+
+<span class="nc" id="L45">        List&lt;StoredResponse&gt; records = jdbcTemplate.query(&quot;&quot;&quot;</span>
+                SELECT request_hash, processing_status, response_status,
+                       response_content_type, response_location, response_body
+                  FROM cms_v2.api_idempotency_record
+                 WHERE tenant_scope = ? AND actor_id = ? AND http_method = ?
+                   AND request_path = ? AND idempotency_key_hash = ?
+                   AND expires_at &gt; CURRENT_TIMESTAMP
+                &quot;&quot;&quot;,
+<span class="nc" id="L53">                (rs, rowNum) -&gt; storedResponse(rs),</span>
+<span class="nc" id="L54">                identity.tenantScope(), identity.actorId(), identity.httpMethod(),</span>
+<span class="nc" id="L55">                identity.requestPath(), identity.idempotencyKeyHash());</span>
+<span class="nc bnc" id="L56" title="All 2 branches missed.">        if (records.isEmpty()) {</span>
+<span class="nc" id="L57">            delete(identity);</span>
+<span class="nc" id="L58">            return claim(identity, requestHash);</span>
+        }
+
+<span class="nc" id="L61">        StoredResponse record = records.get(0);</span>
+<span class="nc bnc" id="L62" title="All 2 branches missed.">        if (!record.requestHash().equals(requestHash)) {</span>
+<span class="nc" id="L63">            return ClaimResult.conflict();</span>
+        }
+<span class="nc bnc" id="L65" title="All 2 branches missed.">        if (&quot;COMPLETED&quot;.equals(record.processingStatus())) {</span>
+<span class="nc" id="L66">            return ClaimResult.replay(record);</span>
+        }
+<span class="nc" id="L68">        return ClaimResult.inProgress();</span>
+    }
+
+    public void complete(RequestIdentity identity, int responseStatus,
+                         String contentType, String location, byte[] responseBody) {
+<span class="nc" id="L73">        jdbcTemplate.update(&quot;&quot;&quot;</span>
+                UPDATE cms_v2.api_idempotency_record
+                   SET processing_status = 'COMPLETED', response_status = ?,
+                       response_content_type = ?, response_location = ?, response_body = ?,
+                       completed_at = CURRENT_TIMESTAMP
+                 WHERE tenant_scope = ? AND actor_id = ? AND http_method = ?
+                   AND request_path = ? AND idempotency_key_hash = ?
+                &quot;&quot;&quot;,
+<span class="nc" id="L81">                responseStatus, contentType, location, responseBody,</span>
+<span class="nc" id="L82">                identity.tenantScope(), identity.actorId(), identity.httpMethod(),</span>
+<span class="nc" id="L83">                identity.requestPath(), identity.idempotencyKeyHash());</span>
+<span class="nc" id="L84">    }</span>
+
+    public void delete(RequestIdentity identity) {
+<span class="nc" id="L87">        jdbcTemplate.update(&quot;&quot;&quot;</span>
+                DELETE FROM cms_v2.api_idempotency_record
+                 WHERE tenant_scope = ? AND actor_id = ? AND http_method = ?
+                   AND request_path = ? AND idempotency_key_hash = ?
+                &quot;&quot;&quot;,
+<span class="nc" id="L92">                identity.tenantScope(), identity.actorId(), identity.httpMethod(),</span>
+<span class="nc" id="L93">                identity.requestPath(), identity.idempotencyKeyHash());</span>
+<span class="nc" id="L94">    }</span>
+
+    public void deleteExpired() {
+<span class="nc" id="L97">        jdbcTemplate.update(&quot;DELETE FROM cms_v2.api_idempotency_record WHERE expires_at &lt;= CURRENT_TIMESTAMP&quot;);</span>
+<span class="nc" id="L98">    }</span>
+
+    private void cleanupExpiredPeriodically() {
+<span class="nc" id="L101">        long now = System.currentTimeMillis();</span>
+<span class="nc" id="L102">        long next = nextCleanupAt.get();</span>
+<span class="nc bnc" id="L103" title="All 4 branches missed.">        if (now &gt;= next &amp;&amp; nextCleanupAt.compareAndSet(next, now + TimeUnit.HOURS.toMillis(1))) {</span>
+<span class="nc" id="L104">            deleteExpired();</span>
+        }
+<span class="nc" id="L106">    }</span>
+
+    private static StoredResponse storedResponse(ResultSet rs) throws SQLException {
+<span class="nc" id="L109">        Integer status = (Integer) rs.getObject(&quot;response_status&quot;);</span>
+<span class="nc" id="L110">        return new StoredResponse(</span>
+<span class="nc" id="L111">                rs.getString(&quot;request_hash&quot;),</span>
+<span class="nc" id="L112">                rs.getString(&quot;processing_status&quot;),</span>
+                status,
+<span class="nc" id="L114">                rs.getString(&quot;response_content_type&quot;),</span>
+<span class="nc" id="L115">                rs.getString(&quot;response_location&quot;),</span>
+<span class="nc" id="L116">                rs.getBytes(&quot;response_body&quot;));</span>
+    }
+
+<span class="fc" id="L119">    public record RequestIdentity(</span>
+            String tenantScope,
+            String actorId,
+            String httpMethod,
+            String requestPath,
+            String idempotencyKeyHash) {
+    }
+
+<span class="fc" id="L127">    public record StoredResponse(</span>
+            String requestHash,
+            String processingStatus,
+            Integer responseStatus,
+            String contentType,
+            String location,
+            byte[] body) {
+    }
+
+<span class="fc" id="L136">    public record ClaimResult(ClaimState state, StoredResponse response) {</span>
+<span class="fc" id="L137">        static ClaimResult started() { return new ClaimResult(ClaimState.STARTED, null); }</span>
+<span class="fc" id="L138">        static ClaimResult conflict() { return new ClaimResult(ClaimState.CONFLICT, null); }</span>
+<span class="nc" id="L139">        static ClaimResult inProgress() { return new ClaimResult(ClaimState.IN_PROGRESS, null); }</span>
+<span class="fc" id="L140">        static ClaimResult replay(StoredResponse response) { return new ClaimResult(ClaimState.REPLAY, response); }</span>
+    }
+
+<span class="fc" id="L143">    public enum ClaimState {</span>
+<span class="fc" id="L144">        STARTED,</span>
+<span class="fc" id="L145">        REPLAY,</span>
+<span class="fc" id="L146">        CONFLICT,</span>
+<span class="fc" id="L147">        IN_PROGRESS</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.15.202606040825</span></div></body></html>

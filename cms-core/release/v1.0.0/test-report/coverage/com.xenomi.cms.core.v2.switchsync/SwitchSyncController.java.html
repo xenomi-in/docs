@@ -1,0 +1,32 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>SwitchSyncController.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">CMS Core Service</a> &gt; <a href="index.source.html" class="el_package">com.xenomi.cms.core.v2.switchsync</a> &gt; <span class="el_source">SwitchSyncController.java</span></div><h1>SwitchSyncController.java</h1><pre class="source lang-java linenums">package com.xenomi.cms.core.v2.switchsync;
+
+import com.xenomi.cms.core.api.ApiResponseHelper;
+import com.xenomi.cms.core.exception.ResourceNotFoundException;
+import io.swagger.v3.oas.annotations.Operation;
+import io.swagger.v3.oas.annotations.tags.Tag;
+import org.springframework.beans.factory.annotation.Value;
+import org.springframework.jdbc.core.JdbcTemplate;
+import org.springframework.web.bind.annotation.*;
+import java.util.*;
+
+@RestController
+@RequestMapping(&quot;/cms/api/v2/institutions/{institutionId}/cards/{cardId}/switch-sync&quot;)
+@Tag(name = &quot;V2 - Cards&quot;, description = &quot;Tenant-scoped card issuance and lifecycle&quot;)
+public class SwitchSyncController {
+    private final JdbcTemplate db; private final boolean enabled;
+<span class="fc" id="L17">    public SwitchSyncController(JdbcTemplate db,@Value(&quot;${cms.switch.sync.enabled:false}&quot;) boolean enabled) { this.db=db; this.enabled=enabled; }</span>
+    @GetMapping
+    @Operation(summary=&quot;Read Switch registration and synchronization status&quot;,description=&quot;Lifecycle success is a CMS commit. Check this endpoint for Switch installation. No PAN, encrypted envelope, or key references are returned.&quot;)
+    public Object get(@PathVariable UUID institutionId,@PathVariable UUID cardId) {
+<span class="fc bfc" id="L21" title="All 2 branches covered.">        if(db.queryForList(&quot;select 1 from cms_v2.card where institution_id=? and card_id=?&quot;,institutionId,cardId).isEmpty())</span>
+<span class="fc" id="L22">            throw new ResourceNotFoundException(&quot;Card not found&quot;);</span>
+<span class="fc" id="L23">        var result=new LinkedHashMap&lt;String,Object&gt;();</span>
+<span class="fc" id="L24">        result.put(&quot;enabled&quot;,enabled); result.put(&quot;cardId&quot;,cardId);</span>
+<span class="fc" id="L25">        var revisions=db.queryForList(&quot;select applied_revision from cms_v2.switch_card_sync where institution_id=? and card_id=?&quot;,Long.class,institutionId,cardId);</span>
+<span class="pc bpc" id="L26" title="1 of 2 branches missed.">        result.put(&quot;appliedRevision&quot;,revisions.isEmpty()?0:revisions.getFirst());</span>
+<span class="fc" id="L27">        result.put(&quot;pendingCommands&quot;,db.queryForList(&quot;select command_id,status,attempts,last_error,next_attempt_at from cms_v2.switch_sync_command where institution_id=? and card_id=? and status&lt;&gt;'APPLIED' order by sequence_id&quot;,institutionId,cardId));</span>
+<span class="fc" id="L28">        result.put(&quot;institutionBacklog&quot;,db.queryForObject(&quot;select count(*) from cms_v2.switch_sync_command where institution_id=? and status&lt;&gt;'APPLIED'&quot;,Long.class,institutionId));</span>
+<span class="fc" id="L29">        return ApiResponseHelper.ok(result);</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.15.202606040825</span></div></body></html>

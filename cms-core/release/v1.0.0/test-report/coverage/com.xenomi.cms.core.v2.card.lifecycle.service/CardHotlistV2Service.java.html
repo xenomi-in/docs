@@ -1,0 +1,189 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>CardHotlistV2Service.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">CMS Core Service</a> &gt; <a href="index.source.html" class="el_package">com.xenomi.cms.core.v2.card.lifecycle.service</a> &gt; <span class="el_source">CardHotlistV2Service.java</span></div><h1>CardHotlistV2Service.java</h1><pre class="source lang-java linenums">package com.xenomi.cms.core.v2.card.lifecycle.service;
+
+import java.nio.charset.StandardCharsets;
+import java.security.MessageDigest;
+import java.time.OffsetDateTime;
+import java.time.ZoneOffset;
+import java.util.LinkedHashMap;
+import java.util.Map;
+import java.util.UUID;
+
+import com.xenomi.cms.core.exception.BusinessRuleViolationException;
+import com.xenomi.cms.core.exception.ResourceNotFoundException;
+import com.xenomi.cms.core.v2.card.entity.CardV2;
+import com.xenomi.cms.core.v2.card.lifecycle.client.CardLifecycleSwitchClient;
+import com.xenomi.cms.core.v2.card.lifecycle.dto.HotlistCardV2Request;
+import com.xenomi.cms.core.v2.card.lifecycle.dto.HotlistCardV2Response;
+import com.xenomi.cms.core.v2.card.lifecycle.entity.CardEventV2;
+import com.xenomi.cms.core.v2.card.lifecycle.entity.CardLifecycleOperationV2;
+import com.xenomi.cms.core.v2.card.lifecycle.model.CardHotlistCallerType;
+import com.xenomi.cms.core.v2.card.lifecycle.model.CardHotlistReason;
+import com.xenomi.cms.core.v2.card.lifecycle.repository.CardEventV2Repository;
+import com.xenomi.cms.core.v2.card.model.CardStatusV2;
+import com.xenomi.cms.core.v2.card.model.CardFormV2;
+import com.xenomi.cms.core.v2.card.model.LifecycleActorTypeV2;
+import com.xenomi.cms.core.v2.card.model.LifecycleOperationStatusV2;
+import com.xenomi.cms.core.v2.card.model.PhysicalFulfilmentStatusV2;
+import com.xenomi.cms.core.v2.card.model.PhysicalRetiredReasonV2;
+import com.xenomi.cms.core.v2.card.repository.CardV2Repository;
+import com.xenomi.cms.core.v2.common.DatabaseUuidV7Generator;
+import com.xenomi.cms.core.v2.event.catalog.CardEventSink;
+import com.xenomi.cms.core.v2.event.correlation.CorrelationIdResolver;
+import jakarta.persistence.EntityManager;
+import jakarta.persistence.PersistenceContext;
+import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
+
+@Service
+public class CardHotlistV2Service {
+    static final String HOTLIST_EVENT = &quot;CARD_HOTLISTED&quot;;
+
+    private final CardV2Repository cardRepository;
+    private final CardEventV2Repository eventRepository;
+    private final CardLifecycleSwitchClient switchClient;
+    private final DatabaseUuidV7Generator uuidGenerator;
+    private final CardEventSink eventSink;
+    private final CorrelationIdResolver correlationIdResolver;
+    @PersistenceContext
+    private EntityManager entityManager;
+
+    public CardHotlistV2Service(CardV2Repository cardRepository,
+            CardEventV2Repository eventRepository,
+            CardLifecycleSwitchClient switchClient,
+            DatabaseUuidV7Generator uuidGenerator,
+            CardEventSink eventSink,
+<span class="fc" id="L55">            CorrelationIdResolver correlationIdResolver) {</span>
+<span class="fc" id="L56">        this.cardRepository = cardRepository;</span>
+<span class="fc" id="L57">        this.eventRepository = eventRepository;</span>
+<span class="fc" id="L58">        this.switchClient = switchClient;</span>
+<span class="fc" id="L59">        this.uuidGenerator = uuidGenerator;</span>
+<span class="fc" id="L60">        this.eventSink = eventSink;</span>
+<span class="fc" id="L61">        this.correlationIdResolver = correlationIdResolver;</span>
+<span class="fc" id="L62">    }</span>
+
+    @Transactional
+    public HotlistCardV2Response hotlist(UUID institutionId, UUID cardId,
+            HotlistCardV2Request request, CardHotlistCallerType callerType,
+            String idempotencyKey, String requestId, String actorId) {
+<span class="fc" id="L68">        CardV2 card = cardRepository.findForUpdate(institutionId, cardId)</span>
+<span class="fc" id="L69">                .orElseThrow(() -&gt; new ResourceNotFoundException(&quot;Card&quot;, cardId.toString()));</span>
+<span class="pc bpc" id="L70" title="2 of 6 branches missed.">        if (card.getClosedAt() != null || card.getReplacedAt() != null || card.getExpiredAt() != null) {</span>
+<span class="fc" id="L71">            throw new BusinessRuleViolationException(&quot;Terminal cards cannot be hot-listed&quot;);</span>
+        }
+<span class="fc bfc" id="L73" title="All 2 branches covered.">        if (request.getReason() == CardHotlistReason.CUSTOMER_REQUEST</span>
+<span class="fc bfc" id="L74" title="All 2 branches covered.">                || request.getReason() == CardHotlistReason.OTHER) {</span>
+<span class="fc" id="L75">            throw new BusinessRuleViolationException(&quot;Use the hold API for reversible or unspecified restrictions&quot;);</span>
+        }
+<span class="fc bfc" id="L77" title="All 2 branches covered.">        var securityReason = request.getReason() == CardHotlistReason.SUSPECTED_FRAUD</span>
+<span class="fc" id="L78">                ? com.xenomi.cms.core.v2.card.model.SecurityHoldReasonV2.FRAUD_SUSPECTED</span>
+<span class="fc" id="L79">                : com.xenomi.cms.core.v2.card.model.SecurityHoldReasonV2.valueOf(request.getReason().name());</span>
+<span class="fc bfc" id="L80" title="All 2 branches covered.">        if (card.getSecurityHoldReason() == securityReason) {</span>
+<span class="fc" id="L81">            throw new BusinessRuleViolationException(&quot;The requested security hold is already set&quot;);</span>
+        }
+<span class="fc bfc" id="L83" title="All 2 branches covered.">        if (card.getSecurityHoldReason() != null) {</span>
+<span class="fc" id="L84">            throw new BusinessRuleViolationException(&quot;A security hold is already set; use escalation&quot;);</span>
+        }
+<span class="fc" id="L86">        String correlation = correlationIdResolver.resolve(requestId);</span>
+<span class="pc bpc" id="L87" title="1 of 2 branches missed.">        long nextVersion = (card.getLifecycleVersion() == null ? 1L : card.getLifecycleVersion()) + 1L;</span>
+<span class="fc" id="L88">        switchClient.block(institutionId, cardId, nextVersion, request.getReason(), callerType,</span>
+                idempotencyKey, correlation);
+<span class="pc bpc" id="L90" title="1 of 2 branches missed.">        CardStatusV2 previous = card.getCardStatus() == null ? CardStatusV2.PENDING : card.getCardStatus();</span>
+<span class="fc" id="L91">        OffsetDateTime now = OffsetDateTime.now(ZoneOffset.UTC);</span>
+<span class="fc" id="L92">        card.setSecurityHoldReason(securityReason);</span>
+<span class="pc bpc" id="L93" title="1 of 4 branches missed.">        if (card.getCardForm() != CardFormV2.VIRTUAL &amp;&amp; card.getRetiredAt() == null) {</span>
+<span class="fc" id="L94">            card.setRetiredAt(now);</span>
+<span class="fc" id="L95">            card.setPhysicalRetiredReason(PhysicalRetiredReasonV2.LOST_STOLEN);</span>
+<span class="pc bpc" id="L96" title="1 of 2 branches missed.">            if (card.getPhysicalFulfilmentStatus() == PhysicalFulfilmentStatusV2.REQUESTED</span>
+<span class="nc bnc" id="L97" title="All 2 branches missed.">                    || card.getPhysicalFulfilmentStatus() == PhysicalFulfilmentStatusV2.PERSONALIZATION_IN_PROGRESS</span>
+<span class="nc bnc" id="L98" title="All 2 branches missed.">                    || card.getPhysicalFulfilmentStatus() == PhysicalFulfilmentStatusV2.PERSONALIZED</span>
+<span class="nc bnc" id="L99" title="All 2 branches missed.">                    || card.getPhysicalFulfilmentStatus() == PhysicalFulfilmentStatusV2.IN_EMBOSSING_FILE) {</span>
+<span class="fc" id="L100">                card.setPhysicalFulfilmentStatus(PhysicalFulfilmentStatusV2.CANCELLED);</span>
+            }
+        }
+<span class="fc" id="L103">        CardV2 saved = cardRepository.saveFactsAndRefresh(card);</span>
+<span class="fc" id="L104">        UUID eventId = uuidGenerator.generate();</span>
+<span class="fc" id="L105">        UUID operationId = uuidGenerator.generate();</span>
+<span class="fc" id="L106">        Map&lt;String,Object&gt; payload = new LinkedHashMap&lt;&gt;();</span>
+<span class="fc" id="L107">        payload.put(&quot;reason&quot;, request.getReason().name());</span>
+<span class="fc" id="L108">        payload.put(&quot;reasonDetail&quot;, request.getReasonDetail());</span>
+<span class="fc" id="L109">        payload.put(&quot;callerType&quot;, callerType.name());</span>
+<span class="fc" id="L110">        payload.put(&quot;lifecycleVersion&quot;, saved.getLifecycleVersion());</span>
+<span class="fc" id="L111">        OffsetDateTime occurred = OffsetDateTime.now(ZoneOffset.UTC);</span>
+<span class="fc" id="L112">        entityManager.persist(CardLifecycleOperationV2.builder().operationId(operationId)</span>
+<span class="fc" id="L113">                .institutionId(saved.getInstitutionId()).operationKind(&quot;CARD_HOTLISTED&quot;)</span>
+<span class="fc bfc" id="L114" title="All 2 branches covered.">                .idempotencyKeyHash(sha256(idempotencyKey == null ? operationId.toString() : idempotencyKey))</span>
+<span class="fc" id="L115">                .requestFingerprint(sha256(saved.getCardId() + &quot;:CARD_HOTLISTED:&quot; + request.getReason().name()))</span>
+<span class="fc" id="L116">                .targetCardId(saved.getCardId()).expectedVersion(saved.getLifecycleVersion())</span>
+<span class="fc bfc" id="L117" title="All 2 branches covered.">                .actorReference(actorId == null ? &quot;UNKNOWN&quot; : actorId)</span>
+<span class="fc bfc" id="L118" title="All 2 branches covered.">                .actorType(callerType == CardHotlistCallerType.CUSTOMER ? LifecycleActorTypeV2.CUSTOMER : LifecycleActorTypeV2.OPS)</span>
+<span class="fc" id="L119">                .operationStatus(LifecycleOperationStatusV2.CONFIRMED).resultPayload(payload)</span>
+<span class="fc" id="L120">                .createdAt(occurred).completedAt(occurred).build());</span>
+<span class="fc" id="L121">        long sequence = eventRepository.findFirstByInstitutionIdAndCardIdOrderByEventSequenceDesc(</span>
+<span class="fc" id="L122">                saved.getInstitutionId(), saved.getCardId()).map(e -&gt; e.getEventSequence() + 1).orElse(1L);</span>
+<span class="fc" id="L123">        eventRepository.save(CardEventV2.builder().cardEventId(eventId).institutionId(saved.getInstitutionId())</span>
+<span class="fc" id="L124">                .cardId(saved.getCardId()).eventType(&quot;CARD_HOTLISTED&quot;).previousStatus(previous.name())</span>
+<span class="fc" id="L125">                .resultingStatus(CardStatusV2.BLOCKED.name()).reasonCode(request.getReason().name())</span>
+<span class="fc" id="L126">                .eventPayload(payload).occurredAt(occurred).actorReference(actorId)</span>
+<span class="fc" id="L127">                .correlationId(correlationIdResolver.toUuid(correlation)).eventSequence(sequence).operationId(operationId)</span>
+<span class="fc" id="L128">                .schemaVersion(1).source(&quot;CMS_V2&quot;).transitionId(&quot;HOTLIST&quot;).build());</span>
+<span class="fc" id="L129">        HotlistCardV2Response response = HotlistCardV2Response.builder()</span>
+<span class="fc" id="L130">                .cardId(saved.getCardId()).institutionId(saved.getInstitutionId())</span>
+<span class="fc" id="L131">                .eventId(eventId).previousStatus(previous).cardStatus(CardStatusV2.BLOCKED)</span>
+<span class="fc" id="L132">                .reason(request.getReason()).callerType(callerType).lifecycleVersion(saved.getLifecycleVersion())</span>
+<span class="fc" id="L133">                .hotlistedAt(occurred).build();</span>
+<span class="fc" id="L134">        eventSink.onHotlisted(response, correlation);</span>
+<span class="fc" id="L135">        return response;</span>
+    }
+
+    private java.util.Optional&lt;HotlistCardV2Response&gt; existingHotlist(
+            UUID institutionId, UUID cardId) {
+<span class="nc" id="L140">        return eventRepository</span>
+<span class="nc" id="L141">                .findFirstByInstitutionIdAndCardIdAndEventTypeOrderByOccurredAtDesc(</span>
+                        institutionId, cardId, HOTLIST_EVENT)
+<span class="nc" id="L143">                .map(event -&gt; {</span>
+<span class="nc" id="L144">                    Object caller = event.getEventPayload().get(&quot;callerType&quot;);</span>
+<span class="nc" id="L145">                    Object version = event.getEventPayload().get(&quot;lifecycleVersion&quot;);</span>
+<span class="nc" id="L146">                    return response(event,</span>
+<span class="nc bnc" id="L147" title="All 2 branches missed.">                            version instanceof Number number ? number.longValue() : 1L,</span>
+<span class="nc bnc" id="L148" title="All 2 branches missed.">                            caller == null ? CardHotlistCallerType.OPERATIONS</span>
+<span class="nc" id="L149">                                    : CardHotlistCallerType.valueOf(caller.toString()));</span>
+                });
+    }
+
+    private static HotlistCardV2Response response(CardEventV2 event, long version,
+            CardHotlistCallerType callerType) {
+<span class="nc" id="L155">        return HotlistCardV2Response.builder()</span>
+<span class="nc" id="L156">                .cardId(event.getCardId())</span>
+<span class="nc" id="L157">                .institutionId(event.getInstitutionId())</span>
+<span class="nc" id="L158">                .eventId(event.getCardEventId())</span>
+<span class="nc" id="L159">                .previousStatus(CardStatusV2.valueOf(event.getPreviousStatus()))</span>
+<span class="nc" id="L160">                .cardStatus(CardStatusV2.BLOCKED)</span>
+<span class="nc" id="L161">                .reason(CardHotlistReason.valueOf(event.getReasonCode()))</span>
+<span class="nc" id="L162">                .callerType(callerType)</span>
+<span class="nc" id="L163">                .lifecycleVersion(version)</span>
+<span class="nc" id="L164">                .hotlistedAt(event.getOccurredAt())</span>
+<span class="nc" id="L165">                .build();</span>
+    }
+
+    private static UUID correlationId(String requestId) {
+        try {
+<span class="nc" id="L170">            return UUID.fromString(requestId);</span>
+<span class="nc" id="L171">        } catch (IllegalArgumentException ignored) {</span>
+<span class="nc" id="L172">            return UUID.nameUUIDFromBytes(requestId.getBytes(StandardCharsets.UTF_8));</span>
+        }
+    }
+
+    private static String trim(String value) {
+<span class="nc bnc" id="L177" title="All 4 branches missed.">        return value == null || value.isBlank() ? null : value.trim();</span>
+    }
+
+    private static String sha256(String value) {
+        try {
+<span class="fc" id="L182">            byte[] bytes = MessageDigest.getInstance(&quot;SHA-256&quot;).digest(value.getBytes(StandardCharsets.UTF_8));</span>
+<span class="fc" id="L183">            StringBuilder result = new StringBuilder(64);</span>
+<span class="fc bfc" id="L184" title="All 2 branches covered.">            for (byte b : bytes) result.append(String.format(&quot;%02x&quot;, b));</span>
+<span class="fc" id="L185">            return result.toString();</span>
+<span class="nc" id="L186">        } catch (Exception e) { throw new IllegalStateException(&quot;Unable to hash lifecycle operation&quot;, e); }</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.15.202606040825</span></div></body></html>

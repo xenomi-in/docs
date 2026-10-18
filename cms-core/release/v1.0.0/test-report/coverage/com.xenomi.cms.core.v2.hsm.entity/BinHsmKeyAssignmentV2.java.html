@@ -1,0 +1,69 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>BinHsmKeyAssignmentV2.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">CMS Core Service</a> &gt; <a href="index.source.html" class="el_package">com.xenomi.cms.core.v2.hsm.entity</a> &gt; <span class="el_source">BinHsmKeyAssignmentV2.java</span></div><h1>BinHsmKeyAssignmentV2.java</h1><pre class="source lang-java linenums">package com.xenomi.cms.core.v2.hsm.entity;
+
+import java.time.OffsetDateTime;
+import java.util.UUID;
+
+import com.xenomi.cms.core.v2.hsm.model.BinHsmKeyAssignmentStatus;
+import com.xenomi.cms.core.v2.hsm.model.KeyPurpose;
+
+import jakarta.persistence.Column;
+import jakarta.persistence.Entity;
+import jakarta.persistence.EnumType;
+import jakarta.persistence.Enumerated;
+import jakarta.persistence.Id;
+import jakarta.persistence.PrePersist;
+import jakarta.persistence.PreUpdate;
+import jakarta.persistence.Table;
+import lombok.AllArgsConstructor;
+import lombok.Builder;
+import lombok.Data;
+import lombok.NoArgsConstructor;
+
+@Entity(name = &quot;BinHsmKeyAssignmentV2&quot;)
+@Table(name = &quot;bin_hsm_key_assignment&quot;, schema = &quot;cms_v2&quot;)
+@Data
+@Builder
+@NoArgsConstructor
+@AllArgsConstructor
+public class BinHsmKeyAssignmentV2 {
+    @Id @Column(name = &quot;bin_hsm_key_assignment_id&quot;, nullable = false, updatable = false)
+    private UUID assignmentId;
+    @Column(name = &quot;institution_id&quot;, nullable = false, updatable = false)
+    private UUID institutionId;
+    @Column(name = &quot;bin_id&quot;, nullable = false, updatable = false)
+    private UUID binId;
+    @Column(name = &quot;hsm_key_id&quot;, nullable = false, updatable = false)
+    private UUID hsmKeyId;
+    @Enumerated(EnumType.STRING)
+    @Column(name = &quot;key_purpose&quot;, nullable = false, length = 60, updatable = false)
+    private KeyPurpose keyPurpose;
+    @Column(name = &quot;assignment_version&quot;, nullable = false, updatable = false)
+    private int assignmentVersion;
+    @Enumerated(EnumType.STRING)
+    @Column(name = &quot;assignment_status&quot;, nullable = false, length = 24)
+    private BinHsmKeyAssignmentStatus assignmentStatus;
+    @Column(name = &quot;effective_from&quot;, nullable = false)
+    private OffsetDateTime effectiveFrom;
+    @Column(name = &quot;effective_to&quot;)
+    private OffsetDateTime effectiveTo;
+    @Column(name = &quot;rotation_group&quot;, length = 100)
+    private String rotationGroup;
+    @Column(name = &quot;approval_request_id&quot;)
+    private UUID approvalRequestId;
+    @Column(name = &quot;created_at&quot;, nullable = false, updatable = false)
+    private OffsetDateTime createdAt;
+    @Column(name = &quot;updated_at&quot;, nullable = false)
+    private OffsetDateTime updatedAt;
+    @Column(name = &quot;created_by&quot;, nullable = false, length = 100, updatable = false)
+    private String createdBy;
+    @Column(name = &quot;updated_by&quot;, nullable = false, length = 100)
+    private String updatedBy;
+
+    @PrePersist void beforeInsert() {
+<span class="nc" id="L63">        OffsetDateTime now = OffsetDateTime.now(java.time.ZoneOffset.UTC);</span>
+<span class="nc bnc" id="L64" title="All 2 branches missed.">        if (createdAt == null) createdAt = now;</span>
+<span class="nc" id="L65">        updatedAt = now;</span>
+<span class="nc" id="L66">    }</span>
+<span class="nc" id="L67">    @PreUpdate void beforeUpdate() { updatedAt = OffsetDateTime.now(java.time.ZoneOffset.UTC); }</span>
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.15.202606040825</span></div></body></html>

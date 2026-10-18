@@ -1,0 +1,155 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>CardProductV2Service.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">CMS Core Service</a> &gt; <a href="index.source.html" class="el_package">com.xenomi.cms.core.v2.product.service</a> &gt; <span class="el_source">CardProductV2Service.java</span></div><h1>CardProductV2Service.java</h1><pre class="source lang-java linenums">package com.xenomi.cms.core.v2.product.service;
+
+import java.time.OffsetDateTime;
+import java.util.Locale;
+import java.util.UUID;
+
+import com.xenomi.cms.core.exception.ResourceAlreadyExistsException;
+import com.xenomi.cms.core.exception.ResourceNotFoundException;
+import com.xenomi.cms.core.v2.bin.model.CardNetwork;
+import com.xenomi.cms.core.v2.common.DatabaseUuidV7Generator;
+import com.xenomi.cms.core.v2.event.catalog.ProductEventSink;
+import com.xenomi.cms.core.v2.event.catalog.ProductEventSink.ProductSnapshot;
+import com.xenomi.cms.core.v2.event.correlation.CorrelationIdResolver;
+import com.xenomi.cms.core.v2.institution.repository.InstitutionV2Repository;
+import com.xenomi.cms.core.v2.product.dto.CardProductV2Response;
+import com.xenomi.cms.core.v2.product.dto.CreateCardProductV2Request;
+import com.xenomi.cms.core.v2.product.dto.UpdateCardProductV2Request;
+import com.xenomi.cms.core.v2.product.entity.CardProductV2;
+import com.xenomi.cms.core.v2.product.model.FundingType;
+import com.xenomi.cms.core.v2.product.model.ProductStatus;
+import com.xenomi.cms.core.v2.product.repository.CardProductV2Repository;
+
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
+import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
+
+@Service
+public class CardProductV2Service {
+
+    private final CardProductV2Repository repository;
+    private final InstitutionV2Repository institutionRepository;
+    private final DatabaseUuidV7Generator uuidGenerator;
+    private final ProductEventSink eventSink;
+    private final CorrelationIdResolver correlationIdResolver;
+
+    public CardProductV2Service(CardProductV2Repository repository,
+            InstitutionV2Repository institutionRepository, DatabaseUuidV7Generator uuidGenerator,
+<span class="fc" id="L39">            ProductEventSink eventSink, CorrelationIdResolver correlationIdResolver) {</span>
+<span class="fc" id="L40">        this.repository = repository;</span>
+<span class="fc" id="L41">        this.institutionRepository = institutionRepository;</span>
+<span class="fc" id="L42">        this.uuidGenerator = uuidGenerator;</span>
+<span class="fc" id="L43">        this.eventSink = eventSink;</span>
+<span class="fc" id="L44">        this.correlationIdResolver = correlationIdResolver;</span>
+<span class="fc" id="L45">    }</span>
+
+    @Transactional
+    public CardProductV2Response create(UUID institutionId,
+            CreateCardProductV2Request request, String actorId) {
+<span class="fc" id="L50">        requireInstitution(institutionId);</span>
+<span class="fc" id="L51">        String productCode = upper(request.getProductCode());</span>
+<span class="fc bfc" id="L52" title="All 2 branches covered.">        if (repository.existsByInstitutionIdAndProductCode(institutionId, productCode)) {</span>
+<span class="fc" id="L53">            throw new ResourceAlreadyExistsException(&quot;Card product&quot;, productCode);</span>
+        }
+<span class="fc" id="L55">        CardProductV2 product = CardProductV2.builder()</span>
+<span class="fc" id="L56">                .productId(uuidGenerator.generate())</span>
+<span class="fc" id="L57">                .institutionId(institutionId)</span>
+<span class="fc" id="L58">                .productCode(productCode)</span>
+<span class="fc" id="L59">                .productName(request.getProductName().trim())</span>
+<span class="fc" id="L60">                .description(trimToNull(request.getDescription()))</span>
+<span class="fc" id="L61">                .cardNetwork(request.getCardNetwork())</span>
+<span class="fc" id="L62">                .fundingType(request.getFundingType())</span>
+<span class="fc" id="L63">                .cardVariant(request.getCardVariant())</span>
+<span class="fc" id="L64">                .productStatus(ProductStatus.DRAFT)</span>
+<span class="fc" id="L65">                .createdBy(actorId.trim())</span>
+<span class="fc" id="L66">                .updatedBy(actorId.trim())</span>
+<span class="fc" id="L67">                .build();</span>
+<span class="fc" id="L68">        CardProductV2Response response = toResponse(repository.save(product));</span>
+<span class="fc" id="L69">        eventSink.onCreated(response, correlationIdResolver.current());</span>
+<span class="fc" id="L70">        return response;</span>
+    }
+
+    @Transactional(readOnly = true)
+    public CardProductV2Response get(UUID institutionId, UUID productId) {
+<span class="fc" id="L75">        return toResponse(find(institutionId, productId));</span>
+    }
+
+    @Transactional(readOnly = true)
+    public CardProductV2Response getByCode(UUID institutionId, String productCode) {
+<span class="fc" id="L80">        String normalized = upper(productCode);</span>
+<span class="fc" id="L81">        return repository.findByInstitutionIdAndProductCode(institutionId, normalized)</span>
+<span class="fc" id="L82">                .map(this::toResponse)</span>
+<span class="fc" id="L83">                .orElseThrow(() -&gt; new ResourceNotFoundException(&quot;Card product&quot;, normalized));</span>
+    }
+
+    @Transactional(readOnly = true)
+    public Page&lt;CardProductV2Response&gt; search(UUID institutionId, String query,
+            CardNetwork network, FundingType fundingType, ProductStatus status, Pageable pageable) {
+<span class="fc" id="L89">        requireInstitution(institutionId);</span>
+<span class="fc" id="L90">        return repository.search(institutionId, trimToNull(query), network, fundingType, status, pageable)</span>
+<span class="fc" id="L91">                .map(this::toResponse);</span>
+    }
+
+    @Transactional
+    public CardProductV2Response update(UUID institutionId, UUID productId,
+            UpdateCardProductV2Request request, String actorId) {
+<span class="fc" id="L97">        CardProductV2 product = find(institutionId, productId);</span>
+<span class="fc" id="L98">        ProductSnapshot before = new ProductSnapshot(</span>
+<span class="fc" id="L99">                product.getProductName(), product.getDescription(), product.getProductStatus());</span>
+<span class="fc bfc" id="L100" title="All 2 branches covered.">        if (request.getProductName() != null) product.setProductName(request.getProductName().trim());</span>
+<span class="fc bfc" id="L101" title="All 2 branches covered.">        if (request.getDescription() != null) product.setDescription(trimToNull(request.getDescription()));</span>
+<span class="pc bpc" id="L102" title="2 of 4 branches missed.">        if (request.getProductStatus() != null &amp;&amp; request.getProductStatus() != product.getProductStatus()) {</span>
+<span class="fc" id="L103">            validateTransition(product.getProductStatus(), request.getProductStatus());</span>
+<span class="fc" id="L104">            product.setProductStatus(request.getProductStatus());</span>
+        }
+<span class="fc" id="L106">        product.setUpdatedBy(actorId.trim());</span>
+<span class="fc" id="L107">        product.setUpdatedAt(OffsetDateTime.now(java.time.ZoneOffset.UTC));</span>
+<span class="fc" id="L108">        CardProductV2Response response = toResponse(repository.save(product));</span>
+<span class="fc" id="L109">        eventSink.onUpdated(response, before, correlationIdResolver.current());</span>
+<span class="fc" id="L110">        return response;</span>
+    }
+
+    CardProductV2 find(UUID institutionId, UUID productId) {
+<span class="fc" id="L114">        return repository.findByProductIdAndInstitutionId(productId, institutionId)</span>
+<span class="fc" id="L115">                .orElseThrow(() -&gt; new ResourceNotFoundException(&quot;Card product&quot;, productId.toString()));</span>
+    }
+
+    private void requireInstitution(UUID institutionId) {
+<span class="fc bfc" id="L119" title="All 2 branches covered.">        if (!institutionRepository.existsById(institutionId)) {</span>
+<span class="fc" id="L120">            throw new ResourceNotFoundException(&quot;Institution&quot;, institutionId.toString());</span>
+        }
+<span class="fc" id="L122">    }</span>
+
+    private static void validateTransition(ProductStatus current, ProductStatus target) {
+<span class="fc bfc" id="L125" title="All 5 branches covered.">        boolean allowed = switch (current) {</span>
+<span class="fc bfc" id="L126" title="All 2 branches covered.">            case DRAFT -&gt; target == ProductStatus.PENDING_APPROVAL;</span>
+<span class="pc bpc" id="L127" title="2 of 4 branches missed.">            case PENDING_APPROVAL -&gt; target == ProductStatus.DRAFT || target == ProductStatus.ACTIVE;</span>
+<span class="pc bpc" id="L128" title="2 of 4 branches missed.">            case ACTIVE -&gt; target == ProductStatus.SUSPENDED || target == ProductStatus.RETIRED;</span>
+<span class="pc bpc" id="L129" title="2 of 4 branches missed.">            case SUSPENDED -&gt; target == ProductStatus.ACTIVE || target == ProductStatus.RETIRED;</span>
+<span class="fc" id="L130">            case RETIRED -&gt; false;</span>
+        };
+<span class="fc bfc" id="L132" title="All 2 branches covered.">        if (!allowed) {</span>
+<span class="fc" id="L133">            throw new IllegalArgumentException(&quot;Invalid product status transition: &quot; + current + &quot; -&gt; &quot; + target);</span>
+        }
+<span class="fc" id="L135">    }</span>
+
+    private CardProductV2Response toResponse(CardProductV2 p) {
+<span class="fc" id="L138">        return CardProductV2Response.builder()</span>
+<span class="fc" id="L139">                .productId(p.getProductId()).institutionId(p.getInstitutionId())</span>
+<span class="fc" id="L140">                .productCode(p.getProductCode()).productName(p.getProductName())</span>
+<span class="fc" id="L141">                .description(p.getDescription()).cardNetwork(p.getCardNetwork())</span>
+<span class="fc" id="L142">                .fundingType(p.getFundingType()).productStatus(p.getProductStatus())</span>
+<span class="fc" id="L143">                .cardVariant(p.getCardVariant())</span>
+<span class="fc" id="L144">                .createdAt(p.getCreatedAt()).updatedAt(p.getUpdatedAt())</span>
+<span class="fc" id="L145">                .createdBy(p.getCreatedBy()).updatedBy(p.getUpdatedBy()).build();</span>
+    }
+
+<span class="fc" id="L148">    private static String upper(String value) { return value.trim().toUpperCase(Locale.ROOT); }</span>
+    private static String trimToNull(String value) {
+<span class="pc bpc" id="L150" title="1 of 2 branches missed.">        if (value == null) return null;</span>
+<span class="fc" id="L151">        String normalized = value.trim();</span>
+<span class="fc bfc" id="L152" title="All 2 branches covered.">        return normalized.isEmpty() ? null : normalized;</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.15.202606040825</span></div></body></html>

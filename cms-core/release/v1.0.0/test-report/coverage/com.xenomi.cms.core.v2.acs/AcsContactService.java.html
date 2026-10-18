@@ -1,0 +1,62 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>AcsContactService.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">CMS Core Service</a> &gt; <a href="index.source.html" class="el_package">com.xenomi.cms.core.v2.acs</a> &gt; <span class="el_source">AcsContactService.java</span></div><h1>AcsContactService.java</h1><pre class="source lang-java linenums">package com.xenomi.cms.core.v2.acs;
+
+import java.time.OffsetDateTime;
+import java.time.ZoneOffset;
+import java.util.*;
+import com.xenomi.cms.core.bin.util.LuhnAlgorithm;
+import com.xenomi.cms.core.exception.ResourceNotFoundException;
+import com.xenomi.cms.core.v2.bin.repository.BinRangeV2Repository;
+import com.xenomi.cms.core.v2.card.repository.CardV2Repository;
+import com.xenomi.cms.core.v2.card.repository.CustomerReferenceV2Repository;
+import com.xenomi.cms.core.v2.card.lifecycle.repository.PanLookupIdentityV2Repository;
+import com.xenomi.cms.core.v2.card.security.CmsCardSecurityService;
+import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
+
+@Service
+public class AcsContactService {
+    private final BinRangeV2Repository ranges;
+    private final PanLookupIdentityV2Repository identities;
+    private final CmsCardSecurityService security;
+    private final CardV2Repository cards;
+    private final CustomerReferenceV2Repository customers;
+    public AcsContactService(BinRangeV2Repository ranges, PanLookupIdentityV2Repository identities,
+<span class="fc" id="L24">            CmsCardSecurityService security, CardV2Repository cards, CustomerReferenceV2Repository customers) {</span>
+<span class="fc" id="L25">        this.ranges=ranges; this.identities=identities; this.security=security; this.cards=cards; this.customers=customers;</span>
+<span class="fc" id="L26">    }</span>
+    @Transactional(readOnly=true)
+    public Contact lookup(String pan) {
+<span class="pc bpc" id="L29" title="2 of 6 branches missed.">        if (pan == null || !pan.matches(&quot;[0-9]{12,19}&quot;) || !LuhnAlgorithm.validate(pan))</span>
+<span class="fc" id="L30">            throw new IllegalArgumentException(&quot;A valid card number is required&quot;);</span>
+<span class="fc" id="L31">        List&lt;UUID&gt; institutions = ranges.findInstitutionsForPan(pan, pan.length());</span>
+<span class="fc bfc" id="L32" title="All 2 branches covered.">        if (institutions.size() &gt; 1) throw new IllegalArgumentException(&quot;Card institution resolution is ambiguous&quot;);</span>
+<span class="pc bpc" id="L33" title="1 of 2 branches missed.">        if (institutions.isEmpty()) throw unavailable();</span>
+<span class="fc" id="L34">        UUID institution = institutions.getFirst();</span>
+<span class="fc" id="L35">        OffsetDateTime now = OffsetDateTime.now(ZoneOffset.UTC);</span>
+<span class="fc" id="L36">        Set&lt;UUID&gt; families = new HashSet&lt;&gt;();</span>
+<span class="fc bfc" id="L37" title="All 2 branches covered.">        for (UUID key : identities.findEffectiveKeyIds(institution, now)) {</span>
+<span class="fc bfc" id="L38" title="All 2 branches covered.">            for (boolean legacy : new boolean[]{false, true}) {</span>
+<span class="fc" id="L39">                String hash = security.hashForLookup(institution, key, pan, legacy);</span>
+<span class="fc" id="L40">                identities.findEffective(institution, key, hash, now).ifPresent(i -&gt; families.add(i.getPanAllocationId()));</span>
+            }
+<span class="fc" id="L42">        }</span>
+<span class="pc bpc" id="L43" title="1 of 2 branches missed.">        if (families.size() &gt; 1) throw new IllegalArgumentException(&quot;Card identity resolution is ambiguous&quot;);</span>
+<span class="fc bfc" id="L44" title="All 2 branches covered.">        if (families.isEmpty()) throw unavailable();</span>
+        // Renewal/replacement can leave several card rows for one PAN. All must identify the same customer.
+<span class="fc" id="L46">        Set&lt;UUID&gt; customerIds = new HashSet&lt;&gt;();</span>
+<span class="fc" id="L47">        cards.findByInstitutionIdAndPanAllocationIdOrderByIssuedAtAscCardIdAsc(institution, families.iterator().next())</span>
+<span class="fc" id="L48">                .forEach(c -&gt; customerIds.add(c.getCustomerReferenceId()));</span>
+<span class="fc bfc" id="L49" title="All 2 branches covered.">        if (customerIds.size() != 1) throw unavailable();</span>
+<span class="fc" id="L50">        var customer = customers.findByCustomerReferenceIdAndInstitutionId(customerIds.iterator().next(), institution)</span>
+<span class="fc" id="L51">                .orElseThrow(AcsContactService::unavailable);</span>
+<span class="fc bfc" id="L52" title="All 4 branches covered.">        if (blank(customer.getRegisteredMobile()) &amp;&amp; blank(customer.getRegisteredEmail())) throw unavailable();</span>
+<span class="fc bfc" id="L53" title="All 2 branches covered.">        return new Contact(blank(customer.getRegisteredMobile()) ? null : customer.getRegisteredMobile(),</span>
+<span class="pc bpc" id="L54" title="1 of 2 branches missed.">                blank(customer.getRegisteredEmail()) ? null : customer.getRegisteredEmail());</span>
+    }
+<span class="fc bfc" id="L56" title="All 4 branches covered.">    private static boolean blank(String value) { return value == null || value.isBlank(); }</span>
+<span class="fc" id="L57">    private static ResourceNotFoundException unavailable() { return new ResourceNotFoundException(&quot;Cardholder contact is unavailable&quot;); }</span>
+<span class="fc" id="L58">    public record Contact(String mobile, String email) {</span>
+<span class="nc" id="L59">        @Override public String toString() { return &quot;Contact[redacted]&quot;; }</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.15.202606040825</span></div></body></html>

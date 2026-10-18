@@ -1,0 +1,815 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>CardIssuanceV2Service.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">CMS Core Service</a> &gt; <a href="index.source.html" class="el_package">com.xenomi.cms.core.v2.card.service</a> &gt; <span class="el_source">CardIssuanceV2Service.java</span></div><h1>CardIssuanceV2Service.java</h1><pre class="source lang-java linenums">package com.xenomi.cms.core.v2.card.service;
+
+import java.nio.charset.StandardCharsets;
+import java.time.LocalDate;
+import java.time.OffsetDateTime;
+import java.time.ZoneOffset;
+import java.time.temporal.TemporalAdjusters;
+import java.util.List;
+import java.util.UUID;
+
+import com.xenomi.cms.core.exception.BusinessRuleViolationException;
+import com.xenomi.cms.core.exception.ResourceNotFoundException;
+import com.xenomi.cms.core.v2.bin.entity.BinRangeV2;
+import com.xenomi.cms.core.v2.bin.model.BinRangeStatus;
+import com.xenomi.cms.core.v2.bin.repository.BinRangeV2Repository;
+import com.xenomi.cms.core.v2.bin.repository.BinConfigurationV2Repository;
+import com.xenomi.cms.core.v2.bin.entity.BinConfigurationV2;
+import com.xenomi.cms.core.v2.bin.model.BinStatus;
+import com.xenomi.cms.core.v2.card.ProductionRequestEligibility;
+import com.xenomi.cms.core.v2.card.dto.CardV2Response;
+import com.xenomi.cms.core.v2.card.dto.CreateCardV2Request;
+import com.xenomi.cms.core.v2.card.dto.RequestPhysicalCardV2Request;
+import com.xenomi.cms.core.v2.card.entity.AddressReferenceV2;
+import com.xenomi.cms.core.v2.card.entity.CardAccountLinkV2;
+import com.xenomi.cms.core.v2.card.entity.CardProductionRequestV2;
+import com.xenomi.cms.core.v2.card.entity.CardV2;
+import com.xenomi.cms.core.v2.card.entity.CardVendorV2;
+import com.xenomi.cms.core.v2.card.entity.CustomerReferenceV2;
+import com.xenomi.cms.core.v2.card.entity.ExternalAccountReferenceV2;
+import com.xenomi.cms.core.v2.card.entity.PanAllocationV2;
+import com.xenomi.cms.core.v2.card.entity.PersonalisationBatchConfigurationV2;
+import com.xenomi.cms.core.v2.card.model.BatchConfigurationStatus;
+import com.xenomi.cms.core.v2.card.model.CardAccountLinkType;
+import com.xenomi.cms.core.v2.card.model.CardFormV2;
+import com.xenomi.cms.core.v2.card.model.CardStatusV2;
+import com.xenomi.cms.core.v2.card.model.PanAllocationStatus;
+import com.xenomi.cms.core.v2.card.model.ProductionRequestTrigger;
+import com.xenomi.cms.core.v2.card.model.ProductionRequestType;
+import com.xenomi.cms.core.v2.card.model.ReferenceStatus;
+import com.xenomi.cms.core.v2.card.pin.PinLifecycleV2Service;
+import com.xenomi.cms.core.v2.card.lifecycle.entity.ActivationPolicyVersionV2;
+import com.xenomi.cms.core.v2.card.lifecycle.repository.ActivationPolicyVersionV2Repository;
+import com.xenomi.cms.core.v2.card.repository.AddressReferenceV2Repository;
+import com.xenomi.cms.core.v2.card.repository.CardAccountLinkV2Repository;
+import com.xenomi.cms.core.v2.card.repository.CardProductionRequestV2Repository;
+import com.xenomi.cms.core.v2.card.repository.CardV2Repository;
+import com.xenomi.cms.core.v2.card.repository.CardVendorV2Repository;
+import com.xenomi.cms.core.v2.card.repository.CustomerReferenceV2Repository;
+import com.xenomi.cms.core.v2.card.repository.ExternalAccountReferenceV2Repository;
+import com.xenomi.cms.core.v2.card.repository.PanAllocationV2Repository;
+import com.xenomi.cms.core.v2.card.repository.PersonalisationBatchConfigurationV2Repository;
+import com.xenomi.cms.core.v2.card.security.CardSecurityMaterial;
+import com.xenomi.cms.core.v2.card.security.CmsCardSecurityService;
+import com.xenomi.cms.core.v2.cardcontrol.service.CardControlProfileInitializerV2;
+import com.xenomi.cms.core.v2.common.DatabaseUuidV7Generator;
+import com.xenomi.cms.core.v2.institution.repository.InstitutionV2Repository;
+import com.xenomi.cms.core.v2.institution.entity.InstitutionV2;
+import com.xenomi.cms.core.v2.product.entity.CardProductV2;
+import com.xenomi.cms.core.v2.product.entity.ProductBinRangeAssignmentV2;
+import com.xenomi.cms.core.v2.product.entity.ProductCardDesignAssignmentV2;
+import com.xenomi.cms.core.v2.product.entity.ProductCardFormPolicyV2;
+import com.xenomi.cms.core.v2.product.entity.ProductCardTechnologyProfileV2;
+import com.xenomi.cms.core.v2.product.entity.ProductCvmProfileV2;
+import com.xenomi.cms.core.v2.product.entity.ProductPersonalisationPolicyV2;
+import com.xenomi.cms.core.v2.product.entity.ProductVersionV2;
+import com.xenomi.cms.core.v2.product.model.CardForm;
+import com.xenomi.cms.core.v2.product.model.CardIssuanceMode;
+import com.xenomi.cms.core.v2.product.model.DesignAssignmentStatus;
+import com.xenomi.cms.core.v2.product.model.ExpiryCalculationRule;
+import com.xenomi.cms.core.v2.product.model.ProductBinAssignmentStatus;
+import com.xenomi.cms.core.v2.product.model.ProductPolicyStatus;
+import com.xenomi.cms.core.v2.product.model.ProductProfileStatus;
+import com.xenomi.cms.core.v2.product.model.ProductStatus;
+import com.xenomi.cms.core.v2.product.model.ProductVersionStatus;
+import com.xenomi.cms.core.v2.product.repository.CardProductV2Repository;
+import com.xenomi.cms.core.v2.product.repository.ProductBinRangeAssignmentV2Repository;
+import com.xenomi.cms.core.v2.product.repository.ProductCardDesignAssignmentV2Repository;
+import com.xenomi.cms.core.v2.product.repository.ProductCardFormPolicyV2Repository;
+import com.xenomi.cms.core.v2.product.repository.ProductCardTechnologyProfileV2Repository;
+import com.xenomi.cms.core.v2.product.repository.ProductCvmProfileV2Repository;
+import com.xenomi.cms.core.v2.product.repository.ProductPersonalisationPolicyV2Repository;
+import com.xenomi.cms.core.v2.product.repository.ProductVersionV2Repository;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
+import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
+
+@Service
+public class CardIssuanceV2Service {
+
+    private final InstitutionV2Repository institutionRepository;
+    private final CustomerReferenceV2Repository customerRepository;
+    private final ExternalAccountReferenceV2Repository accountRepository;
+    private final AddressReferenceV2Repository addressRepository;
+    private final CardProductV2Repository productRepository;
+    private final ProductVersionV2Repository versionRepository;
+    private final ProductCardFormPolicyV2Repository formPolicyRepository;
+    private final ProductPersonalisationPolicyV2Repository personalisationPolicyRepository;
+    private final ProductBinRangeAssignmentV2Repository rangeAssignmentRepository;
+    private final ProductCardDesignAssignmentV2Repository designAssignmentRepository;
+    private final ProductCardTechnologyProfileV2Repository technologyRepository;
+    private final ProductCvmProfileV2Repository cvmRepository;
+    private final BinRangeV2Repository binRangeRepository;
+    private final BinConfigurationV2Repository binRepository;
+    private final CardVendorV2Repository vendorRepository;
+    private final PersonalisationBatchConfigurationV2Repository batchConfigurationRepository;
+    private final PanAllocationV2Repository panAllocationRepository;
+    private final CardV2Repository cardRepository;
+    private final CardAccountLinkV2Repository accountLinkRepository;
+    private final CardProductionRequestV2Repository productionRequestRepository;
+    private final CmsCardSecurityService cardSecurityService;
+    private final DatabaseUuidV7Generator uuidGenerator;
+    private final CardControlProfileInitializerV2 controlProfileInitializer;
+    private final PinLifecycleV2Service pinLifecycleService;
+    private final ActivationPolicyVersionV2Repository activationPolicyVersionRepository;
+
+    public CardIssuanceV2Service(
+            InstitutionV2Repository institutionRepository,
+            CustomerReferenceV2Repository customerRepository,
+            ExternalAccountReferenceV2Repository accountRepository,
+            AddressReferenceV2Repository addressRepository,
+            CardProductV2Repository productRepository,
+            ProductVersionV2Repository versionRepository,
+            ProductCardFormPolicyV2Repository formPolicyRepository,
+            ProductPersonalisationPolicyV2Repository personalisationPolicyRepository,
+            ProductBinRangeAssignmentV2Repository rangeAssignmentRepository,
+            ProductCardDesignAssignmentV2Repository designAssignmentRepository,
+            ProductCardTechnologyProfileV2Repository technologyRepository,
+            ProductCvmProfileV2Repository cvmRepository,
+            BinRangeV2Repository binRangeRepository,
+            BinConfigurationV2Repository binRepository,
+            CardVendorV2Repository vendorRepository,
+            PersonalisationBatchConfigurationV2Repository batchConfigurationRepository,
+            PanAllocationV2Repository panAllocationRepository,
+            CardV2Repository cardRepository,
+            CardAccountLinkV2Repository accountLinkRepository,
+            CardProductionRequestV2Repository productionRequestRepository,
+            CmsCardSecurityService cardSecurityService,
+            DatabaseUuidV7Generator uuidGenerator,
+            CardControlProfileInitializerV2 controlProfileInitializer,
+            PinLifecycleV2Service pinLifecycleService,
+<span class="fc" id="L142">            ActivationPolicyVersionV2Repository activationPolicyVersionRepository) {</span>
+<span class="fc" id="L143">        this.institutionRepository = institutionRepository;</span>
+<span class="fc" id="L144">        this.customerRepository = customerRepository;</span>
+<span class="fc" id="L145">        this.accountRepository = accountRepository;</span>
+<span class="fc" id="L146">        this.addressRepository = addressRepository;</span>
+<span class="fc" id="L147">        this.productRepository = productRepository;</span>
+<span class="fc" id="L148">        this.versionRepository = versionRepository;</span>
+<span class="fc" id="L149">        this.formPolicyRepository = formPolicyRepository;</span>
+<span class="fc" id="L150">        this.personalisationPolicyRepository = personalisationPolicyRepository;</span>
+<span class="fc" id="L151">        this.rangeAssignmentRepository = rangeAssignmentRepository;</span>
+<span class="fc" id="L152">        this.designAssignmentRepository = designAssignmentRepository;</span>
+<span class="fc" id="L153">        this.technologyRepository = technologyRepository;</span>
+<span class="fc" id="L154">        this.cvmRepository = cvmRepository;</span>
+<span class="fc" id="L155">        this.binRangeRepository = binRangeRepository;</span>
+<span class="fc" id="L156">        this.binRepository = binRepository;</span>
+<span class="fc" id="L157">        this.vendorRepository = vendorRepository;</span>
+<span class="fc" id="L158">        this.batchConfigurationRepository = batchConfigurationRepository;</span>
+<span class="fc" id="L159">        this.panAllocationRepository = panAllocationRepository;</span>
+<span class="fc" id="L160">        this.cardRepository = cardRepository;</span>
+<span class="fc" id="L161">        this.accountLinkRepository = accountLinkRepository;</span>
+<span class="fc" id="L162">        this.productionRequestRepository = productionRequestRepository;</span>
+<span class="fc" id="L163">        this.cardSecurityService = cardSecurityService;</span>
+<span class="fc" id="L164">        this.uuidGenerator = uuidGenerator;</span>
+<span class="fc" id="L165">        this.controlProfileInitializer = controlProfileInitializer;</span>
+<span class="fc" id="L166">        this.pinLifecycleService = pinLifecycleService;</span>
+<span class="fc" id="L167">        this.activationPolicyVersionRepository = activationPolicyVersionRepository;</span>
+<span class="fc" id="L168">    }</span>
+
+    @Transactional
+    public CardV2Response issue(UUID institutionId, CreateCardV2Request request,
+            String idempotencyKey, String actorId) {
+<span class="nc" id="L173">        com.xenomi.cms.core.v2.card.lifecycle.service.LifecycleCommandPendingV2.reject(&quot;issue&quot;);</span>
+<span class="nc" id="L174">        return null;</span>
+    }
+
+    /** Resolves nonsecret configuration under the caller's account transaction. */
+    public Draft prepareDraft(UUID institutionId, CreateCardV2Request request, String actor, UUID operationId) {
+<span class="fc" id="L179">        return prepareDraft(institutionId, request, actor, operationId, true);</span>
+    }
+
+    public Draft prepareDraft(UUID institutionId, CreateCardV2Request request, String actor, UUID operationId, boolean newPan) {
+<span class="fc" id="L183">        OffsetDateTime now = OffsetDateTime.now(ZoneOffset.UTC);</span>
+<span class="fc" id="L184">        InstitutionV2 institution = requireInstitution(institutionId);</span>
+<span class="pc bpc" id="L185" title="1 of 2 branches missed.">        if (institution.getStatus() != com.xenomi.cms.core.v2.institution.model.InstitutionStatus.ACTIVE) {</span>
+<span class="nc" id="L186">            throw new BusinessRuleViolationException(&quot;Institution must be ACTIVE for issuance&quot;);</span>
+        }
+<span class="pc bpc" id="L188" title="1 of 4 branches missed.">        if (request.getAccountLinkType() != null &amp;&amp; request.getAccountLinkType() != CardAccountLinkType.PRIMARY_FUNDING) {</span>
+<span class="fc" id="L189">            throw new BusinessRuleViolationException(&quot;Original issuance requires PRIMARY_FUNDING account link&quot;);</span>
+        }
+<span class="fc bfc" id="L191" title="All 2 branches covered.">        if (request.getActivationPolicyVersionId() == null) {</span>
+<span class="fc" id="L192">            throw new BusinessRuleViolationException(&quot;An activation policy version is required for card issuance&quot;);</span>
+        }
+<span class="fc" id="L194">        ActivationPolicyVersionV2 activationPolicy = activationPolicyVersionRepository</span>
+<span class="fc" id="L195">                .findByInstitutionIdAndActivationPolicyVersionId(institutionId, request.getActivationPolicyVersionId())</span>
+<span class="pc" id="L196">                .orElseThrow(() -&gt; new ResourceNotFoundException(&quot;Activation policy version&quot;,</span>
+<span class="nc" id="L197">                        request.getActivationPolicyVersionId().toString()));</span>
+<span class="pc bpc" id="L198" title="1 of 2 branches missed.">        if (activationPolicy.getEffectiveFrom().isAfter(now)</span>
+<span class="pc bpc" id="L199" title="1 of 2 branches missed.">                || !&quot;Asia/Kolkata&quot;.equals(activationPolicy.getExpiryTimezone())) {</span>
+<span class="nc" id="L200">            throw new BusinessRuleViolationException(&quot;Activation policy version is not currently effective&quot;);</span>
+        }
+<span class="fc" id="L202">        CustomerReferenceV2 customer = requireCustomer(institutionId, request.getCustomerReferenceId());</span>
+<span class="fc" id="L203">        ExternalAccountReferenceV2 account = requireAccount(institutionId, request.getAccountReferenceId());</span>
+<span class="fc" id="L204">        AddressReferenceV2 address = requireAddressIfPresent(</span>
+<span class="fc" id="L205">                institutionId, customer.getCustomerReferenceId(), request.getShippingAddressReferenceId());</span>
+<span class="fc" id="L206">        CardProductV2 product = requireProduct(institutionId, request.getProductId());</span>
+<span class="fc" id="L207">        ProductVersionV2 version = requireActiveVersion(</span>
+<span class="fc" id="L208">                institutionId, product.getProductId(), request.getProductVersionId(), now);</span>
+<span class="fc" id="L209">        ProductCardFormPolicyV2 formPolicy = formPolicyRepository</span>
+<span class="fc" id="L210">                .findByProductVersionIdAndInstitutionId(version.getProductVersionId(), institutionId)</span>
+<span class="pc" id="L211">                .orElseThrow(() -&gt; new BusinessRuleViolationException(</span>
+                        &quot;Active product version does not have a card-form policy&quot;));
+<span class="fc" id="L213">        CardFormV2 cardForm = resolveCardForm(formPolicy.getIssuanceMode());</span>
+<span class="pc bpc" id="L214" title="3 of 4 branches missed.">        if ((requiresImmediatePhysical(cardForm) &amp;&amp; !formPolicy.isPhysicalAllowed())</span>
+<span class="pc bpc" id="L215" title="2 of 4 branches missed.">                || (hasVirtualCredential(cardForm) &amp;&amp; !formPolicy.isVirtualAllowed())) {</span>
+<span class="nc" id="L216">            throw new BusinessRuleViolationException(&quot;Product form capability does not permit issuance mode&quot;);</span>
+        }
+
+<span class="fc" id="L219">        BinRangeV2 range = binRangeRepository</span>
+<span class="fc" id="L220">                .findForPanAllocation(institutionId, request.getBinRangeId())</span>
+<span class="pc" id="L221">                .orElseThrow(() -&gt; new ResourceNotFoundException(</span>
+<span class="nc" id="L222">                        &quot;BIN range&quot;, request.getBinRangeId().toString()));</span>
+<span class="pc bpc" id="L223" title="5 of 6 branches missed.">        if (range.getRangeStatus() != BinRangeStatus.ACTIVE &amp;&amp; (newPan || range.getRangeStatus() != BinRangeStatus.EXHAUSTED)) {</span>
+<span class="nc" id="L224">            throw new BusinessRuleViolationException(&quot;BIN range must be ACTIVE for card issuance&quot;);</span>
+        }
+<span class="fc" id="L226">        validateBinAndRangeEffective(institutionId, range, now);</span>
+<span class="fc" id="L227">        List&lt;ProductBinRangeAssignmentV2&gt; assignments = rangeAssignmentRepository.findEffectiveAssignments(</span>
+<span class="fc" id="L228">                institutionId, product.getProductId(), range.getBinRangeId(),</span>
+                ProductBinAssignmentStatus.ACTIVE, now);
+<span class="pc bpc" id="L230" title="1 of 2 branches missed.">        if (assignments.isEmpty()) {</span>
+<span class="nc" id="L231">            throw new BusinessRuleViolationException(</span>
+                    &quot;BIN range is not actively assigned to the selected product&quot;);
+        }
+
+<span class="fc" id="L235">        ResolvedProfiles profiles = resolveProfiles(institutionId, version.getProductVersionId(),</span>
+                cardForm, request);
+<span class="fc" id="L237">        ProductionContext production = resolveProduction(</span>
+<span class="fc" id="L238">                institutionId, version.getProductVersionId(), cardForm, request);</span>
+
+<span class="fc" id="L240">        LocalDate issueDate = now.toLocalDate();</span>
+<span class="fc" id="L241">        LocalDate expiryDate = calculateExpiry(issueDate, version);</span>
+<span class="pc bpc" id="L242" title="1 of 2 branches missed.">        String serviceCode = assignments.get(0).getServiceCodeOverride() == null</span>
+<span class="pc" id="L243">                ? version.getDefaultServiceCode() : assignments.get(0).getServiceCodeOverride();</span>
+<span class="fc" id="L244">        cardSecurityService.validateIssuanceKeys(institutionId, range.getBinId());</span>
+<span class="fc" id="L245">        var pinPolicy=pinLifecycleService.validateOriginalConfiguration(CardV2.builder().institutionId(institutionId)</span>
+<span class="fc" id="L246">                .binId(range.getBinId()).productVersionId(version.getProductVersionId()).build());</span>
+<span class="fc" id="L247">        controlProfileInitializer.validateOriginalConfiguration(institutionId, version.getProductVersionId());</span>
+<span class="fc" id="L248">        return new Draft(institutionId, request, actor, operationId, uuidGenerator.generate(),</span>
+<span class="fc" id="L249">                uuidGenerator.generate(), uuidGenerator.generate(), now, issueDate, expiryDate,</span>
+                serviceCode, cardForm, formPolicy, profiles, production, range, pinPolicy);
+    }
+
+<span class="fc" id="L253">    public record Draft(UUID institutionId, CreateCardV2Request request, String actor, UUID operationId,</span>
+            UUID cardId, UUID panAllocationId, UUID pinDataId, OffsetDateTime issuedAt,
+            LocalDate issueDate, LocalDate expiryDate, String serviceCode, CardFormV2 cardForm,
+            ProductCardFormPolicyV2 formPolicy, ResolvedProfiles profiles, ProductionContext production, BinRangeV2 range,
+            com.xenomi.cms.core.v2.product.entity.ProductPinPolicyV2 pinPolicy) {
+<span class="nc" id="L258">        @Override public String toString() { return &quot;IssuanceDraft[operationId=&quot; + operationId + &quot;]&quot;; }</span>
+    }
+
+    public CardV2 finalizeDraft(Draft draft, CardSecurityMaterial security,
+            com.xenomi.cms.core.v2.card.pin.entity.PinDataV2 pin,
+            com.xenomi.cms.core.v2.card.lifecycle.entity.AccountRestrictionSnapshotV2 holds,
+            jakarta.persistence.EntityManager em) {
+<span class="fc" id="L265">        return finalizeDraftInternal(draft, security, pin, holds, em, null, null, false);</span>
+    }
+
+    /** Same-PAN renewal shares the locked predecessor's family and online PIN aggregate. */
+    public CardV2 finalizeDraft(Draft draft, CardSecurityMaterial security,
+            com.xenomi.cms.core.v2.card.pin.entity.PinDataV2 pin,
+            com.xenomi.cms.core.v2.card.lifecycle.entity.AccountRestrictionSnapshotV2 holds,
+            jakarta.persistence.EntityManager em, CardV2 predecessor) {
+<span class="nc" id="L273">        return finalizeDraftInternal(draft, security, pin, holds, em, predecessor,</span>
+                com.xenomi.cms.core.v2.product.model.ReplacementReason.RENEWAL, false);
+    }
+
+    private CardV2 finalizeDraftInternal(Draft draft, CardSecurityMaterial security,
+            com.xenomi.cms.core.v2.card.pin.entity.PinDataV2 pin,
+            com.xenomi.cms.core.v2.card.lifecycle.entity.AccountRestrictionSnapshotV2 holds,
+            jakarta.persistence.EntityManager em, CardV2 predecessor,
+            com.xenomi.cms.core.v2.product.model.ReplacementReason replacementReason,
+            boolean newPanReplacement) {
+<span class="fc" id="L283">        UUID institutionId = draft.institutionId();</span>
+<span class="fc" id="L284">        var request = draft.request();</span>
+<span class="fc" id="L285">        String actor = draft.actor();</span>
+<span class="fc" id="L286">        var now = draft.issuedAt();</span>
+<span class="fc" id="L287">        var range = draft.range();</span>
+<span class="fc" id="L288">        var cardForm = draft.cardForm();</span>
+<span class="fc" id="L289">        var formPolicy = draft.formPolicy();</span>
+<span class="fc" id="L290">        var profiles = draft.profiles();</span>
+<span class="fc" id="L291">        var production = draft.production();</span>
+<span class="fc" id="L292">        var issueDate = draft.issueDate();</span>
+<span class="fc" id="L293">        var expiryDate = draft.expiryDate();</span>
+<span class="fc" id="L294">        var institution = requireInstitution(institutionId);</span>
+<span class="pc bpc" id="L295" title="1 of 2 branches missed.">        if(institution.getStatus()!=com.xenomi.cms.core.v2.institution.model.InstitutionStatus.ACTIVE)</span>
+<span class="nc" id="L296">            throw new BusinessRuleViolationException(&quot;Institution must remain ACTIVE at finalization&quot;);</span>
+<span class="fc" id="L297">        var customer = requireCustomer(institutionId, request.getCustomerReferenceId());</span>
+<span class="fc" id="L298">        var account = requireAccount(institutionId, request.getAccountReferenceId());</span>
+<span class="fc" id="L299">        var product = requireProduct(institutionId, request.getProductId());</span>
+<span class="fc" id="L300">        var version = requireActiveVersion(institutionId, product.getProductId(), request.getProductVersionId(), OffsetDateTime.now(ZoneOffset.UTC));</span>
+<span class="fc" id="L301">        var address = requireAddressIfPresent(institutionId, customer.getCustomerReferenceId(), request.getShippingAddressReferenceId());</span>
+<span class="pc bpc" id="L302" title="1 of 2 branches missed.">        if(!formPolicy.equals(formPolicyRepository.findByProductVersionIdAndInstitutionId(version.getProductVersionId(),institutionId).orElseThrow())</span>
+<span class="pc bpc" id="L303" title="1 of 2 branches missed.">                || !profiles.equals(resolveProfiles(institutionId,version.getProductVersionId(),cardForm,request))</span>
+<span class="pc bpc" id="L304" title="1 of 2 branches missed.">                || !java.util.Objects.equals(production,resolveProduction(institutionId,version.getProductVersionId(),cardForm,request)))</span>
+<span class="nc" id="L305">            throw new BusinessRuleViolationException(&quot;Prepared issuance configuration changed; reconciliation required&quot;);</span>
+<span class="fc" id="L306">        var currentRange=binRangeRepository.findForPanAllocation(institutionId,range.getBinRangeId()).orElseThrow();</span>
+<span class="pc bpc" id="L307" title="3 of 4 branches missed.">        if ((currentRange.getRangeStatus()!=BinRangeStatus.ACTIVE &amp;&amp; currentRange.getRangeStatus()!=BinRangeStatus.EXHAUSTED)</span>
+<span class="pc bpc" id="L308" title="2 of 4 branches missed.">                || !currentRange.getRangeStart().equals(range.getRangeStart()) || !currentRange.getRangeEnd().equals(range.getRangeEnd()))</span>
+<span class="nc" id="L309">            throw new BusinessRuleViolationException(&quot;Reserved BIN range is no longer eligible&quot;);</span>
+<span class="fc" id="L310">        validateBinAndRangeEffective(institutionId,currentRange,OffsetDateTime.now(ZoneOffset.UTC));</span>
+<span class="fc" id="L311">        if(rangeAssignmentRepository.findEffectiveAssignments(institutionId,product.getProductId(),range.getBinRangeId(),</span>
+<span class="pc bpc" id="L312" title="1 of 2 branches missed.">                ProductBinAssignmentStatus.ACTIVE,OffsetDateTime.now(ZoneOffset.UTC)).isEmpty())</span>
+<span class="nc" id="L313">            throw new BusinessRuleViolationException(&quot;Product BIN assignment is no longer effective&quot;);</span>
+<span class="fc" id="L314">        UUID domainIdempotency = draft.operationId();</span>
+<span class="fc" id="L315">        String idempotencyKey = draft.operationId().toString();</span>
+
+<span class="fc" id="L317">        UUID panAllocationId = draft.panAllocationId();</span>
+<span class="pc bpc" id="L318" title="3 of 4 branches missed.">        PanAllocationV2 panAllocation = predecessor != null &amp;&amp; !newPanReplacement</span>
+<span class="nc" id="L319">                ? em.find(PanAllocationV2.class, predecessor.getPanAllocationId())</span>
+<span class="fc" id="L320">                : panAllocationRepository.save(PanAllocationV2.builder()</span>
+<span class="fc" id="L321">                .panAllocationId(panAllocationId)</span>
+<span class="fc" id="L322">                .institutionId(institutionId)</span>
+<span class="fc" id="L323">                .binRangeId(range.getBinRangeId())</span>
+<span class="fc" id="L324">                .allocationStrategy(range.getAllocationStrategy())</span>
+<span class="fc" id="L325">                .panFingerprint(security.panFingerprint())</span>
+<span class="fc" id="L326">                .securePanReference(security.secureDataReference())</span>
+<span class="fc" id="L327">                .panHmac(security.panHmac())</span>
+                // Older prepared RANDOM results contain the reserved offset; it is not a sequence.
+<span class="pc bpc" id="L329" title="1 of 2 branches missed.">                .sequenceValue(range.getAllocationStrategy() == com.xenomi.cms.core.v2.bin.model.AllocationStrategy.SEQUENTIAL</span>
+<span class="pc" id="L330">                        ? security.sequenceValue() : null)</span>
+<span class="fc" id="L331">                .allocationStatus(PanAllocationStatus.ISSUED)</span>
+<span class="fc" id="L332">                .idempotencyKey(domainIdempotency)</span>
+<span class="fc" id="L333">                .reservedAt(now)</span>
+<span class="fc" id="L334">                .issuedAt(now)</span>
+<span class="fc" id="L335">                .accountReferenceId(account.getExternalAccountReferenceId())</span>
+<span class="fc" id="L336">                .createdBy(actor)</span>
+<span class="fc" id="L337">                .build());</span>
+
+<span class="fc" id="L339">        em.flush();</span>
+<span class="pc bpc" id="L340" title="3 of 4 branches missed.">        if (predecessor == null || newPanReplacement) em.persist(pin);</span>
+<span class="fc" id="L341">        em.flush();</span>
+<span class="fc" id="L342">        UUID cardId = draft.cardId();</span>
+<span class="fc" id="L343">        boolean immediatePhysical = requiresImmediatePhysical(cardForm);</span>
+<span class="fc" id="L344">        CardV2 card = cardRepository.save(CardV2.builder()</span>
+<span class="fc" id="L345">                .cardId(cardId)</span>
+<span class="fc" id="L346">                .institutionId(institutionId)</span>
+<span class="fc" id="L347">                .customerReferenceId(customer.getCustomerReferenceId())</span>
+<span class="fc" id="L348">                .productId(product.getProductId())</span>
+<span class="fc" id="L349">                .productVersionId(version.getProductVersionId())</span>
+<span class="fc" id="L350">                .binId(range.getBinId())</span>
+<span class="fc" id="L351">                .binRangeId(range.getBinRangeId())</span>
+<span class="fc" id="L352">                .panAllocationId(panAllocation.getPanAllocationId())</span>
+<span class="fc" id="L353">                .maskedPan(security.maskedPan())</span>
+<span class="fc" id="L354">                .panLastFour(security.panLastFour())</span>
+<span class="fc" id="L355">                .cardDesignId(profiles.cardDesignId())</span>
+<span class="fc" id="L356">                .technologyProfileId(profiles.technologyProfileId())</span>
+<span class="fc" id="L357">                .cvmProfileId(profiles.cvmProfileId())</span>
+<span class="pc bpc" id="L358" title="1 of 2 branches missed.">                .shippingAddressReferenceId(address == null ? null : address.getAddressReferenceId())</span>
+<span class="fc" id="L359">                .cardForm(cardForm)</span>
+<span class="fc" id="L360">                .issuanceMode(formPolicy.getIssuanceMode())</span>
+<span class="fc" id="L361">                .physicalIssueTiming(formPolicy.getPhysicalIssueTiming())</span>
+<span class="fc" id="L362">                .cardSequenceNumber(null)</span>
+<span class="fc" id="L363">                .embossedNameLine1(trim(request.getEmbossedNameLine1()))</span>
+<span class="fc" id="L364">                .embossedNameLine2(trim(request.getEmbossedNameLine2()))</span>
+<span class="fc" id="L365">                .embossedNameLine3(trim(request.getEmbossedNameLine3()))</span>
+<span class="fc" id="L366">                .embossedNameLine4(trim(request.getEmbossedNameLine4()))</span>
+<span class="fc" id="L367">                .panEncrypted(security.encryptedPan())</span>
+<span class="fc" id="L368">                .cvv1Encrypted(security.encryptedCvv1())</span>
+<span class="fc" id="L369">                .cvv2Encrypted(security.encryptedCvv2())</span>
+<span class="fc" id="L370">                .track2Encrypted(security.encryptedTrack2())</span>
+<span class="fc" id="L371">                .dataEncryptionKeyId(security.encryptionKeyId())</span>
+<span class="fc" id="L372">                .panHmacKeyId(security.panHmacKeyId())</span>
+<span class="fc" id="L373">                .cvvKeyId(security.cvvKeyId())</span>
+<span class="fc" id="L374">                .issueDate(issueDate)</span>
+<span class="fc" id="L375">                .expiryDate(expiryDate)</span>
+<span class="fc" id="L376">                .issuedAt(now)</span>
+<span class="fc" id="L377">                .issuanceReason(issuanceReason(predecessor, replacementReason, newPanReplacement))</span>
+<span class="pc bpc" id="L378" title="1 of 2 branches missed.">                .previousCardId(predecessor == null ? null : predecessor.getCardId())</span>
+<span class="pc bpc" id="L379" title="3 of 4 branches missed.">                .rootCardId(predecessor == null ? null : predecessor.getRootCardId() == null ? predecessor.getCardId() : predecessor.getRootCardId())</span>
+<span class="pc bpc" id="L380" title="1 of 2 branches missed.">                .replacementReason(predecessor == null ? null : replacementReason)</span>
+<span class="pc bpc" id="L381" title="3 of 4 branches missed.">                .panReplacementStrategy(predecessor == null ? null : newPanReplacement</span>
+<span class="nc" id="L382">                        ? com.xenomi.cms.core.v2.product.model.ReplacementPanStrategy.GENERATE_NEW_PAN</span>
+<span class="nc" id="L383">                        : com.xenomi.cms.core.v2.product.model.ReplacementPanStrategy.PRESERVE_EXISTING_PAN)</span>
+<span class="fc" id="L384">                .pinDataRef(draft.pinDataId())</span>
+<span class="fc" id="L385">                .credentialIssuanceRef(draft.operationId())</span>
+<span class="fc" id="L386">                .activationPolicyVersion(request.getActivationPolicyVersionId())</span>
+<span class="pc bpc" id="L387" title="5 of 6 branches missed.">                .collectionsHoldReason(predecessor != null &amp;&amp; !newPanReplacement &amp;&amp; holds.getCollectionsHoldReason() == null</span>
+<span class="pc" id="L388">                        ? predecessor.getCollectionsHoldReason() : holds.getCollectionsHoldReason())</span>
+<span class="pc bpc" id="L389" title="5 of 6 branches missed.">                .complianceHoldReason(predecessor != null &amp;&amp; !newPanReplacement &amp;&amp; (holds.getComplianceHoldReason() == null</span>
+<span class="nc bnc" id="L390" title="All 2 branches missed.">                        || predecessor.getComplianceHoldReason() == com.xenomi.cms.core.v2.card.model.ComplianceHoldReasonV2.REGULATORY)</span>
+<span class="pc" id="L391">                        ? predecessor.getComplianceHoldReason() : holds.getComplianceHoldReason())</span>
+<span class="pc bpc" id="L392" title="3 of 4 branches missed.">                .customerHoldReason(predecessor == null || newPanReplacement ? null : predecessor.getCustomerHoldReason())</span>
+<span class="pc bpc" id="L393" title="3 of 4 branches missed.">                .opsHoldReason(predecessor == null || newPanReplacement ? null : predecessor.getOpsHoldReason())</span>
+<span class="pc bpc" id="L394" title="3 of 4 branches missed.">                .securityHoldReason(predecessor == null || newPanReplacement ? null : predecessor.getSecurityHoldReason())</span>
+<span class="pc bpc" id="L395" title="1 of 2 branches missed.">                .physicalFulfilmentStatus(immediatePhysical ?</span>
+<span class="nc" id="L396">                        com.xenomi.cms.core.v2.card.model.PhysicalFulfilmentStatusV2.REQUESTED :</span>
+<span class="fc" id="L397">                        com.xenomi.cms.core.v2.card.model.PhysicalFulfilmentStatusV2.NOT_APPLICABLE)</span>
+<span class="pc bpc" id="L398" title="1 of 2 branches missed.">                .issueSequence(predecessor == null ? 1 : Math.addExact(predecessor.getIssueSequence(), 1))</span>
+<span class="fc" id="L399">                .digitalAvailable(hasVirtualCredential(cardForm))</span>
+<span class="fc" id="L400">                .createdBy(actor)</span>
+<span class="fc" id="L401">                .updatedBy(actor)</span>
+<span class="fc" id="L402">                .build());</span>
+
+<span class="fc" id="L404">        CardAccountLinkV2 link = accountLinkRepository.save(CardAccountLinkV2.builder()</span>
+<span class="fc" id="L405">                .cardAccountLinkId(uuidGenerator.generate())</span>
+<span class="fc" id="L406">                .institutionId(institutionId)</span>
+<span class="fc" id="L407">                .cardId(cardId)</span>
+<span class="fc" id="L408">                .externalAccountReferenceId(account.getExternalAccountReferenceId())</span>
+<span class="pc bpc" id="L409" title="1 of 2 branches missed.">                .linkType(request.getAccountLinkType() == null</span>
+<span class="pc" id="L410">                        ? CardAccountLinkType.PRIMARY_FUNDING : request.getAccountLinkType())</span>
+<span class="fc" id="L411">                .primary(true)</span>
+<span class="fc" id="L412">                .linkStatus(ReferenceStatus.ACTIVE)</span>
+<span class="fc" id="L413">                .effectiveFrom(now)</span>
+<span class="fc" id="L414">                .sourceReference(trim(request.getAccountLinkSourceReference()))</span>
+<span class="fc" id="L415">                .build());</span>
+
+<span class="fc" id="L417">        controlProfileInitializer.initialize(card, institution, actor);</span>
+<span class="pc bpc" id="L418" title="3 of 4 branches missed.">        if (predecessor == null || newPanReplacement) pinLifecycleService.recordOriginalHistory(card, pin, draft.operationId(), actor);</span>
+<span class="fc" id="L419">        var lookup = em.createQuery(&quot;select p from PanLookupIdentityV2 p where p.institutionId=:t and p.panAllocationId=:f and p.hmacKeyId=:k&quot;,</span>
+                        com.xenomi.cms.core.v2.card.lifecycle.entity.PanLookupIdentityV2.class)
+<span class="fc" id="L421">                .setParameter(&quot;t&quot;, institutionId).setParameter(&quot;f&quot;, panAllocationId).setParameter(&quot;k&quot;, security.panHmacKeyId()).getResultList();</span>
+<span class="pc bpc" id="L422" title="3 of 4 branches missed.">        if (!lookup.isEmpty() &amp;&amp; !lookup.getFirst().getPanHash().equals(security.panHmac()))</span>
+<span class="nc" id="L423">            throw new BusinessRuleViolationException(&quot;PAN lookup identity does not match the prepared credentials&quot;);</span>
+<span class="pc bpc" id="L424" title="1 of 2 branches missed.">        if (lookup.isEmpty()) em.persist(com.xenomi.cms.core.v2.card.lifecycle.entity.PanLookupIdentityV2.builder()</span>
+<span class="fc" id="L425">                .panLookupIdentityId(uuidGenerator.generate()).institutionId(institutionId)</span>
+<span class="fc" id="L426">                .panAllocationId(panAllocationId).hmacKeyId(security.panHmacKeyId())</span>
+<span class="fc" id="L427">                .panHash(security.panHmac()).validFrom(now).build());</span>
+<span class="pc bpc" id="L428" title="1 of 2 branches missed.">        if (immediatePhysical) em.persist(com.xenomi.cms.core.v2.card.lifecycle.entity.PhysicalSequenceReservationV2.builder()</span>
+<span class="nc" id="L429">                .reservationId(uuidGenerator.generate()).institutionId(institutionId).panAllocationId(panAllocationId)</span>
+<span class="nc" id="L430">                .cardId(cardId).operationId(draft.operationId()).reservedAt(now).build());</span>
+
+<span class="pc bpc" id="L432" title="1 of 2 branches missed.">        CardProductionRequestV2 productionRequest = immediatePhysical</span>
+<span class="nc" id="L433">                ? createProductionRequest(institutionId, card, production, address,</span>
+                        idempotencyKey, actor, now)
+<span class="fc" id="L435">                : null;</span>
+<span class="fc" id="L436">        em.flush();</span>
+<span class="fc" id="L437">        em.refresh(card);</span>
+<span class="fc" id="L438">        return card;</span>
+    }
+
+    /** Finalizes a new-PAN replacement and then records lineage without sharing PAN or PIN state. */
+    public CardV2 finalizeNewPanReplacementDraft(Draft draft, CardSecurityMaterial security,
+            com.xenomi.cms.core.v2.card.pin.entity.PinDataV2 pin,
+            com.xenomi.cms.core.v2.card.lifecycle.entity.AccountRestrictionSnapshotV2 holds,
+            jakarta.persistence.EntityManager em, CardV2 predecessor,
+            com.xenomi.cms.core.v2.product.model.ReplacementReason reason) {
+<span class="nc" id="L447">        return finalizeDraftInternal(draft, security, pin, holds, em, predecessor,</span>
+                reason, true);
+    }
+
+    private static com.xenomi.cms.core.v2.card.model.IssuanceReasonV2 issuanceReason(
+            CardV2 predecessor,
+            com.xenomi.cms.core.v2.product.model.ReplacementReason reason,
+            boolean newPanReplacement) {
+<span class="pc bpc" id="L455" title="1 of 2 branches missed.">        if (predecessor == null) {</span>
+<span class="fc" id="L456">            return com.xenomi.cms.core.v2.card.model.IssuanceReasonV2.ORIGINAL;</span>
+        }
+<span class="nc bnc" id="L458" title="All 2 branches missed.">        if (!newPanReplacement) {</span>
+<span class="nc" id="L459">            return com.xenomi.cms.core.v2.card.model.IssuanceReasonV2.RENEWAL_SAME_PAN;</span>
+        }
+<span class="nc bnc" id="L461" title="All 5 branches missed.">        return switch (reason) {</span>
+<span class="nc" id="L462">            case LOST -&gt; com.xenomi.cms.core.v2.card.model.IssuanceReasonV2.REPLACEMENT_LOST;</span>
+<span class="nc" id="L463">            case STOLEN -&gt; com.xenomi.cms.core.v2.card.model.IssuanceReasonV2.REPLACEMENT_STOLEN;</span>
+<span class="nc" id="L464">            case COMPROMISED -&gt; com.xenomi.cms.core.v2.card.model.IssuanceReasonV2.REPLACEMENT_COMPROMISED;</span>
+<span class="nc" id="L465">            case FRAUD -&gt; com.xenomi.cms.core.v2.card.model.IssuanceReasonV2.REPLACEMENT_FRAUD;</span>
+<span class="nc" id="L466">            default -&gt; throw new BusinessRuleViolationException(</span>
+                    &quot;This finalizer supports permanent-security replacement only&quot;);
+        };
+    }
+
+    @Transactional(readOnly = true)
+    public CardV2Response get(UUID institutionId, UUID cardId) {
+<span class="fc" id="L473">        CardV2 card = cardRepository.findByCardIdAndInstitutionId(cardId, institutionId)</span>
+<span class="pc" id="L474">                .orElseThrow(() -&gt; new ResourceNotFoundException(&quot;Card&quot;, cardId.toString()));</span>
+<span class="fc" id="L475">        requireProduct(institutionId, card.getProductId());</span>
+<span class="fc" id="L476">        return toResponse(card,</span>
+<span class="fc" id="L477">                accountLinkRepository.findFirstByInstitutionIdAndCardIdAndPrimaryTrue(</span>
+<span class="fc" id="L478">                        institutionId, cardId).orElse(null),</span>
+<span class="fc" id="L479">                productionRequestRepository.findByInstitutionIdAndCardId(</span>
+<span class="fc" id="L480">                        institutionId, cardId).orElse(null));</span>
+    }
+
+    @Transactional(readOnly = true)
+    public Page&lt;CardV2Response&gt; search(UUID institutionId, UUID customerReferenceId,
+            UUID accountReferenceId, Pageable pageable) {
+<span class="fc" id="L486">        requireInstitution(institutionId);</span>
+<span class="fc" id="L487">        return cardRepository.search(institutionId, customerReferenceId, accountReferenceId, pageable)</span>
+<span class="fc" id="L488">                .map(card -&gt; toResponse(card,</span>
+<span class="fc" id="L489">                        accountLinkRepository.findFirstByInstitutionIdAndCardIdAndPrimaryTrue(</span>
+<span class="fc" id="L490">                                institutionId, card.getCardId()).orElse(null),</span>
+<span class="fc" id="L491">                        productionRequestRepository.findByInstitutionIdAndCardId(</span>
+<span class="fc" id="L492">                                institutionId, card.getCardId()).orElse(null)));</span>
+    }
+
+    @Transactional
+    public CardV2Response requestPhysicalCard(UUID institutionId, UUID cardId,
+            RequestPhysicalCardV2Request request, String idempotencyKey, String actorId) {
+<span class="fc" id="L498">        String actor = actorId.trim();</span>
+<span class="fc" id="L499">        OffsetDateTime now = OffsetDateTime.now(ZoneOffset.UTC);</span>
+<span class="fc bfc" id="L500" title="All 2 branches covered.">        if (request.getShippingAddressReferenceId() == null</span>
+<span class="pc bpc" id="L501" title="1 of 2 branches missed.">                || request.getProductionBatchConfigurationId() == null) {</span>
+<span class="fc" id="L502">            throw new BusinessRuleViolationException(</span>
+                    &quot;Shipping address and production batch configuration are required&quot;);
+        }
+<span class="fc" id="L505">        CardV2 card = cardRepository.findByCardIdAndInstitutionId(cardId, institutionId)</span>
+<span class="pc" id="L506">                .orElseThrow(() -&gt; new ResourceNotFoundException(&quot;Card&quot;, cardId.toString()));</span>
+<span class="pc bpc" id="L507" title="1 of 2 branches missed.">        if (card.getIssuanceMode() != CardIssuanceMode.VIRTUAL_THEN_PHYSICAL_LATER) {</span>
+<span class="nc" id="L508">            throw new BusinessRuleViolationException(</span>
+                    &quot;Physical production can be requested here only for VIRTUAL_THEN_PHYSICAL_LATER cards&quot;);
+        }
+<span class="pc bpc" id="L511" title="1 of 2 branches missed.">        if (card.getCardStatus() == CardStatusV2.CLOSED</span>
+<span class="pc bpc" id="L512" title="1 of 2 branches missed.">                || card.getCardStatus() == CardStatusV2.BLOCKED) {</span>
+<span class="nc" id="L513">            throw new BusinessRuleViolationException(</span>
+                    &quot;A blocked or closed card cannot be submitted for physical production&quot;);
+        }
+<span class="pc bpc" id="L516" title="1 of 2 branches missed.">        if (productionRequestRepository.findByInstitutionIdAndCardId(institutionId, cardId).isPresent()) {</span>
+<span class="nc" id="L517">            throw new BusinessRuleViolationException(</span>
+                    &quot;A physical production request already exists for this card&quot;);
+        }
+
+<span class="fc" id="L521">        AddressReferenceV2 address = requireAddressIfPresent(institutionId,</span>
+<span class="fc" id="L522">                card.getCustomerReferenceId(), request.getShippingAddressReferenceId());</span>
+<span class="fc" id="L523">        ProductionContext production = requireProductionContext(institutionId,</span>
+<span class="fc" id="L524">                card.getProductVersionId(), request.getProductionBatchConfigurationId());</span>
+<span class="fc" id="L525">        card.setShippingAddressReferenceId(address.getAddressReferenceId());</span>
+        // A virtual-first card becomes a dual-form card once physical production is requested.
+        // physical_activation_status is generated from card_form/activated_at/retired_at.
+<span class="fc" id="L528">        card.setCardForm(CardFormV2.VIRTUAL_PHYSICAL);</span>
+<span class="fc" id="L529">        card.setPhysicalFulfilmentStatus(com.xenomi.cms.core.v2.card.model.PhysicalFulfilmentStatusV2.REQUESTED);</span>
+<span class="fc" id="L530">        card.setUpdatedBy(actor);</span>
+<span class="fc" id="L531">        cardRepository.save(card);</span>
+
+<span class="fc" id="L533">        CardProductionRequestV2 productionRequest = createProductionRequest(</span>
+                institutionId, card, production, address, idempotencyKey, actor, now,
+                ProductionRequestType.VIRTUAL_TO_PHYSICAL,
+                ProductionRequestTrigger.CUSTOMER_REQUEST);
+<span class="fc" id="L537">        CardAccountLinkV2 link = accountLinkRepository</span>
+<span class="fc" id="L538">                .findFirstByInstitutionIdAndCardIdAndPrimaryTrue(institutionId, cardId)</span>
+<span class="fc" id="L539">                .orElse(null);</span>
+<span class="fc" id="L540">        return toResponse(card, link, productionRequest);</span>
+    }
+
+    private ProductionContext resolveProduction(UUID institutionId, UUID versionId,
+            CardFormV2 cardForm, CreateCardV2Request request) {
+<span class="pc bpc" id="L545" title="1 of 2 branches missed.">        if (!requiresImmediatePhysical(cardForm)) return null;</span>
+<span class="nc bnc" id="L546" title="All 2 branches missed.">        if (request.getProductionBatchConfigurationId() == null) {</span>
+<span class="nc" id="L547">            throw new BusinessRuleViolationException(</span>
+                    &quot;productionBatchConfigurationId is required for immediate physical issuance&quot;);
+        }
+<span class="nc" id="L550">        return requireProductionContext(</span>
+<span class="nc" id="L551">                institutionId, versionId, request.getProductionBatchConfigurationId());</span>
+    }
+
+    private ProductionContext requireProductionContext(UUID institutionId, UUID versionId,
+            UUID productionBatchConfigurationId) {
+<span class="fc" id="L556">        ProductPersonalisationPolicyV2 policy = personalisationPolicyRepository</span>
+<span class="fc" id="L557">                .findByProductVersionIdAndInstitutionId(versionId, institutionId)</span>
+<span class="pc" id="L558">                .orElseThrow(() -&gt; new BusinessRuleViolationException(</span>
+                        &quot;Physical production requires a personalisation policy&quot;));
+<span class="pc bpc" id="L560" title="2 of 4 branches missed.">        if (policy.getPolicyStatus() != ProductPolicyStatus.ACTIVE || !policy.isPersonalisedAllowed()) {</span>
+<span class="nc" id="L561">            throw new BusinessRuleViolationException(</span>
+                    &quot;Personalised physical issuance is not active for the product version&quot;);
+        }
+<span class="pc bpc" id="L564" title="1 of 2 branches missed.">        if (policy.getDefaultVendorId() == null) {</span>
+<span class="nc" id="L565">            throw new BusinessRuleViolationException(</span>
+                    &quot;Physical issuance requires a default card vendor&quot;);
+        }
+<span class="fc" id="L568">        CardVendorV2 vendor = vendorRepository</span>
+<span class="fc" id="L569">                .findByVendorIdAndInstitutionId(policy.getDefaultVendorId(), institutionId)</span>
+<span class="pc" id="L570">                .orElseThrow(() -&gt; new ResourceNotFoundException(</span>
+<span class="nc" id="L571">                        &quot;Default card vendor&quot;, policy.getDefaultVendorId().toString()));</span>
+<span class="pc bpc" id="L572" title="1 of 2 branches missed.">        if (vendor.getVendorStatus() != ReferenceStatus.ACTIVE) {</span>
+<span class="nc" id="L573">            throw new BusinessRuleViolationException(&quot;Default card vendor must be ACTIVE&quot;);</span>
+        }
+<span class="fc" id="L575">        PersonalisationBatchConfigurationV2 configuration = batchConfigurationRepository</span>
+<span class="fc" id="L576">                .findByBatchConfigurationIdAndInstitutionIdAndVendorId(</span>
+<span class="fc" id="L577">                        productionBatchConfigurationId, institutionId, vendor.getVendorId())</span>
+<span class="pc" id="L578">                .orElseThrow(() -&gt; new ResourceNotFoundException(</span>
+                        &quot;Personalisation batch configuration&quot;,
+<span class="nc" id="L580">                        productionBatchConfigurationId.toString()));</span>
+<span class="pc bpc" id="L581" title="1 of 2 branches missed.">        if (configuration.getConfigurationStatus() != BatchConfigurationStatus.ACTIVE) {</span>
+<span class="nc" id="L582">            throw new BusinessRuleViolationException(</span>
+                    &quot;Personalisation batch configuration must be ACTIVE&quot;);
+        }
+<span class="fc" id="L585">        return new ProductionContext(vendor.getVendorId(), configuration.getBatchConfigurationId(),</span>
+<span class="fc" id="L586">                policy.getVendorFormatProfileReference());</span>
+    }
+
+    private ResolvedProfiles resolveProfiles(UUID institutionId, UUID versionId,
+            CardFormV2 cardForm, CreateCardV2Request request) {
+<span class="pc bpc" id="L591" title="1 of 2 branches missed.">        CardForm designForm = cardForm == CardFormV2.VIRTUAL ? CardForm.VIRTUAL : CardForm.PHYSICAL;</span>
+<span class="pc bpc" id="L592" title="1 of 2 branches missed.">        ProductCardDesignAssignmentV2 design = request.getCardDesignId() == null</span>
+                ? designAssignmentRepository
+<span class="fc" id="L594">                        .findFirstByInstitutionIdAndProductVersionIdAndCardFormAndDefaultDesignTrueAndAssignmentStatusOrderByEffectiveFromDesc(</span>
+                                institutionId, versionId, designForm, DesignAssignmentStatus.ACTIVE)
+<span class="fc" id="L596">                        .orElse(null)</span>
+                : designAssignmentRepository
+<span class="nc" id="L598">                        .findFirstByInstitutionIdAndProductVersionIdAndCardDesignIdAndCardFormAndAssignmentStatusOrderByEffectiveFromDesc(</span>
+<span class="nc" id="L599">                                institutionId, versionId, request.getCardDesignId(), designForm,</span>
+                                DesignAssignmentStatus.ACTIVE)
+<span class="pc" id="L601">                        .orElseThrow(() -&gt; new BusinessRuleViolationException(</span>
+                                &quot;Selected card design is not actively assigned to the product version&quot;));
+<span class="pc bpc" id="L603" title="1 of 2 branches missed.">        ProductCardTechnologyProfileV2 technology = request.getTechnologyProfileId() == null</span>
+                ? technologyRepository
+<span class="fc" id="L605">                        .findTopByInstitutionIdAndProductVersionIdAndProfileStatusOrderByProfileVersionDesc(</span>
+                                institutionId, versionId, ProductProfileStatus.ACTIVE)
+<span class="fc" id="L607">                        .orElse(null)</span>
+                : technologyRepository
+<span class="nc" id="L609">                        .findByTechnologyProfileIdAndInstitutionIdAndProductVersionId(</span>
+<span class="nc" id="L610">                                request.getTechnologyProfileId(), institutionId, versionId)</span>
+<span class="nc bnc" id="L611" title="All 2 branches missed.">                        .filter(value -&gt; value.getProfileStatus() == ProductProfileStatus.ACTIVE)</span>
+<span class="pc" id="L612">                        .orElseThrow(() -&gt; new BusinessRuleViolationException(</span>
+                                &quot;Selected technology profile is not ACTIVE for the product version&quot;));
+<span class="pc bpc" id="L614" title="1 of 2 branches missed.">        ProductCvmProfileV2 cvm = request.getCvmProfileId() == null</span>
+                ? cvmRepository
+<span class="fc" id="L616">                        .findTopByInstitutionIdAndProductVersionIdAndProfileStatusOrderByProfileVersionDesc(</span>
+                                institutionId, versionId, ProductProfileStatus.ACTIVE)
+<span class="fc" id="L618">                        .orElse(null)</span>
+                : cvmRepository
+<span class="nc" id="L620">                        .findByCvmProfileIdAndInstitutionIdAndProductVersionId(</span>
+<span class="nc" id="L621">                                request.getCvmProfileId(), institutionId, versionId)</span>
+<span class="nc bnc" id="L622" title="All 2 branches missed.">                        .filter(value -&gt; value.getProfileStatus() == ProductProfileStatus.ACTIVE)</span>
+<span class="pc" id="L623">                        .orElseThrow(() -&gt; new BusinessRuleViolationException(</span>
+                                &quot;Selected CVM profile is not ACTIVE for the product version&quot;));
+<span class="fc" id="L625">        OffsetDateTime now=OffsetDateTime.now(ZoneOffset.UTC);</span>
+<span class="pc bpc" id="L626" title="3 of 4 branches missed.">        if(design!=null &amp;&amp; (design.getEffectiveFrom().isAfter(now)</span>
+<span class="nc bnc" id="L627" title="All 4 branches missed.">                || (design.getEffectiveTo()!=null &amp;&amp; !design.getEffectiveTo().isAfter(now))))</span>
+<span class="nc" id="L628">            throw new BusinessRuleViolationException(&quot;Card design assignment is not currently effective&quot;);</span>
+<span class="pc bpc" id="L629" title="1 of 2 branches missed.">        return new ResolvedProfiles(design == null ? null : design.getCardDesignId(),</span>
+<span class="pc bpc" id="L630" title="1 of 2 branches missed.">                technology == null ? null : technology.getTechnologyProfileId(),</span>
+<span class="pc bpc" id="L631" title="1 of 2 branches missed.">                cvm == null ? null : cvm.getCvmProfileId());</span>
+    }
+
+    private CardProductionRequestV2 createProductionRequest(UUID institutionId, CardV2 card,
+            ProductionContext production, AddressReferenceV2 address, String idempotencyKey,
+            String actor, OffsetDateTime now) {
+<span class="nc" id="L637">        return createProductionRequest(institutionId, card, production, address,</span>
+                idempotencyKey, actor, now, ProductionRequestType.INITIAL_PHYSICAL,
+                ProductionRequestTrigger.CARD_CREATION);
+    }
+
+    private CardProductionRequestV2 createProductionRequest(UUID institutionId, CardV2 card,
+            ProductionContext production, AddressReferenceV2 address, String idempotencyKey,
+            String actor, OffsetDateTime now, ProductionRequestType requestType,
+            ProductionRequestTrigger requestTrigger) {
+<span class="fc" id="L646">        CardProductionRequestV2 request = CardProductionRequestV2.builder()</span>
+<span class="fc" id="L647">                .productionRequestId(uuidGenerator.generate())</span>
+<span class="fc" id="L648">                .institutionId(institutionId)</span>
+<span class="fc" id="L649">                .cardId(card.getCardId())</span>
+<span class="fc" id="L650">                .vendorId(production.vendorId())</span>
+<span class="fc" id="L651">                .batchConfigurationId(production.batchConfigurationId())</span>
+<span class="fc" id="L652">                .productionProfileReference(production.productionProfileReference())</span>
+<span class="fc" id="L653">                .requestType(requestType)</span>
+<span class="fc" id="L654">                .requestTrigger(requestTrigger)</span>
+<span class="pc bpc" id="L655" title="1 of 2 branches missed.">                .cardDataReady(true)</span>
+<span class="fc" id="L656">                .addressReady(address != null)</span>
+<span class="fc" id="L657">                .approvalReady(true)</span>
+<span class="fc" id="L658">                .requestedAt(now)</span>
+<span class="fc" id="L659">                .idempotencyKey(deterministicId(institutionId, &quot;PRODUCTION:&quot; + idempotencyKey))</span>
+<span class="fc" id="L660">                .createdBy(actor)</span>
+<span class="fc" id="L661">                .updatedAt(now)</span>
+<span class="fc" id="L662">                .build();</span>
+<span class="fc" id="L663">        ProductionRequestEligibility.stamp(request,</span>
+<span class="fc" id="L664">                productionRequestRepository.appliedSwitchRevision(institutionId, card.getCardId()), now);</span>
+<span class="fc" id="L665">        return productionRequestRepository.save(request);</span>
+    }
+
+    private CustomerReferenceV2 requireCustomer(UUID institutionId, UUID customerId) {
+<span class="fc" id="L669">        CustomerReferenceV2 customer = customerRepository</span>
+<span class="fc" id="L670">                .findByCustomerReferenceIdAndInstitutionId(customerId, institutionId)</span>
+<span class="pc" id="L671">                .orElseThrow(() -&gt; new ResourceNotFoundException(&quot;Customer reference&quot;, customerId.toString()));</span>
+<span class="pc bpc" id="L672" title="1 of 2 branches missed.">        if (customer.getCustomerStatus() != ReferenceStatus.ACTIVE) {</span>
+<span class="nc" id="L673">            throw new BusinessRuleViolationException(&quot;Customer reference must be ACTIVE&quot;);</span>
+        }
+<span class="fc" id="L675">        return customer;</span>
+    }
+
+    private ExternalAccountReferenceV2 requireAccount(UUID institutionId, UUID accountId) {
+<span class="fc" id="L679">        ExternalAccountReferenceV2 account = accountRepository</span>
+<span class="fc" id="L680">                .findByExternalAccountReferenceIdAndInstitutionId(accountId, institutionId)</span>
+<span class="pc" id="L681">                .orElseThrow(() -&gt; new ResourceNotFoundException(&quot;Account reference&quot;, accountId.toString()));</span>
+<span class="pc bpc" id="L682" title="1 of 2 branches missed.">        if (account.getAccountStatus() != ReferenceStatus.ACTIVE) {</span>
+<span class="nc" id="L683">            throw new BusinessRuleViolationException(&quot;Account reference must be ACTIVE&quot;);</span>
+        }
+<span class="fc" id="L685">        return account;</span>
+    }
+
+    private AddressReferenceV2 requireAddressIfPresent(UUID institutionId, UUID customerId,
+            UUID addressId) {
+<span class="fc bfc" id="L690" title="All 2 branches covered.">        if (addressId == null) return null;</span>
+<span class="fc" id="L691">        AddressReferenceV2 address = addressRepository</span>
+<span class="fc" id="L692">                .findByAddressReferenceIdAndInstitutionIdAndCustomerReferenceId(</span>
+                        addressId, institutionId, customerId)
+<span class="pc" id="L694">                .orElseThrow(() -&gt; new ResourceNotFoundException(&quot;Address reference&quot;, addressId.toString()));</span>
+<span class="pc bpc" id="L695" title="1 of 2 branches missed.">        if (address.getAddressStatus() != ReferenceStatus.ACTIVE) {</span>
+<span class="nc" id="L696">            throw new BusinessRuleViolationException(&quot;Shipping address reference must be ACTIVE&quot;);</span>
+        }
+<span class="fc" id="L698">        return address;</span>
+    }
+
+    private CardProductV2 requireProduct(UUID institutionId, UUID productId) {
+<span class="fc" id="L702">        CardProductV2 product = productRepository.findByProductIdAndInstitutionId(productId, institutionId)</span>
+<span class="pc" id="L703">                .orElseThrow(() -&gt; new ResourceNotFoundException(&quot;Card product&quot;, productId.toString()));</span>
+<span class="pc bpc" id="L704" title="1 of 2 branches missed.">        if (product.getProductStatus() != ProductStatus.ACTIVE) {</span>
+<span class="nc" id="L705">            throw new BusinessRuleViolationException(&quot;Card product must be ACTIVE for issuance&quot;);</span>
+        }
+<span class="fc" id="L707">        return product;</span>
+    }
+
+    private ProductVersionV2 requireActiveVersion(UUID institutionId, UUID productId,
+            UUID versionId, OffsetDateTime now) {
+<span class="fc" id="L712">        ProductVersionV2 version = versionRepository</span>
+<span class="fc" id="L713">                .findByProductVersionIdAndInstitutionIdAndProductId(versionId, institutionId, productId)</span>
+<span class="pc" id="L714">                .orElseThrow(() -&gt; new ResourceNotFoundException(&quot;Product version&quot;, versionId.toString()));</span>
+<span class="pc bpc" id="L715" title="1 of 2 branches missed.">        if (version.getVersionStatus() != ProductVersionStatus.ACTIVE</span>
+<span class="pc bpc" id="L716" title="1 of 2 branches missed.">                || version.getEffectiveFrom().isAfter(now)</span>
+<span class="pc bpc" id="L717" title="3 of 4 branches missed.">                || (version.getEffectiveTo() != null &amp;&amp; !version.getEffectiveTo().isAfter(now))) {</span>
+<span class="nc" id="L718">            throw new BusinessRuleViolationException(&quot;Product version is not currently ACTIVE&quot;);</span>
+        }
+<span class="fc" id="L720">        return version;</span>
+    }
+
+    private InstitutionV2 requireInstitution(UUID institutionId) {
+<span class="fc" id="L724">        return institutionRepository.findById(institutionId)</span>
+<span class="pc" id="L725">                .orElseThrow(() -&gt; new ResourceNotFoundException(</span>
+<span class="nc" id="L726">                        &quot;Institution&quot;, institutionId.toString()));</span>
+    }
+
+    private void validateBinAndRangeEffective(UUID institutionId, BinRangeV2 range,
+            OffsetDateTime now) {
+<span class="fc" id="L731">        BinConfigurationV2 bin = binRepository.findByBinIdAndInstitutionId(</span>
+<span class="fc" id="L732">                        range.getBinId(), institutionId)</span>
+<span class="pc" id="L733">                .orElseThrow(() -&gt; new ResourceNotFoundException(</span>
+<span class="nc" id="L734">                        &quot;BIN configuration&quot;, range.getBinId().toString()));</span>
+<span class="fc" id="L735">        LocalDate today = now.toLocalDate();</span>
+<span class="pc bpc" id="L736" title="1 of 2 branches missed.">        if (bin.getBinStatus() != BinStatus.ACTIVE</span>
+<span class="pc bpc" id="L737" title="1 of 2 branches missed.">                || today.isBefore(bin.getEffectiveFrom())</span>
+<span class="pc bpc" id="L738" title="3 of 4 branches missed.">                || (bin.getEffectiveTo() != null &amp;&amp; today.isAfter(bin.getEffectiveTo()))) {</span>
+<span class="nc" id="L739">            throw new BusinessRuleViolationException(</span>
+                    &quot;BIN configuration is not active and effective for new card issuance&quot;);
+        }
+<span class="pc bpc" id="L742" title="1 of 2 branches missed.">        if (now.isBefore(range.getEffectiveFrom())</span>
+<span class="pc bpc" id="L743" title="3 of 4 branches missed.">                || (range.getEffectiveTo() != null &amp;&amp; !now.isBefore(range.getEffectiveTo()))) {</span>
+<span class="nc" id="L744">            throw new BusinessRuleViolationException(</span>
+                    &quot;BIN range is not currently effective for new card issuance&quot;);
+        }
+<span class="fc" id="L747">    }</span>
+
+    private static CardFormV2 resolveCardForm(CardIssuanceMode mode) {
+<span class="pc bpc" id="L750" title="2 of 3 branches missed.">        return switch (mode) {</span>
+<span class="nc" id="L751">            case VIRTUAL_AND_PHYSICAL_SAME_DAY -&gt; CardFormV2.VIRTUAL_PHYSICAL;</span>
+<span class="fc" id="L752">            case VIRTUAL_THEN_PHYSICAL_LATER, VIRTUAL_ONLY -&gt; CardFormV2.VIRTUAL;</span>
+<span class="nc" id="L753">            case PHYSICAL_WITH_MULTIPLE_VIRTUAL_PANS, PHYSICAL_ONLY -&gt; CardFormV2.PHYSICAL;</span>
+        };
+    }
+
+    private static boolean requiresImmediatePhysical(CardFormV2 form) {
+<span class="pc bpc" id="L758" title="2 of 4 branches missed.">        return form == CardFormV2.PHYSICAL || form == CardFormV2.VIRTUAL_PHYSICAL;</span>
+    }
+
+    private static boolean hasVirtualCredential(CardFormV2 form) {
+<span class="pc bpc" id="L762" title="3 of 4 branches missed.">        return form == CardFormV2.VIRTUAL || form == CardFormV2.VIRTUAL_PHYSICAL;</span>
+    }
+
+    private static LocalDate calculateExpiry(LocalDate issueDate, ProductVersionV2 version) {
+<span class="fc" id="L766">        LocalDate expiry = issueDate.plusMonths(version.getValidityMonths());</span>
+<span class="pc bpc" id="L767" title="1 of 2 branches missed.">        return version.getExpiryCalculationRule() == ExpiryCalculationRule.END_OF_EXPIRY_MONTH</span>
+<span class="pc" id="L768">                ? expiry.with(TemporalAdjusters.lastDayOfMonth()) : expiry;</span>
+    }
+
+    private static UUID deterministicId(UUID institutionId, String value) {
+<span class="fc" id="L772">        return UUID.nameUUIDFromBytes((institutionId + &quot;:&quot; + value)</span>
+<span class="fc" id="L773">                .getBytes(StandardCharsets.UTF_8));</span>
+    }
+
+    private CardV2Response toResponse(CardV2 card, CardAccountLinkV2 link,
+            CardProductionRequestV2 production) {
+<span class="fc" id="L778">        return CardV2Response.builder()</span>
+<span class="fc" id="L779">                .cardId(card.getCardId())</span>
+<span class="fc" id="L780">                .institutionId(card.getInstitutionId())</span>
+<span class="fc" id="L781">                .customerReferenceId(card.getCustomerReferenceId())</span>
+<span class="fc bfc" id="L782" title="All 2 branches covered.">                .accountReferenceId(link == null ? null : link.getExternalAccountReferenceId())</span>
+<span class="fc" id="L783">                .productId(card.getProductId())</span>
+<span class="fc" id="L784">                .productVersionId(card.getProductVersionId())</span>
+<span class="fc" id="L785">                .binId(card.getBinId())</span>
+<span class="fc" id="L786">                .binRangeId(card.getBinRangeId())</span>
+<span class="fc" id="L787">                .maskedPan(card.getMaskedPan())</span>
+<span class="fc" id="L788">                .panLastFour(card.getPanLastFour())</span>
+<span class="fc" id="L789">                .cardForm(card.getCardForm())</span>
+<span class="fc" id="L790">                .issuanceMode(card.getIssuanceMode())</span>
+<span class="fc" id="L791">                .physicalIssueTiming(card.getPhysicalIssueTiming())</span>
+<span class="fc" id="L792">                .cardStatus(card.getCardStatus())</span>
+<span class="fc" id="L793">                .lifecycleVersion(card.getLifecycleVersion())</span>
+<span class="fc" id="L794">                .digitalAvailable(card.isDigitalAvailable())</span>
+<span class="fc" id="L795">                .issueDate(card.getIssueDate())</span>
+<span class="fc" id="L796">                .expiryDate(card.getExpiryDate())</span>
+<span class="fc bfc" id="L797" title="All 2 branches covered.">                .productionRequestId(production == null ? null : production.getProductionRequestId())</span>
+<span class="fc bfc" id="L798" title="All 2 branches covered.">                .productionRequestStatus(production == null ? null : production.getRequestStatus())</span>
+<span class="fc" id="L799">                .createdAt(card.getCreatedAt())</span>
+<span class="fc" id="L800">                .build();</span>
+    }
+
+    private static String trim(String value) {
+<span class="pc bpc" id="L804" title="3 of 4 branches missed.">        return value == null || value.isBlank() ? null : value.trim();</span>
+    }
+
+<span class="fc" id="L807">    public record ResolvedProfiles(</span>
+            UUID cardDesignId, UUID technologyProfileId, UUID cvmProfileId) {
+    }
+
+<span class="fc" id="L811">    public record ProductionContext(</span>
+            UUID vendorId, UUID batchConfigurationId, String productionProfileReference) {
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.15.202606040825</span></div></body></html>

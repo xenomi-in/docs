@@ -1,0 +1,46 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>MakeUseReadyHandlerV2.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">CMS Core Service</a> &gt; <a href="index.source.html" class="el_package">com.xenomi.cms.core.v2.card.lifecycle.command</a> &gt; <span class="el_source">MakeUseReadyHandlerV2.java</span></div><h1>MakeUseReadyHandlerV2.java</h1><pre class="source lang-java linenums">package com.xenomi.cms.core.v2.card.lifecycle.command;
+
+import com.xenomi.cms.core.exception.BusinessRuleViolationException;
+import com.xenomi.cms.core.v2.card.entity.CardV2;
+import com.xenomi.cms.core.v2.card.model.*;
+import jakarta.persistence.EntityManager;
+import jakarta.validation.constraints.NotNull;
+import org.springframework.stereotype.Component;
+import java.time.LocalDate;
+import java.time.ZoneOffset;
+import java.util.*;
+
+@Component
+public class MakeUseReadyHandlerV2 implements LifecycleCommandHandlerV2&lt;MakeUseReadyHandlerV2.Payload&gt; {
+<span class="fc" id="L15">    public record Payload(@NotNull UUID evidenceId, @NotNull ActivationTriggerV2 trigger) {}</span>
+    private final EntityManager em;
+<span class="fc" id="L17">    public MakeUseReadyHandlerV2(EntityManager em) { this.em = em; }</span>
+<span class="nc" id="L18">    public String kind() { return &quot;MAKE_USE_READY&quot;; }</span>
+<span class="nc" id="L19">    public String permission() { return &quot;cms:card:manage&quot;; }</span>
+<span class="nc" id="L20">    public Set&lt;LifecycleActorTypeV2&gt; actors() { return Set.of(LifecycleActorTypeV2.CUSTOMER, LifecycleActorTypeV2.OPS, LifecycleActorTypeV2.SYSTEM); }</span>
+<span class="nc" id="L21">    public Class&lt;Payload&gt; payloadType() { return Payload.class; }</span>
+<span class="nc" id="L22">    public VersionRequirement versionRequirement() { return VersionRequirement.CARD; }</span>
+    public LockPlan plan(LifecycleCommandRequestV2 request, Payload payload) {
+<span class="pc bpc" id="L24" title="1 of 2 branches missed.">        if (request.targetCardId() == null) throw new IllegalArgumentException(&quot;Target card is required&quot;);</span>
+<span class="nc" id="L25">        UUID family = em.createQuery(&quot;select c.panAllocationId from CardV2 c where c.institutionId=:t and c.cardId=:id&quot;, UUID.class)</span>
+<span class="nc" id="L26">                .setParameter(&quot;t&quot;, request.institutionId()).setParameter(&quot;id&quot;, request.targetCardId()).getResultStream().findFirst()</span>
+<span class="nc" id="L27">                .orElseThrow(() -&gt; new IllegalArgumentException(&quot;Card not found&quot;));</span>
+<span class="nc" id="L28">        return new LockPlan(Set.of(family), Set.of(request.targetCardId()));</span>
+    }
+    public void apply(LifecycleCommandContextV2 c, Payload p) {
+<span class="fc" id="L31">        CardV2 card = c.card(c.request().targetCardId());</span>
+<span class="fc bfc" id="L32" title="All 2 branches covered.">        if (card.getUseReadyAt() != null) throw new BusinessRuleViolationException(&quot;Card is already ready&quot;);</span>
+<span class="pc bpc" id="L33" title="2 of 6 branches missed.">        if (card.getExpiredAt() != null || card.getClosedAt() != null || card.getReplacedAt() != null)</span>
+<span class="fc" id="L34">            throw new BusinessRuleViolationException(&quot;Terminal cards cannot be made ready&quot;);</span>
+<span class="pc bpc" id="L35" title="1 of 4 branches missed.">        if (card.getExpiryDate() != null &amp;&amp; LocalDate.now(ZoneOffset.UTC).isAfter(card.getExpiryDate()))</span>
+<span class="nc" id="L36">            throw new BusinessRuleViolationException(&quot;Expired cards cannot be made ready&quot;);</span>
+<span class="pc bpc" id="L37" title="1 of 4 branches missed.">        if (card.getSecurityHoldReason() != null &amp;&amp; card.getSecurityHoldReason() != SecurityHoldReasonV2.RISK_BLOCK)</span>
+<span class="fc" id="L38">            throw new BusinessRuleViolationException(&quot;Permanent security holds forbid readiness&quot;);</span>
+<span class="pc bpc" id="L39" title="1 of 4 branches missed.">        if (card.getCardForm() != CardFormV2.VIRTUAL &amp;&amp; card.getPhysicalActivationStatus() != PhysicalActivationStatusV2.ACTIVATED)</span>
+<span class="fc" id="L40">            throw new BusinessRuleViolationException(&quot;Physical card must be activated before readiness&quot;);</span>
+<span class="fc" id="L41">        c.changeCard(card.getCardId(), &quot;MAKE_USE_READY&quot;, LifecycleEventTypeV2.CARD_READY, null, null, value -&gt; {</span>
+<span class="fc" id="L42">            value.setUseReadyAt(c.now()); value.setUseReadyEvidenceId(p.evidenceId()); value.setActivationTrigger(p.trigger());</span>
+<span class="fc" id="L43">        });</span>
+<span class="fc" id="L44">    }</span>
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.15.202606040825</span></div></body></html>

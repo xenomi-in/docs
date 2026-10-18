@@ -1,0 +1,139 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>InstitutionPolicyV2Controller.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">CMS Core Service</a> &gt; <a href="index.source.html" class="el_package">com.xenomi.cms.core.v2.institution.controller</a> &gt; <span class="el_source">InstitutionPolicyV2Controller.java</span></div><h1>InstitutionPolicyV2Controller.java</h1><pre class="source lang-java linenums">package com.xenomi.cms.core.v2.institution.controller;
+
+import java.util.UUID;
+
+import com.xenomi.cms.core.api.ApiResponseEnvelope;
+import com.xenomi.cms.core.api.ApiResponseHelper;
+import com.xenomi.cms.core.api.PageableDefaults;
+import com.xenomi.cms.core.api.PagedResponse;
+import com.xenomi.cms.core.v2.institution.dto.CreateDataKeyAssignmentV2Request;
+import com.xenomi.cms.core.v2.institution.dto.DataKeyAssignmentV2Response;
+import com.xenomi.cms.core.v2.institution.dto.OperationalPolicyV2Response;
+import com.xenomi.cms.core.v2.institution.dto.SecurityPolicyV2Response;
+import com.xenomi.cms.core.v2.institution.dto.UpdateDataKeyAssignmentStatusV2Request;
+import com.xenomi.cms.core.v2.institution.dto.UpdateOperationalPolicyV2Request;
+import com.xenomi.cms.core.v2.institution.dto.UpdateSecurityPolicyV2Request;
+import com.xenomi.cms.core.v2.institution.model.DataKeyAssignmentStatus;
+import com.xenomi.cms.core.v2.hsm.model.KeyPurpose;
+import com.xenomi.cms.core.v2.institution.service.InstitutionDataKeyAssignmentV2Service;
+import com.xenomi.cms.core.v2.institution.service.InstitutionPolicyV2Service;
+
+import io.swagger.v3.oas.annotations.Operation;
+import io.swagger.v3.oas.annotations.tags.Tag;
+import jakarta.validation.Valid;
+import jakarta.validation.constraints.NotBlank;
+import jakarta.validation.constraints.Size;
+
+import org.springframework.data.domain.PageRequest;
+import org.springframework.data.domain.Pageable;
+import org.springframework.data.domain.Sort;
+import org.springframework.http.ResponseEntity;
+import org.springframework.validation.annotation.Validated;
+import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PathVariable;
+import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.PutMapping;
+import org.springframework.web.bind.annotation.RequestBody;
+import org.springframework.web.bind.annotation.RequestHeader;
+import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestParam;
+import org.springframework.web.bind.annotation.RestController;
+
+@Validated
+@RestController
+@RequestMapping(&quot;/cms/api/v2/institutions/{institutionId}&quot;)
+@Tag(name = &quot;V2 - Institution Policies&quot;, description = &quot;Operational, security and institution data-key policies&quot;)
+public class InstitutionPolicyV2Controller {
+
+    private static final String ACTOR_HEADER = &quot;X-Actor-Id&quot;;
+
+    private final InstitutionPolicyV2Service policyService;
+    private final InstitutionDataKeyAssignmentV2Service dataKeyService;
+
+    public InstitutionPolicyV2Controller(
+            InstitutionPolicyV2Service policyService,
+<span class="fc" id="L55">            InstitutionDataKeyAssignmentV2Service dataKeyService) {</span>
+<span class="fc" id="L56">        this.policyService = policyService;</span>
+<span class="fc" id="L57">        this.dataKeyService = dataKeyService;</span>
+<span class="fc" id="L58">    }</span>
+
+    @GetMapping(&quot;/operational-policy&quot;)
+    @Operation(summary = &quot;Get the institution operational policy&quot;)
+    public ResponseEntity&lt;ApiResponseEnvelope&lt;OperationalPolicyV2Response&gt;&gt; getOperational(
+            @PathVariable UUID institutionId) {
+<span class="fc" id="L64">        return ApiResponseHelper.ok(policyService.getOperational(institutionId));</span>
+    }
+
+    @PutMapping(&quot;/operational-policy&quot;)
+    @Operation(summary = &quot;Replace the institution operational policy&quot;)
+    public ResponseEntity&lt;ApiResponseEnvelope&lt;OperationalPolicyV2Response&gt;&gt; updateOperational(
+            @PathVariable UUID institutionId,
+            @Valid @RequestBody UpdateOperationalPolicyV2Request request,
+            @RequestHeader(ACTOR_HEADER) @NotBlank @Size(max = 100) String actorId) {
+<span class="fc" id="L73">        return ApiResponseHelper.ok(policyService.updateOperational(institutionId, request, actorId));</span>
+    }
+
+    @GetMapping(&quot;/security-policy&quot;)
+    @Operation(summary = &quot;Get the institution security policy&quot;,
+            description = &quot;Session and token lifetimes are application-level identity-provider settings; &quot;
+                    + &quot;they are not part of the institution security policy.&quot;)
+    public ResponseEntity&lt;ApiResponseEnvelope&lt;SecurityPolicyV2Response&gt;&gt; getSecurity(
+            @PathVariable UUID institutionId) {
+<span class="fc" id="L82">        return ApiResponseHelper.ok(policyService.getSecurity(institutionId));</span>
+    }
+
+    @PutMapping(&quot;/security-policy&quot;)
+    @Operation(summary = &quot;Replace the institution security policy&quot;,
+            description = &quot;Session timeout is not configurable through this endpoint. Configure session &quot;
+                    + &quot;and token lifetimes in the application identity provider.&quot;)
+    public ResponseEntity&lt;ApiResponseEnvelope&lt;SecurityPolicyV2Response&gt;&gt; updateSecurity(
+            @PathVariable UUID institutionId,
+            @Valid @RequestBody UpdateSecurityPolicyV2Request request,
+            @RequestHeader(ACTOR_HEADER) @NotBlank @Size(max = 100) String actorId) {
+<span class="fc" id="L93">        return ApiResponseHelper.ok(policyService.updateSecurity(institutionId, request, actorId));</span>
+    }
+
+    @PostMapping(&quot;/data-key-assignments&quot;)
+    @Operation(summary = &quot;Create an institution data-key assignment&quot;)
+    public ResponseEntity&lt;ApiResponseEnvelope&lt;DataKeyAssignmentV2Response&gt;&gt; createDataKeyAssignment(
+            @PathVariable UUID institutionId,
+            @Valid @RequestBody CreateDataKeyAssignmentV2Request request,
+            @RequestHeader(ACTOR_HEADER) @NotBlank @Size(max = 100) String actorId) {
+<span class="fc" id="L102">        return ApiResponseHelper.created(dataKeyService.create(institutionId, request, actorId));</span>
+    }
+
+    @GetMapping(&quot;/data-key-assignments&quot;)
+    @Operation(summary = &quot;List institution data-key assignments&quot;)
+    public ResponseEntity&lt;ApiResponseEnvelope&lt;PagedResponse&lt;DataKeyAssignmentV2Response&gt;&gt;&gt; searchDataKeys(
+            @PathVariable UUID institutionId,
+            @RequestParam(required = false) KeyPurpose keyPurpose,
+            @RequestParam(required = false) DataKeyAssignmentStatus status,
+            @RequestParam(required = false) Integer page,
+            @RequestParam(required = false) Integer limit) {
+<span class="fc" id="L113">        Pageable base = PageableDefaults.ofOneBased(page, limit);</span>
+<span class="fc" id="L114">        Pageable pageable = PageRequest.of(base.getPageNumber(), base.getPageSize(),</span>
+<span class="fc" id="L115">                Sort.by(Sort.Direction.DESC, &quot;assignmentVersion&quot;));</span>
+<span class="fc" id="L116">        return ApiResponseHelper.ok(PagedResponse.of(</span>
+<span class="fc" id="L117">                dataKeyService.search(institutionId, keyPurpose, status, pageable)));</span>
+    }
+
+    @GetMapping(&quot;/data-key-assignments/{assignmentId}&quot;)
+    @Operation(summary = &quot;Get an institution data-key assignment&quot;)
+    public ResponseEntity&lt;ApiResponseEnvelope&lt;DataKeyAssignmentV2Response&gt;&gt; getDataKeyAssignment(
+            @PathVariable UUID institutionId,
+            @PathVariable UUID assignmentId) {
+<span class="fc" id="L125">        return ApiResponseHelper.ok(dataKeyService.get(institutionId, assignmentId));</span>
+    }
+
+    @PutMapping(&quot;/data-key-assignments/{assignmentId}/status&quot;)
+    @Operation(summary = &quot;Change an institution data-key assignment status&quot;)
+    public ResponseEntity&lt;ApiResponseEnvelope&lt;DataKeyAssignmentV2Response&gt;&gt; changeDataKeyStatus(
+            @PathVariable UUID institutionId,
+            @PathVariable UUID assignmentId,
+            @Valid @RequestBody UpdateDataKeyAssignmentStatusV2Request request,
+            @RequestHeader(ACTOR_HEADER) @NotBlank @Size(max = 100) String actorId) {
+<span class="fc" id="L135">        return ApiResponseHelper.ok(</span>
+<span class="fc" id="L136">                dataKeyService.changeStatus(institutionId, assignmentId, request, actorId));</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.15.202606040825</span></div></body></html>

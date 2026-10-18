@@ -1,0 +1,235 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>CMS Core Service — v1.0.0 | Xenomi Engineering Hub</title>
+  <style>
+    * { box-sizing: border-box; }
+    body { font: 16px/1.65 system-ui, sans-serif; margin: 0; background: #f5f7fb; color: #1e293b; overflow-wrap: anywhere; }
+    main { max-width: 1100px; margin: 32px auto; padding: 32px; background: white; border: 1px solid #e2e8f0; border-radius: 10px; }
+    nav { margin-bottom: 24px; }
+    a { color: #2563eb; }
+    h1, h2, h3 { line-height: 1.25; color: #1e3a8a; }
+    h2 { margin-top: 2em; border-bottom: 1px solid #e2e8f0; padding-bottom: .4em; }
+    table { display: block; width: 100%; overflow-x: auto; border-collapse: collapse; margin: 20px 0; }
+    th, td { border: 1px solid #cbd5e1; padding: 10px 12px; text-align: left; vertical-align: top; }
+    th { background: #edf2f7; }
+    code { background: #f1f5f9; padding: 2px 5px; border-radius: 3px; }
+    pre { background: #f1f5f9; padding: 16px; overflow-x: auto; }
+    pre code { padding: 0; }
+    @media (max-width: 640px) { main { margin: 0; padding: 20px; border: 0; border-radius: 0; } }
+  </style>
+</head>
+<body>
+  <main>
+    <nav><a href="../../../index.html">Xenomi Engineering Hub</a></nav>
+    <article><h1>CMS Core Service — v1.0.0</h1>
+<p><strong>Version:</strong> 1.0.0 — release candidate; Maven artifact remains <code>1.0.0-SNAPSHOT</code>.<br><strong>Release Date:</strong> Not confirmed<br><strong>Release Type:</strong> Proposed initial major baseline; prior client delivery history not confirmed<br><strong>Environment:</strong> Not confirmed<br><strong>Scope:</strong> CMS V2 configuration, card lifecycle, PIN orchestration, HSM integration, card controls, notifications, Switch synchronization, and ACS contact lookup</p>
+<h2>Deployment summary</h2>
+<table>
+<thead>
+<tr>
+<th>Item</th>
+<th>Status</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>Source baseline</td>
+<td><code>4ec52024fb119fa8b8ccfd9fbde7f3d285c20579</code> plus current local application and test changes</td>
+</tr>
+
+<tr>
+<td>Platform</td>
+<td>Java 25; Spring Boot 4.1.1; retained Jackson 2 compatibility</td>
+</tr>
+<tr>
+<td>Supported API</td>
+<td>Tenant-scoped <code>/cms/api/v2</code>; legacy V1 routes denied</td>
+</tr>
+<tr>
+<td>Database</td>
+<td>PostgreSQL; explicit V2 Liquibase changelog, including local migration 038</td>
+</tr>
+<tr>
+<td>Verification</td>
+<td>Historical 15 October 2026 test results available; current candidate has not been reverified for this release note</td>
+</tr>
+<tr>
+<td>Deployment readiness</td>
+<td>Target-environment integration, migration rehearsal, and production acceptance not confirmed</td>
+</tr>
+</tbody></table>
+<p>This note follows the Switch Core release-note structure. It describes the current CMS baseline, including uncommitted changes, rather than asserting a comparison against an established client release. Confirm the delivery version and commit the selected source before publishing final artifacts.</p>
+<h2>Overview</h2>
+<p>CMS Core Service manages institution and card-product configuration, card issuance and lifecycle, protected card data, HSM key assignments, and integration with the authorization switch and notification service. CMS owns card-management workflows; payment authorization decisions belong to the switch.</p>
+<h2>Features</h2>
+<ul>
+<li><strong>Institution and product configuration:</strong> Institution onboarding and policies, card products and versions, issuance profiles, designs, BIN ranges, and product mappings.</li>
+<li><strong>Card issuance:</strong> Durable issuance operations, virtual-first workflows, physical production requests, and operation-status retrieval.</li>
+<li><strong>Card lifecycle:</strong> Activation, holds, hot-listing, renewal, replacement, and closure through guarded lifecycle commands.</li>
+<li><strong>Card controls:</strong> Channel controls and transaction-limit changes, with accounting validation and Switch propagation where configured.</li>
+<li><strong>PIN operations:</strong> Switch-owned initialization, change, and reset orchestration, encrypted request material, operation polling, and CMS audit history.</li>
+<li><strong>HSM keys and card security:</strong> Institution-scoped key inventory, BIN key assignments, rollover handling, and envelope protection of sensitive card data.</li>
+<li><strong>Switch synchronization:</strong> Durable HTTP outbox for card registration and lifecycle updates, authenticated transport, retry handling, and command receipts.</li>
+<li><strong>Notifications:</strong> Transactional PostgreSQL outbox with authenticated HTTP delivery to <code>cms_notification</code>.</li>
+<li><strong>ACS contact lookup:</strong> Restricted lookup of registered mobile/email by PAN. Contact synchronization from Accounting remains deferred; see limitations.</li>
+</ul>
+<h2>Security</h2>
+<ul>
+<li>Stateless JWT authentication with configured issuer, audience, permissions, and institution context protects V2 APIs.</li>
+<li>Legacy <code>/cms/api/v1</code> routes are denied. V1 consumers must migrate to the supported V2 contracts.</li>
+<li>Mutation idempotency and tenant context support safe retries; follow the mutation guide for endpoint-specific requirements.</li>
+<li>ACS lookup requires an allowlisted service-account subject, <code>platform_access: true</code>, and <code>cms:acs-contact:read</code>. An empty subject allowlist denies access. Responses do not echo the PAN and successful results use <code>Cache-Control: no-store</code>.</li>
+<li>Sensitive card data uses envelope encryption and HSM-backed key protection. Production keys, certificates, identity-provider grants, and secrets require environment-specific provisioning.</li>
+</ul>
+<h2>Reliability and maintenance</h2>
+<ul>
+<li>Durable lifecycle operations separate accepted requests from asynchronous execution and expose polling contracts.</li>
+<li>Outbox delivery uses leases, retries, bounded retention, and administrative replay controls.</li>
+<li>Expanded tests cover V2 controllers, lifecycle command boundaries, PIN workflows, HSM services, BIN rules, and Switch transport.</li>
+<li>The Maven coverage gate targets the configured V2 and supported shared-runtime scope. No measured performance improvement is claimed.</li>
+</ul>
+<h2>Pre-release corrections</h2>
+<ul>
+<li>Migrated the application baseline to Java 25 and Spring Boot 4.1.1 while retaining Jackson 2 APIs through the compatibility dependency.</li>
+<li>Denied legacy V1 routes and removed the insecure legacy encryption utility.</li>
+<li>Changed notification HTTP 409 handling to retry delivery rather than mark the event published.</li>
+<li>Local changes refine BIN uniqueness and PAN interval ownership, including historical ranges, and introduce database enforcement through migration 038.</li>
+<li>Removed obsolete replacement and local PIN execution paths in favor of lifecycle-command and Switch PIN ownership, as documented in the coverage guide.</li>
+</ul>
+<p>These items describe the committed baseline and current local changes. The final release must select and verify the exact delivered snapshot.</p>
+<h2>JUnit test results</h2>
+<p>The <a href="CODE_COVERAGE.html">coverage record</a> documents this historical run on <strong>15 October 2026</strong>:</p>
+<pre><code class="language-bash">mvn -q clean -Dtest=&#39;*Test,!OutboxPostgresIntegrationTest&#39; test
+</code></pre>
+<table>
+<thead>
+<tr>
+<th>Tests discovered</th>
+<th>Passed</th>
+<th>Failures</th>
+<th>Errors</th>
+<th>Skipped</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>563</td>
+<td>512</td>
+<td>0</td>
+<td>0</td>
+<td>51</td>
+</tr>
+</tbody></table>
+<p><code>OutboxPostgresIntegrationTest</code> was excluded. These are recorded results from that snapshot, not a fresh verification of the current working tree. No test run or artifact build was performed while preparing this documentation.</p>
+<h2>Measured code coverage</h2>
+<p>The same historical record reports <strong>81.85% line coverage</strong> (7,355 / 8,986) and <strong>55.38% branch coverage</strong> (2,400 / 4,334). Current configured non-regression thresholds are 80% lines and 25% branches. Coverage uses the configured V2/shared-runtime scope and exclusions; it does not establish live interoperability or UAT acceptance.</p>
+<p>The repository contains a <a href="test-report/CMS_Core_Service_JUnit_Results_2026-10-15.zip">JUnit evidence archive</a>. Retain evidence and checksums from the final selected release build; the historical results do not identify the current candidate.</p>
+<h2>Requirements and compatibility</h2>
+<table>
+<thead>
+<tr>
+<th>Component</th>
+<th>Requirement / behavior</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>Java</td>
+<td>Java 25</td>
+</tr>
+<tr>
+<td>Framework</td>
+<td>Spring Boot 4.1.1 with Jackson 2 compatibility</td>
+</tr>
+<tr>
+<td>Build</td>
+<td>Maven; use the project POM</td>
+</tr>
+<tr>
+<td>Database</td>
+<td>PostgreSQL with the reviewed V2 schema and migrations</td>
+</tr>
+<tr>
+<td>Application port</td>
+<td><code>SERVER_PORT</code>, default 9800 in application configuration</td>
+</tr>
+<tr>
+<td>Container</td>
+<td>Dockerfile uses Java 25 and a non-root runtime user</td>
+</tr>
+<tr>
+<td>External dependencies</td>
+<td>Identity provider, HSM, Switch, Accounting, notification service, and fulfilment integrations as enabled</td>
+</tr>
+<tr>
+<td>Optional cache</td>
+<td>In-memory by default; Redis configuration available</td>
+</tr>
+</tbody></table>
+<p>The V2 API is a breaking migration for V1 callers. Review the <a href="https://github.com/lps-pavangutha/cms-core-service/blob/codex/cms-v2-integration/docs/v2/CMS_V2_CONFIGURATION_CHANGE_AUDIT.md">configuration change audit</a>, <a href="https://github.com/lps-pavangutha/cms-core-service/blob/codex/cms-v2-integration/docs/v2/CMS_V2_CONFIGURATION_API_CLIENT_GUIDE.md">client guide</a>, and <a href="https://github.com/lps-pavangutha/cms-core-service/blob/codex/cms-v2-integration/docs/v2/CMS_V2_MUTATION_CONTRACT.md">mutation contract</a>. Minimum compatible external-service release versions are not confirmed.</p>
+<h2>Deployment prerequisites</h2>
+<ul>
+<li>Configure <code>DB_URL</code>, <code>DB_USERNAME</code>, <code>DB_PASSWORD</code>, and <code>DB_SCHEMA</code>; prepare the target schema and migration permissions.</li>
+<li>Review <code>db/changelog/db.changelog-v2.yaml</code>, the configured active changelog. Execute migrations in its explicit order; do not substitute the legacy master changelog.</li>
+<li>Migration 038 adds customer contact fields and a PostgreSQL GiST exclusion constraint for platform-wide PAN interval ownership. Resolve existing overlaps before applying it; closed ranges remain reserved. Rehearse this migration against a representative database copy.</li>
+<li>Configure <code>CMS_AUTH_ISSUER_URI</code>, <code>CMS_AUTH_JWK_SET_URI</code>, and <code>CMS_AUTH_AUDIENCE</code>, and provision the required service-account permissions.</li>
+<li>Provision HSM keys, certificates, trust settings, and institution/BIN assignments. Replace bundled development credentials and certificate settings through the approved secret/configuration mechanism.</li>
+<li>Configure Switch token credentials, recipient certificates, and transport security. The switch-sync profile is included by default; review its effective <code>SWITCH_BASE_URL</code> and TLS settings. TLS defaults to disabled in that profile.</li>
+<li>Configure notification authentication and destination, Accounting limits integration, and enabled vendor workflows.</li>
+<li>For ACS, configure <code>cms.security.acs.allowed-subjects</code> and arrange a supported contact-data population process before enabling client use.</li>
+</ul>
+<h2>Build and deployment</h2>
+<p>Build the final selected snapshot with Java 25:</p>
+<pre><code class="language-bash">mvn clean verify
+docker build -t cms-core-service:1.0.0 .
+</code></pre>
+<p>The Dockerfile packages with tests skipped; image construction alone does not verify tests or coverage gates. Record the final source commit, release tag, JAR SHA-256, image digest, and matching test evidence. The current POM still produces a SNAPSHOT artifact; reconcile that identity with the agreed release version before final delivery.</p>
+<p><strong>Port alignment:</strong> Application configuration defaults to 9800, while the Dockerfile exposes 8081 and checks health at <code>http://127.0.0.1:8081/actuator/health</code>. Set <code>SERVER_PORT=8081</code> with matching deployment port mappings, or align the container health check and mappings with the chosen application port before rollout.</p>
+<h2>Deployment verification</h2>
+<ul>
+<li>Check <code>/actuator/health</code> on the configured port and confirm container health-check success.</li>
+<li>Verify database migration completion and access to the identity provider, HSM, Switch, Accounting, and notification service for enabled workflows.</li>
+<li>Exercise institution/product/BIN configuration, issuance polling, activation, controls, holds, renewal/replacement, and closure with approved fixtures.</li>
+<li>Verify mutation retry behavior, unauthorized-request rejection, and cross-institution access restrictions.</li>
+<li>Validate Switch registration/update receipts, PIN operation completion, notification delivery, and retry/recovery behavior.</li>
+<li>For ACS, test authorized contact lookup, empty/unknown contact handling, and rejection of unapproved service accounts without logging PAN request bodies.</li>
+<li>Complete database-backed integration tests and migration/recovery rehearsal against the intended environment.</li>
+</ul>
+<h2>Known limitations</h2>
+<ul>
+<li><strong>Candidate identity:</strong> Current source includes uncommitted application and test changes. Final release identity and matching build evidence are not established.</li>
+<li><strong>ACS contact population:</strong> Accounting contact transport/synchronization is deferred. Existing customers return 404 from lookup until contact data is populated; no public contact-write API is supplied.</li>
+<li><strong>Migration prerequisite:</strong> Existing overlapping PAN intervals must be resolved before migration 038 can succeed.</li>
+<li><strong>PIN dependency:</strong> PIN operations depend on the configured Switch recipient certificate, supported adapter/profile, permissions, and HSM integration. Confirm compatibility with the delivered Switch version.</li>
+<li><strong>Container port mismatch:</strong> The supplied default application port and Docker health-check port differ; align them before deployment.</li>
+<li><strong>Verification scope:</strong> Historical tests exclude the PostgreSQL outbox integration suite and include 51 skipped tests. Final candidate verification, live integration, migration/recovery rehearsal, performance, and UAT acceptance are not confirmed.</li>
+</ul>
+<h2>Rollback</h2>
+<p>Before rollout, retain the exact previous application image, effective configuration, and a tested database recovery point. For first installation, agree the pre-install recovery state.</p>
+<p>Stop new mutations and coordinate lifecycle, Switch-sync, PIN, and notification workers before recovery. Assess in-flight and uncertain external operations before restoring a compatible application/configuration. Application rollback does not reverse database migrations; restore or reverse schema/data changes only through the rehearsed recovery procedure. Reconcile external receipts and outbox state before resuming work, and avoid blindly replaying accepted operations.</p>
+<h2>References</h2>
+<ul>
+<li><a href="https://github.com/lps-pavangutha/cms-core-service/blob/codex/cms-v2-integration/docs/v2/README.md">V2 documentation index</a></li>
+<li><a href="https://github.com/lps-pavangutha/cms-core-service/blob/codex/cms-v2-integration/docs/openapi3_0.yaml">OpenAPI contract</a></li>
+<li><a href="CODE_COVERAGE.html">Coverage and historical verification</a></li>
+<li><a href="https://github.com/lps-pavangutha/cms-core-service/blob/codex/cms-v2-integration/docs/v2/CMS_V2_CONFIGURATION_CHANGE_AUDIT.md">Configuration migration audit</a></li>
+<li><a href="https://github.com/lps-pavangutha/cms-core-service/blob/codex/cms-v2-integration/docs/v2/CMS_V2_MUTATION_CONTRACT.md">Mutation contract</a></li>
+<li><a href="https://github.com/lps-pavangutha/cms-core-service/blob/codex/cms-v2-integration/docs/v2/CMS_V2_SWITCH_SYNC.md">Switch synchronization</a></li>
+<li><a href="https://github.com/lps-pavangutha/cms-core-service/blob/codex/cms-v2-integration/docs/v2/CMS_V2_PIN_GENERATION.md">PIN operations</a></li>
+<li><a href="guides/CMS_V2_ACS_CONTACT.html">ACS contact lookup and migration</a></li>
+<li><a href="https://github.com/lps-pavangutha/cms-core-service/blob/codex/cms-v2-integration/docs/v2/CMS_V2_BIN_UNIQUENESS.md">BIN uniqueness</a></li>
+<li><a href="https://github.com/lps-pavangutha/cms-core-service/blob/codex/cms-v2-integration/docs/v2/jmeter/README.md">JMeter verification guide</a></li>
+</ul>
+<p>Linked source guides are maintained on the source repository’s <code>codex/cms-v2-integration</code> branch and require repository access; they may change independently of this candidate. Guides absent from the committed source are included locally. The bundled reports preserve historical 15 October 2026 evidence and do not establish verification of the current candidate.</p>
+<h2>Bundled verification reports — 15 October 2026</h2>
+<ul>
+<li><a href="test-report/JUnit_Test_Report.html">JUnit test results</a></li>
+<li><a href="test-report/coverage/index.html">JaCoCo coverage report</a></li>
+<li><a href="test-report/junit-results.xml">JUnit XML results</a></li>
+<li><a href="test-report/test-suites.csv">Test suites CSV</a></li>
+<li><a href="test-report/test-cases.csv">Test cases CSV</a></li>
+</ul>
+</article>
+  </main>
+</body>
+</html>

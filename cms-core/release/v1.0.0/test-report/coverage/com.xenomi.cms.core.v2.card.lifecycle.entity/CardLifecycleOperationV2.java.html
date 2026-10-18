@@ -1,0 +1,57 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>CardLifecycleOperationV2.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">CMS Core Service</a> &gt; <a href="index.source.html" class="el_package">com.xenomi.cms.core.v2.card.lifecycle.entity</a> &gt; <span class="el_source">CardLifecycleOperationV2.java</span></div><h1>CardLifecycleOperationV2.java</h1><pre class="source lang-java linenums">package com.xenomi.cms.core.v2.card.lifecycle.entity;
+
+import jakarta.persistence.*;
+import lombok.*;
+import java.util.UUID;
+import java.util.Map;
+import java.time.OffsetDateTime;
+import com.xenomi.cms.core.v2.card.model.*;
+
+@Entity(name = &quot;CardLifecycleOperationV2&quot;)
+@Table(name = &quot;card_lifecycle_operation&quot;, schema = &quot;cms_v2&quot;)
+@Data @Builder @NoArgsConstructor @AllArgsConstructor
+public class CardLifecycleOperationV2 {
+    @Id
+    @Column(name = &quot;operation_id&quot;, nullable = false, updatable = false)
+    private UUID operationId;
+    @Column(name = &quot;institution_id&quot;, nullable = false)
+    private UUID institutionId;
+    @Column(name = &quot;operation_kind&quot;, length = 60, nullable = false)
+    private String operationKind;
+    @lombok.ToString.Exclude
+    @org.hibernate.annotations.JdbcTypeCode(org.hibernate.type.SqlTypes.CHAR)
+    @Column(name = &quot;idempotency_key_hash&quot;, length = 64, columnDefinition = &quot;char(64)&quot;, nullable = false)
+    private String idempotencyKeyHash;
+    @lombok.ToString.Exclude
+    @org.hibernate.annotations.JdbcTypeCode(org.hibernate.type.SqlTypes.CHAR)
+    @Column(name = &quot;request_fingerprint&quot;, length = 64, columnDefinition = &quot;char(64)&quot;, nullable = false)
+    private String requestFingerprint;
+    @Column(name = &quot;target_card_id&quot;)
+    private UUID targetCardId;
+    @Column(name = &quot;expected_version&quot;)
+    private Long expectedVersion;
+    @Column(name = &quot;actor_reference&quot;, length = 120, nullable = false)
+    private String actorReference;
+    @Enumerated(EnumType.STRING)
+    @Column(name = &quot;actor_type&quot;, length = 24, nullable = false)
+    private LifecycleActorTypeV2 actorType;
+    @Builder.Default
+    @Enumerated(EnumType.STRING)
+    @Column(name = &quot;operation_status&quot;, length = 24, nullable = false)
+    private LifecycleOperationStatusV2 operationStatus = LifecycleOperationStatusV2.PENDING;
+    @org.hibernate.annotations.JdbcTypeCode(org.hibernate.type.SqlTypes.JSON)
+    @Builder.Default
+    @lombok.ToString.Exclude
+    @Column(name = &quot;result_payload&quot;, columnDefinition = &quot;jsonb&quot;, nullable = false)
+    private Map&lt;String, Object&gt; resultPayload = new java.util.LinkedHashMap&lt;&gt;();
+    @Column(name = &quot;created_at&quot;, nullable = false)
+    private OffsetDateTime createdAt;
+    @Column(name = &quot;completed_at&quot;)
+    private OffsetDateTime completedAt;
+    @PrePersist
+    void beforeInsert() {
+<span class="nc bnc" id="L53" title="All 2 branches missed.">        if (createdAt == null) createdAt = OffsetDateTime.now(java.time.ZoneOffset.UTC);</span>
+<span class="nc" id="L54">    }</span>
+
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.15.202606040825</span></div></body></html>

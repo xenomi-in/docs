@@ -1,0 +1,608 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>SecurityReplacementWorkV2.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">CMS Core Service</a> &gt; <a href="index.source.html" class="el_package">com.xenomi.cms.core.v2.card.lifecycle.command</a> &gt; <span class="el_source">SecurityReplacementWorkV2.java</span></div><h1>SecurityReplacementWorkV2.java</h1><pre class="source lang-java linenums">package com.xenomi.cms.core.v2.card.lifecycle.command;
+
+import com.fasterxml.jackson.core.type.TypeReference;
+import com.fasterxml.jackson.databind.ObjectMapper;
+import com.xenomi.cms.core.bin.util.LuhnAlgorithm;
+import com.xenomi.cms.core.exception.BusinessRuleViolationException;
+import com.xenomi.cms.core.exception.ResourceNotFoundException;
+import com.xenomi.cms.core.v2.bin.model.AllocationStrategy;
+import com.xenomi.cms.core.v2.bin.model.BinRangeStatus;
+import com.xenomi.cms.core.v2.card.dto.CreateCardV2Request;
+import com.xenomi.cms.core.v2.card.entity.CardV2;
+import com.xenomi.cms.core.v2.card.entity.PanAllocationV2;
+import com.xenomi.cms.core.v2.card.lifecycle.entity.AccountRestrictionSnapshotV2;
+import com.xenomi.cms.core.v2.card.lifecycle.entity.CardEventV2;
+import com.xenomi.cms.core.v2.card.lifecycle.entity.CardExternalOperationV2;
+import com.xenomi.cms.core.v2.card.lifecycle.entity.CardLifecycleOperationV2;
+import com.xenomi.cms.core.v2.card.lifecycle.entity.CardSecurityReplacementPreparationV2;
+import com.xenomi.cms.core.v2.card.lifecycle.entity.OutboxEventV2;
+import com.xenomi.cms.core.v2.card.model.CardAccountLinkType;
+import com.xenomi.cms.core.v2.card.model.CardFormV2;
+import com.xenomi.cms.core.v2.card.model.CardStatusV2;
+import com.xenomi.cms.core.v2.card.model.LifecycleOperationStatusV2;
+import com.xenomi.cms.core.v2.card.model.PhysicalFulfilmentStatusV2;
+import com.xenomi.cms.core.v2.card.model.PhysicalRetiredReasonV2;
+import com.xenomi.cms.core.v2.card.model.SecurityHoldReasonV2;
+import com.xenomi.cms.core.v2.card.pin.PinLifecycleV2Service;
+import com.xenomi.cms.core.v2.card.pin.entity.PinDataV2;
+import com.xenomi.cms.core.v2.card.replacement.entity.CardReplacementRequestV2;
+import com.xenomi.cms.core.v2.card.replacement.model.CardReplacementPanStrategy;
+import com.xenomi.cms.core.v2.card.replacement.model.CardReplacementRequestStatus;
+import com.xenomi.cms.core.v2.card.security.CardSecurityMaterial;
+import com.xenomi.cms.core.v2.card.security.CmsCardSecurityService;
+import com.xenomi.cms.core.v2.card.service.CardIssuanceV2Service;
+import com.xenomi.cms.core.v2.card.service.CardIssuanceV2Service.Draft;
+import com.xenomi.cms.core.v2.product.entity.ProductReplacementPolicyV2;
+import com.xenomi.cms.core.v2.product.model.OldCardUsagePolicy;
+import com.xenomi.cms.core.v2.product.model.ProductPolicyStatus;
+import com.xenomi.cms.core.v2.product.model.ReplacementAccountLinkStrategy;
+import com.xenomi.cms.core.v2.product.model.ReplacementControlStrategy;
+import com.xenomi.cms.core.v2.product.model.ReplacementExpiryStrategy;
+import com.xenomi.cms.core.v2.product.model.ReplacementPanStrategy;
+import com.xenomi.cms.core.v2.product.model.ReplacementReason;
+import com.xenomi.cms.core.v2.product.model.ReplacementRequestChannel;
+import jakarta.persistence.EntityManager;
+import jakarta.persistence.LockModeType;
+import java.math.BigInteger;
+import java.security.SecureRandom;
+import java.time.OffsetDateTime;
+import java.time.ZoneOffset;
+import java.util.ArrayList;
+import java.util.HashSet;
+import java.util.LinkedHashMap;
+import java.util.List;
+import java.util.Map;
+import java.util.Objects;
+import java.util.Set;
+import java.util.UUID;
+import org.springframework.stereotype.Service;
+import org.springframework.transaction.PlatformTransactionManager;
+import org.springframework.transaction.support.TransactionSynchronizationManager;
+import org.springframework.transaction.support.TransactionTemplate;
+
+/** Durable new-PAN replacement for permanent security incidents. */
+@Service
+public class SecurityReplacementWorkV2 {
+<span class="fc" id="L66">    private static final Set&lt;ReplacementReason&gt; SUPPORTED = Set.of(</span>
+            ReplacementReason.LOST, ReplacementReason.STOLEN,
+            ReplacementReason.COMPROMISED, ReplacementReason.FRAUD);
+
+    private final EntityManager entityManager;
+    private final ObjectMapper mapper;
+    private final CardIssuanceV2Service issuance;
+    private final CmsCardSecurityService security;
+    private final PinLifecycleV2Service pins;
+    private final TransactionTemplate transaction;
+<span class="fc" id="L76">    private final SecureRandom random = new SecureRandom();</span>
+
+    public SecurityReplacementWorkV2(EntityManager entityManager, ObjectMapper mapper,
+            CardIssuanceV2Service issuance, CmsCardSecurityService security,
+<span class="fc" id="L80">            PinLifecycleV2Service pins, PlatformTransactionManager transactionManager) {</span>
+<span class="fc" id="L81">        this.entityManager = entityManager;</span>
+<span class="fc" id="L82">        this.mapper = mapper;</span>
+<span class="fc" id="L83">        this.issuance = issuance;</span>
+<span class="fc" id="L84">        this.security = security;</span>
+<span class="fc" id="L85">        this.pins = pins;</span>
+<span class="fc" id="L86">        this.transaction = new TransactionTemplate(transactionManager);</span>
+<span class="fc" id="L87">        this.transaction.setTimeout(30);</span>
+<span class="fc" id="L88">    }</span>
+
+    public UUID account(UUID institutionId, UUID sourceCardId) {
+<span class="fc" id="L91">        return transaction.execute(status -&gt; family(source(institutionId, sourceCardId))</span>
+<span class="fc" id="L92">                .getAccountReferenceId());</span>
+    }
+
+    public LifecycleCommandHandlerV2.LockPlan plan(LifecycleCommandRequestV2 request,
+            SecurityReplacementHandlerV2.Payload payload) {
+<span class="fc" id="L97">        CardV2 source = source(request.institutionId(), payload.sourceCardId());</span>
+<span class="fc" id="L98">        PanAllocationV2 family = family(source);</span>
+<span class="fc" id="L99">        require(family.getAccountReferenceId().equals(request.accountReferenceId()),</span>
+                &quot;Source account mismatch&quot;);
+<span class="fc" id="L101">        Set&lt;UUID&gt; cardIds = new HashSet&lt;&gt;(entityManager.createQuery(</span>
+                        &quot;select c.cardId from CardV2 c where c.institutionId=:tenant and c.panAllocationId=:family&quot;,
+                        UUID.class)
+<span class="fc" id="L104">                .setParameter(&quot;tenant&quot;, request.institutionId())</span>
+<span class="fc" id="L105">                .setParameter(&quot;family&quot;, family.getPanAllocationId())</span>
+<span class="fc" id="L106">                .getResultList());</span>
+<span class="fc" id="L107">        return new LifecycleCommandHandlerV2.LockPlan(</span>
+<span class="fc" id="L108">                Set.of(family.getPanAllocationId()), cardIds);</span>
+    }
+
+    public void stage(LifecycleCommandContextV2 context,
+            SecurityReplacementHandlerV2.Payload payload,
+            ReplacementRequestChannel requestChannel) {
+<span class="fc" id="L114">        CardV2 source = context.card(payload.sourceCardId());</span>
+<span class="fc" id="L115">        var input = payload.replacement();</span>
+<span class="fc" id="L116">        require(SUPPORTED.contains(input.getReplacementReason()),</span>
+                &quot;This lifecycle command supports LOST, STOLEN, COMPROMISED and FRAUD only&quot;);
+<span class="fc bfc" id="L118" title="All 2 branches covered.">        require(input.getRequestedPanStrategy() == null</span>
+<span class="fc bfc" id="L119" title="All 2 branches covered.">                        || input.getRequestedPanStrategy()</span>
+                                == CardReplacementPanStrategy.GENERATE_NEW_PAN,
+                &quot;Permanent-security replacement requires GENERATE_NEW_PAN&quot;);
+<span class="pc bpc" id="L122" title="1 of 4 branches missed.">        require(source.getClosedAt() == null &amp;&amp; source.getReplacedAt() == null</span>
+<span class="pc bpc" id="L123" title="1 of 2 branches missed.">                        &amp;&amp; source.getExpiredAt() == null,</span>
+                &quot;A terminal source card cannot be security-replaced&quot;);
+<span class="fc bfc" id="L125" title="All 2 branches covered.">        require(context.actor().reference().length() &lt;= 100,</span>
+                &quot;Actor reference exceeds storage limit&quot;);
+<span class="fc" id="L127">        require(entityManager.createQuery(</span>
+                        &quot;select count(r) from CardReplacementRequestV2 r where r.institutionId=:tenant and r.sourceCardId=:source&quot;,
+                        Long.class)
+<span class="fc" id="L130">                .setParameter(&quot;tenant&quot;, source.getInstitutionId())</span>
+<span class="fc bfc" id="L131" title="All 2 branches covered.">                .setParameter(&quot;source&quot;, source.getCardId()).getSingleResult() == 0,</span>
+                &quot;A replacement request already exists for this source&quot;);
+<span class="fc" id="L133">        AccountRestrictionSnapshotV2 restrictions = restrictions(</span>
+<span class="fc" id="L134">                source.getInstitutionId(), context.request().accountReferenceId());</span>
+<span class="fc" id="L135">        ProductReplacementPolicyV2 policy = policy(source, input.getReplacementReason());</span>
+<span class="fc" id="L136">        validatePolicy(policy, requestChannel);</span>
+
+<span class="fc" id="L138">        SecurityHoldReasonV2 securityReason = securityReason(input.getReplacementReason());</span>
+<span class="fc bfc" id="L139" title="All 2 branches covered.">        for (CardV2 member : members(source)) {</span>
+<span class="fc" id="L140">            SecurityHoldReasonV2 existing = member.getSecurityHoldReason();</span>
+<span class="pc bpc" id="L141" title="2 of 6 branches missed.">            require(existing == null || existing == SecurityHoldReasonV2.RISK_BLOCK</span>
+                            || existing == securityReason,
+                    &quot;The PAN family already has a different permanent security restriction&quot;);
+<span class="fc" id="L144">        }</span>
+
+<span class="fc" id="L146">        CreateCardV2Request create = CreateCardV2Request.builder()</span>
+<span class="fc" id="L147">                .customerReferenceId(source.getCustomerReferenceId())</span>
+<span class="fc" id="L148">                .accountReferenceId(context.request().accountReferenceId())</span>
+<span class="fc" id="L149">                .productId(source.getProductId())</span>
+<span class="fc" id="L150">                .productVersionId(source.getProductVersionId())</span>
+<span class="fc" id="L151">                .binRangeId(source.getBinRangeId())</span>
+<span class="fc" id="L152">                .activationPolicyVersionId(source.getActivationPolicyVersion())</span>
+<span class="fc" id="L153">                .accountLinkType(CardAccountLinkType.PRIMARY_FUNDING)</span>
+<span class="fc" id="L154">                .cardDesignId(source.getCardDesignId())</span>
+<span class="fc" id="L155">                .technologyProfileId(source.getTechnologyProfileId())</span>
+<span class="fc" id="L156">                .cvmProfileId(source.getCvmProfileId())</span>
+<span class="pc bpc" id="L157" title="1 of 2 branches missed.">                .shippingAddressReferenceId(input.getShippingAddressReferenceId() == null</span>
+<span class="fc" id="L158">                        ? source.getShippingAddressReferenceId()</span>
+<span class="nc" id="L159">                        : input.getShippingAddressReferenceId())</span>
+<span class="fc" id="L160">                .productionBatchConfigurationId(input.getProductionBatchConfigurationId())</span>
+<span class="fc" id="L161">                .embossedNameLine1(source.getEmbossedNameLine1())</span>
+<span class="fc" id="L162">                .embossedNameLine2(source.getEmbossedNameLine2())</span>
+<span class="fc" id="L163">                .embossedNameLine3(source.getEmbossedNameLine3())</span>
+<span class="fc" id="L164">                .embossedNameLine4(source.getEmbossedNameLine4())</span>
+<span class="fc" id="L165">                .build();</span>
+<span class="fc" id="L166">        Draft draft = issuance.prepareDraft(source.getInstitutionId(), create,</span>
+<span class="fc" id="L167">                context.actor().reference(), context.operationId(), true);</span>
+<span class="fc bfc" id="L168" title="All 2 branches covered.">        require(draft.cardForm() == source.getCardForm(),</span>
+                &quot;Security replacement cannot change card form&quot;);
+<span class="fc" id="L170">        long candidate = reserveCandidate(draft);</span>
+
+<span class="fc" id="L172">        CardReplacementRequestV2 replacement = CardReplacementRequestV2.builder()</span>
+<span class="fc" id="L173">                .replacementRequestId(context.operationId())</span>
+<span class="fc" id="L174">                .institutionId(source.getInstitutionId())</span>
+<span class="fc" id="L175">                .sourceCardId(source.getCardId())</span>
+<span class="fc" id="L176">                .replacementReason(input.getReplacementReason())</span>
+<span class="fc" id="L177">                .policyPanStrategy(policy.getPanStrategy())</span>
+<span class="fc" id="L178">                .requestedPanStrategy(input.getRequestedPanStrategy())</span>
+<span class="fc" id="L179">                .resolvedPanStrategy(CardReplacementPanStrategy.GENERATE_NEW_PAN)</span>
+<span class="fc" id="L180">                .overrideReason(input.getOverrideReason())</span>
+<span class="fc" id="L181">                .requestStatus(CardReplacementRequestStatus.PROCESSING)</span>
+<span class="fc" id="L182">                .policySnapshot(map(policy))</span>
+<span class="fc" id="L183">                .requestedAt(context.now())</span>
+<span class="fc" id="L184">                .idempotencyKey(context.operationId())</span>
+<span class="fc" id="L185">                .createdBy(context.actor().reference())</span>
+<span class="fc" id="L186">                .operationId(context.operationId())</span>
+<span class="fc" id="L187">                .build();</span>
+<span class="fc" id="L188">        entityManager.persist(replacement);</span>
+
+<span class="fc bfc" id="L190" title="All 2 branches covered.">        for (CardV2 member : members(source)) {</span>
+<span class="pc bpc" id="L191" title="2 of 4 branches missed.">            if (member.getClosedAt() != null || member.getReplacedAt() != null) continue;</span>
+<span class="pc bpc" id="L192" title="1 of 2 branches missed.">            if (member.getSecurityHoldReason() == securityReason) continue;</span>
+<span class="pc bpc" id="L193" title="1 of 2 branches missed.">            boolean physicalWasRetired = member.getRetiredAt() != null;</span>
+<span class="fc" id="L194">            boolean changed = context.changeCard(member.getCardId(), &quot;SECURITY_REPLACEMENT_BLOCK&quot;,</span>
+<span class="fc" id="L195">                    LifecycleEventTypeV2.CARD_BLOCKED, securityReason.name(), null, card -&gt; {</span>
+<span class="fc" id="L196">                        card.setSecurityHoldReason(securityReason);</span>
+<span class="fc" id="L197">                        retirePhysical(card, input.getReplacementReason(), context.now());</span>
+<span class="fc" id="L198">                    });</span>
+<span class="pc bpc" id="L199" title="1 of 2 branches missed.">            if (changed) {</span>
+<span class="fc" id="L200">                context.recordCardEvent(member.getCardId(), &quot;HD-01&quot;,</span>
+<span class="fc" id="L201">                        LifecycleEventTypeV2.HOLD_PLACED, securityReason.name(), null);</span>
+<span class="pc bpc" id="L202" title="2 of 4 branches missed.">                if (member.getCardForm() != CardFormV2.VIRTUAL</span>
+<span class="pc bpc" id="L203" title="1 of 2 branches missed.">                        &amp;&amp; !physicalWasRetired &amp;&amp; member.getRetiredAt() != null) {</span>
+<span class="fc" id="L204">                    context.recordCardEvent(member.getCardId(), &quot;PA-04&quot;,</span>
+                            LifecycleEventTypeV2.PHYSICAL_RETIRED,
+<span class="fc" id="L206">                            member.getPhysicalRetiredReason().name(), null);</span>
+                }
+            }
+<span class="fc" id="L209">            cancelPendingProduction(member);</span>
+<span class="fc" id="L210">        }</span>
+
+<span class="fc" id="L212">        UUID externalOperationId = context.stageExternalIntent(</span>
+                &quot;prepare-replacement-credentials&quot;, &quot;HSM&quot;, &quot;PREPARE_CREDENTIALS&quot;,
+<span class="fc" id="L214">                Map.of(&quot;credentialIssuanceRef&quot;, context.operationId()));</span>
+<span class="fc" id="L215">        CardSecurityReplacementPreparationV2 preparation =</span>
+                new CardSecurityReplacementPreparationV2();
+<span class="fc" id="L217">        preparation.setOperationId(context.operationId());</span>
+<span class="fc" id="L218">        preparation.setInstitutionId(source.getInstitutionId());</span>
+<span class="fc" id="L219">        preparation.setAccountReferenceId(context.request().accountReferenceId());</span>
+<span class="fc" id="L220">        preparation.setSourceCardId(source.getCardId());</span>
+<span class="fc" id="L221">        preparation.setExternalOperationId(externalOperationId);</span>
+<span class="fc" id="L222">        preparation.setBinRangeId(draft.range().getBinRangeId());</span>
+<span class="fc" id="L223">        preparation.setCandidateOffset(candidate);</span>
+<span class="fc" id="L224">        preparation.setDraft(map(draft));</span>
+<span class="fc" id="L225">        entityManager.persist(preparation);</span>
+<span class="fc" id="L226">        context.awaitExternalCompletion();</span>
+<span class="fc" id="L227">    }</span>
+
+    public List&lt;UUID&gt; pending() {
+<span class="fc" id="L230">        return transaction.execute(status -&gt; entityManager.createQuery(</span>
+                        &quot;select p.operationId from CardSecurityReplacementPreparationV2 p, CardExternalOperationV2 e, CardLifecycleOperationV2 o &quot;
+                                + &quot;where p.externalOperationId=e.externalOperationId and p.operationId=o.operationId &quot;
+                                + &quot;and o.operationStatus=:pending and (e.nextAttemptAt is null or e.nextAttemptAt&lt;=:now) order by o.createdAt&quot;,
+                        UUID.class)
+<span class="fc" id="L235">                .setParameter(&quot;pending&quot;, LifecycleOperationStatusV2.PENDING)</span>
+<span class="fc" id="L236">                .setParameter(&quot;now&quot;, now()).setMaxResults(10).getResultList());</span>
+    }
+
+    public void process(UUID operationId) {
+<span class="fc bfc" id="L240" title="All 2 branches covered.">        if (TransactionSynchronizationManager.isActualTransactionActive()) {</span>
+<span class="fc" id="L241">            throw new IllegalStateException(&quot;Security replacement worker must own its transactions&quot;);</span>
+        }
+<span class="fc" id="L243">        CardSecurityReplacementPreparationV2 claimed = transaction.execute(status -&gt; {</span>
+<span class="fc" id="L244">            CardSecurityReplacementPreparationV2 preparation = lock(operationId);</span>
+<span class="fc" id="L245">            CardLifecycleOperationV2 operation = entityManager.find(</span>
+                    CardLifecycleOperationV2.class, operationId);
+<span class="fc bfc" id="L247" title="All 2 branches covered.">            if (operation.getOperationStatus() != LifecycleOperationStatusV2.PENDING) return null;</span>
+<span class="fc bfc" id="L248" title="All 2 branches covered.">            if (preparation.getProtectedResult() != null) return preparation;</span>
+<span class="fc" id="L249">            CardExternalOperationV2 external = entityManager.find(</span>
+<span class="fc" id="L250">                    CardExternalOperationV2.class, preparation.getExternalOperationId(),</span>
+                    LockModeType.PESSIMISTIC_WRITE);
+<span class="pc bpc" id="L252" title="1 of 2 branches missed.">            if (external.getOperationStatus() != LifecycleOperationStatusV2.PENDING) return null;</span>
+<span class="fc" id="L253">            external.setOperationStatus(LifecycleOperationStatusV2.UNKNOWN);</span>
+<span class="fc" id="L254">            external.setDispatchedAt(now());</span>
+<span class="fc" id="L255">            external.setAttemptCount(Math.addExact(external.getAttemptCount(), 1));</span>
+<span class="fc" id="L256">            operation.setOperationStatus(LifecycleOperationStatusV2.UNKNOWN);</span>
+<span class="fc" id="L257">            return preparation;</span>
+        });
+<span class="fc bfc" id="L259" title="All 2 branches covered.">        if (claimed == null) return;</span>
+
+<span class="fc bfc" id="L261" title="All 2 branches covered.">        if (claimed.getProtectedResult() == null) {</span>
+<span class="fc" id="L262">            Draft draft = mapper.convertValue(claimed.getDraft(), Draft.class);</span>
+<span class="fc" id="L263">            CardReplacementRequestV2 request = transaction.execute(status -&gt; entityManager.find(</span>
+                    CardReplacementRequestV2.class, operationId));
+<span class="pc" id="L265">            CardSecurityMaterial material = security.generateReserved(draft.institutionId(),</span>
+<span class="fc" id="L266">                    draft.range(), claimed.getCandidateOffset(), draft.expiryDate(),</span>
+<span class="fc" id="L267">                    draft.serviceCode());</span>
+<span class="nc" id="L268">            CardV2 transientCard = CardV2.builder().cardId(draft.cardId())</span>
+<span class="nc" id="L269">                    .institutionId(draft.institutionId()).binId(draft.range().getBinId())</span>
+<span class="nc" id="L270">                    .productVersionId(draft.request().getProductVersionId())</span>
+<span class="nc" id="L271">                    .panAllocationId(draft.panAllocationId()).pinDataRef(draft.pinDataId())</span>
+<span class="nc" id="L272">                    .panEncrypted(material.encryptedPan())</span>
+<span class="nc" id="L273">                    .dataEncryptionKeyId(material.encryptionKeyId()).build();</span>
+<span class="nc" id="L274">            ProductReplacementPolicyV2 activePolicy = transaction.execute(status -&gt; policy(</span>
+<span class="nc" id="L275">                    source(claimed.getInstitutionId(), claimed.getSourceCardId()),</span>
+<span class="nc" id="L276">                    request.getReplacementReason()));</span>
+<span class="nc" id="L277">            PinDataV2 pin = pins.prepareReplacement(transientCard, draft.actor(),</span>
+<span class="nc" id="L278">                    draft.pinPolicy(), activePolicy.getPinStrategy());</span>
+<span class="nc" id="L279">            transaction.executeWithoutResult(status -&gt; {</span>
+<span class="nc" id="L280">                CardSecurityReplacementPreparationV2 preparation = lock(operationId);</span>
+<span class="nc" id="L281">                preparation.setProtectedResult(Map.of(</span>
+<span class="nc" id="L282">                        &quot;credentials&quot;, map(material), &quot;pin&quot;, map(pin)));</span>
+<span class="nc" id="L283">                CardExternalOperationV2 external = entityManager.find(</span>
+<span class="nc" id="L284">                        CardExternalOperationV2.class, preparation.getExternalOperationId(),</span>
+                        LockModeType.PESSIMISTIC_WRITE);
+<span class="nc" id="L286">                external.setOperationStatus(LifecycleOperationStatusV2.CONFIRMED);</span>
+<span class="nc" id="L287">                external.setResolvedAt(now());</span>
+<span class="nc" id="L288">                external.setEvidenceReference(&quot;cms-security-replacement-preparation:&quot; + operationId);</span>
+<span class="nc" id="L289">                entityManager.find(CardLifecycleOperationV2.class, operationId)</span>
+<span class="nc" id="L290">                        .setOperationStatus(LifecycleOperationStatusV2.PENDING);</span>
+<span class="nc" id="L291">            });</span>
+        }
+
+        try {
+<span class="fc" id="L295">            transaction.executeWithoutResult(status -&gt; finalizePrepared(operationId));</span>
+<span class="nc" id="L296">        } catch (RuntimeException failure) {</span>
+<span class="nc" id="L297">            transaction.executeWithoutResult(status -&gt; {</span>
+<span class="nc" id="L298">                CardSecurityReplacementPreparationV2 preparation = lock(operationId);</span>
+<span class="nc" id="L299">                entityManager.find(CardExternalOperationV2.class,</span>
+<span class="nc" id="L300">                        preparation.getExternalOperationId()).setNextAttemptAt(now().plusSeconds(30));</span>
+<span class="nc" id="L301">            });</span>
+<span class="nc" id="L302">            throw failure;</span>
+<span class="fc" id="L303">        }</span>
+<span class="fc" id="L304">    }</span>
+
+    private void finalizePrepared(UUID operationId) {
+<span class="fc" id="L307">        CardSecurityReplacementPreparationV2 preparation = lock(operationId);</span>
+<span class="fc" id="L308">        CardLifecycleOperationV2 operation = entityManager.find(</span>
+                CardLifecycleOperationV2.class, operationId);
+<span class="pc bpc" id="L310" title="1 of 2 branches missed.">        if (operation.getOperationStatus() == LifecycleOperationStatusV2.CONFIRMED) return;</span>
+<span class="nc bnc" id="L311" title="All 2 branches missed.">        require(preparation.getProtectedResult() != null,</span>
+                &quot;Replacement credentials are unresolved&quot;);
+<span class="nc" id="L313">        CardV2 source = source(preparation.getInstitutionId(), preparation.getSourceCardId());</span>
+<span class="nc" id="L314">        CardReplacementRequestV2 request = entityManager.find(</span>
+                CardReplacementRequestV2.class, operationId, LockModeType.PESSIMISTIC_WRITE);
+<span class="nc" id="L316">        SecurityHoldReasonV2 expectedReason = securityReason(request.getReplacementReason());</span>
+<span class="nc bnc" id="L317" title="All 2 branches missed.">        require(source.getSecurityHoldReason() == expectedReason,</span>
+                &quot;Source security restriction changed after replacement acceptance&quot;);
+<span class="nc" id="L319">        ProductReplacementPolicyV2 activePolicy = policy(source, request.getReplacementReason());</span>
+<span class="nc bnc" id="L320" title="All 2 branches missed.">        validatePolicy(activePolicy, operation.getActorType()</span>
+<span class="nc" id="L321">                == com.xenomi.cms.core.v2.card.model.LifecycleActorTypeV2.CUSTOMER</span>
+<span class="nc" id="L322">                        ? ReplacementRequestChannel.CUSTOMER</span>
+<span class="nc" id="L323">                        : ReplacementRequestChannel.OPERATIONS);</span>
+<span class="nc" id="L324">        require(map(activePolicy).equals(request.getPolicySnapshot()),</span>
+                &quot;Replacement policy changed after acceptance; reconciliation required&quot;);
+<span class="nc" id="L326">        Draft draft = mapper.convertValue(preparation.getDraft(), Draft.class);</span>
+<span class="nc" id="L327">        require(draft.expiryDate().isAfter(now().toLocalDate()),</span>
+                &quot;Prepared replacement credentials expired&quot;);
+<span class="nc" id="L329">        AccountRestrictionSnapshotV2 holds = restrictions(</span>
+<span class="nc" id="L330">                preparation.getInstitutionId(), preparation.getAccountReferenceId());</span>
+<span class="nc" id="L331">        CardV2 successor = issuance.finalizeNewPanReplacementDraft(draft,</span>
+<span class="nc" id="L332">                mapper.convertValue(preparation.getProtectedResult().get(&quot;credentials&quot;),</span>
+                        CardSecurityMaterial.class),
+<span class="nc" id="L334">                mapper.convertValue(preparation.getProtectedResult().get(&quot;pin&quot;), PinDataV2.class),</span>
+<span class="nc" id="L335">                holds, entityManager, source, request.getReplacementReason());</span>
+
+<span class="nc" id="L337">        List&lt;String&gt; eventIds = new ArrayList&lt;&gt;(entityManager.createQuery(</span>
+                        &quot;select cast(e.cardEventId as string) from CardEventV2 e where e.institutionId=:tenant and e.operationId=:operation order by e.occurredAt,e.cardEventId&quot;,
+                        String.class)
+<span class="nc" id="L340">                .setParameter(&quot;tenant&quot;, preparation.getInstitutionId())</span>
+<span class="nc" id="L341">                .setParameter(&quot;operation&quot;, operationId).getResultList());</span>
+<span class="nc" id="L342">        long sequence = 1;</span>
+<span class="nc" id="L343">        eventIds.add(event(operation, successor, source.getCardId(), &quot;CARD_CREATED&quot;,</span>
+<span class="nc bnc" id="L344" title="All 2 branches missed.">                successor.getCardStatus() == CardStatusV2.BLOCKED ? &quot;CS-03&quot; : &quot;CS-01&quot;,</span>
+                sequence++));
+<span class="nc bnc" id="L346" title="All 2 branches missed.">        if (successor.getCardForm() != CardFormV2.VIRTUAL) {</span>
+<span class="nc" id="L347">            eventIds.add(event(operation, successor, source.getCardId(),</span>
+                    &quot;PHYSICAL_REQUESTED&quot;, &quot;PF-01&quot;, sequence++));
+        }
+<span class="nc" id="L350">        eventIds.add(event(operation, successor, source.getCardId(),</span>
+                &quot;CREDENTIALS_REISSUED&quot;, &quot;REISSUE_CREDENTIALS&quot;, sequence));
+<span class="nc" id="L352">        request.setReplacementCardId(successor.getCardId());</span>
+<span class="nc" id="L353">        request.setRequestStatus(CardReplacementRequestStatus.COMPLETED);</span>
+<span class="nc" id="L354">        request.setCompletedAt(now());</span>
+<span class="nc" id="L355">        operation.setResultPayload(Map.of(</span>
+<span class="nc" id="L356">                &quot;replacementRequestId&quot;, operationId.toString(),</span>
+<span class="nc" id="L357">                &quot;cards&quot;, List.of(Map.of(</span>
+<span class="nc" id="L358">                        &quot;cardId&quot;, successor.getCardId().toString(),</span>
+<span class="nc" id="L359">                        &quot;cardStatus&quot;, successor.getCardStatus().name(),</span>
+<span class="nc" id="L360">                        &quot;cardForm&quot;, successor.getCardForm().name(),</span>
+<span class="nc" id="L361">                        &quot;lifecycleVersion&quot;, successor.getLifecycleVersion())),</span>
+                &quot;eventIds&quot;, eventIds,
+<span class="nc" id="L363">                &quot;externalOperationIds&quot;, List.of(</span>
+<span class="nc" id="L364">                        preparation.getExternalOperationId().toString())));</span>
+<span class="nc" id="L365">        operation.setOperationStatus(LifecycleOperationStatusV2.CONFIRMED);</span>
+<span class="nc" id="L366">        operation.setCompletedAt(now());</span>
+<span class="nc" id="L367">        entityManager.flush();</span>
+<span class="nc" id="L368">    }</span>
+
+    private long reserveCandidate(Draft draft) {
+<span class="fc" id="L371">        var range = draft.range();</span>
+<span class="pc bpc" id="L372" title="1 of 2 branches missed.">        if (range.getIssuedPanCount() &gt;= range.getUsableCapacity()) {</span>
+<span class="nc" id="L373">            throw new BusinessRuleViolationException(&quot;PAN range exhausted&quot;);</span>
+        }
+<span class="fc" id="L375">        BigInteger start = new BigInteger(range.getRangeStart());</span>
+<span class="fc" id="L376">        BigInteger end = new BigInteger(range.getRangeEnd());</span>
+<span class="fc" id="L377">        long width = end.subtract(start).add(BigInteger.ONE).longValueExact();</span>
+<span class="fc" id="L378">        long candidate = range.getNextSequenceValue();</span>
+<span class="fc" id="L379">        boolean found = false;</span>
+<span class="pc bpc" id="L380" title="1 of 2 branches missed.">        for (int attempts = 0; attempts &lt; 10_000; attempts++) {</span>
+<span class="pc bpc" id="L381" title="1 of 2 branches missed.">            if (range.getAllocationStrategy() == AllocationStrategy.RANDOM) {</span>
+<span class="nc" id="L382">                candidate = random.nextLong(width);</span>
+            }
+<span class="pc bpc" id="L384" title="1 of 2 branches missed.">            if (candidate &gt;= width) break;</span>
+<span class="fc" id="L385">            String pan = start.add(BigInteger.valueOf(candidate)).toString();</span>
+<span class="fc" id="L386">            pan = &quot;0&quot;.repeat(Math.max(0, range.getRangeStart().length() - pan.length())) + pan;</span>
+<span class="pc bpc" id="L387" title="2 of 4 branches missed.">            if (LuhnAlgorithm.validate(pan) &amp;&amp; candidateAvailable(</span>
+<span class="fc" id="L388">                    draft.institutionId(), range.getBinRangeId(), candidate)) {</span>
+<span class="fc" id="L389">                found = true;</span>
+<span class="fc" id="L390">                break;</span>
+            }
+<span class="nc bnc" id="L392" title="All 2 branches missed.">            if (range.getAllocationStrategy() == AllocationStrategy.SEQUENTIAL) candidate++;</span>
+        }
+<span class="pc bpc" id="L394" title="1 of 2 branches missed.">        if (!found) throw new BusinessRuleViolationException(&quot;No available PAN candidate&quot;);</span>
+<span class="fc" id="L395">        range.setIssuedPanCount(Math.addExact(range.getIssuedPanCount(), 1));</span>
+<span class="pc bpc" id="L396" title="1 of 2 branches missed.">        if (range.getAllocationStrategy() == AllocationStrategy.SEQUENTIAL) {</span>
+<span class="fc" id="L397">            range.setNextSequenceValue(Math.addExact(candidate, 1));</span>
+        }
+<span class="pc bpc" id="L399" title="1 of 2 branches missed.">        if (range.getIssuedPanCount() &gt;= range.getUsableCapacity()) {</span>
+<span class="fc" id="L400">            range.setRangeStatus(BinRangeStatus.EXHAUSTED);</span>
+        }
+<span class="fc" id="L402">        return candidate;</span>
+    }
+
+    private boolean candidateAvailable(UUID institutionId, UUID rangeId, long candidate) {
+<span class="fc" id="L406">        long issuanceCount = entityManager.createQuery(</span>
+                        &quot;select count(p) from CardIssuancePreparationV2 p where p.institutionId=:tenant and p.binRangeId=:range and p.candidateOffset=:candidate&quot;,
+                        Long.class)
+<span class="fc" id="L409">                .setParameter(&quot;tenant&quot;, institutionId).setParameter(&quot;range&quot;, rangeId)</span>
+<span class="fc" id="L410">                .setParameter(&quot;candidate&quot;, candidate).getSingleResult();</span>
+<span class="fc" id="L411">        long replacementCount = entityManager.createQuery(</span>
+                        &quot;select count(p) from CardSecurityReplacementPreparationV2 p where p.institutionId=:tenant and p.binRangeId=:range and p.candidateOffset=:candidate&quot;,
+                        Long.class)
+<span class="fc" id="L414">                .setParameter(&quot;tenant&quot;, institutionId).setParameter(&quot;range&quot;, rangeId)</span>
+<span class="fc" id="L415">                .setParameter(&quot;candidate&quot;, candidate).getSingleResult();</span>
+<span class="pc bpc" id="L416" title="2 of 4 branches missed.">        return issuanceCount == 0 &amp;&amp; replacementCount == 0;</span>
+    }
+
+    private CardSecurityReplacementPreparationV2 lock(UUID operationId) {
+<span class="fc" id="L420">        CardSecurityReplacementPreparationV2 preparation = entityManager.find(</span>
+                CardSecurityReplacementPreparationV2.class, operationId);
+<span class="pc bpc" id="L422" title="1 of 2 branches missed.">        if (preparation == null) {</span>
+<span class="nc" id="L423">            throw new ResourceNotFoundException(</span>
+<span class="nc" id="L424">                    &quot;Security replacement preparation&quot;, operationId.toString());</span>
+        }
+<span class="fc" id="L426">        entityManager.createQuery(</span>
+                        &quot;select a from ExternalAccountReferenceV2 a where a.institutionId=:tenant and a.externalAccountReferenceId=:account&quot;)
+<span class="fc" id="L428">                .setParameter(&quot;tenant&quot;, preparation.getInstitutionId())</span>
+<span class="fc" id="L429">                .setParameter(&quot;account&quot;, preparation.getAccountReferenceId())</span>
+<span class="fc" id="L430">                .setLockMode(LockModeType.PESSIMISTIC_WRITE).getSingleResult();</span>
+<span class="fc" id="L431">        CardV2 source = source(preparation.getInstitutionId(), preparation.getSourceCardId());</span>
+<span class="fc" id="L432">        entityManager.refresh(family(source), LockModeType.PESSIMISTIC_WRITE);</span>
+<span class="fc bfc" id="L433" title="All 2 branches covered.">        for (CardV2 member : members(source)) {</span>
+<span class="fc" id="L434">            entityManager.refresh(member, LockModeType.PESSIMISTIC_WRITE);</span>
+<span class="fc" id="L435">        }</span>
+<span class="fc" id="L436">        entityManager.createQuery(</span>
+                        &quot;select r from BinRangeV2 r where r.institutionId=:tenant and r.binRangeId=:range&quot;)
+<span class="fc" id="L438">                .setParameter(&quot;tenant&quot;, preparation.getInstitutionId())</span>
+<span class="fc" id="L439">                .setParameter(&quot;range&quot;, preparation.getBinRangeId())</span>
+<span class="fc" id="L440">                .setLockMode(LockModeType.PESSIMISTIC_WRITE).getSingleResult();</span>
+<span class="fc" id="L441">        entityManager.refresh(preparation, LockModeType.PESSIMISTIC_WRITE);</span>
+<span class="fc" id="L442">        CardLifecycleOperationV2 operation = entityManager.find(</span>
+                CardLifecycleOperationV2.class, operationId, LockModeType.PESSIMISTIC_WRITE);
+<span class="fc" id="L444">        entityManager.refresh(operation);</span>
+<span class="fc" id="L445">        return preparation;</span>
+    }
+
+    private ProductReplacementPolicyV2 policy(CardV2 source, ReplacementReason reason) {
+<span class="fc" id="L449">        return entityManager.createQuery(</span>
+                        &quot;select p from ProductReplacementPolicyV2 p where p.institutionId=:tenant and p.productVersionId=:version and p.replacementReason=:reason and p.policyStatus=:status&quot;,
+                        ProductReplacementPolicyV2.class)
+<span class="fc" id="L452">                .setParameter(&quot;tenant&quot;, source.getInstitutionId())</span>
+<span class="fc" id="L453">                .setParameter(&quot;version&quot;, source.getProductVersionId())</span>
+<span class="fc" id="L454">                .setParameter(&quot;reason&quot;, reason)</span>
+<span class="fc" id="L455">                .setParameter(&quot;status&quot;, ProductPolicyStatus.ACTIVE)</span>
+<span class="fc" id="L456">                .getResultStream().findFirst()</span>
+<span class="pc" id="L457">                .orElseThrow(() -&gt; new BusinessRuleViolationException(</span>
+                        &quot;An ACTIVE security replacement policy is required&quot;));
+    }
+
+    private static void validatePolicy(ProductReplacementPolicyV2 policy,
+            ReplacementRequestChannel requestChannel) {
+<span class="pc bpc" id="L463" title="1 of 2 branches missed.">        require(policy.isReplacementAllowed()</span>
+<span class="fc bfc" id="L464" title="All 2 branches covered.">                        &amp;&amp; policy.getPermittedChannels().contains(requestChannel),</span>
+                &quot;Security replacement is not allowed through &quot; + requestChannel);
+<span class="pc bpc" id="L466" title="1 of 2 branches missed.">        require(!policy.isApprovalRequired(),</span>
+                &quot;Approval-required security replacement needs the approval lifecycle implementation&quot;);
+<span class="pc bpc" id="L468" title="1 of 2 branches missed.">        require(policy.getPanStrategy() == ReplacementPanStrategy.GENERATE_NEW_PAN,</span>
+                &quot;Permanent-security replacement policy must generate a new PAN&quot;);
+<span class="pc bpc" id="L470" title="1 of 2 branches missed.">        require(policy.getOldCardUsagePolicy() == OldCardUsagePolicy.BLOCK_IMMEDIATELY,</span>
+                &quot;Permanent-security replacement must block the source immediately&quot;);
+<span class="pc bpc" id="L472" title="1 of 2 branches missed.">        require(policy.getExpiryStrategy() == ReplacementExpiryStrategy.GENERATE_NEW_EXPIRY,</span>
+                &quot;New-PAN security replacement must generate a new expiry&quot;);
+<span class="pc bpc" id="L474" title="1 of 2 branches missed.">        require(policy.getAccountLinkStrategy()</span>
+                        == ReplacementAccountLinkStrategy.PRESERVE_ACCOUNT_LINK,
+                &quot;Security replacement must preserve the account link&quot;);
+<span class="pc bpc" id="L477" title="1 of 2 branches missed.">        require(policy.getControlStrategy() == ReplacementControlStrategy.APPLY_PRODUCT_DEFAULTS,</span>
+                &quot;New-PAN security replacement must apply product-default controls&quot;);
+<span class="fc" id="L479">    }</span>
+
+    private AccountRestrictionSnapshotV2 restrictions(UUID institutionId, UUID accountId) {
+<span class="fc" id="L482">        AccountRestrictionSnapshotV2 snapshot = entityManager.find(</span>
+                AccountRestrictionSnapshotV2.class,
+                new AccountRestrictionSnapshotV2.Key(institutionId, accountId),
+                LockModeType.PESSIMISTIC_READ);
+<span class="pc bpc" id="L486" title="1 of 4 branches missed.">        require(snapshot != null &amp;&amp; snapshot.getValidUntil().isAfter(now())</span>
+<span class="pc bpc" id="L487" title="1 of 2 branches missed.">                        &amp;&amp; !snapshot.getObservedAt().isAfter(now()),</span>
+                &quot;Fresh authoritative account restrictions required&quot;);
+<span class="fc" id="L489">        return snapshot;</span>
+    }
+
+    private CardV2 source(UUID institutionId, UUID cardId) {
+<span class="fc" id="L493">        return entityManager.createQuery(</span>
+                        &quot;select c from CardV2 c where c.institutionId=:tenant and c.cardId=:card&quot;,
+                        CardV2.class)
+<span class="fc" id="L496">                .setParameter(&quot;tenant&quot;, institutionId).setParameter(&quot;card&quot;, cardId)</span>
+<span class="fc" id="L497">                .getResultStream().findFirst()</span>
+<span class="fc" id="L498">                .orElseThrow(() -&gt; new ResourceNotFoundException(&quot;Card&quot;, cardId.toString()));</span>
+    }
+
+    private PanAllocationV2 family(CardV2 source) {
+<span class="fc" id="L502">        return entityManager.find(PanAllocationV2.class, source.getPanAllocationId());</span>
+    }
+
+    private List&lt;CardV2&gt; members(CardV2 source) {
+<span class="fc" id="L506">        return entityManager.createQuery(</span>
+                        &quot;select c from CardV2 c where c.institutionId=:tenant and c.panAllocationId=:family order by c.cardId&quot;,
+                        CardV2.class)
+<span class="fc" id="L509">                .setParameter(&quot;tenant&quot;, source.getInstitutionId())</span>
+<span class="fc" id="L510">                .setParameter(&quot;family&quot;, source.getPanAllocationId()).getResultList();</span>
+    }
+
+    private void cancelPendingProduction(CardV2 card) {
+<span class="pc bpc" id="L514" title="1 of 2 branches missed.">        if (card.getPhysicalFulfilmentStatus() == PhysicalFulfilmentStatusV2.CANCELLED) {</span>
+<span class="fc" id="L515">            entityManager.createNativeQuery(</span>
+                            &quot;update cms_v2.card_production_request set request_status='CANCELLED', updated_at=now() &quot;
+                                    + &quot;where institution_id=:tenant and card_id=:card and request_status in ('PENDING','ELIGIBLE','RESERVED_FOR_BATCH')&quot;)
+<span class="fc" id="L518">                    .setParameter(&quot;tenant&quot;, card.getInstitutionId())</span>
+<span class="fc" id="L519">                    .setParameter(&quot;card&quot;, card.getCardId()).executeUpdate();</span>
+        }
+<span class="fc" id="L521">    }</span>
+
+    private static void retirePhysical(CardV2 card, ReplacementReason reason,
+            OffsetDateTime occurredAt) {
+<span class="pc bpc" id="L525" title="2 of 4 branches missed.">        if (card.getCardForm() == CardFormV2.VIRTUAL || card.getRetiredAt() != null) return;</span>
+<span class="fc" id="L526">        card.setRetiredAt(occurredAt);</span>
+<span class="fc" id="L527">        card.setPhysicalRetiredReason(reason == ReplacementReason.LOST</span>
+<span class="pc bpc" id="L528" title="3 of 4 branches missed.">                || reason == ReplacementReason.STOLEN</span>
+<span class="pc" id="L529">                ? PhysicalRetiredReasonV2.LOST_STOLEN : PhysicalRetiredReasonV2.FRAUD);</span>
+<span class="pc bpc" id="L530" title="1 of 2 branches missed.">        if (card.getPhysicalFulfilmentStatus() == PhysicalFulfilmentStatusV2.REQUESTED</span>
+<span class="nc bnc" id="L531" title="All 2 branches missed.">                || card.getPhysicalFulfilmentStatus()</span>
+                        == PhysicalFulfilmentStatusV2.PERSONALIZATION_IN_PROGRESS
+<span class="nc bnc" id="L533" title="All 2 branches missed.">                || card.getPhysicalFulfilmentStatus() == PhysicalFulfilmentStatusV2.PERSONALIZED</span>
+<span class="nc bnc" id="L534" title="All 2 branches missed.">                || card.getPhysicalFulfilmentStatus()</span>
+                        == PhysicalFulfilmentStatusV2.IN_EMBOSSING_FILE) {
+<span class="fc" id="L536">            card.setPhysicalFulfilmentStatus(PhysicalFulfilmentStatusV2.CANCELLED);</span>
+        }
+<span class="fc" id="L538">    }</span>
+
+    private String event(CardLifecycleOperationV2 operation, CardV2 card, UUID relatedCardId,
+            String eventType, String transition, long sequence) {
+<span class="nc" id="L542">        UUID eventId = id();</span>
+<span class="nc" id="L543">        OffsetDateTime occurredAt = now();</span>
+<span class="nc" id="L544">        Map&lt;String, Object&gt; payload = new LinkedHashMap&lt;&gt;();</span>
+<span class="nc" id="L545">        payload.put(&quot;eventId&quot;, eventId.toString());</span>
+<span class="nc" id="L546">        payload.put(&quot;operationId&quot;, operation.getOperationId().toString());</span>
+<span class="nc" id="L547">        payload.put(&quot;institutionId&quot;, operation.getInstitutionId().toString());</span>
+<span class="nc" id="L548">        payload.put(&quot;cardId&quot;, card.getCardId().toString());</span>
+<span class="nc" id="L549">        payload.put(&quot;relatedCardId&quot;, relatedCardId.toString());</span>
+<span class="nc" id="L550">        payload.put(&quot;eventSequence&quot;, sequence);</span>
+<span class="nc" id="L551">        payload.put(&quot;transitionId&quot;, transition);</span>
+<span class="nc" id="L552">        payload.put(&quot;schemaVersion&quot;, 1);</span>
+<span class="nc" id="L553">        payload.put(&quot;source&quot;, &quot;CMS_V2&quot;);</span>
+<span class="nc" id="L554">        payload.put(&quot;cardStatus&quot;, card.getCardStatus().name());</span>
+<span class="nc" id="L555">        payload.put(&quot;actorType&quot;, operation.getActorType().name());</span>
+<span class="nc" id="L556">        entityManager.persist(CardEventV2.builder().cardEventId(eventId)</span>
+<span class="nc" id="L557">                .institutionId(operation.getInstitutionId()).cardId(card.getCardId())</span>
+<span class="nc" id="L558">                .relatedCardId(relatedCardId).operationId(operation.getOperationId())</span>
+<span class="nc" id="L559">                .eventType(eventType).eventSequence(sequence)</span>
+<span class="nc" id="L560">                .resultingStatus(card.getCardStatus().name())</span>
+<span class="nc bnc" id="L561" title="All 2 branches missed.">                .reasonCode(card.getReplacementReason() == null ? null</span>
+<span class="nc" id="L562">                        : card.getReplacementReason().name())</span>
+<span class="nc" id="L563">                .source(&quot;CMS_V2&quot;).transitionId(transition)</span>
+<span class="nc" id="L564">                .actorReference(operation.getActorReference())</span>
+<span class="nc" id="L565">                .correlationId(operation.getOperationId()).occurredAt(occurredAt)</span>
+<span class="nc" id="L566">                .eventPayload(payload).build());</span>
+<span class="nc" id="L567">        PanAllocationV2 allocation = entityManager.find(</span>
+<span class="nc" id="L568">                PanAllocationV2.class, card.getPanAllocationId());</span>
+<span class="nc" id="L569">        entityManager.persist(OutboxEventV2.builder().outboxEventId(id())</span>
+<span class="nc" id="L570">                .institutionId(operation.getInstitutionId())</span>
+<span class="nc" id="L571">                .operationId(operation.getOperationId()).aggregateType(&quot;CARD&quot;)</span>
+<span class="nc" id="L572">                .aggregateId(card.getCardId().toString()).eventType(eventType)</span>
+<span class="nc" id="L573">                .eventPayload(payload).correlationId(operation.getOperationId())</span>
+<span class="nc" id="L574">                .idempotencyKey(eventId).familyRevision(allocation.getFamilyRevision())</span>
+<span class="nc" id="L575">                .occurredAt(occurredAt).build());</span>
+<span class="nc" id="L576">        return eventId.toString();</span>
+    }
+
+    private static SecurityHoldReasonV2 securityReason(ReplacementReason reason) {
+<span class="pc bpc" id="L580" title="4 of 5 branches missed.">        return switch (reason) {</span>
+<span class="fc" id="L581">            case LOST -&gt; SecurityHoldReasonV2.LOST;</span>
+<span class="nc" id="L582">            case STOLEN -&gt; SecurityHoldReasonV2.STOLEN;</span>
+<span class="nc" id="L583">            case COMPROMISED -&gt; SecurityHoldReasonV2.COMPROMISED;</span>
+<span class="nc" id="L584">            case FRAUD -&gt; SecurityHoldReasonV2.FRAUD_SUSPECTED;</span>
+<span class="nc" id="L585">            default -&gt; throw new BusinessRuleViolationException(</span>
+                    &quot;Unsupported permanent-security replacement reason&quot;);
+        };
+    }
+
+    private Map&lt;String, Object&gt; map(Object value) {
+<span class="fc" id="L591">        return mapper.convertValue(value,</span>
+<span class="fc" id="L592">                new TypeReference&lt;LinkedHashMap&lt;String, Object&gt;&gt;() {});</span>
+    }
+
+    private UUID id() {
+<span class="nc" id="L596">        return (UUID) entityManager.createNativeQuery(&quot;select uuidv7()&quot;, UUID.class)</span>
+<span class="nc" id="L597">                .getSingleResult();</span>
+    }
+
+    private static OffsetDateTime now() {
+<span class="fc" id="L601">        return OffsetDateTime.now(ZoneOffset.UTC);</span>
+    }
+
+    private static void require(boolean condition, String message) {
+<span class="fc bfc" id="L605" title="All 2 branches covered.">        if (!condition) throw new BusinessRuleViolationException(message);</span>
+<span class="fc" id="L606">    }</span>
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.15.202606040825</span></div></body></html>

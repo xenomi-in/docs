@@ -1,0 +1,152 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>InstitutionPolicyV2Service.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">CMS Core Service</a> &gt; <a href="index.source.html" class="el_package">com.xenomi.cms.core.v2.institution.service</a> &gt; <span class="el_source">InstitutionPolicyV2Service.java</span></div><h1>InstitutionPolicyV2Service.java</h1><pre class="source lang-java linenums">package com.xenomi.cms.core.v2.institution.service;
+
+import java.util.LinkedHashMap;
+import java.util.UUID;
+
+import com.xenomi.cms.core.exception.ResourceNotFoundException;
+import com.xenomi.cms.core.v2.institution.dto.OperationalPolicyV2Response;
+import com.xenomi.cms.core.v2.institution.dto.SecurityPolicyV2Response;
+import com.xenomi.cms.core.v2.institution.dto.UpdateOperationalPolicyV2Request;
+import com.xenomi.cms.core.v2.institution.dto.UpdateSecurityPolicyV2Request;
+import com.xenomi.cms.core.v2.institution.entity.InstitutionOperationalPolicyV2;
+import com.xenomi.cms.core.v2.institution.entity.InstitutionSecurityPolicyV2;
+import com.xenomi.cms.core.v2.institution.repository.InstitutionOperationalPolicyV2Repository;
+import com.xenomi.cms.core.v2.institution.repository.InstitutionSecurityPolicyV2Repository;
+import com.xenomi.cms.core.v2.institution.repository.InstitutionV2Repository;
+
+import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
+
+@Service
+public class InstitutionPolicyV2Service {
+
+    private final InstitutionV2Repository institutionRepository;
+    private final InstitutionOperationalPolicyV2Repository operationalRepository;
+    private final InstitutionSecurityPolicyV2Repository securityRepository;
+
+    public InstitutionPolicyV2Service(
+            InstitutionV2Repository institutionRepository,
+            InstitutionOperationalPolicyV2Repository operationalRepository,
+<span class="fc" id="L30">            InstitutionSecurityPolicyV2Repository securityRepository) {</span>
+<span class="fc" id="L31">        this.institutionRepository = institutionRepository;</span>
+<span class="fc" id="L32">        this.operationalRepository = operationalRepository;</span>
+<span class="fc" id="L33">        this.securityRepository = securityRepository;</span>
+<span class="fc" id="L34">    }</span>
+
+    @Transactional(readOnly = true)
+    public OperationalPolicyV2Response getOperational(UUID institutionId) {
+<span class="nc" id="L38">        return toResponse(operationalRepository.findById(institutionId)</span>
+<span class="nc" id="L39">                .orElseThrow(() -&gt; new ResourceNotFoundException(</span>
+<span class="nc" id="L40">                        &quot;Institution operational policy&quot;, institutionId.toString())));</span>
+    }
+
+    @Transactional
+    public OperationalPolicyV2Response updateOperational(
+            UUID institutionId, UpdateOperationalPolicyV2Request request, String actorId) {
+<span class="fc" id="L46">        requireInstitution(institutionId);</span>
+<span class="fc" id="L47">        InstitutionOperationalPolicyV2 policy = operationalRepository.findById(institutionId)</span>
+<span class="pc" id="L48">                .orElseGet(() -&gt; newOperationalDefaults(institutionId, actorId));</span>
+<span class="fc" id="L49">        policy.setCardIssuanceEnabled(request.getCardIssuanceEnabled());</span>
+<span class="fc" id="L50">        policy.setReplacementEnabled(request.getReplacementEnabled());</span>
+<span class="fc" id="L51">        policy.setRenewalEnabled(request.getRenewalEnabled());</span>
+<span class="fc" id="L52">        policy.setPinOperationsEnabled(request.getPinOperationsEnabled());</span>
+<span class="fc" id="L53">        policy.setTokenOperationsEnabled(request.getTokenOperationsEnabled());</span>
+<span class="fc" id="L54">        policy.setBatchProcessingEnabled(request.getBatchProcessingEnabled());</span>
+<span class="fc" id="L55">        policy.setMaintenanceMode(request.getMaintenanceMode());</span>
+<span class="fc" id="L56">        policy.setUpdatedBy(actorId.trim());</span>
+<span class="fc" id="L57">        return toResponse(operationalRepository.saveAndFlush(policy));</span>
+    }
+
+    @Transactional(readOnly = true)
+    public SecurityPolicyV2Response getSecurity(UUID institutionId) {
+<span class="nc" id="L62">        return toResponse(securityRepository.findById(institutionId)</span>
+<span class="nc" id="L63">                .orElseThrow(() -&gt; new ResourceNotFoundException(</span>
+<span class="nc" id="L64">                        &quot;Institution security policy&quot;, institutionId.toString())));</span>
+    }
+
+    @Transactional
+    public SecurityPolicyV2Response updateSecurity(
+            UUID institutionId, UpdateSecurityPolicyV2Request request, String actorId) {
+<span class="fc" id="L70">        requireInstitution(institutionId);</span>
+<span class="fc" id="L71">        InstitutionSecurityPolicyV2 policy = securityRepository.findById(institutionId)</span>
+<span class="pc" id="L72">                .orElseGet(() -&gt; newSecurityDefaults(institutionId, actorId));</span>
+<span class="fc" id="L73">        policy.setMakerCheckerEnabled(request.getMakerCheckerEnabled());</span>
+<span class="fc" id="L74">        policy.setMfaRequired(request.getMfaRequired());</span>
+<span class="fc" id="L75">        policy.setMaximumLoginAttempts(request.getMaximumLoginAttempts());</span>
+<span class="fc" id="L76">        policy.setPasswordPolicyReference(trimToNull(request.getPasswordPolicyReference()));</span>
+<span class="fc" id="L77">        policy.setDataMaskingPolicy(new LinkedHashMap&lt;&gt;(request.getDataMaskingPolicy()));</span>
+<span class="fc" id="L78">        policy.setAuditRetentionDays(request.getAuditRetentionDays());</span>
+<span class="fc" id="L79">        policy.setUpdatedBy(actorId.trim());</span>
+<span class="fc" id="L80">        return toResponse(securityRepository.saveAndFlush(policy));</span>
+    }
+
+    private void requireInstitution(UUID institutionId) {
+<span class="pc bpc" id="L84" title="1 of 2 branches missed.">        if (!institutionRepository.existsById(institutionId)) {</span>
+<span class="nc" id="L85">            throw new ResourceNotFoundException(&quot;Institution&quot;, institutionId.toString());</span>
+        }
+<span class="fc" id="L87">    }</span>
+
+    private static InstitutionOperationalPolicyV2 newOperationalDefaults(UUID institutionId, String actorId) {
+<span class="nc" id="L90">        return InstitutionOperationalPolicyV2.builder()</span>
+<span class="nc" id="L91">                .institutionId(institutionId)</span>
+<span class="nc" id="L92">                .cardIssuanceEnabled(true)</span>
+<span class="nc" id="L93">                .replacementEnabled(true)</span>
+<span class="nc" id="L94">                .renewalEnabled(true)</span>
+<span class="nc" id="L95">                .pinOperationsEnabled(true)</span>
+<span class="nc" id="L96">                .tokenOperationsEnabled(true)</span>
+<span class="nc" id="L97">                .batchProcessingEnabled(true)</span>
+<span class="nc" id="L98">                .maintenanceMode(false)</span>
+<span class="nc" id="L99">                .policyVersion(1)</span>
+<span class="nc" id="L100">                .updatedBy(actorId.trim())</span>
+<span class="nc" id="L101">                .build();</span>
+    }
+
+    private static InstitutionSecurityPolicyV2 newSecurityDefaults(UUID institutionId, String actorId) {
+<span class="nc" id="L105">        return InstitutionSecurityPolicyV2.builder()</span>
+<span class="nc" id="L106">                .institutionId(institutionId)</span>
+<span class="nc" id="L107">                .makerCheckerEnabled(true)</span>
+<span class="nc" id="L108">                .mfaRequired(true)</span>
+<span class="nc" id="L109">                .maximumLoginAttempts(5)</span>
+<span class="nc" id="L110">                .dataMaskingPolicy(new LinkedHashMap&lt;&gt;())</span>
+<span class="nc" id="L111">                .auditRetentionDays(2555)</span>
+<span class="nc" id="L112">                .policyVersion(1)</span>
+<span class="nc" id="L113">                .updatedBy(actorId.trim())</span>
+<span class="nc" id="L114">                .build();</span>
+    }
+
+    private static OperationalPolicyV2Response toResponse(InstitutionOperationalPolicyV2 policy) {
+<span class="fc" id="L118">        return OperationalPolicyV2Response.builder()</span>
+<span class="fc" id="L119">                .institutionId(policy.getInstitutionId())</span>
+<span class="fc" id="L120">                .cardIssuanceEnabled(policy.isCardIssuanceEnabled())</span>
+<span class="fc" id="L121">                .replacementEnabled(policy.isReplacementEnabled())</span>
+<span class="fc" id="L122">                .renewalEnabled(policy.isRenewalEnabled())</span>
+<span class="fc" id="L123">                .pinOperationsEnabled(policy.isPinOperationsEnabled())</span>
+<span class="fc" id="L124">                .tokenOperationsEnabled(policy.isTokenOperationsEnabled())</span>
+<span class="fc" id="L125">                .batchProcessingEnabled(policy.isBatchProcessingEnabled())</span>
+<span class="fc" id="L126">                .maintenanceMode(policy.isMaintenanceMode())</span>
+<span class="fc" id="L127">                .policyVersion(policy.getPolicyVersion())</span>
+<span class="fc" id="L128">                .updatedAt(policy.getUpdatedAt())</span>
+<span class="fc" id="L129">                .updatedBy(policy.getUpdatedBy())</span>
+<span class="fc" id="L130">                .build();</span>
+    }
+
+    private static SecurityPolicyV2Response toResponse(InstitutionSecurityPolicyV2 policy) {
+<span class="fc" id="L134">        return SecurityPolicyV2Response.builder()</span>
+<span class="fc" id="L135">                .institutionId(policy.getInstitutionId())</span>
+<span class="fc" id="L136">                .makerCheckerEnabled(policy.isMakerCheckerEnabled())</span>
+<span class="fc" id="L137">                .mfaRequired(policy.isMfaRequired())</span>
+<span class="fc" id="L138">                .maximumLoginAttempts(policy.getMaximumLoginAttempts())</span>
+<span class="fc" id="L139">                .passwordPolicyReference(policy.getPasswordPolicyReference())</span>
+<span class="fc" id="L140">                .dataMaskingPolicy(policy.getDataMaskingPolicy())</span>
+<span class="fc" id="L141">                .auditRetentionDays(policy.getAuditRetentionDays())</span>
+<span class="fc" id="L142">                .policyVersion(policy.getPolicyVersion())</span>
+<span class="fc" id="L143">                .updatedAt(policy.getUpdatedAt())</span>
+<span class="fc" id="L144">                .updatedBy(policy.getUpdatedBy())</span>
+<span class="fc" id="L145">                .build();</span>
+    }
+
+    private static String trimToNull(String value) {
+<span class="pc bpc" id="L149" title="1 of 4 branches missed.">        return value == null || value.isBlank() ? null : value.trim();</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.15.202606040825</span></div></body></html>

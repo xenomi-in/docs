@@ -1,0 +1,258 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>InstitutionDataKeyAssignmentV2Service.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">CMS Core Service</a> &gt; <a href="index.source.html" class="el_package">com.xenomi.cms.core.v2.institution.service</a> &gt; <span class="el_source">InstitutionDataKeyAssignmentV2Service.java</span></div><h1>InstitutionDataKeyAssignmentV2Service.java</h1><pre class="source lang-java linenums">package com.xenomi.cms.core.v2.institution.service;
+
+import java.time.OffsetDateTime;
+import java.util.EnumMap;
+import java.util.Map;
+import java.util.Set;
+import java.util.UUID;
+
+import com.xenomi.cms.core.exception.ResourceNotFoundException;
+import com.xenomi.cms.core.v2.common.DatabaseUuidV7Generator;
+import com.xenomi.cms.core.v2.institution.dto.CreateDataKeyAssignmentV2Request;
+import com.xenomi.cms.core.v2.institution.dto.DataKeyAssignmentV2Response;
+import com.xenomi.cms.core.v2.institution.dto.UpdateDataKeyAssignmentStatusV2Request;
+import com.xenomi.cms.core.v2.institution.entity.InstitutionDataKeyAssignmentV2;
+import com.xenomi.cms.core.v2.institution.model.DataKeyAssignmentStatus;
+import com.xenomi.cms.core.v2.institution.repository.HsmKeyReferenceV2Repository;
+import com.xenomi.cms.core.v2.institution.repository.InstitutionDataKeyAssignmentV2Repository;
+import com.xenomi.cms.core.v2.institution.repository.InstitutionSecurityPolicyV2Repository;
+import com.xenomi.cms.core.v2.institution.repository.InstitutionV2Repository;
+import com.xenomi.cms.core.v2.hsm.model.HsmKeyStatus;
+import com.xenomi.cms.core.v2.hsm.model.HsmKeyType;
+import com.xenomi.cms.core.v2.hsm.model.HsmKeyScope;
+import com.xenomi.cms.core.v2.hsm.model.KeyPurpose;
+
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
+import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
+
+@Service
+public class InstitutionDataKeyAssignmentV2Service {
+
+<span class="fc" id="L33">    private static final Set&lt;HsmKeyStatus&gt; ASSIGNABLE_KEY_STATUSES = Set.of(</span>
+            HsmKeyStatus.PENDING_APPROVAL, HsmKeyStatus.SCHEDULED,
+            HsmKeyStatus.ACTIVE, HsmKeyStatus.DECRYPT_ONLY);
+
+<span class="fc" id="L37">    private static final Map&lt;DataKeyAssignmentStatus, Set&lt;DataKeyAssignmentStatus&gt;&gt; ALLOWED_TRANSITIONS =</span>
+<span class="fc" id="L38">            transitions();</span>
+
+    private final InstitutionV2Repository institutionRepository;
+    private final HsmKeyReferenceV2Repository hsmKeyRepository;
+    private final InstitutionDataKeyAssignmentV2Repository assignmentRepository;
+    private final InstitutionSecurityPolicyV2Repository securityPolicyRepository;
+    private final DatabaseUuidV7Generator uuidGenerator;
+
+    public InstitutionDataKeyAssignmentV2Service(
+            InstitutionV2Repository institutionRepository,
+            HsmKeyReferenceV2Repository hsmKeyRepository,
+            InstitutionDataKeyAssignmentV2Repository assignmentRepository,
+            InstitutionSecurityPolicyV2Repository securityPolicyRepository,
+<span class="fc" id="L51">            DatabaseUuidV7Generator uuidGenerator) {</span>
+<span class="fc" id="L52">        this.institutionRepository = institutionRepository;</span>
+<span class="fc" id="L53">        this.hsmKeyRepository = hsmKeyRepository;</span>
+<span class="fc" id="L54">        this.assignmentRepository = assignmentRepository;</span>
+<span class="fc" id="L55">        this.securityPolicyRepository = securityPolicyRepository;</span>
+<span class="fc" id="L56">        this.uuidGenerator = uuidGenerator;</span>
+<span class="fc" id="L57">    }</span>
+
+    @Transactional
+    public DataKeyAssignmentV2Response create(
+            UUID institutionId, CreateDataKeyAssignmentV2Request request, String actorId) {
+<span class="fc" id="L62">        institutionRepository.findByIdForUpdate(institutionId)</span>
+<span class="pc" id="L63">                .orElseThrow(() -&gt; new ResourceNotFoundException(&quot;Institution&quot;, institutionId.toString()));</span>
+
+<span class="fc bfc" id="L65" title="All 2 branches covered.">        if (!hsmKeyRepository.existsByKeyIdAndInstitutionIdAndStatusIn(</span>
+<span class="fc" id="L66">                request.getHsmKeyId(), institutionId, ASSIGNABLE_KEY_STATUSES)) {</span>
+<span class="fc" id="L67">            throw new IllegalArgumentException(</span>
+                    &quot;hsmKeyId must reference an assignable HSM key owned by the institution&quot;);
+        }
+<span class="fc" id="L70">        var key = hsmKeyRepository.findByKeyIdAndInstitutionId(</span>
+<span class="fc" id="L71">                request.getHsmKeyId(), institutionId).orElseThrow();</span>
+<span class="pc bpc" id="L72" title="1 of 2 branches missed.">        if (key.getKeyType() == HsmKeyType.KEK) {</span>
+<span class="nc" id="L73">            throw new IllegalArgumentException(</span>
+                    &quot;KEK cannot be used as an operational institution data key&quot;);
+        }
+<span class="fc" id="L76">        validateDates(request.getEffectiveFrom(), request.getEffectiveTo());</span>
+
+<span class="fc" id="L78">        KeyPurpose keyPurpose = request.getKeyPurpose();</span>
+<span class="pc bpc" id="L79" title="1 of 2 branches missed.">        if (keyPurpose.scope() != HsmKeyScope.INSTITUTION) {</span>
+<span class="nc" id="L80">            throw new IllegalArgumentException(&quot;keyPurpose must be approved for institution scope&quot;);</span>
+        }
+<span class="pc bpc" id="L82" title="1 of 2 branches missed.">        if (key.getKeyScope() != HsmKeyScope.INSTITUTION) {</span>
+<span class="nc" id="L83">            throw new IllegalArgumentException(&quot;Institution data keys must use INSTITUTION scope&quot;);</span>
+        }
+<span class="pc bpc" id="L85" title="2 of 3 branches missed.">        HsmKeyType requiredType = switch (keyPurpose) {</span>
+<span class="nc" id="L86">            case PAN_HMAC, AUDIT_HMAC -&gt; HsmKeyType.HMAC;</span>
+            case PAN_DATA_ENCRYPTION, CARDHOLDER_DATA_ENCRYPTION, PII_ENCRYPTION,
+<span class="fc" id="L88">                    FILE_ENCRYPTION, TOKEN_REFERENCE_ENCRYPTION -&gt; HsmKeyType.DEK;</span>
+<span class="nc" id="L89">            default -&gt; throw new IllegalArgumentException(&quot;Unsupported institution key purpose&quot;);</span>
+        };
+<span class="pc bpc" id="L91" title="1 of 2 branches missed.">        if (key.getKeyType() != requiredType) {</span>
+<span class="nc" id="L92">            throw new IllegalArgumentException(keyPurpose + &quot; requires an &quot; + requiredType + &quot; key&quot;);</span>
+        }
+<span class="fc" id="L94">        int nextVersion = assignmentRepository.findMaximumVersion(institutionId, keyPurpose) + 1;</span>
+<span class="fc" id="L95">        String actor = actorId.trim();</span>
+<span class="fc" id="L96">        InstitutionDataKeyAssignmentV2 assignment = InstitutionDataKeyAssignmentV2.builder()</span>
+<span class="fc" id="L97">                .assignmentId(uuidGenerator.generate())</span>
+<span class="fc" id="L98">                .institutionId(institutionId)</span>
+<span class="fc" id="L99">                .hsmKeyId(request.getHsmKeyId())</span>
+<span class="fc" id="L100">                .keyPurpose(keyPurpose)</span>
+<span class="fc" id="L101">                .dataClassification(request.getDataClassification())</span>
+<span class="fc" id="L102">                .assignmentVersion(nextVersion)</span>
+<span class="fc" id="L103">                .assignmentStatus(DataKeyAssignmentStatus.PENDING_APPROVAL)</span>
+<span class="fc" id="L104">                .effectiveFrom(request.getEffectiveFrom())</span>
+<span class="fc" id="L105">                .effectiveTo(request.getEffectiveTo())</span>
+<span class="fc" id="L106">                .rotationPolicyReference(trimToNull(request.getRotationPolicyReference()))</span>
+<span class="fc" id="L107">                .createdBy(actor)</span>
+<span class="fc" id="L108">                .updatedBy(actor)</span>
+<span class="fc" id="L109">                .build();</span>
+<span class="fc" id="L110">        return toResponse(assignmentRepository.save(assignment));</span>
+    }
+
+    @Transactional(readOnly = true)
+    public DataKeyAssignmentV2Response get(UUID institutionId, UUID assignmentId) {
+<span class="nc" id="L115">        return toResponse(find(institutionId, assignmentId));</span>
+    }
+
+    @Transactional(readOnly = true)
+    public Page&lt;DataKeyAssignmentV2Response&gt; search(
+            UUID institutionId,
+            KeyPurpose keyPurpose,
+            DataKeyAssignmentStatus status,
+            Pageable pageable) {
+<span class="nc bnc" id="L124" title="All 2 branches missed.">        if (!institutionRepository.existsById(institutionId)) {</span>
+<span class="nc" id="L125">            throw new ResourceNotFoundException(&quot;Institution&quot;, institutionId.toString());</span>
+        }
+<span class="nc" id="L127">        return assignmentRepository.search(institutionId, keyPurpose, status, pageable)</span>
+<span class="nc" id="L128">                .map(InstitutionDataKeyAssignmentV2Service::toResponse);</span>
+    }
+
+    @Transactional
+    public DataKeyAssignmentV2Response changeStatus(
+            UUID institutionId,
+            UUID assignmentId,
+            UpdateDataKeyAssignmentStatusV2Request request,
+            String actorId) {
+<span class="fc" id="L137">        InstitutionDataKeyAssignmentV2 assignment = find(institutionId, assignmentId);</span>
+<span class="fc" id="L138">        DataKeyAssignmentStatus current = assignment.getAssignmentStatus();</span>
+<span class="fc" id="L139">        DataKeyAssignmentStatus requested = request.getStatus();</span>
+<span class="pc bpc" id="L140" title="1 of 2 branches missed.">        if (!ALLOWED_TRANSITIONS.getOrDefault(current, Set.of()).contains(requested)) {</span>
+<span class="fc" id="L141">            throw new IllegalArgumentException(</span>
+                    &quot;Invalid data-key assignment transition: &quot; + current + &quot; -&gt; &quot; + requested);
+        }
+<span class="nc" id="L144">        enforceApprovalGate(institutionId, assignment, current, requested);</span>
+
+<span class="nc bnc" id="L146" title="All 2 branches missed.">        if (requested == DataKeyAssignmentStatus.ACTIVE) {</span>
+<span class="nc" id="L147">            var key = hsmKeyRepository.findByKeyIdAndInstitutionId(</span>
+<span class="nc" id="L148">                    assignment.getHsmKeyId(), institutionId)</span>
+<span class="nc" id="L149">                    .orElseThrow(() -&gt; new ResourceNotFoundException(</span>
+<span class="nc" id="L150">                            &quot;HSM key&quot;, assignment.getHsmKeyId().toString()));</span>
+<span class="nc bnc" id="L151" title="All 2 branches missed.">            if (key.getStatus() != HsmKeyStatus.ACTIVE) {</span>
+<span class="nc" id="L152">                throw new IllegalArgumentException(</span>
+                        &quot;The referenced HSM key must be ACTIVE before assignment activation&quot;);
+            }
+<span class="nc" id="L155">            OffsetDateTime now = OffsetDateTime.now(java.time.ZoneOffset.UTC);</span>
+<span class="nc" id="L156">            assignmentRepository</span>
+<span class="nc" id="L157">                    .findFirstByInstitutionIdAndKeyPurposeAndAssignmentStatusAndAssignmentIdNot(</span>
+<span class="nc" id="L158">                            institutionId, assignment.getKeyPurpose(),</span>
+                            DataKeyAssignmentStatus.ACTIVE, assignmentId)
+<span class="nc" id="L160">                    .ifPresent(previous -&gt; {</span>
+<span class="nc" id="L161">                        previous.setAssignmentStatus(DataKeyAssignmentStatus.DECRYPT_ONLY);</span>
+<span class="nc" id="L162">                        previous.setEffectiveTo(now);</span>
+<span class="nc" id="L163">                        previous.setUpdatedBy(actorId.trim());</span>
+<span class="nc" id="L164">                        assignmentRepository.save(previous);</span>
+<span class="nc" id="L165">                    });</span>
+        }
+
+<span class="nc" id="L168">        OffsetDateTime effectiveTo = request.getEffectiveTo();</span>
+<span class="nc bnc" id="L169" title="All 6 branches missed.">        if ((requested == DataKeyAssignmentStatus.RETIRED</span>
+                || requested == DataKeyAssignmentStatus.REVOKED) &amp;&amp; effectiveTo == null) {
+<span class="nc" id="L171">            effectiveTo = OffsetDateTime.now(java.time.ZoneOffset.UTC);</span>
+        }
+<span class="nc" id="L173">        validateDates(assignment.getEffectiveFrom(), effectiveTo);</span>
+<span class="nc" id="L174">        assignment.setAssignmentStatus(requested);</span>
+<span class="nc" id="L175">        assignment.setEffectiveTo(effectiveTo);</span>
+<span class="nc" id="L176">        assignment.setUpdatedBy(actorId.trim());</span>
+<span class="nc" id="L177">        return toResponse(assignmentRepository.save(assignment));</span>
+    }
+
+    private InstitutionDataKeyAssignmentV2 find(UUID institutionId, UUID assignmentId) {
+<span class="fc" id="L181">        return assignmentRepository.findByAssignmentIdAndInstitutionId(assignmentId, institutionId)</span>
+<span class="pc" id="L182">                .orElseThrow(() -&gt; new ResourceNotFoundException(</span>
+<span class="nc" id="L183">                        &quot;Institution data-key assignment&quot;, assignmentId.toString()));</span>
+    }
+
+    private void enforceApprovalGate(
+            UUID institutionId,
+            InstitutionDataKeyAssignmentV2 assignment,
+            DataKeyAssignmentStatus current,
+            DataKeyAssignmentStatus requested) {
+<span class="pc bpc" id="L191" title="3 of 6 branches missed.">        boolean activationFromPending = current == DataKeyAssignmentStatus.PENDING_APPROVAL</span>
+                &amp;&amp; (requested == DataKeyAssignmentStatus.SCHEDULED
+                    || requested == DataKeyAssignmentStatus.ACTIVE);
+<span class="pc bpc" id="L194" title="1 of 2 branches missed.">        if (!activationFromPending) {</span>
+<span class="nc" id="L195">            return;</span>
+        }
+<span class="fc" id="L197">        boolean makerCheckerEnabled = securityPolicyRepository.findById(institutionId)</span>
+<span class="pc" id="L198">                .map(policy -&gt; policy.isMakerCheckerEnabled())</span>
+<span class="fc" id="L199">                .orElse(true);</span>
+<span class="pc bpc" id="L200" title="2 of 4 branches missed.">        if (makerCheckerEnabled &amp;&amp; assignment.getApprovalRequestId() == null) {</span>
+<span class="fc" id="L201">            throw new IllegalArgumentException(</span>
+                    &quot;An approved approvalRequestId is required before activating this assignment&quot;);
+        }
+<span class="nc" id="L204">    }</span>
+
+    private static void validateDates(OffsetDateTime effectiveFrom, OffsetDateTime effectiveTo) {
+<span class="pc bpc" id="L207" title="3 of 4 branches missed.">        if (effectiveTo != null &amp;&amp; !effectiveTo.isAfter(effectiveFrom)) {</span>
+<span class="nc" id="L208">            throw new IllegalArgumentException(&quot;effectiveTo must be later than effectiveFrom&quot;);</span>
+        }
+<span class="fc" id="L210">    }</span>
+
+    private static String trimToNull(String value) {
+<span class="pc bpc" id="L213" title="3 of 4 branches missed.">        return value == null || value.isBlank() ? null : value.trim();</span>
+    }
+
+    private static DataKeyAssignmentV2Response toResponse(InstitutionDataKeyAssignmentV2 assignment) {
+<span class="fc" id="L217">        return DataKeyAssignmentV2Response.builder()</span>
+<span class="fc" id="L218">                .assignmentId(assignment.getAssignmentId())</span>
+<span class="fc" id="L219">                .institutionId(assignment.getInstitutionId())</span>
+<span class="fc" id="L220">                .hsmKeyId(assignment.getHsmKeyId())</span>
+<span class="fc" id="L221">                .keyPurpose(assignment.getKeyPurpose())</span>
+<span class="fc" id="L222">                .dataClassification(assignment.getDataClassification())</span>
+<span class="fc" id="L223">                .assignmentVersion(assignment.getAssignmentVersion())</span>
+<span class="fc" id="L224">                .assignmentStatus(assignment.getAssignmentStatus())</span>
+<span class="fc" id="L225">                .effectiveFrom(assignment.getEffectiveFrom())</span>
+<span class="fc" id="L226">                .effectiveTo(assignment.getEffectiveTo())</span>
+<span class="fc" id="L227">                .rotationPolicyReference(assignment.getRotationPolicyReference())</span>
+<span class="fc" id="L228">                .approvalRequestId(assignment.getApprovalRequestId())</span>
+<span class="fc" id="L229">                .createdAt(assignment.getCreatedAt())</span>
+<span class="fc" id="L230">                .updatedAt(assignment.getUpdatedAt())</span>
+<span class="fc" id="L231">                .createdBy(assignment.getCreatedBy())</span>
+<span class="fc" id="L232">                .updatedBy(assignment.getUpdatedBy())</span>
+<span class="fc" id="L233">                .build();</span>
+    }
+
+    private static Map&lt;DataKeyAssignmentStatus, Set&lt;DataKeyAssignmentStatus&gt;&gt; transitions() {
+<span class="fc" id="L237">        Map&lt;DataKeyAssignmentStatus, Set&lt;DataKeyAssignmentStatus&gt;&gt; transitions =</span>
+                new EnumMap&lt;&gt;(DataKeyAssignmentStatus.class);
+<span class="fc" id="L239">        transitions.put(DataKeyAssignmentStatus.PENDING_APPROVAL,</span>
+<span class="fc" id="L240">                Set.of(DataKeyAssignmentStatus.SCHEDULED, DataKeyAssignmentStatus.ACTIVE,</span>
+                        DataKeyAssignmentStatus.REVOKED));
+<span class="fc" id="L242">        transitions.put(DataKeyAssignmentStatus.SCHEDULED,</span>
+<span class="fc" id="L243">                Set.of(DataKeyAssignmentStatus.ACTIVE, DataKeyAssignmentStatus.SUSPENDED,</span>
+                        DataKeyAssignmentStatus.REVOKED));
+<span class="fc" id="L245">        transitions.put(DataKeyAssignmentStatus.ACTIVE,</span>
+<span class="fc" id="L246">                Set.of(DataKeyAssignmentStatus.DECRYPT_ONLY, DataKeyAssignmentStatus.SUSPENDED,</span>
+                        DataKeyAssignmentStatus.RETIRED, DataKeyAssignmentStatus.REVOKED));
+<span class="fc" id="L248">        transitions.put(DataKeyAssignmentStatus.DECRYPT_ONLY,</span>
+<span class="fc" id="L249">                Set.of(DataKeyAssignmentStatus.RETIRED, DataKeyAssignmentStatus.REVOKED));</span>
+<span class="fc" id="L250">        transitions.put(DataKeyAssignmentStatus.SUSPENDED,</span>
+<span class="fc" id="L251">                Set.of(DataKeyAssignmentStatus.ACTIVE, DataKeyAssignmentStatus.RETIRED,</span>
+                        DataKeyAssignmentStatus.REVOKED));
+<span class="fc" id="L253">        transitions.put(DataKeyAssignmentStatus.RETIRED, Set.of());</span>
+<span class="fc" id="L254">        transitions.put(DataKeyAssignmentStatus.REVOKED, Set.of());</span>
+<span class="fc" id="L255">        return Map.copyOf(transitions);</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.15.202606040825</span></div></body></html>

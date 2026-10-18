@@ -1,0 +1,108 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>OutboxRetentionJob.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">CMS Core Service</a> &gt; <a href="index.source.html" class="el_package">com.xenomi.cms.core.v2.event.publisher</a> &gt; <span class="el_source">OutboxRetentionJob.java</span></div><h1>OutboxRetentionJob.java</h1><pre class="source lang-java linenums">package com.xenomi.cms.core.v2.event.publisher;
+
+import java.time.OffsetDateTime;
+import java.time.ZoneOffset;
+import java.util.TimeZone;
+import java.util.concurrent.ScheduledFuture;
+import java.util.concurrent.atomic.AtomicBoolean;
+
+import com.xenomi.cms.core.v2.event.config.EventV2Config;
+import com.xenomi.cms.core.v2.event.config.OutboxV2Properties;
+import com.xenomi.cms.core.v2.event.repository.OutboxEventV2Repository;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+import org.springframework.beans.factory.annotation.Qualifier;
+import org.springframework.context.SmartLifecycle;
+import org.springframework.scheduling.concurrent.ThreadPoolTaskScheduler;
+import org.springframework.scheduling.support.CronTrigger;
+import org.springframework.stereotype.Component;
+import org.springframework.transaction.PlatformTransactionManager;
+import org.springframework.transaction.support.TransactionTemplate;
+
+/**
+ * Purges PUBLISHED outbox rows past their retention in bounded batches, each in its own
+ * short transaction so the table is never locked for long. DEAD_LETTER rows are kept until
+ * an operator resolves them; {@code card_event} remains the permanent audit record.
+ */
+@Component
+public class OutboxRetentionJob implements SmartLifecycle {
+
+<span class="fc" id="L30">    private static final Logger log = LoggerFactory.getLogger(OutboxRetentionJob.class);</span>
+
+    private final OutboxV2Properties properties;
+    private final OutboxEventV2Repository repository;
+    private final ThreadPoolTaskScheduler scheduler;
+    private final TransactionTemplate transactionTemplate;
+<span class="fc" id="L36">    private final AtomicBoolean running = new AtomicBoolean(false);</span>
+    private volatile ScheduledFuture&lt;?&gt; handle;
+
+    public OutboxRetentionJob(
+            OutboxV2Properties properties,
+            OutboxEventV2Repository repository,
+            @Qualifier(EventV2Config.OUTBOX_SCHEDULER) ThreadPoolTaskScheduler scheduler,
+<span class="fc" id="L43">            PlatformTransactionManager transactionManager) {</span>
+<span class="fc" id="L44">        this.properties = properties;</span>
+<span class="fc" id="L45">        this.repository = repository;</span>
+<span class="fc" id="L46">        this.scheduler = scheduler;</span>
+<span class="fc" id="L47">        this.transactionTemplate = new TransactionTemplate(transactionManager);</span>
+<span class="fc" id="L48">    }</span>
+
+    @Override
+    public void start() {
+<span class="fc" id="L52">        OutboxV2Properties.Retention retention = properties.getRetention();</span>
+<span class="fc bfc" id="L53" title="All 4 branches covered.">        if (!properties.isEnabled() || !retention.isEnabled()) {</span>
+<span class="fc" id="L54">            return;</span>
+        }
+<span class="fc bfc" id="L56" title="All 2 branches covered.">        if (!running.compareAndSet(false, true)) {</span>
+<span class="fc" id="L57">            return;</span>
+        }
+<span class="fc" id="L59">        handle = scheduler.schedule(this::purgeSafely,</span>
+<span class="fc" id="L60">                new CronTrigger(retention.getCron(), TimeZone.getTimeZone(&quot;UTC&quot;)));</span>
+<span class="fc" id="L61">        log.info(&quot;Outbox retention scheduled cron='{}' retention={} batch={}&quot;,</span>
+<span class="fc" id="L62">                retention.getCron(), retention.getPublishedRetention(), retention.getPurgeBatchSize());</span>
+<span class="fc" id="L63">    }</span>
+
+    @Override
+    public void stop() {
+<span class="pc bpc" id="L67" title="2 of 4 branches missed.">        if (running.compareAndSet(true, false) &amp;&amp; handle != null) {</span>
+<span class="fc" id="L68">            handle.cancel(false);</span>
+        }
+<span class="fc" id="L70">    }</span>
+
+    @Override
+    public boolean isRunning() {
+<span class="fc" id="L74">        return running.get();</span>
+    }
+
+    @Override
+    public int getPhase() {
+<span class="fc" id="L79">        return Integer.MAX_VALUE - 512;</span>
+    }
+
+    void purgeSafely() {
+        try {
+<span class="nc" id="L84">            long deleted = purge();</span>
+<span class="nc bnc" id="L85" title="All 2 branches missed.">            if (deleted &gt; 0) {</span>
+<span class="nc" id="L86">                log.info(&quot;Outbox retention purged {} published events&quot;, deleted);</span>
+            }
+<span class="fc" id="L88">        } catch (Exception exception) {</span>
+<span class="fc" id="L89">            log.error(&quot;Outbox retention purge failed&quot;, exception);</span>
+<span class="nc" id="L90">        }</span>
+<span class="fc" id="L91">    }</span>
+
+    long purge() {
+<span class="fc" id="L94">        OutboxV2Properties.Retention retention = properties.getRetention();</span>
+<span class="fc" id="L95">        OffsetDateTime cutoff = OffsetDateTime.now(ZoneOffset.UTC).minus(retention.getPublishedRetention());</span>
+<span class="fc" id="L96">        long total = 0;</span>
+<span class="pc bpc" id="L97" title="1 of 2 branches missed.">        while (running.get()) {</span>
+<span class="fc" id="L98">            Integer deleted = transactionTemplate.execute(status -&gt;</span>
+<span class="fc" id="L99">                    repository.purgePublishedBefore(cutoff, Math.max(1, retention.getPurgeBatchSize())));</span>
+<span class="pc bpc" id="L100" title="1 of 4 branches missed.">            if (deleted == null || deleted == 0) {</span>
+<span class="fc" id="L101">                break;</span>
+            }
+<span class="fc" id="L103">            total += deleted;</span>
+<span class="fc" id="L104">        }</span>
+<span class="fc" id="L105">        return total;</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.15.202606040825</span></div></body></html>

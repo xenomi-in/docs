@@ -1,0 +1,87 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>RetryPolicy.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">CMS Core Service</a> &gt; <a href="index.source.html" class="el_package">com.xenomi.cms.core.v2.event.publisher</a> &gt; <span class="el_source">RetryPolicy.java</span></div><h1>RetryPolicy.java</h1><pre class="source lang-java linenums">package com.xenomi.cms.core.v2.event.publisher;
+
+import java.time.Duration;
+import java.time.OffsetDateTime;
+import java.util.concurrent.ThreadLocalRandom;
+
+import com.xenomi.cms.core.v2.event.config.OutboxV2Properties;
+import com.xenomi.cms.core.v2.event.entity.OutboxEventV2;
+import com.xenomi.cms.core.v2.event.model.OutboxPublicationStatus;
+
+/**
+ * Applies a publish outcome to an outbox row.
+ *
+ * &lt;p&gt;Transient failures are retried with capped exponential backoff plus jitter for as long
+ * as the configured retry window allows, measured from the first failure. A hub outage of
+ * any length shorter than the window therefore never dead-letters an event. Permanent
+ * failures (contract rejections) dead-letter immediately for operator review.
+ */
+public final class RetryPolicy {
+
+    private final OutboxV2Properties.Retry retry;
+
+<span class="fc" id="L23">    public RetryPolicy(OutboxV2Properties.Retry retry) {</span>
+<span class="fc" id="L24">        this.retry = retry;</span>
+<span class="fc" id="L25">    }</span>
+
+    public void apply(OutboxEventV2 event, NotificationPublishResult result, OffsetDateTime now) {
+<span class="fc" id="L28">        event.setLockedUntil(null);</span>
+<span class="fc" id="L29">        event.setLockedBy(null);</span>
+<span class="pc bpc" id="L30" title="1 of 4 branches missed.">        switch (result.outcome()) {</span>
+            case PUBLISHED -&gt; {
+<span class="fc" id="L32">                event.setPublicationStatus(OutboxPublicationStatus.PUBLISHED);</span>
+<span class="fc" id="L33">                event.setPublishedAt(now);</span>
+<span class="fc" id="L34">                event.setNextRetryAt(null);</span>
+<span class="fc" id="L35">                event.setLastError(null);</span>
+<span class="fc" id="L36">            }</span>
+<span class="fc" id="L37">            case PERMANENT_FAILURE -&gt; deadLetter(event, result.error());</span>
+<span class="fc" id="L38">            case TRANSIENT_FAILURE -&gt; transientFailure(event, result.error(), now);</span>
+        }
+<span class="fc" id="L40">    }</span>
+
+    private void transientFailure(OutboxEventV2 event, String error, OffsetDateTime now) {
+<span class="fc bfc" id="L43" title="All 2 branches covered.">        if (event.getFirstFailedAt() == null) {</span>
+<span class="fc" id="L44">            event.setFirstFailedAt(now);</span>
+        }
+<span class="fc" id="L46">        int attempt = event.getRetryCount() + 1;</span>
+<span class="fc" id="L47">        event.setRetryCount(attempt);</span>
+<span class="fc" id="L48">        event.setLastError(truncate(error));</span>
+
+<span class="fc" id="L50">        OffsetDateTime windowEnd = event.getFirstFailedAt().plus(retry.getWindow());</span>
+<span class="fc bfc" id="L51" title="All 2 branches covered.">        if (!now.isBefore(windowEnd)) {</span>
+<span class="fc" id="L52">            deadLetter(event, &quot;retry window &quot; + retry.getWindow() + &quot; exhausted; last error: &quot; + error);</span>
+<span class="fc" id="L53">            return;</span>
+        }
+<span class="fc" id="L55">        Duration delay = backoff(attempt);</span>
+<span class="fc" id="L56">        OffsetDateTime next = now.plus(delay);</span>
+<span class="fc" id="L57">        event.setPublicationStatus(OutboxPublicationStatus.FAILED);</span>
+<span class="fc bfc" id="L58" title="All 2 branches covered.">        event.setNextRetryAt(next.isAfter(windowEnd) ? windowEnd : next);</span>
+<span class="fc" id="L59">    }</span>
+
+    Duration backoff(int attempt) {
+<span class="fc" id="L62">        long initial = Math.max(1, retry.getInitialBackoff().toMillis());</span>
+<span class="fc" id="L63">        long max = Math.max(initial, retry.getMaxBackoff().toMillis());</span>
+<span class="fc" id="L64">        int shift = Math.min(Math.max(attempt - 1, 0), 30);</span>
+<span class="fc" id="L65">        long base = Math.min(max, initial &lt;&lt; shift);</span>
+<span class="fc" id="L66">        double jitter = Math.max(0d, Math.min(1d, retry.getJitter()));</span>
+<span class="fc bfc" id="L67" title="All 2 branches covered.">        if (jitter == 0d) {</span>
+<span class="fc" id="L68">            return Duration.ofMillis(base);</span>
+        }
+<span class="fc" id="L70">        double factor = 1d + (ThreadLocalRandom.current().nextDouble(-jitter, jitter));</span>
+<span class="fc" id="L71">        return Duration.ofMillis(Math.max(initial, Math.min(max, Math.round(base * factor))));</span>
+    }
+
+    private static void deadLetter(OutboxEventV2 event, String error) {
+<span class="fc" id="L75">        event.setPublicationStatus(OutboxPublicationStatus.DEAD_LETTER);</span>
+<span class="fc" id="L76">        event.setNextRetryAt(null);</span>
+<span class="fc" id="L77">        event.setLastError(truncate(error));</span>
+<span class="fc" id="L78">    }</span>
+
+    private static String truncate(String value) {
+<span class="pc bpc" id="L81" title="1 of 2 branches missed.">        if (value == null) {</span>
+<span class="nc" id="L82">            return null;</span>
+        }
+<span class="pc bpc" id="L84" title="1 of 2 branches missed.">        return value.length() &lt;= 1000 ? value : value.substring(0, 1000);</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.15.202606040825</span></div></body></html>

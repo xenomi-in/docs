@@ -1,0 +1,22 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>SamePanRenewalWorkerV2.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">CMS Core Service</a> &gt; <a href="index.source.html" class="el_package">com.xenomi.cms.core.v2.card.lifecycle.command</a> &gt; <span class="el_source">SamePanRenewalWorkerV2.java</span></div><h1>SamePanRenewalWorkerV2.java</h1><pre class="source lang-java linenums">package com.xenomi.cms.core.v2.card.lifecycle.command;
+
+import org.springframework.beans.factory.DisposableBean;
+import org.springframework.beans.factory.SmartInitializingSingleton;
+import org.springframework.stereotype.Component;
+import java.util.concurrent.*;
+
+@Component
+public class SamePanRenewalWorkerV2 implements SmartInitializingSingleton, DisposableBean {
+    private final SamePanRenewalWorkV2 work;
+<span class="pc" id="L11">    private final ScheduledExecutorService executor=Executors.newSingleThreadScheduledExecutor(r-&gt;{var t=new Thread(r,&quot;cms-v2-renewal&quot;);t.setDaemon(true);return t;});</span>
+<span class="fc" id="L12">    private static final org.slf4j.Logger log=org.slf4j.LoggerFactory.getLogger(SamePanRenewalWorkerV2.class);</span>
+<span class="fc" id="L13">    public SamePanRenewalWorkerV2(SamePanRenewalWorkV2 work) { this.work=work; }</span>
+<span class="nc" id="L14">    public void afterSingletonsInstantiated() { executor.scheduleWithFixedDelay(this::poll,5,5,TimeUnit.SECONDS); }</span>
+    private void poll() {
+<span class="fc bfc" id="L16" title="All 2 branches covered.">        try { for(var id:work.pending()) try { work.process(id); }</span>
+<span class="pc" id="L17">            catch(RuntimeException failure) { log.warn(&quot;Renewal operation {} remains unresolved ({})&quot;,id,failure.getClass().getSimpleName()); }</span>
+<span class="fc" id="L18">        } catch(RuntimeException failure) { log.warn(&quot;Renewal poll unavailable ({})&quot;,failure.getClass().getSimpleName()); }</span>
+<span class="fc" id="L19">    }</span>
+<span class="fc" id="L20">    public void destroy() { executor.shutdownNow(); }</span>
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.15.202606040825</span></div></body></html>

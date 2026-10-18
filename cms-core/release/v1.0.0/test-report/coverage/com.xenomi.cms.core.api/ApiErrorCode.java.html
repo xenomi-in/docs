@@ -1,0 +1,51 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>ApiErrorCode.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">CMS Core Service</a> &gt; <a href="index.source.html" class="el_package">com.xenomi.cms.core.api</a> &gt; <span class="el_source">ApiErrorCode.java</span></div><h1>ApiErrorCode.java</h1><pre class="source lang-java linenums">package com.xenomi.cms.core.api;
+
+import org.springframework.http.HttpStatus;
+
+/**
+ * Versioned, machine-readable CMS API error catalogue.
+ *
+ * &lt;p&gt;Names are part of the public API contract and must not be renamed or
+ * reused with a different meaning within an API major version.&lt;/p&gt;
+ */
+<span class="fc" id="L11">public enum ApiErrorCode {</span>
+<span class="fc" id="L12">    BAD_REQUEST(HttpStatus.BAD_REQUEST),</span>
+<span class="fc" id="L13">    VALIDATION_ERROR(HttpStatus.BAD_REQUEST),</span>
+<span class="fc" id="L14">    INVALID_TOKEN(HttpStatus.BAD_REQUEST),</span>
+<span class="fc" id="L15">    IDEMPOTENCY_KEY_REQUIRED(HttpStatus.BAD_REQUEST),</span>
+<span class="fc" id="L16">    PROHIBITED_HEADER(HttpStatus.BAD_REQUEST),</span>
+<span class="fc" id="L17">    IMMUTABLE_FIELD(HttpStatus.BAD_REQUEST),</span>
+
+<span class="fc" id="L19">    UNAUTHENTICATED(HttpStatus.UNAUTHORIZED),</span>
+<span class="fc" id="L20">    INVALID_TOKEN_CLAIMS(HttpStatus.UNAUTHORIZED),</span>
+
+<span class="fc" id="L22">    ACCESS_DENIED(HttpStatus.FORBIDDEN),</span>
+<span class="fc" id="L23">    TENANT_ACCESS_DENIED(HttpStatus.FORBIDDEN),</span>
+<span class="fc" id="L24">    PLATFORM_ACCESS_REQUIRED(HttpStatus.FORBIDDEN),</span>
+
+<span class="fc" id="L26">    NOT_FOUND(HttpStatus.NOT_FOUND),</span>
+<span class="fc" id="L27">    CONFLICT(HttpStatus.CONFLICT),</span>
+<span class="fc" id="L28">    VERSION_CONFLICT(HttpStatus.CONFLICT),</span>
+<span class="fc" id="L29">    IDEMPOTENCY_CONFLICT(HttpStatus.CONFLICT),</span>
+<span class="fc" id="L30">    IDEMPOTENCY_IN_PROGRESS(HttpStatus.CONFLICT),</span>
+
+<span class="fc" id="L32">    REQUEST_BODY_TOO_LARGE(HttpStatus.PAYLOAD_TOO_LARGE),</span>
+<span class="fc" id="L33">    UNSUPPORTED_MEDIA_TYPE(HttpStatus.UNSUPPORTED_MEDIA_TYPE),</span>
+
+<span class="fc" id="L35">    BUSINESS_RULE_VIOLATION(HttpStatus.UNPROCESSABLE_ENTITY),</span>
+<span class="fc" id="L36">    PIN_CHANGE_NOT_ALLOWED(HttpStatus.UNPROCESSABLE_ENTITY),</span>
+<span class="fc" id="L37">    INVALID_CURRENT_PIN(HttpStatus.UNPROCESSABLE_ENTITY),</span>
+
+<span class="fc" id="L39">    INTERNAL_ERROR(HttpStatus.INTERNAL_SERVER_ERROR);</span>
+
+    private final HttpStatus status;
+
+<span class="fc" id="L43">    ApiErrorCode(HttpStatus status) {</span>
+<span class="fc" id="L44">        this.status = status;</span>
+<span class="fc" id="L45">    }</span>
+
+    public HttpStatus status() {
+<span class="fc" id="L48">        return status;</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.15.202606040825</span></div></body></html>

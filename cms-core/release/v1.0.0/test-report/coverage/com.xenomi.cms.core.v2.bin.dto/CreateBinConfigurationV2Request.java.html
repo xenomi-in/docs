@@ -1,0 +1,105 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>CreateBinConfigurationV2Request.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">CMS Core Service</a> &gt; <a href="index.source.html" class="el_package">com.xenomi.cms.core.v2.bin.dto</a> &gt; <span class="el_source">CreateBinConfigurationV2Request.java</span></div><h1>CreateBinConfigurationV2Request.java</h1><pre class="source lang-java linenums">package com.xenomi.cms.core.v2.bin.dto;
+
+import java.time.LocalDate;
+
+import com.xenomi.cms.core.v2.bin.model.BinStatus;
+import com.xenomi.cms.core.v2.bin.model.BinType;
+import com.xenomi.cms.core.v2.bin.model.CardNetwork;
+import com.xenomi.cms.core.v2.bin.model.CardTechnology;
+import com.xenomi.cms.core.v2.bin.model.PinMethod;
+
+import io.swagger.v3.oas.annotations.media.Schema;
+import jakarta.validation.constraints.Max;
+import jakarta.validation.constraints.Min;
+import jakarta.validation.constraints.NotBlank;
+import jakarta.validation.constraints.NotNull;
+import jakarta.validation.constraints.Pattern;
+import jakarta.validation.constraints.Size;
+import jakarta.validation.constraints.AssertTrue;
+import lombok.AllArgsConstructor;
+import lombok.Builder;
+import lombok.Data;
+import lombok.NoArgsConstructor;
+
+@Data
+@Builder
+@NoArgsConstructor
+@AllArgsConstructor
+@Schema(description = &quot;CMS V2 BIN configuration creation request&quot;)
+public class CreateBinConfigurationV2Request {
+
+    @NotBlank
+    @Pattern(regexp = &quot;(?:[0-9]{6}|[0-9]{8})&quot;, message = &quot;binNumber must contain exactly 6 or 8 digits&quot;)
+    private String binNumber;
+
+    @Schema(description = &quot;BIN length; only ISO/IIN lengths 6 and 8 are supported&quot;,
+            example = &quot;6&quot;, minimum = &quot;6&quot;, maximum = &quot;8&quot;)
+    private Integer binLength;
+
+    @NotNull
+    @Schema(description = &quot;Total numeric PAN length, including BIN and check digit; only 16 or 19 is supported&quot;,
+            example = &quot;16&quot;, allowableValues = {&quot;16&quot;, &quot;19&quot;}, requiredMode = Schema.RequiredMode.REQUIRED)
+    private Integer panLength;
+
+    @AssertTrue(message = &quot;panLength must be 16 or 19&quot;)
+    @Schema(hidden = true)
+    public boolean isPanLengthValid() {
+<span class="nc bnc" id="L47" title="All 6 branches missed.">        return panLength != null &amp;&amp; (panLength == 16 || panLength == 19);</span>
+    }
+
+    @NotNull
+    private CardNetwork cardNetwork;
+
+    @NotNull
+    private BinType binType;
+
+    @NotBlank
+    @Size(max = 20)
+    @Schema(description = &quot;Scheme/issuer-defined product class&quot;, example = &quot;CLASSIC&quot;)
+    private String cardProductClass;
+
+    private CardTechnology cardTechnology;
+
+    private PinMethod pinMethod;
+
+    @Min(4)
+    @Max(12)
+    private Integer pinLength;
+
+    @Pattern(regexp = &quot;[A-Za-z]{3}&quot;)
+    private String issuingCountryCode;
+
+    @Pattern(regexp = &quot;[A-Za-z]{3}&quot;)
+    private String defaultCurrencyCode;
+
+    private Boolean defaultChipEnabled;
+    private Boolean defaultDomesticContactEnabled;
+    private Boolean defaultDomesticContactlessEnabled;
+    private Boolean defaultDomesticEcommerceEnabled;
+    private Boolean defaultInternationalEnabled;
+    private BinStatus binStatus;
+
+    @NotNull
+    private LocalDate effectiveFrom;
+
+    private LocalDate effectiveTo;
+
+    @Size(max = 50)
+    @Schema(description = &quot;Network-assigned program identifier, for example the NPCI program record reference&quot;)
+    private String networkProgramIdentifier;
+
+    @Size(max = 100)
+    @Schema(description = &quot;Network certification or onboarding record reference&quot;)
+    private String networkCertificationReference;
+
+    @Pattern(regexp = &quot;[D=]&quot;)
+    private String track2Separator;
+
+    @Size(max = 20)
+    private String decimalizationTable;
+
+    @Min(0)
+    @Max(9)
+    private Integer pvki;
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.15.202606040825</span></div></body></html>

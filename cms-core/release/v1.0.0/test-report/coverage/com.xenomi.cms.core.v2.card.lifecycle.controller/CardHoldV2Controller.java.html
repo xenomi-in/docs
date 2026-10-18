@@ -1,0 +1,28 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>CardHoldV2Controller.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">CMS Core Service</a> &gt; <a href="index.source.html" class="el_package">com.xenomi.cms.core.v2.card.lifecycle.controller</a> &gt; <span class="el_source">CardHoldV2Controller.java</span></div><h1>CardHoldV2Controller.java</h1><pre class="source lang-java linenums">package com.xenomi.cms.core.v2.card.lifecycle.controller;
+
+import java.util.UUID;
+import com.xenomi.cms.core.api.ApiResponseEnvelope;
+import com.xenomi.cms.core.api.ApiResponseHelper;
+import com.xenomi.cms.core.v2.card.lifecycle.dto.CardHoldV2Request;
+import com.xenomi.cms.core.v2.card.lifecycle.dto.CardLifecycleActionV2Response;
+import com.xenomi.cms.core.v2.card.lifecycle.service.CardHoldV2Service;
+import io.swagger.v3.oas.annotations.tags.Tag;
+import jakarta.validation.Valid;
+import jakarta.validation.constraints.NotBlank;
+import jakarta.validation.constraints.Size;
+import org.springframework.http.ResponseEntity;
+import org.springframework.validation.annotation.Validated;
+import org.springframework.web.bind.annotation.*;
+
+@Validated
+@RestController
+@RequestMapping(&quot;/cms/api/v2/institutions/{institutionId}/cards/{cardId}/holds&quot;)
+@Tag(name = &quot;V2 - Cards&quot;, description = &quot;Tenant-scoped card issuance and lifecycle&quot;)
+public class CardHoldV2Controller {
+    private final CardHoldV2Service service;
+<span class="fc" id="L23">    public CardHoldV2Controller(CardHoldV2Service service) { this.service = service; }</span>
+<span class="fc" id="L24">    @PostMapping(&quot;/place&quot;) public ResponseEntity&lt;ApiResponseEnvelope&lt;CardLifecycleActionV2Response&gt;&gt; place(@PathVariable UUID institutionId,@PathVariable UUID cardId,@Valid @RequestBody CardHoldV2Request request,@RequestHeader(&quot;Idempotency-Key&quot;) @NotBlank @Size(max=128) String key,@RequestHeader(value=&quot;X-Request-Id&quot;,required=false) String requestId,@RequestHeader(&quot;X-Actor-Id&quot;) @NotBlank String actor) { return ApiResponseHelper.ok(service.place(institutionId,cardId,request,key,requestId,actor)); }</span>
+<span class="fc" id="L25">    @PostMapping(&quot;/escalate&quot;) public ResponseEntity&lt;ApiResponseEnvelope&lt;CardLifecycleActionV2Response&gt;&gt; escalate(@PathVariable UUID institutionId,@PathVariable UUID cardId,@Valid @RequestBody CardHoldV2Request request,@RequestHeader(&quot;Idempotency-Key&quot;) @NotBlank @Size(max=128) String key,@RequestHeader(value=&quot;X-Request-Id&quot;,required=false) String requestId,@RequestHeader(&quot;X-Actor-Id&quot;) @NotBlank String actor) { return ApiResponseHelper.ok(service.escalate(institutionId,cardId,request,key,requestId,actor)); }</span>
+<span class="fc" id="L26">    @PostMapping(&quot;/release&quot;) public ResponseEntity&lt;ApiResponseEnvelope&lt;CardLifecycleActionV2Response&gt;&gt; release(@PathVariable UUID institutionId,@PathVariable UUID cardId,@Valid @RequestBody CardHoldV2Request request,@RequestHeader(&quot;Idempotency-Key&quot;) @NotBlank @Size(max=128) String key,@RequestHeader(value=&quot;X-Request-Id&quot;,required=false) String requestId,@RequestHeader(&quot;X-Actor-Id&quot;) @NotBlank String actor) { return ApiResponseHelper.ok(service.release(institutionId,cardId,request,key,requestId,actor)); }</span>
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.15.202606040825</span></div></body></html>

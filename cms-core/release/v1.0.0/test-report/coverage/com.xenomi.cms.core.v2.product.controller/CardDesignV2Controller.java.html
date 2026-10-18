@@ -1,0 +1,69 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>CardDesignV2Controller.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">CMS Core Service</a> &gt; <a href="index.source.html" class="el_package">com.xenomi.cms.core.v2.product.controller</a> &gt; <span class="el_source">CardDesignV2Controller.java</span></div><h1>CardDesignV2Controller.java</h1><pre class="source lang-java linenums">package com.xenomi.cms.core.v2.product.controller;
+
+import java.util.UUID;
+import com.xenomi.cms.core.api.ApiResponseEnvelope;
+import com.xenomi.cms.core.api.ApiResponseHelper;
+import com.xenomi.cms.core.api.PageableDefaults;
+import com.xenomi.cms.core.api.PagedResponse;
+import com.xenomi.cms.core.v2.bin.model.CardNetwork;
+import com.xenomi.cms.core.v2.product.dto.CardDesignV2Response;
+import com.xenomi.cms.core.v2.product.dto.CreateCardDesignV2Request;
+import com.xenomi.cms.core.v2.product.dto.UpdateCardDesignV2Request;
+import com.xenomi.cms.core.v2.product.model.CardDesignStatus;
+import com.xenomi.cms.core.v2.product.service.CardDesignV2Service;
+import io.swagger.v3.oas.annotations.Operation;
+import io.swagger.v3.oas.annotations.tags.Tag;
+import jakarta.validation.Valid;
+import jakarta.validation.constraints.NotBlank;
+import jakarta.validation.constraints.Size;
+import org.springframework.data.domain.PageRequest;
+import org.springframework.data.domain.Pageable;
+import org.springframework.data.domain.Sort;
+import org.springframework.http.ResponseEntity;
+import org.springframework.validation.annotation.Validated;
+import org.springframework.web.bind.annotation.*;
+
+@Validated
+@RestController
+@RequestMapping(&quot;/cms/api/v2/institutions/{institutionId}/card-designs&quot;)
+@Tag(name = &quot;V2 - Issuance Profiles&quot;, description = &quot;Card designs, assignments, technology capabilities and CVM rules&quot;)
+public class CardDesignV2Controller {
+    private static final String ACTOR_HEADER = &quot;X-Actor-Id&quot;;
+    private final CardDesignV2Service service;
+<span class="fc" id="L33">    public CardDesignV2Controller(CardDesignV2Service service) { this.service = service; }</span>
+
+    @PostMapping
+    @Operation(operationId = &quot;createCardDesignV2&quot;, summary = &quot;Create a draft card design version&quot;)
+    public ResponseEntity&lt;ApiResponseEnvelope&lt;CardDesignV2Response&gt;&gt; create(
+            @PathVariable UUID institutionId, @Valid @RequestBody CreateCardDesignV2Request request,
+            @RequestHeader(ACTOR_HEADER) @NotBlank @Size(max = 100) String actorId) {
+<span class="fc" id="L40">        return ApiResponseHelper.created(service.create(institutionId, request, actorId));</span>
+    }
+    @GetMapping
+    @Operation(operationId = &quot;listCardDesignsV2&quot;, summary = &quot;List institution card designs&quot;)
+    public ResponseEntity&lt;ApiResponseEnvelope&lt;PagedResponse&lt;CardDesignV2Response&gt;&gt;&gt; list(
+            @PathVariable UUID institutionId,
+            @RequestParam(required = false) CardNetwork cardNetwork,
+            @RequestParam(required = false) CardDesignStatus designStatus,
+            @RequestParam(required = false) Integer page, @RequestParam(required = false) Integer limit) {
+<span class="fc" id="L49">        Pageable base = PageableDefaults.ofOneBased(page, limit);</span>
+<span class="fc" id="L50">        Pageable pageable = PageRequest.of(base.getPageNumber(), base.getPageSize(),</span>
+<span class="fc" id="L51">                Sort.by(Sort.Direction.ASC, &quot;designCode&quot;, &quot;designVersion&quot;));</span>
+<span class="fc" id="L52">        return ApiResponseHelper.ok(PagedResponse.of(service.search(institutionId, cardNetwork, designStatus, pageable)));</span>
+    }
+    @GetMapping(&quot;/{designId}&quot;)
+    @Operation(operationId = &quot;getCardDesignV2&quot;, summary = &quot;Get a card design version&quot;)
+    public ResponseEntity&lt;ApiResponseEnvelope&lt;CardDesignV2Response&gt;&gt; get(
+            @PathVariable UUID institutionId, @PathVariable UUID designId) {
+<span class="fc" id="L58">        return ApiResponseHelper.ok(service.get(institutionId, designId));</span>
+    }
+    @PostMapping(&quot;/{designId}/actions/update&quot;)
+    @Operation(operationId = &quot;updateCardDesignV2&quot;, summary = &quot;Update or transition a card design&quot;)
+    public ResponseEntity&lt;ApiResponseEnvelope&lt;CardDesignV2Response&gt;&gt; update(
+            @PathVariable UUID institutionId, @PathVariable UUID designId,
+            @Valid @RequestBody UpdateCardDesignV2Request request,
+            @RequestHeader(ACTOR_HEADER) @NotBlank @Size(max = 100) String actorId) {
+<span class="fc" id="L66">        return ApiResponseHelper.ok(service.update(institutionId, designId, request, actorId));</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.15.202606040825</span></div></body></html>

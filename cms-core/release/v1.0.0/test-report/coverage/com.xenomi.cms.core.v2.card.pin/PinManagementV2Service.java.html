@@ -1,0 +1,48 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>PinManagementV2Service.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">CMS Core Service</a> &gt; <a href="index.source.html" class="el_package">com.xenomi.cms.core.v2.card.pin</a> &gt; <span class="el_source">PinManagementV2Service.java</span></div><h1>PinManagementV2Service.java</h1><pre class="source lang-java linenums">package com.xenomi.cms.core.v2.card.pin;
+
+import java.util.UUID;
+
+import com.xenomi.cms.core.exception.ResourceNotFoundException;
+import com.xenomi.cms.core.v2.card.pin.dto.CardPinHistoryV2Response;
+import com.xenomi.cms.core.v2.card.pin.entity.PinHistoryV2;
+import com.xenomi.cms.core.v2.card.pin.repository.PinHistoryV2Repository;
+import com.xenomi.cms.core.v2.card.repository.CardV2Repository;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
+import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
+
+/**
+ * Read-side access to the CMS PIN audit trail.
+ *
+ * &lt;p&gt;PIN initialization, change, and reset are owned by {@code SwitchPinService}; CMS does not
+ * retain or mutate PIN verification material locally.&lt;/p&gt;
+ */
+@Service
+public class PinManagementV2Service {
+    private final CardV2Repository cards;
+    private final PinHistoryV2Repository history;
+
+<span class="fc" id="L26">    public PinManagementV2Service(CardV2Repository cards, PinHistoryV2Repository history) {</span>
+<span class="fc" id="L27">        this.cards = cards;</span>
+<span class="fc" id="L28">        this.history = history;</span>
+<span class="fc" id="L29">    }</span>
+
+    @Transactional(readOnly = true)
+    public Page&lt;CardPinHistoryV2Response&gt; history(
+            UUID institutionId, UUID cardId, Pageable pageable) {
+<span class="fc bfc" id="L34" title="All 2 branches covered.">        if (cards.findByCardIdAndInstitutionId(cardId, institutionId).isEmpty()) {</span>
+<span class="fc" id="L35">            throw new ResourceNotFoundException(&quot;Card&quot;, cardId.toString());</span>
+        }
+<span class="fc" id="L37">        return history.findByInstitutionIdAndCardIdOrderByOccurredAtDesc(</span>
+<span class="fc" id="L38">                institutionId, cardId, pageable).map(this::historyResponse);</span>
+    }
+
+    private CardPinHistoryV2Response historyResponse(PinHistoryV2 event) {
+<span class="fc" id="L42">        return new CardPinHistoryV2Response(event.getPinHistoryId(), event.getCardId(),</span>
+<span class="fc" id="L43">                event.getOperationType(), event.getPreviousStatus(), event.getResultingStatus(),</span>
+<span class="fc" id="L44">                event.getOccurredAt(), event.getActorReference(), event.getOperationReason(),</span>
+<span class="fc" id="L45">                event.getCorrelationId());</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.15.202606040825</span></div></body></html>

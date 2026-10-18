@@ -1,0 +1,108 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>ProductEventSink.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">CMS Core Service</a> &gt; <a href="index.source.html" class="el_package">com.xenomi.cms.core.v2.event.catalog</a> &gt; <span class="el_source">ProductEventSink.java</span></div><h1>ProductEventSink.java</h1><pre class="source lang-java linenums">package com.xenomi.cms.core.v2.event.catalog;
+
+import java.util.Map;
+
+import com.xenomi.cms.core.v2.event.mapper.PayloadValues;
+import com.xenomi.cms.core.v2.event.model.EventTypes;
+import com.xenomi.cms.core.v2.event.model.IdempotencyKeys;
+import com.xenomi.cms.core.v2.event.model.NotificationPriority;
+import com.xenomi.cms.core.v2.event.model.OutboxEventCommand;
+import com.xenomi.cms.core.v2.event.writer.OutboxEventWriter;
+import com.xenomi.cms.core.v2.product.dto.CardProductV2Response;
+import com.xenomi.cms.core.v2.product.model.ProductStatus;
+import org.springframework.stereotype.Component;
+
+@Component
+public class ProductEventSink {
+
+    private final OutboxEventWriter writer;
+
+<span class="fc" id="L20">    public ProductEventSink(OutboxEventWriter writer) {</span>
+<span class="fc" id="L21">        this.writer = writer;</span>
+<span class="fc" id="L22">    }</span>
+
+    public void onCreated(CardProductV2Response product, String correlationId) {
+<span class="pc bpc" id="L25" title="1 of 2 branches missed.">        if (product == null) {</span>
+<span class="nc" id="L26">            return;</span>
+        }
+<span class="fc" id="L28">        writer.enqueue(command(product, EventTypes.PRODUCT_CREATED, correlationId,</span>
+<span class="fc" id="L29">                IdempotencyKeys.of(product.getInstitutionId(), EventTypes.PRODUCT_CREATED, product.getProductId()),</span>
+<span class="fc" id="L30">                payload(product, null, product.getProductStatus(), null)));</span>
+<span class="fc" id="L31">    }</span>
+
+    /**
+     * @param before snapshot taken before the update ran; {@code null} when unknown
+     */
+    public void onUpdated(CardProductV2Response product, ProductSnapshot before, String correlationId) {
+<span class="pc bpc" id="L37" title="1 of 2 branches missed.">        if (product == null) {</span>
+<span class="nc" id="L38">            return;</span>
+        }
+<span class="pc bpc" id="L40" title="1 of 2 branches missed.">        ProductStatus previousStatus = before == null ? null : before.status();</span>
+<span class="pc bpc" id="L41" title="1 of 4 branches missed.">        boolean statusChanged = previousStatus != null &amp;&amp; previousStatus != product.getProductStatus();</span>
+<span class="pc bpc" id="L42" title="1 of 6 branches missed.">        boolean changed = before == null || statusChanged || before.differsFrom(product);</span>
+<span class="fc bfc" id="L43" title="All 2 branches covered.">        if (!changed) {</span>
+<span class="fc" id="L44">            return;</span>
+        }
+<span class="fc" id="L46">        Object version = PayloadValues.instant(product.getUpdatedAt());</span>
+<span class="fc" id="L47">        writer.enqueue(command(product, EventTypes.PRODUCT_UPDATED, correlationId,</span>
+<span class="fc" id="L48">                IdempotencyKeys.of(product.getInstitutionId(), EventTypes.PRODUCT_UPDATED,</span>
+<span class="fc" id="L49">                        product.getProductId(), version),</span>
+<span class="fc" id="L50">                payload(product, previousStatus, product.getProductStatus(), &quot;PRODUCT_UPDATED&quot;)));</span>
+<span class="fc bfc" id="L51" title="All 2 branches covered.">        if (!statusChanged) {</span>
+<span class="fc" id="L52">            return;</span>
+        }
+<span class="fc" id="L54">        writer.enqueue(command(product, EventTypes.PRODUCT_STATUS_CHANGED, correlationId,</span>
+<span class="fc" id="L55">                IdempotencyKeys.of(product.getInstitutionId(), EventTypes.PRODUCT_STATUS_CHANGED,</span>
+<span class="fc" id="L56">                        product.getProductId(), previousStatus, product.getProductStatus(), version),</span>
+<span class="fc" id="L57">                payload(product, previousStatus, product.getProductStatus(), &quot;STATUS_CHANGED&quot;)));</span>
+<span class="pc bpc" id="L58" title="1 of 2 branches missed.">        if (product.getProductStatus() == ProductStatus.RETIRED) {</span>
+<span class="fc" id="L59">            writer.enqueue(command(product, EventTypes.PRODUCT_DEACTIVATED, correlationId,</span>
+<span class="fc" id="L60">                    IdempotencyKeys.of(product.getInstitutionId(), EventTypes.PRODUCT_DEACTIVATED,</span>
+<span class="fc" id="L61">                            product.getProductId(), version),</span>
+<span class="fc" id="L62">                    payload(product, previousStatus, product.getProductStatus(), &quot;RETIRED&quot;)));</span>
+        }
+<span class="fc" id="L64">    }</span>
+
+    private static OutboxEventCommand command(CardProductV2Response product, String eventType,
+            String correlationId, java.util.UUID idempotencyKey, Map&lt;String, Object&gt; payload) {
+<span class="fc" id="L68">        return OutboxEventCommand.builder()</span>
+<span class="fc" id="L69">                .institutionId(product.getInstitutionId())</span>
+<span class="fc" id="L70">                .eventType(eventType)</span>
+<span class="fc" id="L71">                .aggregateType(EventTypes.AGGREGATE_PRODUCT)</span>
+<span class="fc" id="L72">                .aggregateId(product.getProductId())</span>
+<span class="fc" id="L73">                .customerId(null)</span>
+<span class="fc" id="L74">                .correlationId(correlationId)</span>
+<span class="fc" id="L75">                .priority(NotificationPriority.MEDIUM)</span>
+<span class="fc" id="L76">                .idempotencyKey(idempotencyKey)</span>
+<span class="fc" id="L77">                .payload(payload)</span>
+<span class="fc" id="L78">                .build();</span>
+    }
+
+    private static Map&lt;String, Object&gt; payload(CardProductV2Response product,
+            ProductStatus oldStatus, ProductStatus newStatus, String reason) {
+<span class="fc" id="L83">        return PayloadValues.entries(</span>
+<span class="fc" id="L84">                &quot;productId&quot;, PayloadValues.uuid(product.getProductId()),</span>
+<span class="fc" id="L85">                &quot;institutionId&quot;, PayloadValues.uuid(product.getInstitutionId()),</span>
+<span class="fc" id="L86">                &quot;productCode&quot;, product.getProductCode(),</span>
+<span class="fc" id="L87">                &quot;productName&quot;, product.getProductName(),</span>
+<span class="fc" id="L88">                &quot;cardNetwork&quot;, PayloadValues.name(product.getCardNetwork()),</span>
+<span class="fc" id="L89">                &quot;fundingType&quot;, PayloadValues.name(product.getFundingType()),</span>
+<span class="fc" id="L90">                &quot;cardVariant&quot;, PayloadValues.name(product.getCardVariant()),</span>
+<span class="fc" id="L91">                &quot;oldStatus&quot;, PayloadValues.name(oldStatus),</span>
+<span class="fc" id="L92">                &quot;newStatus&quot;, PayloadValues.name(newStatus),</span>
+                &quot;reason&quot;, reason,
+<span class="fc" id="L94">                &quot;changedBy&quot;, product.getUpdatedBy(),</span>
+<span class="fc" id="L95">                &quot;changedAt&quot;, PayloadValues.instant(product.getUpdatedAt()));</span>
+    }
+
+    /** Mutable product fields captured before an update, used to suppress no-op events. */
+<span class="fc" id="L99">    public record ProductSnapshot(String name, String description, ProductStatus status) {</span>
+
+        boolean differsFrom(CardProductV2Response after) {
+<span class="fc bfc" id="L102" title="All 2 branches covered.">            return !java.util.Objects.equals(name, after.getProductName())</span>
+<span class="pc bpc" id="L103" title="1 of 2 branches missed.">                    || !java.util.Objects.equals(description, after.getDescription())</span>
+<span class="pc bpc" id="L104" title="1 of 2 branches missed.">                    || status != after.getProductStatus();</span>
+        }
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.15.202606040825</span></div></body></html>

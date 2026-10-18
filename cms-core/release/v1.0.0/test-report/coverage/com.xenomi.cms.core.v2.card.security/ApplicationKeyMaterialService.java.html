@@ -1,0 +1,163 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>ApplicationKeyMaterialService.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">CMS Core Service</a> &gt; <a href="index.source.html" class="el_package">com.xenomi.cms.core.v2.card.security</a> &gt; <span class="el_source">ApplicationKeyMaterialService.java</span></div><h1>ApplicationKeyMaterialService.java</h1><pre class="source lang-java linenums">package com.xenomi.cms.core.v2.card.security;
+
+import java.security.MessageDigest;
+import java.security.NoSuchAlgorithmException;
+import java.security.SecureRandom;
+import java.nio.charset.StandardCharsets;
+import java.time.Duration;
+import java.time.OffsetDateTime;
+import java.time.ZoneOffset;
+import java.util.Arrays;
+import java.util.HexFormat;
+import java.util.Map;
+import java.util.UUID;
+import java.util.concurrent.ConcurrentHashMap;
+
+import com.xenomi.cms.core.v2.hsm.model.HsmKeyType;
+import com.xenomi.cms.core.v2.institution.entity.HsmKeyReferenceV2;
+import jakarta.annotation.PreDestroy;
+import org.springframework.beans.factory.annotation.Value;
+import org.springframework.jdbc.core.JdbcTemplate;
+import org.springframework.stereotype.Service;
+
+/** Resolves short-lived clear application keys from HSM-wrapped database material. */
+@Service
+class ApplicationKeyMaterialService {
+    private static final int KEY_BYTES = 32;
+
+    private final ApplicationKeyMaterialV2Repository repository;
+    private final HsmApplicationKeyWrapper wrapper;
+    private final JdbcTemplate jdbcTemplate;
+<span class="fc" id="L31">    private final SecureRandom random = new SecureRandom();</span>
+<span class="fc" id="L32">    private final Map&lt;UUID, CacheEntry&gt; cache = new ConcurrentHashMap&lt;&gt;();</span>
+    private final long cacheTtlNanos;
+
+    ApplicationKeyMaterialService(ApplicationKeyMaterialV2Repository repository,
+            HsmApplicationKeyWrapper wrapper,
+            JdbcTemplate jdbcTemplate,
+<span class="fc" id="L38">            @Value(&quot;${cms.card-security.application-key-cache-ttl:PT5M}&quot;) Duration cacheTtl) {</span>
+<span class="fc" id="L39">        this.repository = repository;</span>
+<span class="fc" id="L40">        this.wrapper = wrapper;</span>
+<span class="fc" id="L41">        this.jdbcTemplate = jdbcTemplate;</span>
+<span class="pc bpc" id="L42" title="2 of 4 branches missed.">        if (cacheTtl.isZero() || cacheTtl.isNegative()) {</span>
+<span class="nc" id="L43">            throw new IllegalArgumentException(&quot;Application key cache TTL must be positive&quot;);</span>
+        }
+<span class="fc" id="L45">        this.cacheTtlNanos = cacheTtl.toNanos();</span>
+<span class="fc" id="L46">    }</span>
+
+    byte[] resolve(HsmKeyReferenceV2 hsmKey, ApplicationKeyUse use) {
+<span class="fc" id="L49">        validate(hsmKey, use);</span>
+<span class="fc" id="L50">        long now = System.nanoTime();</span>
+<span class="fc" id="L51">        CacheEntry cached = cache.get(hsmKey.getKeyId());</span>
+<span class="pc bpc" id="L52" title="1 of 4 branches missed.">        if (cached != null &amp;&amp; cached.expiresAtNanos &gt; now) return cached.copy();</span>
+<span class="fc" id="L53">        synchronized (cache) {</span>
+<span class="fc" id="L54">            cached = cache.get(hsmKey.getKeyId());</span>
+<span class="pc bpc" id="L55" title="3 of 4 branches missed.">            if (cached != null &amp;&amp; cached.expiresAtNanos &gt; System.nanoTime()) return cached.copy();</span>
+<span class="pc bpc" id="L56" title="1 of 2 branches missed.">            if (cached != null) cached.destroy();</span>
+<span class="fc" id="L57">            byte[] clearKey = loadOrCreate(hsmKey, use);</span>
+<span class="fc" id="L58">            cache.put(hsmKey.getKeyId(), new CacheEntry(clearKey,</span>
+<span class="fc" id="L59">                    System.nanoTime() + cacheTtlNanos));</span>
+<span class="fc" id="L60">            byte[] result = clearKey.clone();</span>
+<span class="fc" id="L61">            Arrays.fill(clearKey, (byte) 0);</span>
+<span class="fc" id="L62">            return result;</span>
+        }
+    }
+
+    private byte[] loadOrCreate(HsmKeyReferenceV2 hsmKey, ApplicationKeyUse use) {
+<span class="fc" id="L67">        return repository</span>
+<span class="fc" id="L68">                .findByHsmKeyIdAndInstitutionIdAndKeyUse(</span>
+<span class="fc" id="L69">                        hsmKey.getKeyId(), hsmKey.getInstitutionId(), use)</span>
+<span class="fc" id="L70">                .map(material -&gt; unwrap(material, hsmKey, use))</span>
+<span class="fc" id="L71">                .orElseGet(() -&gt; create(hsmKey, use));</span>
+    }
+
+    private byte[] unwrap(ApplicationKeyMaterialV2 material,
+            HsmKeyReferenceV2 hsmKey, ApplicationKeyUse use) {
+<span class="pc bpc" id="L76" title="1 of 2 branches missed.">        if (!use.algorithm().equals(material.getAlgorithm())) {</span>
+<span class="nc" id="L77">            throw new CardSecurityException(&quot;Unsupported application key algorithm&quot;);</span>
+        }
+<span class="fc" id="L79">        String clearHex = wrapper.unwrap(material.getWrappedKeyMaterial(), hsmKey);</span>
+        byte[] clearKey;
+        try {
+<span class="fc" id="L82">            clearKey = HexFormat.of().parseHex(clearHex);</span>
+<span class="nc" id="L83">        } catch (IllegalArgumentException exception) {</span>
+<span class="nc" id="L84">            throw new CardSecurityException(&quot;HSM returned invalid wrapped key material&quot;, exception);</span>
+<span class="fc" id="L85">        }</span>
+<span class="pc bpc" id="L86" title="1 of 2 branches missed.">        if (clearKey.length != KEY_BYTES</span>
+<span class="pc bpc" id="L87" title="1 of 2 branches missed.">                || !MessageDigest.isEqual(</span>
+<span class="fc" id="L88">                        checksum(clearKey).getBytes(StandardCharsets.US_ASCII),</span>
+<span class="fc" id="L89">                        material.getKeyChecksum().getBytes(StandardCharsets.US_ASCII))) {</span>
+<span class="nc" id="L90">            Arrays.fill(clearKey, (byte) 0);</span>
+<span class="nc" id="L91">            throw new CardSecurityException(&quot;Wrapped application key integrity check failed&quot;);</span>
+        }
+<span class="fc" id="L93">        return clearKey;</span>
+    }
+
+    private byte[] create(HsmKeyReferenceV2 hsmKey, ApplicationKeyUse use) {
+<span class="fc" id="L97">        byte[] clearKey = new byte[KEY_BYTES];</span>
+<span class="fc" id="L98">        random.nextBytes(clearKey);</span>
+        try {
+<span class="fc" id="L100">            String clearHex = HexFormat.of().withUpperCase().formatHex(clearKey);</span>
+<span class="fc" id="L101">            String wrapped = wrapper.wrap(clearHex, hsmKey);</span>
+<span class="fc" id="L102">            int inserted = jdbcTemplate.update(&quot;&quot;&quot;</span>
+                    INSERT INTO cms_v2.application_key_material
+                        (hsm_key_id, institution_id, key_use, algorithm,
+                         wrapped_key_material, key_checksum, created_at)
+                    VALUES (?, ?, ?, ?, ?, ?, ?)
+                    ON CONFLICT (hsm_key_id) DO NOTHING
+<span class="fc" id="L108">                    &quot;&quot;&quot;, hsmKey.getKeyId(), hsmKey.getInstitutionId(), use.name(),</span>
+<span class="fc" id="L109">                    use.algorithm(), wrapped, checksum(clearKey),</span>
+<span class="fc" id="L110">                    OffsetDateTime.now(ZoneOffset.UTC));</span>
+<span class="pc bpc" id="L111" title="1 of 2 branches missed.">            if (inserted == 1) {</span>
+<span class="fc" id="L112">                byte[] result = clearKey;</span>
+<span class="fc" id="L113">                clearKey = null;</span>
+<span class="fc" id="L114">                return result;</span>
+            }
+<span class="nc" id="L116">            ApplicationKeyMaterialV2 winner = repository</span>
+<span class="nc" id="L117">                    .findByHsmKeyIdAndInstitutionIdAndKeyUse(</span>
+<span class="nc" id="L118">                            hsmKey.getKeyId(), hsmKey.getInstitutionId(), use)</span>
+<span class="nc" id="L119">                    .orElseThrow(() -&gt; new CardSecurityException(</span>
+                            &quot;Application key material could not be provisioned&quot;));
+<span class="nc" id="L121">            return unwrap(winner, hsmKey, use);</span>
+        } finally {
+<span class="pc bpc" id="L123" title="1 of 2 branches missed.">            if (clearKey != null) Arrays.fill(clearKey, (byte) 0);</span>
+        }
+    }
+
+    private static void validate(HsmKeyReferenceV2 key, ApplicationKeyUse use) {
+<span class="pc bpc" id="L128" title="1 of 2 branches missed.">        HsmKeyType expected = use == ApplicationKeyUse.CARD_DATA_ENCRYPTION</span>
+<span class="pc" id="L129">                ? HsmKeyType.DEK : HsmKeyType.HMAC;</span>
+<span class="pc bpc" id="L130" title="1 of 2 branches missed.">        if (key.getKeyType() != expected) {</span>
+<span class="nc" id="L131">            throw new CardSecurityException(use + &quot; requires an institution &quot; + expected + &quot; key&quot;);</span>
+        }
+<span class="fc" id="L133">    }</span>
+
+    private static String checksum(byte[] value) {
+        try {
+<span class="fc" id="L137">            return HexFormat.of().withUpperCase().formatHex(</span>
+<span class="fc" id="L138">                    MessageDigest.getInstance(&quot;SHA-256&quot;).digest(value));</span>
+<span class="nc" id="L139">        } catch (NoSuchAlgorithmException impossible) {</span>
+<span class="nc" id="L140">            throw new IllegalStateException(impossible);</span>
+        }
+    }
+
+    @PreDestroy
+    void destroy() {
+<span class="fc" id="L146">        cache.values().forEach(CacheEntry::destroy);</span>
+<span class="fc" id="L147">        cache.clear();</span>
+<span class="fc" id="L148">    }</span>
+
+    private static final class CacheEntry {
+        private final byte[] key;
+        private final long expiresAtNanos;
+
+<span class="fc" id="L154">        private CacheEntry(byte[] key, long expiresAtNanos) {</span>
+<span class="fc" id="L155">            this.key = key.clone();</span>
+<span class="fc" id="L156">            this.expiresAtNanos = expiresAtNanos;</span>
+<span class="fc" id="L157">        }</span>
+
+<span class="fc" id="L159">        private byte[] copy() { return key.clone(); }</span>
+<span class="fc" id="L160">        private void destroy() { Arrays.fill(key, (byte) 0); }</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.15.202606040825</span></div></body></html>

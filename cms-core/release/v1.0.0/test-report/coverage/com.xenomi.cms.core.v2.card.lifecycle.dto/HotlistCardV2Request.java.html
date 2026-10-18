@@ -1,0 +1,33 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>HotlistCardV2Request.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">CMS Core Service</a> &gt; <a href="index.source.html" class="el_package">com.xenomi.cms.core.v2.card.lifecycle.dto</a> &gt; <span class="el_source">HotlistCardV2Request.java</span></div><h1>HotlistCardV2Request.java</h1><pre class="source lang-java linenums">package com.xenomi.cms.core.v2.card.lifecycle.dto;
+
+import com.fasterxml.jackson.annotation.JsonIgnore;
+import com.xenomi.cms.core.v2.card.lifecycle.model.CardHotlistReason;
+import io.swagger.v3.oas.annotations.media.Schema;
+import jakarta.validation.constraints.AssertTrue;
+import jakarta.validation.constraints.NotNull;
+import jakarta.validation.constraints.Size;
+import lombok.AllArgsConstructor;
+import lombok.Builder;
+import lombok.Data;
+import lombok.NoArgsConstructor;
+
+@Data @Builder @NoArgsConstructor @AllArgsConstructor
+@Schema(description = &quot;Immediately hot-lists a card. Never include PAN, PIN, CVV or track data.&quot;)
+public class HotlistCardV2Request {
+    @NotNull
+    @Schema(description = &quot;Why the card must be blocked&quot;, example = &quot;STOLEN&quot;)
+    private CardHotlistReason reason;
+
+    @Size(max = 250)
+    @Schema(description = &quot;Non-sensitive explanation. Required when reason is OTHER.&quot;,
+            example = &quot;Customer reported an unrecognized physical-card event&quot;)
+    private String reasonDetail;
+
+    @JsonIgnore
+    @AssertTrue(message = &quot;reasonDetail is required when reason is OTHER&quot;)
+    public boolean isReasonDetailValid() {
+<span class="pc bpc" id="L29" title="1 of 4 branches missed.">        return reason != CardHotlistReason.OTHER</span>
+<span class="pc bnc" id="L30" title="All 2 branches missed.">                || (reasonDetail != null &amp;&amp; !reasonDetail.isBlank());</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.15.202606040825</span></div></body></html>

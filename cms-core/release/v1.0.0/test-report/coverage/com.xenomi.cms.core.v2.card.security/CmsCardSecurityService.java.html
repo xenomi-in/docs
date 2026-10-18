@@ -1,0 +1,305 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>CmsCardSecurityService.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">CMS Core Service</a> &gt; <a href="index.source.html" class="el_package">com.xenomi.cms.core.v2.card.security</a> &gt; <span class="el_source">CmsCardSecurityService.java</span></div><h1>CmsCardSecurityService.java</h1><pre class="source lang-java linenums">package com.xenomi.cms.core.v2.card.security;
+
+import java.math.BigInteger;
+import java.nio.charset.StandardCharsets;
+import java.security.MessageDigest;
+import java.security.NoSuchAlgorithmException;
+import java.security.SecureRandom;
+import java.time.LocalDate;
+import java.time.OffsetDateTime;
+import java.time.ZoneOffset;
+import java.time.format.DateTimeFormatter;
+import java.util.HexFormat;
+import java.util.List;
+import java.util.Set;
+import java.util.UUID;
+import java.util.function.Function;
+
+import com.xenomi.cms.core.bin.util.LuhnAlgorithm;
+import com.xenomi.cms.core.v2.bin.entity.BinRangeV2;
+import com.xenomi.cms.core.v2.bin.model.AllocationStrategy;
+import com.xenomi.cms.core.v2.bin.model.BinRangeStatus;
+import com.xenomi.cms.core.v2.card.entity.CardV2;
+import com.xenomi.cms.core.v2.card.entity.PanAllocationV2;
+import com.xenomi.cms.core.v2.card.repository.PanAllocationV2Repository;
+import com.xenomi.cms.core.v2.hsm.entity.BinHsmKeyAssignmentV2;
+import com.xenomi.cms.core.v2.hsm.model.BinHsmKeyAssignmentStatus;
+import com.xenomi.cms.core.v2.hsm.model.HsmKeyScope;
+import com.xenomi.cms.core.v2.hsm.model.HsmKeyStatus;
+import com.xenomi.cms.core.v2.hsm.model.HsmKeyType;
+import com.xenomi.cms.core.v2.hsm.model.KeyPurpose;
+import com.xenomi.cms.core.v2.hsm.repository.BinHsmKeyAssignmentV2Repository;
+import com.xenomi.cms.core.v2.institution.entity.HsmKeyReferenceV2;
+import com.xenomi.cms.core.v2.institution.entity.InstitutionDataKeyAssignmentV2;
+import com.xenomi.cms.core.v2.institution.model.DataKeyAssignmentStatus;
+import com.xenomi.cms.core.v2.institution.repository.HsmKeyReferenceV2Repository;
+import com.xenomi.cms.core.v2.institution.repository.InstitutionDataKeyAssignmentV2Repository;
+import org.springframework.stereotype.Service;
+
+/** Keeps clear PAN, CVV and Track 2 transient and resolves all keys from approved assignments. */
+@Service
+public class CmsCardSecurityService {
+<span class="fc" id="L42">    private static final DateTimeFormatter EXPIRY_YYMM = DateTimeFormatter.ofPattern(&quot;yyMM&quot;);</span>
+    private static final int MAX_RANDOM_ATTEMPTS = 200;
+
+    private final InstitutionDataKeyAssignmentV2Repository institutionAssignmentRepository;
+    private final BinHsmKeyAssignmentV2Repository binAssignmentRepository;
+    private final HsmKeyReferenceV2Repository keyRepository;
+    private final PanAllocationV2Repository panAllocationRepository;
+    private final CardHsmOperations hsm;
+<span class="fc" id="L50">    private final SecureRandom random = new SecureRandom();</span>
+
+    public CmsCardSecurityService(
+            InstitutionDataKeyAssignmentV2Repository institutionAssignmentRepository,
+            BinHsmKeyAssignmentV2Repository binAssignmentRepository,
+            HsmKeyReferenceV2Repository keyRepository,
+            PanAllocationV2Repository panAllocationRepository,
+<span class="fc" id="L57">            CardHsmOperations hsm) {</span>
+<span class="fc" id="L58">        this.institutionAssignmentRepository = institutionAssignmentRepository;</span>
+<span class="fc" id="L59">        this.binAssignmentRepository = binAssignmentRepository;</span>
+<span class="fc" id="L60">        this.keyRepository = keyRepository;</span>
+<span class="fc" id="L61">        this.panAllocationRepository = panAllocationRepository;</span>
+<span class="fc" id="L62">        this.hsm = hsm;</span>
+<span class="fc" id="L63">    }</span>
+
+    public CardSecurityMaterial generate(UUID institutionId, BinRangeV2 range,
+            LocalDate expiryDate, String serviceCode, String track2Separator) {
+<span class="fc" id="L67">        KeySet keys = activeKeys(institutionId, range.getBinId());</span>
+<span class="fc" id="L68">        PanCandidate candidate = allocatePan(institutionId, range, keys.hmacKey());</span>
+<span class="fc" id="L69">        recordAllocation(range, candidate);</span>
+<span class="fc" id="L70">        return protect(candidate.pan(), candidate.sequenceValue(), expiryDate, serviceCode,</span>
+                track2Separator, keys);
+    }
+
+    /** Metadata validation only; no HSM command. */
+    public void validateIssuanceKeys(UUID institutionId, UUID binId) {
+<span class="nc" id="L76">        activeKeys(institutionId, binId);</span>
+<span class="nc" id="L77">    }</span>
+
+    /** Candidate was durably reserved before this call. Never mutate allocation counters here. */
+    public CardSecurityMaterial generateReserved(UUID institutionId, BinRangeV2 range, long offset,
+            LocalDate expiryDate, String serviceCode) {
+<span class="nc bnc" id="L82" title="All 2 branches missed.">        if (org.springframework.transaction.support.TransactionSynchronizationManager.isActualTransactionActive()) {</span>
+<span class="nc" id="L83">            throw new IllegalStateException(&quot;Credential preparation must run outside a database transaction&quot;);</span>
+        }
+<span class="nc" id="L85">        var value = new BigInteger(range.getRangeStart()).add(BigInteger.valueOf(offset));</span>
+<span class="nc" id="L86">        String pan = leftPad(value.toString(), range.getRangeStart().length());</span>
+<span class="nc bnc" id="L87" title="All 6 branches missed.">        if (offset &lt; 0 || value.compareTo(new BigInteger(range.getRangeEnd())) &gt; 0 || !LuhnAlgorithm.validate(pan)) {</span>
+<span class="nc" id="L88">            throw new CardSecurityException(&quot;Invalid reserved PAN candidate&quot;);</span>
+        }
+<span class="nc bnc" id="L90" title="All 2 branches missed.">        Long sequenceValue = range.getAllocationStrategy() == AllocationStrategy.SEQUENTIAL ? offset : null;</span>
+<span class="nc" id="L91">        return protect(pan, sequenceValue, expiryDate, serviceCode, &quot;D&quot;, activeKeys(institutionId, range.getBinId()));</span>
+    }
+
+    public CardSecurityMaterial reissueSamePan(UUID institutionId, CardV2 source,
+            PanAllocationV2 allocation, LocalDate expiryDate, String serviceCode,
+            String track2Separator) {
+<span class="fc" id="L97">        CardSecurityMaterial material = prepareSamePan(institutionId, source, allocation, expiryDate, serviceCode, track2Separator);</span>
+<span class="fc" id="L98">        allocation.setPanHmac(material.panHmac());</span>
+<span class="fc" id="L99">        allocation.setPanFingerprint(material.panFingerprint());</span>
+<span class="fc" id="L100">        allocation.setSecurePanReference(material.secureDataReference());</span>
+<span class="fc" id="L101">        panAllocationRepository.save(allocation);</span>
+<span class="fc" id="L102">        return material;</span>
+    }
+
+    /** Prepares successor credentials without changing the PAN family; caller owns durable finalization. */
+    public CardSecurityMaterial prepareSamePan(UUID institutionId, CardV2 source,
+            PanAllocationV2 allocation, LocalDate expiryDate, String serviceCode, String track2Separator) {
+<span class="fc" id="L108">        HsmKeyReferenceV2 sourceEncryptionKey = historicalKey(institutionId,</span>
+<span class="fc" id="L109">                source.getDataEncryptionKeyId(), HsmKeyType.DEK);</span>
+<span class="fc" id="L110">        String pan = hsm.decrypt(source.getPanEncrypted(), sourceEncryptionKey);</span>
+<span class="pc bpc" id="L111" title="3 of 6 branches missed.">        if (pan == null || !pan.matches(&quot;[0-9]{12,19}&quot;) || !LuhnAlgorithm.validate(pan)) {</span>
+<span class="nc" id="L112">            throw new CardSecurityException(&quot;The source PAN could not be recovered securely&quot;);</span>
+        }
+<span class="fc" id="L114">        HsmKeyReferenceV2 sourceHmacKey = historicalKey(institutionId,</span>
+<span class="fc" id="L115">                source.getPanHmacKeyId(), HsmKeyType.HMAC);</span>
+<span class="pc bpc" id="L116" title="1 of 2 branches missed.">        String recoveredHmac = source.getPanEncrypted().startsWith(&quot;HSM1:&quot;)</span>
+<span class="fc" id="L117">                ? hsm.generateLegacyPanHmac(pan, sourceHmacKey)</span>
+<span class="pc" id="L118">                : hsm.generatePanHmac(pan, sourceHmacKey);</span>
+<span class="pc bpc" id="L119" title="1 of 2 branches missed.">        if (!MessageDigest.isEqual(recoveredHmac.getBytes(StandardCharsets.UTF_8),</span>
+<span class="fc" id="L120">                allocation.getPanHmac().getBytes(StandardCharsets.UTF_8))) {</span>
+<span class="nc" id="L121">            throw new CardSecurityException(&quot;The source PAN identity check failed&quot;);</span>
+        }
+<span class="fc" id="L123">        KeySet keys = activeKeys(institutionId, source.getBinId());</span>
+<span class="fc" id="L124">        CardSecurityMaterial material = protect(pan, allocation.getSequenceValue(),</span>
+                expiryDate, serviceCode, track2Separator, keys);
+<span class="fc" id="L126">        return material;</span>
+    }
+
+    /**
+     * Exposes a recovered PAN only to a synchronous secure operation. The callback must not
+     * persist, return, or log the clear PAN.
+     */
+    public &lt;T&gt; T withDecryptedPan(UUID institutionId, CardV2 card, Function&lt;String, T&gt; operation) {
+<span class="nc" id="L134">        HsmKeyReferenceV2 encryptionKey = historicalKey(</span>
+<span class="nc" id="L135">                institutionId, card.getDataEncryptionKeyId(), HsmKeyType.DEK);</span>
+<span class="nc" id="L136">        String pan = hsm.decrypt(card.getPanEncrypted(), encryptionKey);</span>
+<span class="nc bnc" id="L137" title="All 6 branches missed.">        if (pan == null || !pan.matches(&quot;[0-9]{12,19}&quot;) || !LuhnAlgorithm.validate(pan)) {</span>
+<span class="nc" id="L138">            throw new CardSecurityException(&quot;The card PAN could not be recovered securely&quot;);</span>
+        }
+<span class="nc" id="L140">        return operation.apply(pan);</span>
+    }
+
+    private CardSecurityMaterial protect(String pan, Long sequenceValue, LocalDate expiryDate,
+            String serviceCode, String separator, KeySet keys) {
+<span class="fc" id="L145">        String expiry = expiryDate.format(EXPIRY_YYMM);</span>
+<span class="fc" id="L146">        CardHsmOperations.CvvPair cvv = hsm.generateCvv(</span>
+<span class="fc" id="L147">                pan, expiry, requireServiceCode(serviceCode), keys.cvvKey());</span>
+<span class="fc" id="L148">        String track2 = pan + normalizeSeparator(separator) + expiry</span>
+<span class="fc" id="L149">                + requireServiceCode(serviceCode) + &quot;0000&quot; + cvv.cvv1() + &quot;0&quot;;</span>
+<span class="fc" id="L150">        String hmacValue = hsm.generatePanHmac(pan, keys.hmacKey());</span>
+<span class="fc" id="L151">        return new CardSecurityMaterial(mask(pan), pan.substring(pan.length() - 4),</span>
+<span class="fc" id="L152">                fingerprint(hmacValue), hmacValue, sequenceValue,</span>
+<span class="fc" id="L153">                hsm.encrypt(pan, keys.encryptionKey()),</span>
+<span class="fc" id="L154">                hsm.encrypt(cvv.cvv1(), keys.encryptionKey()),</span>
+<span class="fc" id="L155">                hsm.encrypt(cvv.cvv2(), keys.encryptionKey()),</span>
+<span class="fc" id="L156">                hsm.encrypt(track2, keys.encryptionKey()),</span>
+<span class="fc" id="L157">                keys.encryptionKey().getKeyId(),</span>
+<span class="fc" id="L158">                keys.hmacKey().getKeyId(),</span>
+<span class="fc" id="L159">                keys.cvvKey().getKeyId(), &quot;cms-secure-card-data:&quot; + UUID.randomUUID());</span>
+    }
+
+    private PanCandidate allocatePan(UUID institutionId, BinRangeV2 range,
+            HsmKeyReferenceV2 hmacKey) {
+<span class="pc bpc" id="L164" title="1 of 2 branches missed.">        if (range.getIssuedPanCount() == null) range.setIssuedPanCount(0L);</span>
+<span class="pc bpc" id="L165" title="1 of 2 branches missed.">        if (range.getNextSequenceValue() == null) range.setNextSequenceValue(0L);</span>
+<span class="pc bpc" id="L166" title="1 of 2 branches missed.">        if (range.getUsableCapacity() == null</span>
+<span class="fc bfc" id="L167" title="All 2 branches covered.">                || range.getIssuedPanCount() &gt;= range.getUsableCapacity()) {</span>
+<span class="fc" id="L168">            throw new CardSecurityException(&quot;BIN range has no remaining PAN capacity&quot;);</span>
+        }
+<span class="fc" id="L170">        BigInteger start = new BigInteger(range.getRangeStart());</span>
+<span class="fc" id="L171">        BigInteger end = new BigInteger(range.getRangeEnd());</span>
+<span class="pc bpc" id="L172" title="1 of 2 branches missed.">        if (start.compareTo(end) &gt; 0) throw new CardSecurityException(&quot;Invalid BIN range bounds&quot;);</span>
+<span class="pc bpc" id="L173" title="1 of 2 branches missed.">        if (range.getAllocationStrategy() == AllocationStrategy.SEQUENTIAL) {</span>
+<span class="fc" id="L174">            long sequence = range.getNextSequenceValue();</span>
+<span class="pc" id="L175">            for (long offset = sequence; ; offset++) {</span>
+<span class="fc" id="L176">                BigInteger value = start.add(BigInteger.valueOf(offset));</span>
+<span class="pc bpc" id="L177" title="1 of 2 branches missed.">                if (value.compareTo(end) &gt; 0) throw new CardSecurityException(&quot;BIN range is exhausted&quot;);</span>
+<span class="fc" id="L178">                String pan = leftPad(value.toString(), range.getRangeStart().length());</span>
+<span class="pc bpc" id="L179" title="1 of 2 branches missed.">                if (LuhnAlgorithm.validate(pan)</span>
+<span class="pc bpc" id="L180" title="1 of 2 branches missed.">                        &amp;&amp; unique(institutionId, pan, hmacKey)) return new PanCandidate(pan, offset);</span>
+            }
+        }
+<span class="nc" id="L183">        BigInteger width = end.subtract(start).add(BigInteger.ONE);</span>
+<span class="nc bnc" id="L184" title="All 2 branches missed.">        for (int attempt = 0; attempt &lt; MAX_RANDOM_ATTEMPTS; attempt++) {</span>
+            BigInteger offset;
+<span class="nc bnc" id="L186" title="All 2 branches missed.">            do offset = new BigInteger(width.bitLength(), random); while (offset.compareTo(width) &gt;= 0);</span>
+<span class="nc" id="L187">            String pan = leftPad(start.add(offset).toString(), range.getRangeStart().length());</span>
+<span class="nc bnc" id="L188" title="All 4 branches missed.">            if (LuhnAlgorithm.validate(pan) &amp;&amp; unique(institutionId, pan, hmacKey)) {</span>
+<span class="nc" id="L189">                return new PanCandidate(pan, null);</span>
+            }
+        }
+<span class="nc" id="L192">        throw new CardSecurityException(&quot;No available PAN could be allocated from the BIN range&quot;);</span>
+    }
+
+    private static void recordAllocation(BinRangeV2 range, PanCandidate candidate) {
+<span class="fc" id="L196">        range.setIssuedPanCount(Math.addExact(range.getIssuedPanCount(), 1L));</span>
+<span class="pc bpc" id="L197" title="1 of 2 branches missed.">        if (candidate.sequenceValue() != null) {</span>
+<span class="fc" id="L198">            range.setNextSequenceValue(Math.addExact(candidate.sequenceValue(), 1L));</span>
+        }
+<span class="pc bpc" id="L200" title="1 of 2 branches missed.">        if (range.getIssuedPanCount() &gt;= range.getUsableCapacity()) {</span>
+<span class="fc" id="L201">            range.setRangeStatus(BinRangeStatus.EXHAUSTED);</span>
+        }
+<span class="fc" id="L203">    }</span>
+
+    private boolean unique(UUID institutionId, String pan, HsmKeyReferenceV2 hmacKey) {
+<span class="fc" id="L206">        String value = hsm.generatePanHmac(pan, hmacKey);</span>
+<span class="pc bpc" id="L207" title="1 of 2 branches missed.">        return !panAllocationRepository.existsByInstitutionIdAndPanHmac(institutionId, value);</span>
+    }
+
+    private static String leftPad(String value, int length) {
+<span class="fc" id="L211">        return &quot;0&quot;.repeat(Math.max(0, length - value.length())) + value;</span>
+    }
+
+    private KeySet activeKeys(UUID institutionId, UUID binId) {
+<span class="fc" id="L215">        OffsetDateTime now = OffsetDateTime.now(ZoneOffset.UTC);</span>
+<span class="fc" id="L216">        HsmKeyReferenceV2 encryption = institutionKey(institutionId,</span>
+                KeyPurpose.PAN_DATA_ENCRYPTION, HsmKeyType.DEK, now);
+<span class="fc" id="L218">        HsmKeyReferenceV2 hmacKey = institutionKey(institutionId,</span>
+                KeyPurpose.PAN_HMAC, HsmKeyType.HMAC, now);
+<span class="pc bpc" id="L220" title="1 of 2 branches missed.">        if (encryption.getKeyId().equals(hmacKey.getKeyId())) {</span>
+<span class="nc" id="L221">            throw new CardSecurityException(&quot;PAN encryption and PAN HMAC must use different keys&quot;);</span>
+        }
+<span class="fc" id="L223">        List&lt;BinHsmKeyAssignmentV2&gt; assignments = binAssignmentRepository.findEffective(</span>
+                institutionId, binId, KeyPurpose.CVV_GENERATION,
+                BinHsmKeyAssignmentStatus.ACTIVE, now);
+<span class="pc bpc" id="L226" title="1 of 2 branches missed.">        if (assignments.size() != 1) {</span>
+<span class="nc" id="L227">            throw new CardSecurityException(&quot;Exactly one active BIN CVV key assignment is required&quot;);</span>
+        }
+<span class="fc" id="L229">        HsmKeyReferenceV2 cvv = requireUsableKey(</span>
+<span class="fc" id="L230">                institutionId, assignments.get(0).getHsmKeyId(), HsmKeyScope.BIN, HsmKeyType.CVK);</span>
+<span class="pc bpc" id="L231" title="1 of 2 branches missed.">        if (!binId.equals(cvv.getBinId())) {</span>
+<span class="nc" id="L232">            throw new CardSecurityException(&quot;The CVV key is not scoped to the selected BIN&quot;);</span>
+        }
+<span class="fc" id="L234">        return new KeySet(encryption, hmacKey, cvv);</span>
+    }
+
+    private HsmKeyReferenceV2 institutionKey(UUID institutionId, KeyPurpose purpose,
+            HsmKeyType type, OffsetDateTime now) {
+<span class="fc" id="L239">        List&lt;InstitutionDataKeyAssignmentV2&gt; assignments = institutionAssignmentRepository</span>
+<span class="fc" id="L240">                .findEffective(institutionId, purpose, DataKeyAssignmentStatus.ACTIVE, now);</span>
+<span class="pc bpc" id="L241" title="1 of 2 branches missed.">        if (assignments.size() != 1) {</span>
+<span class="nc" id="L242">            throw new CardSecurityException(&quot;Exactly one active &quot; + purpose + &quot; assignment is required&quot;);</span>
+        }
+<span class="fc" id="L244">        return requireUsableKey(institutionId, assignments.get(0).getHsmKeyId(),</span>
+                HsmKeyScope.INSTITUTION, type);
+    }
+
+    private HsmKeyReferenceV2 requireUsableKey(UUID institutionId, UUID keyId,
+            HsmKeyScope scope, HsmKeyType type) {
+<span class="fc" id="L250">        LocalDate today = LocalDate.now(ZoneOffset.UTC);</span>
+<span class="fc" id="L251">        return keyRepository.findByKeyIdAndInstitutionId(keyId, institutionId)</span>
+<span class="pc bpc" id="L252" title="1 of 2 branches missed.">                .filter(key -&gt; key.getStatus() == HsmKeyStatus.ACTIVE)</span>
+<span class="pc bpc" id="L253" title="2 of 4 branches missed.">                .filter(key -&gt; key.getKeyScope() == scope &amp;&amp; key.getKeyType() == type)</span>
+<span class="pc bpc" id="L254" title="2 of 4 branches missed.">                .filter(key -&gt; !today.isBefore(key.getEffectiveFrom()) &amp;&amp; today.isBefore(key.getExpiryDate()))</span>
+<span class="pc bpc" id="L255" title="2 of 4 branches missed.">                .filter(key -&gt; key.getEncryptedKeyBlock() != null &amp;&amp; !key.getEncryptedKeyBlock().isBlank())</span>
+<span class="pc" id="L256">                .orElseThrow(() -&gt; new CardSecurityException(</span>
+                        &quot;Assigned &quot; + type + &quot; key is not active, effective, or HSM-protected&quot;));
+    }
+
+    public String hashForLookup(UUID institutionId, UUID keyId, String pan, boolean legacy) {
+<span class="nc" id="L261">        HsmKeyReferenceV2 key = historicalKey(institutionId, keyId, HsmKeyType.HMAC);</span>
+<span class="nc bnc" id="L262" title="All 2 branches missed.">        return legacy ? hsm.generateLegacyPanHmac(pan, key) : hsm.generatePanHmac(pan, key);</span>
+    }
+
+    private HsmKeyReferenceV2 historicalKey(UUID institutionId, UUID keyId, HsmKeyType type) {
+<span class="fc" id="L266">        return keyRepository.findByKeyIdAndInstitutionId(keyId, institutionId)</span>
+<span class="fc" id="L267">                .filter(key -&gt; Set.of(HsmKeyStatus.ACTIVE, HsmKeyStatus.DECRYPT_ONLY)</span>
+<span class="fc" id="L268">                        .contains(key.getStatus()))</span>
+<span class="pc bpc" id="L269" title="1 of 2 branches missed.">                .filter(key -&gt; key.getKeyScope() == HsmKeyScope.INSTITUTION</span>
+<span class="pc bpc" id="L270" title="1 of 2 branches missed.">                        &amp;&amp; key.getKeyType() == type)</span>
+<span class="pc bpc" id="L271" title="1 of 2 branches missed.">                .filter(key -&gt; key.getEncryptedKeyBlock() != null</span>
+<span class="pc bpc" id="L272" title="1 of 2 branches missed.">                        &amp;&amp; !key.getEncryptedKeyBlock().isBlank())</span>
+<span class="pc" id="L273">                .orElseThrow(() -&gt; new CardSecurityException(</span>
+                        &quot;The historical &quot; + type + &quot; key is unavailable&quot;));
+    }
+
+    private static String requireServiceCode(String value) {
+<span class="pc bpc" id="L278" title="2 of 4 branches missed.">        return value != null &amp;&amp; value.matches(&quot;[0-9]{3}&quot;) ? value : &quot;201&quot;;</span>
+    }
+
+    private static String normalizeSeparator(String value) {
+<span class="pc bpc" id="L282" title="2 of 4 branches missed.">        return value != null &amp;&amp; value.length() == 1 ? value : &quot;D&quot;;</span>
+    }
+
+    private static String mask(String pan) {
+<span class="fc" id="L286">        int visiblePrefix = Math.min(6, pan.length() - 4);</span>
+<span class="fc" id="L287">        return pan.substring(0, visiblePrefix)</span>
+<span class="fc" id="L288">                + &quot;*&quot;.repeat(pan.length() - visiblePrefix - 4)</span>
+<span class="fc" id="L289">                + pan.substring(pan.length() - 4);</span>
+    }
+
+    private static String fingerprint(String keyedHmac) {
+        try {
+<span class="fc" id="L294">            return HexFormat.of().formatHex(MessageDigest.getInstance(&quot;SHA-256&quot;)</span>
+<span class="fc" id="L295">                    .digest(keyedHmac.getBytes(StandardCharsets.UTF_8)));</span>
+<span class="nc" id="L296">        } catch (NoSuchAlgorithmException impossible) {</span>
+<span class="nc" id="L297">            throw new IllegalStateException(impossible);</span>
+        }
+    }
+
+<span class="fc" id="L301">    private record PanCandidate(String pan, Long sequenceValue) { }</span>
+<span class="fc" id="L302">    private record KeySet(HsmKeyReferenceV2 encryptionKey,</span>
+            HsmKeyReferenceV2 hmacKey, HsmKeyReferenceV2 cvvKey) { }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.15.202606040825</span></div></body></html>

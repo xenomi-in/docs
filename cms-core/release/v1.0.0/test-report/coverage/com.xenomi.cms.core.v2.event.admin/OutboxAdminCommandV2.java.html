@@ -1,0 +1,71 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>OutboxAdminCommandV2.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">CMS Core Service</a> &gt; <a href="index.source.html" class="el_package">com.xenomi.cms.core.v2.event.admin</a> &gt; <span class="el_source">OutboxAdminCommandV2.java</span></div><h1>OutboxAdminCommandV2.java</h1><pre class="source lang-java linenums">package com.xenomi.cms.core.v2.event.admin;
+
+import java.time.OffsetDateTime;
+import java.util.UUID;
+
+import jakarta.persistence.Column;
+import jakarta.persistence.Entity;
+import jakarta.persistence.Id;
+import jakarta.persistence.Table;
+import lombok.Builder;
+import lombok.Getter;
+import lombok.NoArgsConstructor;
+import lombok.Setter;
+
+/**
+ * Idempotency ledger for destructive operator commands. A replay can be safely
+ * retried even after it changes the outbox event from DEAD_LETTER to PENDING.
+ */
+@Getter
+@Setter
+@Entity
+@NoArgsConstructor
+@Table(name = &quot;outbox_admin_command&quot;, schema = &quot;cms_v2&quot;)
+public class OutboxAdminCommandV2 {
+
+    @Id
+    @Column(name = &quot;outbox_admin_command_id&quot;, nullable = false, updatable = false)
+    private UUID outboxAdminCommandId;
+
+    @Column(name = &quot;institution_id&quot;, nullable = false, updatable = false)
+    private UUID institutionId;
+
+    @Column(name = &quot;idempotency_key&quot;, nullable = false, length = 128, updatable = false)
+    private String idempotencyKey;
+
+    @Column(name = &quot;operation&quot;, nullable = false, length = 32, updatable = false)
+    private String operation;
+
+    @Column(name = &quot;outbox_event_id&quot;, updatable = false)
+    private UUID outboxEventId;
+
+    @Column(name = &quot;replayed_count&quot;, nullable = false)
+    private int replayedCount;
+
+    @Column(name = &quot;actor_id&quot;, nullable = false, length = 100, updatable = false)
+    private String actorId;
+
+    @Column(name = &quot;created_at&quot;, nullable = false, updatable = false)
+    private OffsetDateTime createdAt;
+
+    @Builder
+    public OutboxAdminCommandV2(
+            UUID outboxAdminCommandId,
+            UUID institutionId,
+            String idempotencyKey,
+            String operation,
+            UUID outboxEventId,
+            int replayedCount,
+            String actorId,
+<span class="fc" id="L60">            OffsetDateTime createdAt) {</span>
+<span class="fc" id="L61">        this.outboxAdminCommandId = outboxAdminCommandId;</span>
+<span class="fc" id="L62">        this.institutionId = institutionId;</span>
+<span class="fc" id="L63">        this.idempotencyKey = idempotencyKey;</span>
+<span class="fc" id="L64">        this.operation = operation;</span>
+<span class="fc" id="L65">        this.outboxEventId = outboxEventId;</span>
+<span class="fc" id="L66">        this.replayedCount = replayedCount;</span>
+<span class="fc" id="L67">        this.actorId = actorId;</span>
+<span class="fc" id="L68">        this.createdAt = createdAt;</span>
+<span class="fc" id="L69">    }</span>
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.15.202606040825</span></div></body></html>

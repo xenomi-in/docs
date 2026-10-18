@@ -1,0 +1,122 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>InstitutionV2Mapper.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">CMS Core Service</a> &gt; <a href="index.source.html" class="el_package">com.xenomi.cms.core.v2.institution.mapper</a> &gt; <span class="el_source">InstitutionV2Mapper.java</span></div><h1>InstitutionV2Mapper.java</h1><pre class="source lang-java linenums">package com.xenomi.cms.core.v2.institution.mapper;
+
+import java.util.Locale;
+import java.util.UUID;
+
+import com.xenomi.cms.core.v2.institution.dto.CreateInstitutionV2Request;
+import com.xenomi.cms.core.v2.institution.dto.InstitutionAddressV2;
+import com.xenomi.cms.core.v2.institution.dto.InstitutionV2Response;
+import com.xenomi.cms.core.v2.institution.entity.InstitutionV2;
+import com.xenomi.cms.core.v2.institution.model.InstitutionStatus;
+
+import org.springframework.stereotype.Component;
+
+@Component
+<span class="fc" id="L15">public class InstitutionV2Mapper {</span>
+
+    public InstitutionV2 toEntity(CreateInstitutionV2Request request, UUID institutionId, String actorId) {
+<span class="fc" id="L18">        InstitutionAddressV2 address = request.getRegisteredAddress();</span>
+<span class="fc" id="L19">        return InstitutionV2.builder()</span>
+<span class="fc" id="L20">                .institutionId(institutionId)</span>
+<span class="fc" id="L21">                .institutionName(request.getInstitutionName().trim())</span>
+<span class="fc" id="L22">                .institutionCode(upper(request.getInstitutionCode()))</span>
+<span class="fc" id="L23">                .institutionShortName(trimToNull(request.getInstitutionShortName()))</span>
+<span class="fc" id="L24">                .institutionType(request.getInstitutionType())</span>
+<span class="fc" id="L25">                .visaMemberFlag(Boolean.TRUE.equals(request.getVisaMemberFlag()))</span>
+<span class="fc" id="L26">                .visaMemberId(trimToNull(request.getVisaMemberId()))</span>
+<span class="fc" id="L27">                .rupayMemberFlag(Boolean.TRUE.equals(request.getRupayMemberFlag()))</span>
+<span class="fc" id="L28">                .npciMemberId(trimToNull(request.getNpciMemberId()))</span>
+<span class="fc" id="L29">                .registeredAddressLine1(address.getAddressLine1().trim())</span>
+<span class="fc" id="L30">                .registeredAddressLine2(trimToNull(address.getAddressLine2()))</span>
+<span class="fc" id="L31">                .city(address.getCity().trim())</span>
+<span class="fc" id="L32">                .stateCode(upper(address.getStateCode()))</span>
+<span class="fc" id="L33">                .countryCode(upperOrDefault(address.getCountryCode(), &quot;IND&quot;))</span>
+<span class="fc" id="L34">                .postalCode(address.getPostalCode().trim())</span>
+<span class="fc" id="L35">                .contactPhonePrimary(request.getContactPhonePrimary().trim())</span>
+<span class="fc" id="L36">                .contactPhoneSecondary(trimToNull(request.getContactPhoneSecondary()))</span>
+<span class="fc" id="L37">                .contactEmailPrimary(request.getContactEmailPrimary().trim().toLowerCase(Locale.ROOT))</span>
+<span class="fc" id="L38">                .contactEmailSecondary(lowerOrNull(request.getContactEmailSecondary()))</span>
+<span class="fc" id="L39">                .websiteUrl(trimToNull(request.getWebsiteUrl()))</span>
+<span class="fc" id="L40">                .timezone(valueOrDefault(request.getTimezone(), &quot;Asia/Kolkata&quot;))</span>
+<span class="fc" id="L41">                .reportDeliverySftpPath(trimToNull(request.getReportDeliverySftpPath()))</span>
+<span class="fc" id="L42">                .reportDeliveryEmail(lowerOrNull(request.getReportDeliveryEmail()))</span>
+               // .prepaidCardIssuingEnabled(Boolean.TRUE.equals(request.getPrepaidCardIssuingEnabled()))
+<span class="fc" id="L44">                .creditCardIssuingEnabled(Boolean.TRUE.equals(request.getCreditCardIssuingEnabled()))</span>
+<span class="pc bpc" id="L45" title="1 of 2 branches missed.">                .defaultCardValidityMonths(request.getDefaultCardValidityMonths() == null</span>
+<span class="pc" id="L46">                        ? 60 : request.getDefaultCardValidityMonths())</span>
+<span class="fc" id="L47">                .baseCurrency(upper(request.getBaseCurrency()))</span>
+<span class="pc bpc" id="L48" title="1 of 2 branches missed.">                .currencyExponent(request.getCurrencyExponent() == null</span>
+<span class="pc" id="L49">                        ? (short) 2 : request.getCurrencyExponent())</span>
+<span class="fc" id="L50">                .businessDate(request.getBusinessDate())</span>
+<span class="pc bpc" id="L51" title="1 of 2 branches missed.">                .status(request.getStatus() == null ? InstitutionStatus.ACTIVE : request.getStatus())</span>
+<span class="fc" id="L52">                .createdBy(actorId)</span>
+<span class="fc" id="L53">                .updatedBy(actorId)</span>
+<span class="fc" id="L54">                .build();</span>
+    }
+
+    public InstitutionV2Response toResponse(InstitutionV2 institution) {
+<span class="fc" id="L58">        return InstitutionV2Response.builder()</span>
+<span class="fc" id="L59">                .institutionId(institution.getInstitutionId())</span>
+<span class="fc" id="L60">                .institutionName(institution.getInstitutionName())</span>
+<span class="fc" id="L61">                .institutionCode(institution.getInstitutionCode())</span>
+<span class="fc" id="L62">                .institutionShortName(institution.getInstitutionShortName())</span>
+<span class="fc" id="L63">                .institutionType(institution.getInstitutionType())</span>
+<span class="fc" id="L64">                .visaMemberFlag(institution.isVisaMemberFlag())</span>
+<span class="fc" id="L65">                .visaMemberId(institution.getVisaMemberId())</span>
+<span class="fc" id="L66">                .rupayMemberFlag(institution.isRupayMemberFlag())</span>
+<span class="fc" id="L67">                .npciMemberId(institution.getNpciMemberId())</span>
+<span class="fc" id="L68">                .registeredAddress(InstitutionAddressV2.builder()</span>
+<span class="fc" id="L69">                        .addressLine1(institution.getRegisteredAddressLine1())</span>
+<span class="fc" id="L70">                        .addressLine2(institution.getRegisteredAddressLine2())</span>
+<span class="fc" id="L71">                        .city(institution.getCity())</span>
+<span class="fc" id="L72">                        .stateCode(institution.getStateCode())</span>
+<span class="fc" id="L73">                        .countryCode(institution.getCountryCode())</span>
+<span class="fc" id="L74">                        .postalCode(institution.getPostalCode())</span>
+<span class="fc" id="L75">                        .build())</span>
+<span class="fc" id="L76">                .contactPhonePrimary(institution.getContactPhonePrimary())</span>
+<span class="fc" id="L77">                .contactPhoneSecondary(institution.getContactPhoneSecondary())</span>
+<span class="fc" id="L78">                .contactEmailPrimary(institution.getContactEmailPrimary())</span>
+<span class="fc" id="L79">                .contactEmailSecondary(institution.getContactEmailSecondary())</span>
+<span class="fc" id="L80">                .websiteUrl(institution.getWebsiteUrl())</span>
+<span class="fc" id="L81">                .timezone(institution.getTimezone())</span>
+<span class="fc" id="L82">                .reportDeliverySftpPath(institution.getReportDeliverySftpPath())</span>
+<span class="fc" id="L83">                .reportDeliveryEmail(institution.getReportDeliveryEmail())</span>
+<span class="fc" id="L84">                .prepaidCardIssuingEnabled(institution.isPrepaidCardIssuingEnabled())</span>
+<span class="fc" id="L85">                .creditCardIssuingEnabled(institution.isCreditCardIssuingEnabled())</span>
+<span class="fc" id="L86">                .defaultCardValidityMonths(institution.getDefaultCardValidityMonths())</span>
+<span class="fc" id="L87">                .baseCurrency(institution.getBaseCurrency())</span>
+<span class="fc" id="L88">                .currencyExponent(institution.getCurrencyExponent())</span>
+<span class="fc" id="L89">                .businessDate(institution.getBusinessDate())</span>
+<span class="fc" id="L90">                .status(institution.getStatus())</span>
+<span class="fc" id="L91">                .createdAt(institution.getCreatedAt())</span>
+<span class="fc" id="L92">                .updatedAt(institution.getUpdatedAt())</span>
+<span class="fc" id="L93">                .createdBy(institution.getCreatedBy())</span>
+<span class="fc" id="L94">                .updatedBy(institution.getUpdatedBy())</span>
+<span class="fc" id="L95">                .build();</span>
+    }
+
+    public static String upper(String value) {
+<span class="fc" id="L99">        return value.trim().toUpperCase(Locale.ROOT);</span>
+    }
+
+    public static String trimToNull(String value) {
+<span class="fc bfc" id="L103" title="All 4 branches covered.">        if (value == null || value.isBlank()) {</span>
+<span class="fc" id="L104">            return null;</span>
+        }
+<span class="fc" id="L106">        return value.trim();</span>
+    }
+
+    private static String upperOrDefault(String value, String defaultValue) {
+<span class="pc bpc" id="L110" title="2 of 4 branches missed.">        return value == null || value.isBlank() ? defaultValue : upper(value);</span>
+    }
+
+    private static String valueOrDefault(String value, String defaultValue) {
+<span class="pc bpc" id="L114" title="3 of 4 branches missed.">        return value == null || value.isBlank() ? defaultValue : value.trim();</span>
+    }
+
+    private static String lowerOrNull(String value) {
+<span class="fc" id="L118">        String normalized = trimToNull(value);</span>
+<span class="pc bpc" id="L119" title="1 of 2 branches missed.">        return normalized == null ? null : normalized.toLowerCase(Locale.ROOT);</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.15.202606040825</span></div></body></html>

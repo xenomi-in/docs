@@ -1,0 +1,158 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>CardHoldV2Service.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">CMS Core Service</a> &gt; <a href="index.source.html" class="el_package">com.xenomi.cms.core.v2.card.lifecycle.service</a> &gt; <span class="el_source">CardHoldV2Service.java</span></div><h1>CardHoldV2Service.java</h1><pre class="source lang-java linenums">package com.xenomi.cms.core.v2.card.lifecycle.service;
+
+import java.nio.charset.StandardCharsets;
+import java.security.MessageDigest;
+import java.time.OffsetDateTime;
+import java.time.ZoneOffset;
+import java.util.LinkedHashMap;
+import java.util.Map;
+import java.util.UUID;
+
+import com.xenomi.cms.core.exception.BusinessRuleViolationException;
+import com.xenomi.cms.core.exception.ResourceNotFoundException;
+import com.xenomi.cms.core.v2.card.entity.CardV2;
+import com.xenomi.cms.core.v2.card.lifecycle.dto.CardHoldV2Request;
+import com.xenomi.cms.core.v2.card.lifecycle.dto.CardLifecycleActionV2Response;
+import com.xenomi.cms.core.v2.card.lifecycle.entity.CardEventV2;
+import com.xenomi.cms.core.v2.card.lifecycle.entity.CardLifecycleOperationV2;
+import com.xenomi.cms.core.v2.card.lifecycle.model.CardHoldReasonV2;
+import com.xenomi.cms.core.v2.card.model.LifecycleActorTypeV2;
+import com.xenomi.cms.core.v2.card.model.LifecycleOperationStatusV2;
+import com.xenomi.cms.core.v2.card.model.PhysicalFulfilmentStatusV2;
+import com.xenomi.cms.core.v2.card.model.PhysicalRetiredReasonV2;
+import com.xenomi.cms.core.v2.card.lifecycle.repository.CardEventV2Repository;
+import com.xenomi.cms.core.v2.card.repository.CardV2Repository;
+import com.xenomi.cms.core.v2.card.model.CardStatusV2;
+import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
+import jakarta.persistence.EntityManager;
+import jakarta.persistence.PersistenceContext;
+
+@Service
+public class CardHoldV2Service {
+    private final CardV2Repository cards;
+    private final CardEventV2Repository events;
+    @PersistenceContext
+    private EntityManager entityManager;
+
+<span class="fc" id="L38">    public CardHoldV2Service(CardV2Repository cards, CardEventV2Repository events) {</span>
+<span class="fc" id="L39">        this.cards = cards;</span>
+<span class="fc" id="L40">        this.events = events;</span>
+<span class="fc" id="L41">    }</span>
+
+    @Transactional
+    public CardLifecycleActionV2Response place(UUID institutionId, UUID cardId,
+            CardHoldV2Request request, String idempotencyKey, String requestId, String actorId) {
+<span class="fc" id="L46">        return mutate(institutionId, cardId, request, &quot;HOLD_PLACED&quot;, false, idempotencyKey, actorId, requestId);</span>
+    }
+
+    @Transactional
+    public CardLifecycleActionV2Response escalate(UUID institutionId, UUID cardId,
+            CardHoldV2Request request, String idempotencyKey, String requestId, String actorId) {
+<span class="fc" id="L52">        return mutate(institutionId, cardId, request, &quot;HOLD_ESCALATED&quot;, true, idempotencyKey, actorId, requestId);</span>
+    }
+
+    @Transactional
+    public CardLifecycleActionV2Response release(UUID institutionId, UUID cardId,
+            CardHoldV2Request request, String idempotencyKey, String requestId, String actorId) {
+<span class="fc" id="L58">        CardV2 card = load(institutionId, cardId);</span>
+<span class="fc" id="L59">        CardHoldReasonV2 reason = request.getReason();</span>
+<span class="fc bfc" id="L60" title="All 2 branches covered.">        if (permanent(reason)) throw new BusinessRuleViolationException(&quot;Permanent security holds cannot be released&quot;);</span>
+<span class="fc bfc" id="L61" title="All 2 branches covered.">        if (!has(card, reason)) throw new BusinessRuleViolationException(&quot;The requested hold is not set&quot;);</span>
+<span class="fc" id="L62">        clear(card, reason);</span>
+<span class="fc" id="L63">        return save(card, &quot;HOLD_RELEASED&quot;, reason, request, idempotencyKey, actorId, requestId);</span>
+    }
+
+    private CardLifecycleActionV2Response mutate(UUID institutionId, UUID cardId,
+            CardHoldV2Request request, String eventType, boolean escalation,
+            String idempotencyKey, String actorId, String requestId) {
+<span class="fc" id="L69">        CardV2 card = load(institutionId, cardId);</span>
+<span class="pc bpc" id="L70" title="1 of 4 branches missed.">        if (card.getClosedAt() != null || card.getReplacedAt() != null)</span>
+<span class="fc" id="L71">            throw new BusinessRuleViolationException(&quot;Terminal cards cannot receive holds&quot;);</span>
+<span class="fc" id="L72">        CardHoldReasonV2 reason = request.getReason();</span>
+<span class="fc" id="L73">        CardHoldReasonV2 current = current(card, reason);</span>
+<span class="pc bpc" id="L74" title="1 of 6 branches missed.">        if (escalation &amp;&amp; (current == null || priority(current) &gt;= priority(reason)))</span>
+<span class="fc" id="L75">            throw new BusinessRuleViolationException(&quot;Escalation requires a strictly higher same-column reason&quot;);</span>
+<span class="fc bfc" id="L76" title="All 4 branches covered.">        if (!escalation &amp;&amp; current != null)</span>
+<span class="fc" id="L77">            throw new BusinessRuleViolationException(&quot;A hold column is already set; use escalation&quot;);</span>
+<span class="fc" id="L78">        set(card, reason);</span>
+        // Permanent security reasons also retire any physical representation in the same transaction.
+        // The card check constraint requires this for non-virtual forms.
+<span class="pc bpc" id="L81" title="1 of 4 branches missed.">        if (permanent(reason) &amp;&amp; card.getCardForm() != com.xenomi.cms.core.v2.card.model.CardFormV2.VIRTUAL</span>
+<span class="pc bpc" id="L82" title="1 of 2 branches missed.">                &amp;&amp; card.getRetiredAt() == null) {</span>
+<span class="fc" id="L83">            card.setRetiredAt(OffsetDateTime.now(ZoneOffset.UTC));</span>
+<span class="fc" id="L84">            card.setPhysicalRetiredReason(PhysicalRetiredReasonV2.LOST_STOLEN);</span>
+<span class="pc bpc" id="L85" title="1 of 2 branches missed.">            if (card.getPhysicalFulfilmentStatus() == PhysicalFulfilmentStatusV2.REQUESTED</span>
+<span class="pc bpc" id="L86" title="1 of 2 branches missed.">                    || card.getPhysicalFulfilmentStatus() == PhysicalFulfilmentStatusV2.PERSONALIZATION_IN_PROGRESS</span>
+<span class="pc bpc" id="L87" title="1 of 2 branches missed.">                    || card.getPhysicalFulfilmentStatus() == PhysicalFulfilmentStatusV2.PERSONALIZED</span>
+<span class="pc bpc" id="L88" title="1 of 2 branches missed.">                    || card.getPhysicalFulfilmentStatus() == PhysicalFulfilmentStatusV2.IN_EMBOSSING_FILE) {</span>
+<span class="nc" id="L89">                card.setPhysicalFulfilmentStatus(PhysicalFulfilmentStatusV2.CANCELLED);</span>
+<span class="nc" id="L90">                entityManager.createNativeQuery(&quot;update cms_v2.card_production_request set request_status='CANCELLED', updated_at=now() where institution_id=? and card_id=? and request_status in ('PENDING','ELIGIBLE','RESERVED_FOR_BATCH')&quot;)</span>
+<span class="nc" id="L91">                        .setParameter(1, card.getInstitutionId()).setParameter(2, card.getCardId()).executeUpdate();</span>
+            }
+        }
+<span class="fc" id="L94">        return save(card, eventType, reason, request, idempotencyKey, actorId, requestId);</span>
+    }
+
+    private CardV2 load(UUID institutionId, UUID cardId) {
+<span class="fc" id="L98">        return cards.findForUpdate(institutionId, cardId)</span>
+<span class="fc" id="L99">                .orElseThrow(() -&gt; new ResourceNotFoundException(&quot;Card not found&quot;));</span>
+    }
+
+    private CardLifecycleActionV2Response save(CardV2 card, String type, CardHoldReasonV2 reason,
+            CardHoldV2Request request, String idempotencyKey, String actorId, String requestId) {
+<span class="fc" id="L104">        CardStatusV2 previous = card.getCardStatus();</span>
+<span class="fc" id="L105">        CardV2 saved = cards.saveFactsAndRefresh(card);</span>
+<span class="fc" id="L106">        OffsetDateTime now = OffsetDateTime.now(ZoneOffset.UTC);</span>
+<span class="fc" id="L107">        UUID eventId = UUID.randomUUID();</span>
+<span class="fc" id="L108">        Map&lt;String,Object&gt; payload = new LinkedHashMap&lt;&gt;();</span>
+<span class="fc" id="L109">        payload.put(&quot;reason&quot;, reason.name());</span>
+<span class="fc" id="L110">        payload.put(&quot;reasonDetail&quot;, request.getReasonDetail());</span>
+<span class="fc" id="L111">        payload.put(&quot;lifecycleVersion&quot;, saved.getLifecycleVersion());</span>
+<span class="fc" id="L112">        UUID operationId = UUID.randomUUID();</span>
+<span class="fc" id="L113">        entityManager.persist(CardLifecycleOperationV2.builder()</span>
+<span class="fc" id="L114">                .operationId(operationId).institutionId(saved.getInstitutionId())</span>
+<span class="fc" id="L115">                .operationKind(type)</span>
+<span class="fc bfc" id="L116" title="All 2 branches covered.">                .idempotencyKeyHash(sha256(idempotencyKey == null ? operationId.toString() : idempotencyKey))</span>
+<span class="fc" id="L117">                .requestFingerprint(sha256(saved.getCardId() + &quot;:&quot; + type + &quot;:&quot; + reason.name()))</span>
+<span class="fc" id="L118">                .targetCardId(saved.getCardId()).expectedVersion(saved.getLifecycleVersion())</span>
+<span class="fc bfc" id="L119" title="All 2 branches covered.">                .actorReference(actorId == null ? &quot;UNKNOWN&quot; : actorId)</span>
+<span class="fc" id="L120">                .actorType(LifecycleActorTypeV2.OPS)</span>
+<span class="fc" id="L121">                .operationStatus(LifecycleOperationStatusV2.CONFIRMED)</span>
+<span class="fc" id="L122">                .resultPayload(new LinkedHashMap&lt;&gt;(payload)).createdAt(now).completedAt(now).build());</span>
+<span class="fc" id="L123">        CardEventV2 event = CardEventV2.builder().cardEventId(eventId)</span>
+<span class="fc" id="L124">                .institutionId(saved.getInstitutionId()).cardId(saved.getCardId()).eventType(type)</span>
+<span class="pc bpc" id="L125" title="1 of 2 branches missed.">                .previousStatus(previous == null ? null : previous.name())</span>
+<span class="fc" id="L126">                .resultingStatus(saved.getCardStatus().name()).reasonCode(reason.name())</span>
+<span class="fc" id="L127">                .eventPayload(payload).occurredAt(now).actorReference(actorId)</span>
+<span class="fc" id="L128">                .correlationId(correlationId(requestId)).eventSequence(nextSequence(saved))</span>
+<span class="fc" id="L129">                .operationId(operationId).schemaVersion(1).source(&quot;CMS_V2&quot;)</span>
+<span class="fc" id="L130">                .transitionId(type).build();</span>
+<span class="fc" id="L131">        events.save(event);</span>
+<span class="fc" id="L132">        return CardLifecycleActionV2Response.builder().institutionId(saved.getInstitutionId())</span>
+<span class="fc" id="L133">                .cardId(saved.getCardId()).eventId(eventId).previousStatus(previous)</span>
+<span class="fc" id="L134">                .cardStatus(saved.getCardStatus()).lifecycleVersion(saved.getLifecycleVersion())</span>
+<span class="fc" id="L135">                .reason(reason.name()).occurredAt(now).build();</span>
+    }
+
+    private long nextSequence(CardV2 card) {
+<span class="fc" id="L139">        return events.findFirstByInstitutionIdAndCardIdOrderByEventSequenceDesc(card.getInstitutionId(), card.getCardId())</span>
+<span class="pc" id="L140">                .map(e -&gt; e.getEventSequence() + 1).orElse(1L);</span>
+    }
+<span class="fc bfc" id="L142" title="All 2 branches covered.">    private static UUID correlationId(String id) { try { return UUID.fromString(id); } catch (Exception e) { return UUID.nameUUIDFromBytes((id == null ? &quot;&quot; : id).getBytes(StandardCharsets.UTF_8)); } }</span>
+    private static String sha256(String value) {
+        try {
+<span class="fc" id="L145">            byte[] bytes = MessageDigest.getInstance(&quot;SHA-256&quot;).digest(value.getBytes(StandardCharsets.UTF_8));</span>
+<span class="fc" id="L146">            StringBuilder result = new StringBuilder(64);</span>
+<span class="fc bfc" id="L147" title="All 2 branches covered.">            for (byte b : bytes) result.append(String.format(&quot;%02x&quot;, b));</span>
+<span class="fc" id="L148">            return result.toString();</span>
+<span class="nc" id="L149">        } catch (Exception e) { throw new IllegalStateException(&quot;Unable to hash lifecycle operation&quot;, e); }</span>
+    }
+<span class="pc bpc" id="L151" title="2 of 8 branches missed.">    private static boolean permanent(CardHoldReasonV2 r) { return r == CardHoldReasonV2.LOST || r == CardHoldReasonV2.STOLEN || r == CardHoldReasonV2.COMPROMISED || r == CardHoldReasonV2.FRAUD_SUSPECTED; }</span>
+<span class="pc bpc" id="L152" title="4 of 7 branches missed.">    private static int priority(CardHoldReasonV2 r) { return switch (r) { case RISK_BLOCK -&gt; 1; case LOST, FRAUD_SUSPECTED -&gt; 2; case STOLEN -&gt; 3; case COMPROMISED -&gt; 4; case KYC -&gt; 1; case REGULATORY -&gt; 2; default -&gt; 1; }; }</span>
+<span class="pc bpc" id="L153" title="9 of 15 branches missed.">    private static CardHoldReasonV2 current(CardV2 c, CardHoldReasonV2 r) { return switch (r) { case CUSTOMER_FREEZE -&gt; c.getCustomerHoldReason() == null ? null : CardHoldReasonV2.CUSTOMER_FREEZE; case OPS_FREEZE -&gt; c.getOpsHoldReason() == null ? null : CardHoldReasonV2.OPS_FREEZE; case RISK_BLOCK, LOST, STOLEN, COMPROMISED, FRAUD_SUSPECTED -&gt; c.getSecurityHoldReason() == null ? null : CardHoldReasonV2.valueOf(c.getSecurityHoldReason().name()); case DELINQUENCY -&gt; c.getCollectionsHoldReason() == null ? null : CardHoldReasonV2.DELINQUENCY; case KYC, REGULATORY -&gt; c.getComplianceHoldReason() == null ? null : CardHoldReasonV2.valueOf(c.getComplianceHoldReason().name()); }; }</span>
+<span class="fc bfc" id="L154" title="All 2 branches covered.">    private static boolean has(CardV2 c, CardHoldReasonV2 r) { return current(c,r) == r; }</span>
+<span class="pc bpc" id="L155" title="4 of 6 branches missed.">    private static void set(CardV2 c, CardHoldReasonV2 r) { switch (r) { case CUSTOMER_FREEZE -&gt; c.setCustomerHoldReason(com.xenomi.cms.core.v2.card.model.CustomerHoldReasonV2.CUSTOMER_FREEZE); case OPS_FREEZE -&gt; c.setOpsHoldReason(com.xenomi.cms.core.v2.card.model.OpsHoldReasonV2.OPS_FREEZE); case RISK_BLOCK, LOST, STOLEN, COMPROMISED, FRAUD_SUSPECTED -&gt; c.setSecurityHoldReason(com.xenomi.cms.core.v2.card.model.SecurityHoldReasonV2.valueOf(r.name())); case DELINQUENCY -&gt; c.setCollectionsHoldReason(com.xenomi.cms.core.v2.card.model.CollectionsHoldReasonV2.DELINQUENCY); case KYC, REGULATORY -&gt; c.setComplianceHoldReason(com.xenomi.cms.core.v2.card.model.ComplianceHoldReasonV2.valueOf(r.name())); } }</span>
+<span class="pc bpc" id="L156" title="5 of 6 branches missed.">    private static void clear(CardV2 c, CardHoldReasonV2 r) { switch (r) { case CUSTOMER_FREEZE -&gt; c.setCustomerHoldReason(null); case OPS_FREEZE -&gt; c.setOpsHoldReason(null); case RISK_BLOCK -&gt; c.setSecurityHoldReason(null); case DELINQUENCY -&gt; c.setCollectionsHoldReason(null); case KYC, REGULATORY -&gt; c.setComplianceHoldReason(null); default -&gt; throw new BusinessRuleViolationException(&quot;Permanent security holds cannot be released&quot;); } }</span>
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.15.202606040825</span></div></body></html>

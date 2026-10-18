@@ -1,0 +1,57 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>KeyExchangeEventAuditV2Service.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">CMS Core Service</a> &gt; <a href="index.source.html" class="el_package">com.xenomi.cms.core.v2.hsm.service</a> &gt; <span class="el_source">KeyExchangeEventAuditV2Service.java</span></div><h1>KeyExchangeEventAuditV2Service.java</h1><pre class="source lang-java linenums">package com.xenomi.cms.core.v2.hsm.service;
+
+import java.time.OffsetDateTime;
+import java.util.UUID;
+
+import com.xenomi.cms.core.v2.common.DatabaseUuidV7Generator;
+import com.xenomi.cms.core.v2.hsm.entity.KeyExchangeEventV2;
+import com.xenomi.cms.core.v2.hsm.model.HsmKeyScope;
+import com.xenomi.cms.core.v2.hsm.model.HsmKeyType;
+import com.xenomi.cms.core.v2.hsm.model.KeyExchangeDirection;
+import com.xenomi.cms.core.v2.hsm.model.KeyExchangeStatus;
+import com.xenomi.cms.core.v2.hsm.model.KeyPurpose;
+import com.xenomi.cms.core.v2.hsm.repository.KeyExchangeEventV2Repository;
+
+import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Propagation;
+import org.springframework.transaction.annotation.Transactional;
+
+@Service
+public class KeyExchangeEventAuditV2Service {
+
+    private final KeyExchangeEventV2Repository repository;
+    private final DatabaseUuidV7Generator uuidGenerator;
+
+    public KeyExchangeEventAuditV2Service(KeyExchangeEventV2Repository repository,
+<span class="fc" id="L26">            DatabaseUuidV7Generator uuidGenerator) {</span>
+<span class="fc" id="L27">        this.repository = repository;</span>
+<span class="fc" id="L28">        this.uuidGenerator = uuidGenerator;</span>
+<span class="fc" id="L29">    }</span>
+
+    @Transactional(propagation = Propagation.REQUIRES_NEW)
+    public void recordFailure(UUID institutionId, UUID kekKeyId, String externalRequestId,
+            String idempotencyKeyHash, String requestFingerprint, HsmKeyType keyType,
+            HsmKeyScope targetScope, KeyPurpose keyPurpose, String expectedKcv,
+            String calculatedKcv, KeyExchangeStatus status, String failureCode,
+            String actorId) {
+<span class="fc" id="L37">        if (repository.findByInstitutionIdAndIdempotencyKeyHash(</span>
+<span class="fc bfc" id="L38" title="All 2 branches covered.">                institutionId, idempotencyKeyHash).isPresent()</span>
+<span class="fc" id="L39">                || repository.findByInstitutionIdAndExternalRequestId(</span>
+<span class="fc bfc" id="L40" title="All 2 branches covered.">                        institutionId, externalRequestId).isPresent()) {</span>
+<span class="fc" id="L41">            return;</span>
+        }
+<span class="fc" id="L43">        repository.save(KeyExchangeEventV2.builder()</span>
+<span class="fc" id="L44">                .exchangeEventId(uuidGenerator.generate())</span>
+<span class="fc" id="L45">                .institutionId(institutionId).kekKeyId(kekKeyId)</span>
+<span class="fc" id="L46">                .externalRequestId(externalRequestId)</span>
+<span class="fc" id="L47">                .idempotencyKeyHash(idempotencyKeyHash)</span>
+<span class="fc" id="L48">                .requestFingerprint(requestFingerprint)</span>
+<span class="fc" id="L49">                .direction(KeyExchangeDirection.INBOUND)</span>
+<span class="fc" id="L50">                .workingKeyType(keyType).targetScope(targetScope)</span>
+<span class="fc" id="L51">                .keyPurpose(keyPurpose).expectedKcv(expectedKcv)</span>
+<span class="fc" id="L52">                .calculatedKcv(calculatedKcv).exchangeStatus(status)</span>
+<span class="fc" id="L53">                .failureCode(failureCode).completedAt(OffsetDateTime.now(java.time.ZoneOffset.UTC))</span>
+<span class="fc" id="L54">                .createdBy(actorId).build());</span>
+<span class="fc" id="L55">    }</span>
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.15.202606040825</span></div></body></html>

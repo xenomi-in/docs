@@ -1,0 +1,61 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>CachedBodyHttpServletRequest.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">CMS Core Service</a> &gt; <a href="index.source.html" class="el_package">com.xenomi.cms.core.api.idempotency</a> &gt; <span class="el_source">CachedBodyHttpServletRequest.java</span></div><h1>CachedBodyHttpServletRequest.java</h1><pre class="source lang-java linenums">package com.xenomi.cms.core.api.idempotency;
+
+import jakarta.servlet.ReadListener;
+import jakarta.servlet.ServletInputStream;
+import jakarta.servlet.http.HttpServletRequest;
+import jakarta.servlet.http.HttpServletRequestWrapper;
+
+import java.io.BufferedReader;
+import java.io.ByteArrayInputStream;
+import java.io.IOException;
+import java.io.InputStreamReader;
+import java.nio.charset.Charset;
+import java.nio.charset.StandardCharsets;
+
+final class CachedBodyHttpServletRequest extends HttpServletRequestWrapper {
+
+    private final byte[] body;
+
+    CachedBodyHttpServletRequest(HttpServletRequest request, int maxBodyBytes) throws IOException {
+<span class="fc" id="L20">        super(request);</span>
+<span class="fc" id="L21">        this.body = request.getInputStream().readNBytes(maxBodyBytes + 1);</span>
+<span class="pc bpc" id="L22" title="1 of 2 branches missed.">        if (body.length &gt; maxBodyBytes) {</span>
+<span class="nc" id="L23">            throw new RequestBodyTooLargeException();</span>
+        }
+<span class="fc" id="L25">    }</span>
+
+    byte[] body() {
+<span class="fc" id="L28">        return body.clone();</span>
+    }
+
+    @Override
+    public ServletInputStream getInputStream() {
+<span class="fc" id="L33">        ByteArrayInputStream input = new ByteArrayInputStream(body);</span>
+<span class="fc" id="L34">        return new ServletInputStream() {</span>
+<span class="nc bnc" id="L35" title="All 2 branches missed.">            @Override public boolean isFinished() { return input.available() == 0; }</span>
+<span class="nc" id="L36">            @Override public boolean isReady() { return true; }</span>
+<span class="nc" id="L37">            @Override public void setReadListener(ReadListener readListener) { }</span>
+<span class="nc" id="L38">            @Override public int read() { return input.read(); }</span>
+            @Override public int read(byte[] bytes, int offset, int length) {
+<span class="fc" id="L40">                return input.read(bytes, offset, length);</span>
+            }
+        };
+    }
+
+    @Override
+    public BufferedReader getReader() {
+        Charset charset;
+        try {
+<span class="nc bnc" id="L49" title="All 2 branches missed.">            charset = getCharacterEncoding() == null</span>
+<span class="nc" id="L50">                    ? StandardCharsets.UTF_8</span>
+<span class="nc" id="L51">                    : Charset.forName(getCharacterEncoding());</span>
+<span class="nc" id="L52">        } catch (RuntimeException ignored) {</span>
+<span class="nc" id="L53">            charset = StandardCharsets.UTF_8;</span>
+<span class="nc" id="L54">        }</span>
+<span class="nc" id="L55">        return new BufferedReader(new InputStreamReader(getInputStream(), charset));</span>
+    }
+
+<span class="nc" id="L58">    static final class RequestBodyTooLargeException extends IOException {</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.15.202606040825</span></div></body></html>

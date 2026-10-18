@@ -1,0 +1,103 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>HttpCardLifecycleSwitchClient.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">CMS Core Service</a> &gt; <a href="index.source.html" class="el_package">com.xenomi.cms.core.v2.card.lifecycle.client</a> &gt; <span class="el_source">HttpCardLifecycleSwitchClient.java</span></div><h1>HttpCardLifecycleSwitchClient.java</h1><pre class="source lang-java linenums">package com.xenomi.cms.core.v2.card.lifecycle.client;
+
+import java.util.UUID;
+
+import com.xenomi.cms.core.v2.card.lifecycle.model.CardHotlistCallerType;
+import com.xenomi.cms.core.v2.card.lifecycle.model.CardHotlistReason;
+import com.xenomi.cms.core.v2.card.model.CardStatusV2;
+import org.springframework.beans.factory.annotation.Value;
+import org.springframework.http.MediaType;
+import org.springframework.http.client.SimpleClientHttpRequestFactory;
+import org.springframework.stereotype.Component;
+import org.springframework.web.client.RestClient;
+import org.springframework.web.client.RestClientException;
+
+@Component
+public class HttpCardLifecycleSwitchClient implements CardLifecycleSwitchClient {
+    @Value(&quot;${cms.switch.sync.enabled:false}&quot;)
+    private boolean durableSyncEnabled;
+    private static final String BLOCKED = &quot;BLOCKED&quot;;
+    private final RestClient restClient;
+    private final String baseUrl;
+
+    public HttpCardLifecycleSwitchClient(RestClient.Builder builder,
+            @Value(&quot;${cms.switch.base-url:}&quot;) String baseUrl,
+<span class="fc" id="L25">            @Value(&quot;${cms.switch.timeout-ms:3000}&quot;) int timeoutMs) {</span>
+<span class="fc" id="L26">        SimpleClientHttpRequestFactory requestFactory = new SimpleClientHttpRequestFactory();</span>
+<span class="fc" id="L27">        requestFactory.setConnectTimeout(timeoutMs);</span>
+<span class="fc" id="L28">        requestFactory.setReadTimeout(timeoutMs);</span>
+<span class="fc" id="L29">        this.restClient = builder.requestFactory(requestFactory).build();</span>
+<span class="fc bfc" id="L30" title="All 2 branches covered.">        this.baseUrl = baseUrl == null ? &quot;&quot; : baseUrl.trim();</span>
+<span class="fc" id="L31">    }</span>
+
+    @Override
+    public void block(UUID institutionId, UUID cardId, long lifecycleVersion,
+            CardHotlistReason reason, CardHotlistCallerType callerType,
+            String idempotencyKey, String requestId) {
+        // The deferred database trigger captures the committed final lifecycle facts.
+<span class="fc bfc" id="L38" title="All 2 branches covered.">        if (durableSyncEnabled) return;</span>
+<span class="fc bfc" id="L39" title="All 2 branches covered.">        if (baseUrl.isBlank()) {</span>
+<span class="fc" id="L40">            throw new CardLifecycleSwitchException(&quot;Authorization switch is not configured&quot;);</span>
+        }
+        try {
+<span class="fc" id="L43">            SwitchStatusResponse response = restClient.put()</span>
+<span class="fc" id="L44">                    .uri(baseUrl + &quot;/internal/v1/institutions/{institutionId}/cards/{cardId}/status&quot;,</span>
+                            institutionId, cardId)
+<span class="fc" id="L46">                    .contentType(MediaType.APPLICATION_JSON)</span>
+<span class="fc" id="L47">                    .header(&quot;Idempotency-Key&quot;, idempotencyKey)</span>
+<span class="fc" id="L48">                    .header(&quot;X-Request-Id&quot;, requestId)</span>
+<span class="fc" id="L49">                    .body(new SwitchStatusRequest(BLOCKED, lifecycleVersion,</span>
+<span class="fc" id="L50">                            reason.name(), callerType.name()))</span>
+<span class="fc" id="L51">                    .retrieve()</span>
+<span class="fc" id="L52">                    .body(SwitchStatusResponse.class);</span>
+<span class="pc bpc" id="L53" title="1 of 4 branches missed.">            if (response == null || !response.applied()</span>
+<span class="pc bpc" id="L54" title="1 of 2 branches missed.">                    || !BLOCKED.equals(response.appliedStatus())</span>
+<span class="pc bpc" id="L55" title="1 of 2 branches missed.">                    || response.appliedVersion() != lifecycleVersion) {</span>
+<span class="fc" id="L56">                throw new CardLifecycleSwitchException(</span>
+                        &quot;Authorization switch did not confirm the hot-listing version&quot;);
+            }
+<span class="fc" id="L59">        } catch (RestClientException exception) {</span>
+<span class="fc" id="L60">            throw new CardLifecycleSwitchException(</span>
+                    &quot;Authorization switch hot-listing failed&quot;, exception);
+<span class="fc" id="L62">        }</span>
+<span class="fc" id="L63">    }</span>
+
+    @Override
+    public void changeStatus(UUID institutionId, UUID cardId, CardStatusV2 targetStatus,
+            long lifecycleVersion, String reason, String idempotencyKey, String requestId) {
+<span class="fc bfc" id="L68" title="All 2 branches covered.">        if (durableSyncEnabled) return;</span>
+<span class="fc bfc" id="L69" title="All 2 branches covered.">        if (baseUrl.isBlank()) {</span>
+<span class="fc" id="L70">            throw new CardLifecycleSwitchException(&quot;Authorization switch is not configured&quot;);</span>
+        }
+        try {
+<span class="fc" id="L73">            SwitchStatusResponse response = restClient.put()</span>
+<span class="fc" id="L74">                    .uri(baseUrl + &quot;/internal/v1/institutions/{institutionId}/cards/{cardId}/status&quot;,</span>
+                            institutionId, cardId)
+<span class="fc" id="L76">                    .contentType(MediaType.APPLICATION_JSON)</span>
+<span class="fc" id="L77">                    .header(&quot;Idempotency-Key&quot;, idempotencyKey)</span>
+<span class="fc" id="L78">                    .header(&quot;X-Request-Id&quot;, requestId)</span>
+<span class="fc" id="L79">                    .body(new SwitchStatusRequest(targetStatus.name(), lifecycleVersion,</span>
+                            reason, &quot;OPERATIONS&quot;))
+<span class="fc" id="L81">                    .retrieve()</span>
+<span class="fc" id="L82">                    .body(SwitchStatusResponse.class);</span>
+<span class="pc bpc" id="L83" title="1 of 4 branches missed.">            if (response == null || !response.applied()</span>
+<span class="pc bpc" id="L84" title="1 of 2 branches missed.">                    || !targetStatus.name().equals(response.appliedStatus())</span>
+<span class="pc bpc" id="L85" title="1 of 2 branches missed.">                    || response.appliedVersion() != lifecycleVersion) {</span>
+<span class="fc" id="L86">                throw new CardLifecycleSwitchException(</span>
+                        &quot;Authorization switch did not confirm the card lifecycle version&quot;);
+            }
+<span class="fc" id="L89">        } catch (RestClientException exception) {</span>
+<span class="fc" id="L90">            throw new CardLifecycleSwitchException(</span>
+                    &quot;Authorization switch card lifecycle update failed&quot;, exception);
+<span class="fc" id="L92">        }</span>
+<span class="fc" id="L93">    }</span>
+
+<span class="fc" id="L95">    private record SwitchStatusRequest(String status, long lifecycleVersion,</span>
+            String reason, String callerType) {
+    }
+
+<span class="fc" id="L99">    private record SwitchStatusResponse(boolean applied, String appliedStatus,</span>
+            long appliedVersion) {
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.15.202606040825</span></div></body></html>

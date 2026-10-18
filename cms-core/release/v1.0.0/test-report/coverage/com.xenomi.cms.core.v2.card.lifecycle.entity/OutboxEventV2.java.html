@@ -1,0 +1,61 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>OutboxEventV2.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">CMS Core Service</a> &gt; <a href="index.source.html" class="el_package">com.xenomi.cms.core.v2.card.lifecycle.entity</a> &gt; <span class="el_source">OutboxEventV2.java</span></div><h1>OutboxEventV2.java</h1><pre class="source lang-java linenums">package com.xenomi.cms.core.v2.card.lifecycle.entity;
+
+import jakarta.persistence.*;
+import lombok.*;
+import java.util.UUID;
+import java.util.Map;
+import java.time.OffsetDateTime;
+import com.xenomi.cms.core.v2.card.model.*;
+
+@Entity(name = &quot;LifecycleOutboxEventV2&quot;)
+@Table(name = &quot;outbox_event&quot;, schema = &quot;cms_v2&quot;)
+@Data @Builder @NoArgsConstructor @AllArgsConstructor
+public class OutboxEventV2 {
+    @Id
+    @Column(name = &quot;outbox_event_id&quot;, nullable = false, updatable = false)
+    private UUID outboxEventId;
+    @Column(name = &quot;institution_id&quot;, nullable = false)
+    private UUID institutionId;
+    @Column(name = &quot;aggregate_type&quot;, length = 60, nullable = false)
+    private String aggregateType;
+    @Column(name = &quot;aggregate_id&quot;, length = 120, nullable = false)
+    private String aggregateId;
+    @Column(name = &quot;event_type&quot;, length = 100, nullable = false)
+    private String eventType;
+    @Builder.Default
+    @Column(name = &quot;event_version&quot;, nullable = false)
+    private Integer eventVersion = 1;
+    @org.hibernate.annotations.JdbcTypeCode(org.hibernate.type.SqlTypes.JSON)
+    @lombok.ToString.Exclude
+    @Column(name = &quot;event_payload&quot;, columnDefinition = &quot;jsonb&quot;, nullable = false)
+    private Map&lt;String, Object&gt; eventPayload;
+    @Column(name = &quot;correlation_id&quot;, nullable = false)
+    private UUID correlationId;
+    @Column(name = &quot;idempotency_key&quot;, nullable = false)
+    private UUID idempotencyKey;
+    @Builder.Default
+    @Enumerated(EnumType.STRING)
+    @Column(name = &quot;publication_status&quot;, length = 24, nullable = false)
+    private OutboxPublicationStatusV2 publicationStatus = OutboxPublicationStatusV2.PENDING;
+    @Column(name = &quot;occurred_at&quot;, nullable = false)
+    private OffsetDateTime occurredAt;
+    @Column(name = &quot;published_at&quot;)
+    private OffsetDateTime publishedAt;
+    @Builder.Default
+    @Column(name = &quot;retry_count&quot;, nullable = false)
+    private Integer retryCount = 0;
+    @Column(name = &quot;next_retry_at&quot;)
+    private OffsetDateTime nextRetryAt;
+    @Column(name = &quot;last_error&quot;, length = 1000)
+    private String lastError;
+    @Column(name = &quot;operation_id&quot;, nullable = false)
+    private UUID operationId;
+    @Column(name = &quot;family_revision&quot;)
+    private Long familyRevision;
+    @PrePersist
+    void beforeInsert() {
+<span class="nc bnc" id="L57" title="All 2 branches missed.">        if (occurredAt == null) occurredAt = OffsetDateTime.now(java.time.ZoneOffset.UTC);</span>
+<span class="nc" id="L58">    }</span>
+
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.15.202606040825</span></div></body></html>

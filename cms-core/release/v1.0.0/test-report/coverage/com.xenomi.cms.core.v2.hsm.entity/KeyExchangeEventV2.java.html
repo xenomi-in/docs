@@ -1,0 +1,86 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>KeyExchangeEventV2.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">CMS Core Service</a> &gt; <a href="index.source.html" class="el_package">com.xenomi.cms.core.v2.hsm.entity</a> &gt; <span class="el_source">KeyExchangeEventV2.java</span></div><h1>KeyExchangeEventV2.java</h1><pre class="source lang-java linenums">package com.xenomi.cms.core.v2.hsm.entity;
+
+import java.time.OffsetDateTime;
+import java.util.UUID;
+
+import com.xenomi.cms.core.v2.hsm.model.HsmKeyScope;
+import com.xenomi.cms.core.v2.hsm.model.HsmKeyType;
+import com.xenomi.cms.core.v2.hsm.model.KeyExchangeDirection;
+import com.xenomi.cms.core.v2.hsm.model.KeyExchangeStatus;
+import com.xenomi.cms.core.v2.hsm.model.KeyPurpose;
+
+import jakarta.persistence.Column;
+import jakarta.persistence.Entity;
+import jakarta.persistence.EnumType;
+import jakarta.persistence.Enumerated;
+import jakarta.persistence.Id;
+import jakarta.persistence.PrePersist;
+import jakarta.persistence.Table;
+import lombok.AllArgsConstructor;
+import lombok.Builder;
+import lombok.Data;
+import lombok.NoArgsConstructor;
+
+@Entity(name = &quot;KeyExchangeEventV2&quot;)
+@Table(name = &quot;key_exchange_event&quot;, schema = &quot;cms_v2&quot;)
+@Data
+@Builder
+@NoArgsConstructor
+@AllArgsConstructor
+public class KeyExchangeEventV2 {
+
+    @Id
+    @Column(name = &quot;exchange_event_id&quot;, nullable = false, updatable = false)
+    private UUID exchangeEventId;
+    @Column(name = &quot;institution_id&quot;, nullable = false, updatable = false)
+    private UUID institutionId;
+    @Column(name = &quot;kek_key_id&quot;, nullable = false, updatable = false)
+    private UUID kekKeyId;
+    @Column(name = &quot;external_request_id&quot;, nullable = false, length = 100, updatable = false)
+    private String externalRequestId;
+    @org.hibernate.annotations.JdbcTypeCode(org.hibernate.type.SqlTypes.CHAR)
+    @Column(name = &quot;idempotency_key_hash&quot;, nullable = false, length = 64, updatable = false, columnDefinition = &quot;char(64)&quot;)
+    private String idempotencyKeyHash;
+    @org.hibernate.annotations.JdbcTypeCode(org.hibernate.type.SqlTypes.CHAR)
+    @Column(name = &quot;request_fingerprint&quot;, nullable = false, length = 64, updatable = false, columnDefinition = &quot;char(64)&quot;)
+    private String requestFingerprint;
+    @Enumerated(EnumType.STRING)
+    @Column(name = &quot;direction&quot;, nullable = false, length = 12, updatable = false)
+    private KeyExchangeDirection direction;
+    @Enumerated(EnumType.STRING)
+    @Column(name = &quot;working_key_type&quot;, nullable = false, length = 50, updatable = false)
+    private HsmKeyType workingKeyType;
+    @Enumerated(EnumType.STRING)
+    @Column(name = &quot;target_scope&quot;, nullable = false, length = 20, updatable = false)
+    private HsmKeyScope targetScope;
+    @Enumerated(EnumType.STRING)
+    @Column(name = &quot;key_purpose&quot;, nullable = false, length = 60, updatable = false)
+    private KeyPurpose keyPurpose;
+    @Column(name = &quot;expected_kcv&quot;, nullable = false, length = 16, updatable = false)
+    private String expectedKcv;
+    @Column(name = &quot;calculated_kcv&quot;, length = 16)
+    private String calculatedKcv;
+    @Column(name = &quot;resulting_key_id&quot;)
+    private UUID resultingKeyId;
+    @Column(name = &quot;assignment_id&quot;)
+    private UUID assignmentId;
+    @Enumerated(EnumType.STRING)
+    @Column(name = &quot;exchange_status&quot;, nullable = false, length = 20)
+    private KeyExchangeStatus exchangeStatus;
+    @Column(name = &quot;failure_code&quot;, length = 50)
+    private String failureCode;
+    @Column(name = &quot;created_at&quot;, nullable = false, updatable = false)
+    private OffsetDateTime createdAt;
+    @Column(name = &quot;completed_at&quot;)
+    private OffsetDateTime completedAt;
+    @Column(name = &quot;created_by&quot;, nullable = false, length = 100, updatable = false)
+    private String createdBy;
+
+    @PrePersist
+    void beforeInsert() {
+<span class="nc bnc" id="L81" title="All 2 branches missed.">        if (createdAt == null) {</span>
+<span class="nc" id="L82">            createdAt = OffsetDateTime.now(java.time.ZoneOffset.UTC);</span>
+        }
+<span class="nc" id="L84">    }</span>
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.15.202606040825</span></div></body></html>

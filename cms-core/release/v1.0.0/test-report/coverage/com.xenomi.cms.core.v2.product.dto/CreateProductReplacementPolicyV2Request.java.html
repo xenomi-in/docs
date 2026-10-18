@@ -1,0 +1,28 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>CreateProductReplacementPolicyV2Request.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">CMS Core Service</a> &gt; <a href="index.source.html" class="el_package">com.xenomi.cms.core.v2.product.dto</a> &gt; <span class="el_source">CreateProductReplacementPolicyV2Request.java</span></div><h1>CreateProductReplacementPolicyV2Request.java</h1><pre class="source lang-java linenums">package com.xenomi.cms.core.v2.product.dto;
+
+import java.util.Set;
+
+import com.xenomi.cms.core.v2.product.model.OldCardUsagePolicy;
+import com.xenomi.cms.core.v2.product.model.ReplacementAccountLinkStrategy;
+import com.xenomi.cms.core.v2.product.model.ReplacementControlStrategy;
+import com.xenomi.cms.core.v2.product.model.ReplacementExpiryStrategy;
+import com.xenomi.cms.core.v2.product.model.ReplacementPanStrategy;
+import com.xenomi.cms.core.v2.product.model.ReplacementPinStrategy;
+import com.xenomi.cms.core.v2.product.model.ReplacementReason;
+import com.xenomi.cms.core.v2.product.model.ReplacementRequestChannel;
+import jakarta.validation.constraints.NotEmpty;
+import jakarta.validation.constraints.NotNull;
+
+<span class="fc" id="L16">public record CreateProductReplacementPolicyV2Request(</span>
+        @NotNull ReplacementReason replacementReason,
+        @NotNull ReplacementPanStrategy panStrategy,
+        @NotNull ReplacementExpiryStrategy expiryStrategy,
+        @NotNull OldCardUsagePolicy oldCardUsagePolicy,
+        ReplacementPinStrategy pinStrategy,
+        ReplacementControlStrategy controlStrategy,
+        ReplacementAccountLinkStrategy accountLinkStrategy,
+        @NotEmpty Set&lt;ReplacementRequestChannel&gt; permittedChannels,
+        Boolean replacementAllowed,
+        Boolean approvalRequired) {
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.15.202606040825</span></div></body></html>

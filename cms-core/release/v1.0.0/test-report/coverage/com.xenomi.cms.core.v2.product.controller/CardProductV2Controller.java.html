@@ -1,0 +1,147 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>CardProductV2Controller.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">CMS Core Service</a> &gt; <a href="index.source.html" class="el_package">com.xenomi.cms.core.v2.product.controller</a> &gt; <span class="el_source">CardProductV2Controller.java</span></div><h1>CardProductV2Controller.java</h1><pre class="source lang-java linenums">package com.xenomi.cms.core.v2.product.controller;
+
+import java.util.UUID;
+
+import com.xenomi.cms.core.api.ApiResponseEnvelope;
+import com.xenomi.cms.core.api.ApiResponseHelper;
+import com.xenomi.cms.core.api.PageableDefaults;
+import com.xenomi.cms.core.api.PagedResponse;
+import com.xenomi.cms.core.v2.bin.model.CardNetwork;
+import com.xenomi.cms.core.v2.product.dto.CardProductV2Response;
+import com.xenomi.cms.core.v2.product.dto.CreateCardProductV2Request;
+import com.xenomi.cms.core.v2.product.dto.CreateProductVersionV2Request;
+import com.xenomi.cms.core.v2.product.dto.ProductVersionV2Response;
+import com.xenomi.cms.core.v2.product.dto.UpdateCardProductV2Request;
+import com.xenomi.cms.core.v2.product.dto.UpdateProductVersionV2Request;
+import com.xenomi.cms.core.v2.product.model.FundingType;
+import com.xenomi.cms.core.v2.product.model.ProductStatus;
+import com.xenomi.cms.core.v2.product.service.CardProductV2Service;
+import com.xenomi.cms.core.v2.product.service.ProductVersionV2Service;
+
+import io.swagger.v3.oas.annotations.Operation;
+import io.swagger.v3.oas.annotations.tags.Tag;
+import jakarta.validation.Valid;
+import jakarta.validation.constraints.NotBlank;
+import jakarta.validation.constraints.Size;
+import org.springframework.data.domain.PageRequest;
+import org.springframework.data.domain.Pageable;
+import org.springframework.data.domain.Sort;
+import org.springframework.http.ResponseEntity;
+import org.springframework.validation.annotation.Validated;
+import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PathVariable;
+import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.RequestBody;
+import org.springframework.web.bind.annotation.RequestHeader;
+import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestParam;
+import org.springframework.web.bind.annotation.RestController;
+
+@Validated
+@RestController
+@RequestMapping(&quot;/cms/api/v2/institutions/{institutionId}/products&quot;)
+@Tag(name = &quot;V2 - Products&quot;, description = &quot;Stable products, configuration versions and lifecycle&quot;)
+public class CardProductV2Controller {
+
+    private static final String ACTOR_HEADER = &quot;X-Actor-Id&quot;;
+    private final CardProductV2Service productService;
+    private final ProductVersionV2Service versionService;
+
+    public CardProductV2Controller(
+<span class="fc" id="L51">            CardProductV2Service productService, ProductVersionV2Service versionService) {</span>
+<span class="fc" id="L52">        this.productService = productService;</span>
+<span class="fc" id="L53">        this.versionService = versionService;</span>
+<span class="fc" id="L54">    }</span>
+
+    @PostMapping
+    @Operation(operationId = &quot;createCardProductV2&quot;, summary = &quot;Create a card product&quot;)
+    public ResponseEntity&lt;ApiResponseEnvelope&lt;CardProductV2Response&gt;&gt; create(
+            @PathVariable UUID institutionId,
+            @Valid @RequestBody CreateCardProductV2Request request,
+            @RequestHeader(ACTOR_HEADER) @NotBlank @Size(max = 100) String actorId) {
+<span class="fc" id="L62">        return ApiResponseHelper.created(productService.create(institutionId, request, actorId));</span>
+    }
+
+    @GetMapping
+    @Operation(operationId = &quot;searchCardProductsV2&quot;, summary = &quot;Search and list card products&quot;)
+    public ResponseEntity&lt;ApiResponseEnvelope&lt;PagedResponse&lt;CardProductV2Response&gt;&gt;&gt; search(
+            @PathVariable UUID institutionId,
+            @RequestParam(required = false) String query,
+            @RequestParam(required = false) CardNetwork cardNetwork,
+            @RequestParam(required = false) FundingType fundingType,
+            @RequestParam(required = false) ProductStatus productStatus,
+            @RequestParam(required = false) Integer page,
+            @RequestParam(required = false) Integer limit) {
+<span class="fc" id="L75">        Pageable base = PageableDefaults.ofOneBased(page, limit);</span>
+<span class="fc" id="L76">        Pageable pageable = PageRequest.of(base.getPageNumber(), base.getPageSize(),</span>
+<span class="fc" id="L77">                Sort.by(Sort.Direction.ASC, &quot;productCode&quot;));</span>
+<span class="fc" id="L78">        return ApiResponseHelper.ok(PagedResponse.of(productService.search(</span>
+                institutionId, query, cardNetwork, fundingType, productStatus, pageable)));
+    }
+
+    @GetMapping(&quot;/{productId}&quot;)
+    @Operation(operationId = &quot;getCardProductV2&quot;, summary = &quot;Get a card product&quot;)
+    public ResponseEntity&lt;ApiResponseEnvelope&lt;CardProductV2Response&gt;&gt; get(
+            @PathVariable UUID institutionId, @PathVariable UUID productId) {
+<span class="fc" id="L86">        return ApiResponseHelper.ok(productService.get(institutionId, productId));</span>
+    }
+
+    @GetMapping(&quot;/code/{productCode}&quot;)
+    @Operation(operationId = &quot;getCardProductByCodeV2&quot;, summary = &quot;Get a card product by code&quot;)
+    public ResponseEntity&lt;ApiResponseEnvelope&lt;CardProductV2Response&gt;&gt; getByCode(
+            @PathVariable UUID institutionId, @PathVariable String productCode) {
+<span class="fc" id="L93">        return ApiResponseHelper.ok(productService.getByCode(institutionId, productCode));</span>
+    }
+
+    @PostMapping(&quot;/{productId}/actions/update&quot;)
+    @Operation(operationId = &quot;updateCardProductV2&quot;, summary = &quot;Apply an explicit update or lifecycle action to a card product&quot;,
+            description = &quot;This is the single product lifecycle path; V2 has no overlapping deactivate endpoint. ACTIVE permits new issuance and virtual-to-physical requests. SUSPENDED and RETIRED reject those new operations, but do not alter live cards or cancel production requests already created. Existing cards remain serviceable, including policy-controlled replacement. Invalid transitions return a business validation error.&quot;)
+    public ResponseEntity&lt;ApiResponseEnvelope&lt;CardProductV2Response&gt;&gt; update(
+            @PathVariable UUID institutionId, @PathVariable UUID productId,
+            @Valid @RequestBody UpdateCardProductV2Request request,
+            @RequestHeader(ACTOR_HEADER) @NotBlank @Size(max = 100) String actorId) {
+<span class="fc" id="L103">        return ApiResponseHelper.ok(productService.update(institutionId, productId, request, actorId));</span>
+    }
+
+    @PostMapping(&quot;/{productId}/versions&quot;)
+    @Operation(operationId = &quot;createProductVersionV2&quot;, summary = &quot;Create the next configuration version for a product&quot;)
+    public ResponseEntity&lt;ApiResponseEnvelope&lt;ProductVersionV2Response&gt;&gt; createVersion(
+            @PathVariable UUID institutionId, @PathVariable UUID productId,
+            @Valid @RequestBody CreateProductVersionV2Request request,
+            @RequestHeader(ACTOR_HEADER) @NotBlank @Size(max = 100) String actorId) {
+<span class="fc" id="L112">        return ApiResponseHelper.created(versionService.create(institutionId, productId, request, actorId));</span>
+    }
+
+    @GetMapping(&quot;/{productId}/versions&quot;)
+    @Operation(operationId = &quot;listProductVersionsV2&quot;, summary = &quot;List configuration versions for a product&quot;)
+    public ResponseEntity&lt;ApiResponseEnvelope&lt;PagedResponse&lt;ProductVersionV2Response&gt;&gt;&gt; listVersions(
+            @PathVariable UUID institutionId, @PathVariable UUID productId,
+            @RequestParam(required = false) Integer page,
+            @RequestParam(required = false) Integer limit) {
+<span class="fc" id="L121">        Pageable base = PageableDefaults.ofOneBased(page, limit);</span>
+<span class="fc" id="L122">        Pageable pageable = PageRequest.of(base.getPageNumber(), base.getPageSize(),</span>
+<span class="fc" id="L123">                Sort.by(Sort.Direction.DESC, &quot;versionNumber&quot;));</span>
+<span class="fc" id="L124">        return ApiResponseHelper.ok(PagedResponse.of(</span>
+<span class="fc" id="L125">                versionService.list(institutionId, productId, pageable)));</span>
+    }
+
+    @GetMapping(&quot;/{productId}/versions/{versionId}&quot;)
+    @Operation(operationId = &quot;getProductVersionV2&quot;, summary = &quot;Get a product configuration version&quot;)
+    public ResponseEntity&lt;ApiResponseEnvelope&lt;ProductVersionV2Response&gt;&gt; getVersion(
+            @PathVariable UUID institutionId, @PathVariable UUID productId,
+            @PathVariable UUID versionId) {
+<span class="fc" id="L133">        return ApiResponseHelper.ok(versionService.get(institutionId, productId, versionId));</span>
+    }
+
+    @PostMapping(&quot;/{productId}/versions/{versionId}/actions/update&quot;)
+    @Operation(operationId = &quot;updateProductVersionV2&quot;, summary = &quot;Apply an explicit update or lifecycle action to a draft version&quot;)
+    public ResponseEntity&lt;ApiResponseEnvelope&lt;ProductVersionV2Response&gt;&gt; updateVersion(
+            @PathVariable UUID institutionId, @PathVariable UUID productId,
+            @PathVariable UUID versionId,
+            @Valid @RequestBody UpdateProductVersionV2Request request,
+            @RequestHeader(ACTOR_HEADER) @NotBlank @Size(max = 100) String actorId) {
+<span class="fc" id="L143">        return ApiResponseHelper.ok(versionService.update(</span>
+                institutionId, productId, versionId, request, actorId));
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.15.202606040825</span></div></body></html>

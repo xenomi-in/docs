@@ -1,0 +1,47 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>CourierShipmentV2.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">CMS Core Service</a> &gt; <a href="index.source.html" class="el_package">com.xenomi.cms.core.v2.card.lifecycle.entity</a> &gt; <span class="el_source">CourierShipmentV2.java</span></div><h1>CourierShipmentV2.java</h1><pre class="source lang-java linenums">package com.xenomi.cms.core.v2.card.lifecycle.entity;
+
+import jakarta.persistence.*;
+import lombok.*;
+import java.util.UUID;
+import java.util.Map;
+import java.time.OffsetDateTime;
+import com.xenomi.cms.core.v2.card.model.*;
+
+@Entity(name = &quot;CourierShipmentV2&quot;)
+@Table(name = &quot;courier_shipment&quot;, schema = &quot;cms_v2&quot;)
+@Data @Builder @NoArgsConstructor @AllArgsConstructor
+public class CourierShipmentV2 {
+    @Id
+    @Column(name = &quot;shipment_id&quot;, nullable = false, updatable = false)
+    private UUID shipmentId;
+    @Column(name = &quot;institution_id&quot;, nullable = false)
+    private UUID institutionId;
+    @Column(name = &quot;card_id&quot;, nullable = false)
+    private UUID cardId;
+    @Column(name = &quot;production_request_id&quot;, nullable = false)
+    private UUID productionRequestId;
+    @Column(name = &quot;courier_provider_id&quot;, nullable = false)
+    private UUID courierProviderId;
+    @Column(name = &quot;courier_waybill_id&quot;, nullable = false)
+    private UUID courierWaybillId;
+    @Column(name = &quot;shipping_address_reference_id&quot;, nullable = false)
+    private UUID shippingAddressReferenceId;
+    @Column(name = &quot;shipment_status&quot;, length = 32, nullable = false)
+    private String shipmentStatus;
+    @Column(name = &quot;dispatched_at&quot;)
+    private OffsetDateTime dispatchedAt;
+    @Column(name = &quot;delivered_at&quot;)
+    private OffsetDateTime deliveredAt;
+    @Column(name = &quot;created_at&quot;, nullable = false)
+    private OffsetDateTime createdAt;
+    @Builder.Default
+    @Column(name = &quot;shipment_attempt&quot;, nullable = false)
+    private Integer shipmentAttempt = 1;
+    @PrePersist
+    void beforeInsert() {
+<span class="nc bnc" id="L42" title="All 2 branches missed.">        if (createdAt == null) createdAt = OffsetDateTime.now(java.time.ZoneOffset.UTC);</span>
+<span class="nc bnc" id="L43" title="All 2 branches missed.">        if (shipmentStatus == null) shipmentStatus = &quot;CREATED&quot;;</span>
+<span class="nc" id="L44">    }</span>
+
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.15.202606040825</span></div></body></html>

@@ -1,0 +1,126 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>ProductVersionEventSink.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">CMS Core Service</a> &gt; <a href="index.source.html" class="el_package">com.xenomi.cms.core.v2.event.catalog</a> &gt; <span class="el_source">ProductVersionEventSink.java</span></div><h1>ProductVersionEventSink.java</h1><pre class="source lang-java linenums">package com.xenomi.cms.core.v2.event.catalog;
+
+import java.time.OffsetDateTime;
+import java.util.Map;
+import java.util.Objects;
+
+import com.xenomi.cms.core.v2.event.mapper.PayloadValues;
+import com.xenomi.cms.core.v2.event.model.EventTypes;
+import com.xenomi.cms.core.v2.event.model.IdempotencyKeys;
+import com.xenomi.cms.core.v2.event.model.NotificationPriority;
+import com.xenomi.cms.core.v2.event.model.OutboxEventCommand;
+import com.xenomi.cms.core.v2.event.writer.OutboxEventWriter;
+import com.xenomi.cms.core.v2.product.dto.ProductVersionV2Response;
+import com.xenomi.cms.core.v2.product.model.ExpiryCalculationRule;
+import com.xenomi.cms.core.v2.product.model.ProductVersionStatus;
+import com.xenomi.cms.core.v2.product.model.ValidityStartRule;
+import org.springframework.stereotype.Component;
+
+@Component
+public class ProductVersionEventSink {
+
+    private final OutboxEventWriter writer;
+
+<span class="fc" id="L24">    public ProductVersionEventSink(OutboxEventWriter writer) {</span>
+<span class="fc" id="L25">        this.writer = writer;</span>
+<span class="fc" id="L26">    }</span>
+
+    public void onCreated(ProductVersionV2Response version, String correlationId) {
+<span class="pc bpc" id="L29" title="1 of 2 branches missed.">        if (version == null) {</span>
+<span class="nc" id="L30">            return;</span>
+        }
+<span class="fc" id="L32">        writer.enqueue(command(version, EventTypes.PRODUCT_VERSION_CREATED, correlationId,</span>
+<span class="fc" id="L33">                IdempotencyKeys.of(version.getInstitutionId(), EventTypes.PRODUCT_VERSION_CREATED,</span>
+<span class="fc" id="L34">                        version.getProductVersionId()),</span>
+<span class="fc" id="L35">                payload(version, null, version.getVersionStatus(), null)));</span>
+<span class="fc" id="L36">    }</span>
+
+    /**
+     * @param before snapshot taken before the update ran; {@code null} when unknown
+     */
+    public void onUpdated(ProductVersionV2Response version, VersionSnapshot before, String correlationId) {
+<span class="pc bpc" id="L42" title="1 of 2 branches missed.">        if (version == null) {</span>
+<span class="nc" id="L43">            return;</span>
+        }
+<span class="pc bpc" id="L45" title="1 of 2 branches missed.">        ProductVersionStatus previousStatus = before == null ? null : before.status();</span>
+<span class="pc bpc" id="L46" title="1 of 4 branches missed.">        boolean statusChanged = previousStatus != null &amp;&amp; previousStatus != version.getVersionStatus();</span>
+<span class="pc bpc" id="L47" title="1 of 6 branches missed.">        boolean changed = before == null || statusChanged || before.differsFrom(version);</span>
+<span class="fc bfc" id="L48" title="All 2 branches covered.">        if (!changed) {</span>
+<span class="fc" id="L49">            return;</span>
+        }
+<span class="fc" id="L51">        Object stamp = PayloadValues.instant(version.getUpdatedAt());</span>
+<span class="fc" id="L52">        writer.enqueue(command(version, EventTypes.PRODUCT_VERSION_UPDATED, correlationId,</span>
+<span class="fc" id="L53">                IdempotencyKeys.of(version.getInstitutionId(), EventTypes.PRODUCT_VERSION_UPDATED,</span>
+<span class="fc" id="L54">                        version.getProductVersionId(), stamp),</span>
+<span class="fc" id="L55">                payload(version, previousStatus, version.getVersionStatus(), &quot;PRODUCT_VERSION_UPDATED&quot;)));</span>
+<span class="fc bfc" id="L56" title="All 2 branches covered.">        if (!statusChanged) {</span>
+<span class="fc" id="L57">            return;</span>
+        }
+<span class="fc" id="L59">        writer.enqueue(command(version, EventTypes.PRODUCT_VERSION_STATUS_CHANGED, correlationId,</span>
+<span class="fc" id="L60">                IdempotencyKeys.of(version.getInstitutionId(), EventTypes.PRODUCT_VERSION_STATUS_CHANGED,</span>
+<span class="fc" id="L61">                        version.getProductVersionId(), previousStatus, version.getVersionStatus(), stamp),</span>
+<span class="fc" id="L62">                payload(version, previousStatus, version.getVersionStatus(), &quot;STATUS_CHANGED&quot;)));</span>
+<span class="fc" id="L63">    }</span>
+
+    private static OutboxEventCommand command(ProductVersionV2Response version, String eventType,
+            String correlationId, java.util.UUID idempotencyKey, Map&lt;String, Object&gt; payload) {
+<span class="fc" id="L67">        return OutboxEventCommand.builder()</span>
+<span class="fc" id="L68">                .institutionId(version.getInstitutionId())</span>
+<span class="fc" id="L69">                .eventType(eventType)</span>
+<span class="fc" id="L70">                .aggregateType(EventTypes.AGGREGATE_PRODUCT_VERSION)</span>
+<span class="fc" id="L71">                .aggregateId(version.getProductVersionId())</span>
+<span class="fc" id="L72">                .customerId(null)</span>
+<span class="fc" id="L73">                .correlationId(correlationId)</span>
+<span class="fc" id="L74">                .priority(NotificationPriority.MEDIUM)</span>
+<span class="fc" id="L75">                .idempotencyKey(idempotencyKey)</span>
+<span class="fc" id="L76">                .payload(payload)</span>
+<span class="fc" id="L77">                .build();</span>
+    }
+
+    private static Map&lt;String, Object&gt; payload(ProductVersionV2Response version,
+            ProductVersionStatus oldStatus, ProductVersionStatus newStatus, String reason) {
+<span class="fc" id="L82">        return PayloadValues.entries(</span>
+<span class="fc" id="L83">                &quot;productVersionId&quot;, PayloadValues.uuid(version.getProductVersionId()),</span>
+<span class="fc" id="L84">                &quot;productId&quot;, PayloadValues.uuid(version.getProductId()),</span>
+<span class="fc" id="L85">                &quot;institutionId&quot;, PayloadValues.uuid(version.getInstitutionId()),</span>
+<span class="fc" id="L86">                &quot;versionNumber&quot;, version.getVersionNumber(),</span>
+<span class="fc" id="L87">                &quot;oldStatus&quot;, PayloadValues.name(oldStatus),</span>
+<span class="fc" id="L88">                &quot;newStatus&quot;, PayloadValues.name(newStatus),</span>
+                &quot;reason&quot;, reason,
+<span class="fc" id="L90">                &quot;effectiveFrom&quot;, PayloadValues.instant(version.getEffectiveFrom()),</span>
+<span class="fc" id="L91">                &quot;effectiveTo&quot;, PayloadValues.instant(version.getEffectiveTo()),</span>
+<span class="fc" id="L92">                &quot;activatedAt&quot;, PayloadValues.instant(version.getActivatedAt()),</span>
+<span class="fc" id="L93">                &quot;changedBy&quot;, version.getUpdatedBy(),</span>
+<span class="fc" id="L94">                &quot;changedAt&quot;, PayloadValues.instant(version.getUpdatedAt()));</span>
+    }
+
+    /** Mutable version fields captured before an update, used to suppress no-op events. */
+<span class="fc" id="L98">    public record VersionSnapshot(</span>
+            ProductVersionStatus status,
+            int validityMonths,
+            ValidityStartRule validityStartRule,
+            ExpiryCalculationRule expiryCalculationRule,
+            Integer renewalNoticeDays,
+            Integer renewalProductionDays,
+            boolean automaticRenewalEnabled,
+            String defaultServiceCode,
+            String icvvServiceCode,
+            OffsetDateTime effectiveFrom,
+            OffsetDateTime effectiveTo) {
+
+        boolean differsFrom(ProductVersionV2Response after) {
+<span class="pc bpc" id="L112" title="1 of 2 branches missed.">            return status != after.getVersionStatus()</span>
+<span class="fc bfc" id="L113" title="All 2 branches covered.">                    || validityMonths != after.getValidityMonths()</span>
+<span class="pc bpc" id="L114" title="1 of 2 branches missed.">                    || validityStartRule != after.getValidityStartRule()</span>
+<span class="pc bpc" id="L115" title="1 of 2 branches missed.">                    || expiryCalculationRule != after.getExpiryCalculationRule()</span>
+<span class="pc bpc" id="L116" title="1 of 2 branches missed.">                    || !Objects.equals(renewalNoticeDays, after.getRenewalNoticeDays())</span>
+<span class="pc bpc" id="L117" title="1 of 2 branches missed.">                    || !Objects.equals(renewalProductionDays, after.getRenewalProductionDays())</span>
+<span class="pc bpc" id="L118" title="1 of 2 branches missed.">                    || automaticRenewalEnabled != after.isAutomaticRenewalEnabled()</span>
+<span class="pc bpc" id="L119" title="1 of 2 branches missed.">                    || !Objects.equals(defaultServiceCode, after.getDefaultServiceCode())</span>
+<span class="pc bpc" id="L120" title="1 of 2 branches missed.">                    || !Objects.equals(icvvServiceCode, after.getIcvvServiceCode())</span>
+<span class="pc bpc" id="L121" title="1 of 2 branches missed.">                    || !Objects.equals(effectiveFrom, after.getEffectiveFrom())</span>
+<span class="pc bpc" id="L122" title="1 of 2 branches missed.">                    || !Objects.equals(effectiveTo, after.getEffectiveTo());</span>
+        }
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.15.202606040825</span></div></body></html>

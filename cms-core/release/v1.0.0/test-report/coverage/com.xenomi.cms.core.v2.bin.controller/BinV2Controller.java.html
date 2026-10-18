@@ -1,0 +1,154 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>BinV2Controller.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">CMS Core Service</a> &gt; <a href="index.source.html" class="el_package">com.xenomi.cms.core.v2.bin.controller</a> &gt; <span class="el_source">BinV2Controller.java</span></div><h1>BinV2Controller.java</h1><pre class="source lang-java linenums">package com.xenomi.cms.core.v2.bin.controller;
+
+import java.util.UUID;
+
+import com.xenomi.cms.core.api.ApiResponseEnvelope;
+import com.xenomi.cms.core.api.ApiErrorEnvelope;
+import com.xenomi.cms.core.api.ApiResponseHelper;
+import com.xenomi.cms.core.api.PageableDefaults;
+import com.xenomi.cms.core.api.PagedResponse;
+import com.xenomi.cms.core.v2.bin.dto.BinConfigurationV2Response;
+import com.xenomi.cms.core.v2.bin.dto.BinRangeV2Response;
+import com.xenomi.cms.core.v2.bin.dto.CreateBinConfigurationV2Request;
+import com.xenomi.cms.core.v2.bin.dto.CreateBinRangeV2Request;
+import com.xenomi.cms.core.v2.bin.dto.UpdateBinConfigurationV2Request;
+import com.xenomi.cms.core.v2.bin.dto.UpdateBinRangeV2Request;
+import com.xenomi.cms.core.v2.bin.model.BinRangeStatus;
+import com.xenomi.cms.core.v2.bin.model.BinStatus;
+import com.xenomi.cms.core.v2.bin.model.CardNetwork;
+import com.xenomi.cms.core.v2.bin.service.BinConfigurationV2Service;
+import com.xenomi.cms.core.v2.bin.service.BinRangeV2Service;
+
+import io.swagger.v3.oas.annotations.Operation;
+import io.swagger.v3.oas.annotations.media.Content;
+import io.swagger.v3.oas.annotations.media.Schema;
+import io.swagger.v3.oas.annotations.responses.ApiResponse;
+import io.swagger.v3.oas.annotations.responses.ApiResponses;
+import io.swagger.v3.oas.annotations.tags.Tag;
+import jakarta.validation.Valid;
+import jakarta.validation.constraints.NotBlank;
+import jakarta.validation.constraints.Size;
+import org.springframework.data.domain.PageRequest;
+import org.springframework.data.domain.Pageable;
+import org.springframework.data.domain.Sort;
+import org.springframework.http.ResponseEntity;
+import org.springframework.validation.annotation.Validated;
+import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PathVariable;
+import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.PutMapping;
+import org.springframework.web.bind.annotation.RequestBody;
+import org.springframework.web.bind.annotation.RequestHeader;
+import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestParam;
+import org.springframework.web.bind.annotation.RestController;
+
+@Validated
+@RestController
+@RequestMapping(&quot;/cms/api/v2/institutions/{institutionId}/bins&quot;)
+@Tag(name = &quot;V2 - BIN Configuration&quot;, description = &quot;BIN configuration, PAN ranges and lifecycle&quot;)
+public class BinV2Controller {
+
+    private static final String ACTOR_HEADER = &quot;X-Actor-Id&quot;;
+    private final BinConfigurationV2Service binService;
+    private final BinRangeV2Service rangeService;
+
+<span class="fc" id="L56">    public BinV2Controller(BinConfigurationV2Service binService, BinRangeV2Service rangeService) {</span>
+<span class="fc" id="L57">        this.binService = binService;</span>
+<span class="fc" id="L58">        this.rangeService = rangeService;</span>
+<span class="fc" id="L59">    }</span>
+
+    @PostMapping
+    @Operation(summary = &quot;Create a BIN configuration&quot;)
+    public ResponseEntity&lt;ApiResponseEnvelope&lt;BinConfigurationV2Response&gt;&gt; createBin(
+            @PathVariable UUID institutionId,
+            @Valid @RequestBody CreateBinConfigurationV2Request request,
+            @RequestHeader(ACTOR_HEADER) @NotBlank @Size(max = 50) String actorId) {
+<span class="fc" id="L67">        return ApiResponseHelper.created(binService.create(institutionId, request, actorId));</span>
+    }
+
+    @GetMapping
+    @Operation(summary = &quot;List BIN configurations for an institution&quot;)
+    public ResponseEntity&lt;ApiResponseEnvelope&lt;PagedResponse&lt;BinConfigurationV2Response&gt;&gt;&gt; listBins(
+            @PathVariable UUID institutionId,
+            @RequestParam(required = false) CardNetwork cardNetwork,
+            @RequestParam(required = false) BinStatus binStatus,
+            @RequestParam(required = false) Integer page,
+            @RequestParam(required = false) Integer limit) {
+<span class="fc" id="L78">        Pageable base = PageableDefaults.ofOneBased(page, limit);</span>
+<span class="fc" id="L79">        Pageable pageable = PageRequest.of(base.getPageNumber(), base.getPageSize(),</span>
+<span class="fc" id="L80">                Sort.by(Sort.Direction.ASC, &quot;binNumber&quot;));</span>
+<span class="fc" id="L81">        return ApiResponseHelper.ok(PagedResponse.of(</span>
+<span class="fc" id="L82">                binService.search(institutionId, cardNetwork, binStatus, pageable)));</span>
+    }
+
+    @GetMapping(&quot;/{binId}&quot;)
+    @Operation(summary = &quot;Get a BIN configuration&quot;)
+    public ResponseEntity&lt;ApiResponseEnvelope&lt;BinConfigurationV2Response&gt;&gt; getBin(
+            @PathVariable UUID institutionId, @PathVariable UUID binId) {
+<span class="fc" id="L89">        return ApiResponseHelper.ok(binService.get(institutionId, binId));</span>
+    }
+
+    @PutMapping(&quot;/{binId}&quot;)
+    @Operation(
+            summary = &quot;Replace the mutable BIN configuration&quot;,
+            description = &quot;Applies full PUT semantics. The request must contain every required mutable field and the latest version returned by GET. &quot;
+                    + &quot;BIN identity, institution ownership, network classification and audit fields are immutable. &quot;
+                    + &quot;A stale version returns 409 CONFLICT.&quot;)
+    @ApiResponses({
+            @ApiResponse(responseCode = &quot;200&quot;, description = &quot;BIN configuration replaced&quot;),
+            @ApiResponse(responseCode = &quot;400&quot;, description = &quot;Incomplete representation, invalid value, unknown field, or immutable field&quot;,
+                    content = @Content(mediaType = &quot;application/json&quot;, schema = @Schema(implementation = ApiErrorEnvelope.class))),
+            @ApiResponse(responseCode = &quot;404&quot;, description = &quot;BIN not found within the institution&quot;,
+                    content = @Content(mediaType = &quot;application/json&quot;, schema = @Schema(implementation = ApiErrorEnvelope.class))),
+            @ApiResponse(responseCode = &quot;409&quot;, description = &quot;Stale optimistic-lock version&quot;,
+                    content = @Content(mediaType = &quot;application/json&quot;, schema = @Schema(implementation = ApiErrorEnvelope.class)))
+    })
+    public ResponseEntity&lt;ApiResponseEnvelope&lt;BinConfigurationV2Response&gt;&gt; updateBin(
+            @PathVariable UUID institutionId, @PathVariable UUID binId,
+            @Valid @RequestBody UpdateBinConfigurationV2Request request,
+            @RequestHeader(ACTOR_HEADER) @NotBlank @Size(max = 50) String actorId) {
+<span class="fc" id="L111">        return ApiResponseHelper.ok(binService.update(institutionId, binId, request, actorId));</span>
+    }
+
+    @PostMapping(&quot;/{binId}/ranges&quot;)
+    @Operation(summary = &quot;Create a PAN range under a BIN configuration&quot;)
+    public ResponseEntity&lt;ApiResponseEnvelope&lt;BinRangeV2Response&gt;&gt; createRange(
+            @PathVariable UUID institutionId, @PathVariable UUID binId,
+            @Valid @RequestBody CreateBinRangeV2Request request,
+            @RequestHeader(ACTOR_HEADER) @NotBlank @Size(max = 100) String actorId) {
+<span class="fc" id="L120">        return ApiResponseHelper.created(rangeService.create(institutionId, binId, request, actorId));</span>
+    }
+
+    @GetMapping(&quot;/{binId}/ranges&quot;)
+    @Operation(summary = &quot;List PAN ranges under a BIN configuration&quot;)
+    public ResponseEntity&lt;ApiResponseEnvelope&lt;PagedResponse&lt;BinRangeV2Response&gt;&gt;&gt; listRanges(
+            @PathVariable UUID institutionId, @PathVariable UUID binId,
+            @RequestParam(required = false) BinRangeStatus rangeStatus,
+            @RequestParam(required = false) Integer page,
+            @RequestParam(required = false) Integer limit) {
+<span class="fc" id="L130">        Pageable base = PageableDefaults.ofOneBased(page, limit);</span>
+<span class="fc" id="L131">        Pageable pageable = PageRequest.of(base.getPageNumber(), base.getPageSize(),</span>
+<span class="fc" id="L132">                Sort.by(Sort.Direction.ASC, &quot;rangeStart&quot;));</span>
+<span class="fc" id="L133">        return ApiResponseHelper.ok(PagedResponse.of(</span>
+<span class="fc" id="L134">                rangeService.search(institutionId, binId, rangeStatus, pageable)));</span>
+    }
+
+    @GetMapping(&quot;/{binId}/ranges/{rangeId}&quot;)
+    @Operation(summary = &quot;Get a PAN range under a BIN configuration&quot;)
+    public ResponseEntity&lt;ApiResponseEnvelope&lt;BinRangeV2Response&gt;&gt; getRange(
+            @PathVariable UUID institutionId, @PathVariable UUID binId, @PathVariable UUID rangeId) {
+<span class="fc" id="L141">        return ApiResponseHelper.ok(rangeService.get(institutionId, binId, rangeId));</span>
+    }
+
+    @PostMapping(&quot;/{binId}/ranges/{rangeId}/actions/update&quot;)
+    @Operation(summary = &quot;Apply an explicit update or lifecycle action to a PAN range&quot;)
+    public ResponseEntity&lt;ApiResponseEnvelope&lt;BinRangeV2Response&gt;&gt; updateRange(
+            @PathVariable UUID institutionId, @PathVariable UUID binId, @PathVariable UUID rangeId,
+            @Valid @RequestBody UpdateBinRangeV2Request request,
+            @RequestHeader(ACTOR_HEADER) @NotBlank @Size(max = 100) String actorId) {
+<span class="fc" id="L150">        return ApiResponseHelper.ok(rangeService.update(</span>
+                institutionId, binId, rangeId, request, actorId));
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.15.202606040825</span></div></body></html>

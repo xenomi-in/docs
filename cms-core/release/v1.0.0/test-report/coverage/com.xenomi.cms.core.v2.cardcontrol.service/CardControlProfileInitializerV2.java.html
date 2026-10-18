@@ -1,0 +1,240 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>CardControlProfileInitializerV2.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">CMS Core Service</a> &gt; <a href="index.source.html" class="el_package">com.xenomi.cms.core.v2.cardcontrol.service</a> &gt; <span class="el_source">CardControlProfileInitializerV2.java</span></div><h1>CardControlProfileInitializerV2.java</h1><pre class="source lang-java linenums">package com.xenomi.cms.core.v2.cardcontrol.service;
+
+import java.time.OffsetDateTime;
+import java.time.ZoneOffset;
+import java.util.ArrayList;
+import java.util.EnumMap;
+import java.util.List;
+import java.util.Map;
+import java.util.UUID;
+
+import com.xenomi.cms.core.exception.BusinessRuleViolationException;
+import com.xenomi.cms.core.v2.card.entity.CardV2;
+import com.xenomi.cms.core.v2.cardcontrol.entity.CardControlProfileV2;
+import com.xenomi.cms.core.v2.cardcontrol.entity.CardTransactionControlV2;
+import com.xenomi.cms.core.v2.cardcontrol.model.ControlChannel;
+import com.xenomi.cms.core.v2.cardcontrol.model.ControlGeography;
+import com.xenomi.cms.core.v2.cardcontrol.model.ControlProfileStatus;
+import com.xenomi.cms.core.v2.cardcontrol.repository.CardControlProfileV2Repository;
+import com.xenomi.cms.core.v2.cardcontrol.repository.CardTransactionControlV2Repository;
+import com.xenomi.cms.core.v2.common.DatabaseUuidV7Generator;
+import com.xenomi.cms.core.v2.institution.entity.InstitutionV2;
+import com.xenomi.cms.core.v2.product.entity.ProductCardLimitV2;
+import com.xenomi.cms.core.v2.product.entity.ProductDefaultControlsV2;
+import com.xenomi.cms.core.v2.product.model.LimitPeriodType;
+import com.xenomi.cms.core.v2.product.model.ProductLimitStatus;
+import com.xenomi.cms.core.v2.product.model.ProductLimitType;
+import com.xenomi.cms.core.v2.product.repository.ProductCardLimitV2Repository;
+import com.xenomi.cms.core.v2.product.repository.ProductDefaultControlsV2Repository;
+import org.springframework.stereotype.Component;
+
+@Component
+public class CardControlProfileInitializerV2 {
+    private final CardControlProfileV2Repository profileRepository;
+    private final CardTransactionControlV2Repository controlRepository;
+    private final ProductDefaultControlsV2Repository defaultsRepository;
+    private final ProductCardLimitV2Repository productLimitRepository;
+    private final DatabaseUuidV7Generator uuidGenerator;
+
+    public CardControlProfileInitializerV2(
+            CardControlProfileV2Repository profileRepository,
+            CardTransactionControlV2Repository controlRepository,
+            ProductDefaultControlsV2Repository defaultsRepository,
+            ProductCardLimitV2Repository productLimitRepository,
+<span class="fc" id="L44">            DatabaseUuidV7Generator uuidGenerator) {</span>
+<span class="fc" id="L45">        this.profileRepository = profileRepository;</span>
+<span class="fc" id="L46">        this.controlRepository = controlRepository;</span>
+<span class="fc" id="L47">        this.defaultsRepository = defaultsRepository;</span>
+<span class="fc" id="L48">        this.productLimitRepository = productLimitRepository;</span>
+<span class="fc" id="L49">        this.uuidGenerator = uuidGenerator;</span>
+<span class="fc" id="L50">    }</span>
+
+    public InitializedControls initialize(CardV2 card, InstitutionV2 institution, String actor) {
+<span class="fc" id="L53">        ProductDefaultControlsV2 defaults = defaultsRepository</span>
+<span class="fc" id="L54">                .findByProductVersionIdAndInstitutionId(</span>
+<span class="fc" id="L55">                        card.getProductVersionId(), card.getInstitutionId())</span>
+<span class="fc" id="L56">                .orElseThrow(() -&gt; new BusinessRuleViolationException(</span>
+                        &quot;Product version must define default controls before card issuance&quot;));
+<span class="fc" id="L58">        Map&lt;ProductLimitType, ProductCardLimitV2&gt; limits = new EnumMap&lt;&gt;(ProductLimitType.class);</span>
+<span class="fc" id="L59">        productLimitRepository</span>
+<span class="fc" id="L60">                .findByInstitutionIdAndProductVersionIdAndPeriodTypeAndLimitStatus(</span>
+<span class="fc" id="L61">                        card.getInstitutionId(), card.getProductVersionId(),</span>
+                        LimitPeriodType.PER_TRANSACTION, ProductLimitStatus.ACTIVE)
+<span class="fc" id="L63">                .forEach(value -&gt; limits.put(value.getLimitType(), value));</span>
+
+<span class="fc" id="L65">        UUID profileId = uuidGenerator.generate();</span>
+<span class="fc" id="L66">        CardControlProfileV2 profile = profileRepository.save(CardControlProfileV2.builder()</span>
+<span class="fc" id="L67">                .cardControlProfileId(profileId)</span>
+<span class="fc" id="L68">                .institutionId(card.getInstitutionId())</span>
+<span class="fc" id="L69">                .cardId(card.getCardId())</span>
+<span class="fc" id="L70">                .controlVersion(1)</span>
+<span class="fc" id="L71">                .internationalEnabled(false)</span>
+<span class="fc" id="L72">                .profileStatus(ControlProfileStatus.PENDING_SWITCH)</span>
+<span class="fc" id="L73">                .updatedBy(actor)</span>
+<span class="fc" id="L74">                .build());</span>
+<span class="fc" id="L75">        OffsetDateTime now = OffsetDateTime.now(ZoneOffset.UTC);</span>
+<span class="fc" id="L76">        List&lt;CardTransactionControlV2&gt; controls = new ArrayList&lt;&gt;();</span>
+<span class="fc bfc" id="L77" title="All 2 branches covered.">        for (ControlGeography geography : ControlGeography.values()) {</span>
+<span class="fc bfc" id="L78" title="All 2 branches covered.">            for (ControlChannel channel : ControlChannel.values()) {</span>
+<span class="fc" id="L79">                ProductLimitType limitType = limitType(geography, channel, false);</span>
+<span class="fc" id="L80">                ProductCardLimitV2 limit = limits.get(limitType);</span>
+<span class="fc bfc" id="L81" title="All 6 branches covered.">                boolean enabled = geography == ControlGeography.DOMESTIC</span>
+                        &amp;&amp; (channel == ControlChannel.ATM || channel == ControlChannel.POS_CONTACT)
+<span class="fc bfc" id="L83" title="All 2 branches covered.">                        &amp;&amp; enabled(defaults, geography, channel);</span>
+<span class="fc" id="L84">                boolean allowed = allowed(defaults, geography, channel);</span>
+<span class="fc" id="L85">                controls.add(CardTransactionControlV2.builder()</span>
+<span class="fc" id="L86">                        .cardTransactionControlId(uuidGenerator.generate())</span>
+<span class="fc" id="L87">                        .institutionId(card.getInstitutionId())</span>
+<span class="fc" id="L88">                        .cardControlProfileId(profileId)</span>
+<span class="fc" id="L89">                        .geography(geography)</span>
+<span class="fc" id="L90">                        .channel(channel)</span>
+<span class="fc" id="L91">                        .allowed(allowed)</span>
+<span class="fc" id="L92">                        .enabled(enabled)</span>
+<span class="fc bfc" id="L93" title="All 4 branches covered.">                        .perTransactionLimitMinor(!allowed || limit == null</span>
+<span class="fc" id="L94">                                ? null : limit.getDefaultAmountMinor())</span>
+<span class="fc" id="L95">                        .currencyCode(institution.getBaseCurrency())</span>
+<span class="fc" id="L96">                        .effectiveAt(now)</span>
+<span class="fc" id="L97">                        .build());</span>
+            }
+        }
+<span class="fc" id="L100">        return new InitializedControls(profile, controlRepository.saveAll(controls));</span>
+    }
+
+    public void validateOriginalConfiguration(UUID tenant, UUID version) {
+<span class="fc bfc" id="L104" title="All 2 branches covered.">        if(defaultsRepository.findByProductVersionIdAndInstitutionId(version,tenant).isEmpty())</span>
+<span class="fc" id="L105">            throw new BusinessRuleViolationException(&quot;Product version must define default controls before issuance&quot;);</span>
+<span class="fc" id="L106">    }</span>
+
+    public InitializedControls initializeFromSource(
+            CardV2 source, CardV2 replacement, InstitutionV2 institution, String actor,
+            long assignedLimitMinor) {
+<span class="fc" id="L111">        CardControlProfileV2 sourceProfile = profileRepository</span>
+<span class="fc" id="L112">                .findByInstitutionIdAndCardId(source.getInstitutionId(), source.getCardId())</span>
+<span class="fc" id="L113">                .orElse(null);</span>
+<span class="fc bfc" id="L114" title="All 2 branches covered.">        if (sourceProfile == null) return initialize(replacement, institution, actor);</span>
+<span class="fc" id="L115">        List&lt;CardTransactionControlV2&gt; sourceControls = controlRepository</span>
+<span class="fc" id="L116">                .findByInstitutionIdAndCardControlProfileIdOrderByGeographyAscChannelAsc(</span>
+<span class="fc" id="L117">                        source.getInstitutionId(), sourceProfile.getCardControlProfileId());</span>
+<span class="fc bfc" id="L118" title="All 2 branches covered.">        if (sourceControls.size() != ControlGeography.values().length * ControlChannel.values().length) {</span>
+<span class="fc" id="L119">            throw new BusinessRuleViolationException(</span>
+                    &quot;Source card does not contain all ten control dimensions&quot;);
+        }
+<span class="fc bfc" id="L122" title="All 4 branches covered.">        if (assignedLimitMinor &lt; 0 || sourceControls.stream().anyMatch(value -&gt;</span>
+<span class="fc" id="L123">                exceeds(value.getPerTransactionLimitMinor(), assignedLimitMinor))) {</span>
+<span class="fc" id="L124">            throw new BusinessRuleViolationException(</span>
+                    &quot;Source card controls exceed the current Accounting assigned card limit&quot;);
+        }
+<span class="fc" id="L127">        UUID profileId = uuidGenerator.generate();</span>
+<span class="fc" id="L128">        CardControlProfileV2 profile = profileRepository.save(CardControlProfileV2.builder()</span>
+<span class="fc" id="L129">                .cardControlProfileId(profileId)</span>
+<span class="fc" id="L130">                .institutionId(replacement.getInstitutionId())</span>
+<span class="fc" id="L131">                .cardId(replacement.getCardId())</span>
+<span class="fc" id="L132">                .controlVersion(1)</span>
+<span class="fc" id="L133">                .internationalEnabled(sourceProfile.isInternationalEnabled())</span>
+<span class="fc" id="L134">                .profileStatus(ControlProfileStatus.PENDING_SWITCH)</span>
+<span class="fc" id="L135">                .updatedBy(actor)</span>
+<span class="fc" id="L136">                .build());</span>
+<span class="fc" id="L137">        OffsetDateTime now = OffsetDateTime.now(ZoneOffset.UTC);</span>
+<span class="fc" id="L138">        List&lt;CardTransactionControlV2&gt; controls = sourceControls.stream()</span>
+<span class="fc" id="L139">                .map(value -&gt; CardTransactionControlV2.builder()</span>
+<span class="fc" id="L140">                        .cardTransactionControlId(uuidGenerator.generate())</span>
+<span class="fc" id="L141">                        .institutionId(replacement.getInstitutionId())</span>
+<span class="fc" id="L142">                        .cardControlProfileId(profileId)</span>
+<span class="fc" id="L143">                        .geography(value.getGeography())</span>
+<span class="fc" id="L144">                        .channel(value.getChannel())</span>
+<span class="fc" id="L145">                        .allowed(value.isAllowed())</span>
+<span class="fc" id="L146">                        .enabled(value.isEnabled())</span>
+<span class="fc" id="L147">                        .perTransactionLimitMinor(value.getPerTransactionLimitMinor())</span>
+<span class="fc" id="L148">                        .currencyCode(institution.getBaseCurrency())</span>
+<span class="fc" id="L149">                        .effectiveAt(now)</span>
+<span class="fc" id="L150">                        .build())</span>
+<span class="fc" id="L151">                .toList();</span>
+<span class="fc" id="L152">        return new InitializedControls(profile, controlRepository.saveAll(controls));</span>
+    }
+
+    private static boolean exceeds(Long value, long maximum) {
+<span class="pc bpc" id="L156" title="1 of 4 branches missed.">        return value != null &amp;&amp; value &gt; maximum;</span>
+    }
+
+    static ProductLimitType limitType(
+            ControlGeography geography, ControlChannel channel, boolean contactless) {
+<span class="fc bfc" id="L161" title="All 4 branches covered.">        if (contactless || channel == ControlChannel.CONTACTLESS_POS) {</span>
+<span class="fc bfc" id="L162" title="All 2 branches covered.">            return geography == ControlGeography.DOMESTIC</span>
+<span class="fc" id="L163">                    ? ProductLimitType.DOMESTIC_CONTACTLESS</span>
+<span class="fc" id="L164">                    : ProductLimitType.INTERNATIONAL_CONTACTLESS;</span>
+        }
+<span class="fc bfc" id="L166" title="All 2 branches covered.">        return switch (geography) {</span>
+<span class="pc bpc" id="L167" title="1 of 5 branches missed.">            case DOMESTIC -&gt; switch (channel) {</span>
+<span class="fc" id="L168">                case ATM -&gt; ProductLimitType.DOMESTIC_ATM;</span>
+<span class="fc" id="L169">                case POS_CONTACT -&gt; ProductLimitType.DOMESTIC_POS;</span>
+<span class="nc" id="L170">                case CONTACTLESS_POS -&gt; ProductLimitType.DOMESTIC_CONTACTLESS;</span>
+<span class="fc" id="L171">                case ECOM -&gt; ProductLimitType.DOMESTIC_ECOMMERCE;</span>
+<span class="fc" id="L172">                case MOTO -&gt; ProductLimitType.DOMESTIC_MOTO;</span>
+            };
+<span class="pc bpc" id="L174" title="1 of 5 branches missed.">            case INTERNATIONAL -&gt; switch (channel) {</span>
+<span class="fc" id="L175">                case ATM -&gt; ProductLimitType.INTERNATIONAL_ATM;</span>
+<span class="fc" id="L176">                case POS_CONTACT -&gt; ProductLimitType.INTERNATIONAL_POS;</span>
+<span class="nc" id="L177">                case CONTACTLESS_POS -&gt; ProductLimitType.INTERNATIONAL_CONTACTLESS;</span>
+<span class="fc" id="L178">                case ECOM -&gt; ProductLimitType.INTERNATIONAL_ECOMMERCE;</span>
+<span class="fc" id="L179">                case MOTO -&gt; ProductLimitType.INTERNATIONAL_MOTO;</span>
+            };
+        };
+    }
+
+    static boolean enabled(ProductDefaultControlsV2 value,
+            ControlGeography geography, ControlChannel channel) {
+<span class="fc bfc" id="L186" title="All 2 branches covered.">        return geography == ControlGeography.DOMESTIC</span>
+<span class="fc bfc" id="L187" title="All 5 branches covered.">                ? switch (channel) {</span>
+<span class="fc" id="L188">                    case ATM -&gt; value.isDomesticAtmEnabled();</span>
+<span class="fc" id="L189">                    case POS_CONTACT -&gt; value.isDomesticPosEnabled();</span>
+<span class="fc" id="L190">                    case CONTACTLESS_POS -&gt; value.isDomesticContactlessEnabled();</span>
+<span class="fc" id="L191">                    case ECOM -&gt; value.isDomesticEcommerceEnabled();</span>
+<span class="fc" id="L192">                    case MOTO -&gt; value.isDomesticMotoEnabled();</span>
+                }
+<span class="fc bfc" id="L194" title="All 5 branches covered.">                : switch (channel) {</span>
+<span class="fc" id="L195">                    case ATM -&gt; value.isInternationalAtmEnabled();</span>
+<span class="fc" id="L196">                    case POS_CONTACT -&gt; value.isInternationalPosEnabled();</span>
+<span class="fc" id="L197">                    case CONTACTLESS_POS -&gt; value.isInternationalContactlessEnabled();</span>
+<span class="fc" id="L198">                    case ECOM -&gt; value.isInternationalEcommerceEnabled();</span>
+<span class="fc" id="L199">                    case MOTO -&gt; value.isInternationalMotoEnabled();</span>
+                };
+    }
+
+    static boolean allowed(ProductDefaultControlsV2 value,
+            ControlGeography geography, ControlChannel channel) {
+<span class="fc bfc" id="L205" title="All 2 branches covered.">        return geography == ControlGeography.DOMESTIC</span>
+<span class="fc bfc" id="L206" title="All 5 branches covered.">                ? switch (channel) {</span>
+<span class="fc" id="L207">                    case ATM -&gt; value.isDomesticAtmAllowed();</span>
+<span class="fc" id="L208">                    case POS_CONTACT -&gt; value.isDomesticPosAllowed();</span>
+<span class="fc" id="L209">                    case CONTACTLESS_POS -&gt; value.isDomesticContactlessAllowed();</span>
+<span class="fc" id="L210">                    case ECOM -&gt; value.isDomesticEcommerceAllowed();</span>
+<span class="fc" id="L211">                    case MOTO -&gt; value.isDomesticMotoAllowed();</span>
+                }
+<span class="fc bfc" id="L213" title="All 5 branches covered.">                : switch (channel) {</span>
+<span class="fc" id="L214">                    case ATM -&gt; value.isInternationalAtmAllowed();</span>
+<span class="fc" id="L215">                    case POS_CONTACT -&gt; value.isInternationalPosAllowed();</span>
+<span class="fc" id="L216">                    case CONTACTLESS_POS -&gt; value.isInternationalContactlessAllowed();</span>
+<span class="fc" id="L217">                    case ECOM -&gt; value.isInternationalEcommerceAllowed();</span>
+<span class="fc" id="L218">                    case MOTO -&gt; value.isInternationalMotoAllowed();</span>
+                };
+    }
+
+    static boolean contactlessEnabled(
+            ProductDefaultControlsV2 value, ControlGeography geography) {
+<span class="fc bfc" id="L224" title="All 2 branches covered.">        return geography == ControlGeography.DOMESTIC</span>
+<span class="fc" id="L225">                ? value.isDomesticContactlessEnabled()</span>
+<span class="fc" id="L226">                : value.isInternationalContactlessEnabled();</span>
+    }
+
+    static boolean contactlessAllowed(
+            ProductDefaultControlsV2 value, ControlGeography geography) {
+<span class="fc bfc" id="L231" title="All 2 branches covered.">        return geography == ControlGeography.DOMESTIC</span>
+<span class="fc" id="L232">                ? value.isDomesticContactlessAllowed()</span>
+<span class="fc" id="L233">                : value.isInternationalContactlessAllowed();</span>
+    }
+
+<span class="fc" id="L236">    public record InitializedControls(</span>
+            CardControlProfileV2 profile, List&lt;CardTransactionControlV2&gt; controls) {
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.15.202606040825</span></div></body></html>

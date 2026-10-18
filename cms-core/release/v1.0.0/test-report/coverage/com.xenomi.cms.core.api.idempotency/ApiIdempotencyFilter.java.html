@@ -1,0 +1,204 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>ApiIdempotencyFilter.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">CMS Core Service</a> &gt; <a href="index.source.html" class="el_package">com.xenomi.cms.core.api.idempotency</a> &gt; <span class="el_source">ApiIdempotencyFilter.java</span></div><h1>ApiIdempotencyFilter.java</h1><pre class="source lang-java linenums">package com.xenomi.cms.core.api.idempotency;
+
+import com.xenomi.cms.core.api.ApiErrorCode;
+import com.fasterxml.jackson.databind.ObjectMapper;
+import com.xenomi.cms.core.api.ApiResponseHelper;
+import jakarta.servlet.FilterChain;
+import jakarta.servlet.ServletException;
+import jakarta.servlet.http.HttpServletRequest;
+import jakarta.servlet.http.HttpServletResponse;
+import org.springframework.beans.factory.annotation.Value;
+import org.springframework.http.HttpHeaders;
+import org.springframework.http.HttpMethod;
+import org.springframework.http.MediaType;
+import org.springframework.security.core.Authentication;
+import org.springframework.security.core.context.SecurityContextHolder;
+import org.springframework.security.oauth2.server.resource.authentication.JwtAuthenticationToken;
+import org.springframework.web.filter.OncePerRequestFilter;
+import org.springframework.web.util.ContentCachingResponseWrapper;
+
+import java.io.IOException;
+import java.nio.charset.StandardCharsets;
+import java.security.MessageDigest;
+import java.security.NoSuchAlgorithmException;
+import java.util.HexFormat;
+import java.util.regex.Pattern;
+
+/** Common idempotency enforcement for V2 POST and PUT operations. */
+public class ApiIdempotencyFilter extends OncePerRequestFilter {
+
+    public static final String IDEMPOTENCY_KEY = &quot;Idempotency-Key&quot;;
+    public static final String REPLAYED_HEADER = &quot;Idempotency-Replayed&quot;;
+<span class="fc" id="L32">    private static final Pattern VALID_KEY = Pattern.compile(&quot;[A-Za-z0-9._:-]{1,128}&quot;);</span>
+    private static final String HSM_IMPORT_SUFFIX = &quot;/hsm-keys/imports&quot;;
+
+    private final ApiIdempotencyRepository repository;
+    private final ObjectMapper objectMapper;
+    private final int maxBodyBytes;
+
+    public ApiIdempotencyFilter(
+            ApiIdempotencyRepository repository,
+            ObjectMapper objectMapper,
+<span class="fc" id="L42">            @Value(&quot;${cms.idempotency.max-body-bytes:2097152}&quot;) int maxBodyBytes) {</span>
+<span class="fc" id="L43">        this.repository = repository;</span>
+<span class="fc" id="L44">        this.objectMapper = objectMapper;</span>
+<span class="fc" id="L45">        this.maxBodyBytes = maxBodyBytes;</span>
+<span class="fc" id="L46">    }</span>
+
+    @Override
+    protected boolean shouldNotFilter(HttpServletRequest request) {
+<span class="fc" id="L50">        String method = request.getMethod();</span>
+<span class="fc" id="L51">        String path = request.getRequestURI();</span>
+<span class="pc bpc" id="L52" title="3 of 4 branches missed.">        boolean write = HttpMethod.POST.matches(method) || HttpMethod.PUT.matches(method);</span>
+        // HSM import already has stronger domain-specific idempotency and audit semantics.
+<span class="pc bpc" id="L54" title="7 of 8 branches missed.">        return path.equals(&quot;/cms/api/v2/acs/cardholder-contact&quot;) || !write || !path.startsWith(&quot;/cms/api/v2/&quot;) || path.endsWith(HSM_IMPORT_SUFFIX);</span>
+    }
+
+    @Override
+    protected void doFilterInternal(HttpServletRequest request, HttpServletResponse response,
+                                    FilterChain filterChain) throws ServletException, IOException {
+<span class="fc" id="L60">        Authentication authentication = SecurityContextHolder.getContext().getAuthentication();</span>
+<span class="pc bpc" id="L61" title="2 of 4 branches missed.">        if (!(authentication instanceof JwtAuthenticationToken jwt) || !authentication.isAuthenticated()) {</span>
+<span class="nc" id="L62">            filterChain.doFilter(request, response);</span>
+<span class="nc" id="L63">            return;</span>
+        }
+
+<span class="fc" id="L66">        String key = request.getHeader(IDEMPOTENCY_KEY);</span>
+<span class="pc bpc" id="L67" title="1 of 4 branches missed.">        if (key == null || !VALID_KEY.matcher(key.trim()).matches()) {</span>
+<span class="fc" id="L68">            writeError(request, response, HttpServletResponse.SC_BAD_REQUEST,</span>
+                    ApiErrorCode.IDEMPOTENCY_KEY_REQUIRED,
+                    &quot;Idempotency-Key is required for V2 POST/PUT requests and must match [A-Za-z0-9._:-]{1,128}&quot;);
+<span class="fc" id="L71">            return;</span>
+        }
+
+        CachedBodyHttpServletRequest cachedRequest;
+        try {
+<span class="fc" id="L76">            cachedRequest = new CachedBodyHttpServletRequest(request, maxBodyBytes);</span>
+<span class="nc" id="L77">        } catch (CachedBodyHttpServletRequest.RequestBodyTooLargeException exception) {</span>
+<span class="nc" id="L78">            writeError(request, response, HttpServletResponse.SC_REQUEST_ENTITY_TOO_LARGE,</span>
+                    ApiErrorCode.REQUEST_BODY_TOO_LARGE,
+                    &quot;Request body exceeds the configured idempotency limit&quot;);
+<span class="nc" id="L81">            return;</span>
+<span class="fc" id="L82">        }</span>
+
+        // Issuance owns durable idempotency and returns the operation's current receipt.
+        // Caching its initial 202 would hide later completion and skip lifecycle authorization.
+<span class="pc bpc" id="L86" title="1 of 4 branches missed.">        if (HttpMethod.POST.matches(request.getMethod()) &amp;&amp; request.getRequestURI().matches(</span>
+                &quot;/cms/api/v2/institutions/[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}/cards(?:/[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}/replacement)?&quot;)) {
+<span class="fc" id="L88">            filterChain.doFilter(cachedRequest, response);</span>
+<span class="fc" id="L89">            return;</span>
+        }
+
+<span class="fc" id="L92">        String actorId = jwt.getToken().getSubject();</span>
+<span class="fc" id="L93">        String tenantScope = tenantScope(jwt);</span>
+<span class="fc" id="L94">        String requestPath = request.getRequestURI();</span>
+<span class="fc" id="L95">        ApiIdempotencyRepository.RequestIdentity identity = new ApiIdempotencyRepository.RequestIdentity(</span>
+<span class="fc" id="L96">                tenantScope, actorId, request.getMethod(), requestPath, sha256(key.trim()));</span>
+<span class="fc" id="L97">        String requestHash = requestHash(cachedRequest);</span>
+<span class="fc" id="L98">        ApiIdempotencyRepository.ClaimResult claim = repository.claim(identity, requestHash);</span>
+
+<span class="pc bpc" id="L100" title="2 of 5 branches missed.">        switch (claim.state()) {</span>
+            case CONFLICT -&gt; {
+<span class="fc" id="L102">                writeError(request, response, HttpServletResponse.SC_CONFLICT,</span>
+                        ApiErrorCode.IDEMPOTENCY_CONFLICT,
+                        &quot;The Idempotency-Key was already used with a different request payload&quot;);
+<span class="fc" id="L105">                return;</span>
+            }
+            case IN_PROGRESS -&gt; {
+<span class="nc" id="L108">                response.setHeader(HttpHeaders.RETRY_AFTER, &quot;1&quot;);</span>
+<span class="nc" id="L109">                writeError(request, response, HttpServletResponse.SC_CONFLICT,</span>
+                        ApiErrorCode.IDEMPOTENCY_IN_PROGRESS,
+                        &quot;A request with this Idempotency-Key is still being processed&quot;);
+<span class="nc" id="L112">                return;</span>
+            }
+            case REPLAY -&gt; {
+<span class="fc" id="L115">                replay(response, claim.response());</span>
+<span class="fc" id="L116">                return;</span>
+            }
+<span class="fc" id="L118">            case STARTED -&gt; processAndRecord(cachedRequest, response, filterChain, identity);</span>
+        }
+<span class="fc" id="L120">    }</span>
+
+    private void processAndRecord(
+            CachedBodyHttpServletRequest request,
+            HttpServletResponse response,
+            FilterChain filterChain,
+            ApiIdempotencyRepository.RequestIdentity identity) throws IOException, ServletException {
+<span class="fc" id="L127">        ContentCachingResponseWrapper cachedResponse = new ContentCachingResponseWrapper(response);</span>
+        try {
+<span class="fc" id="L129">            filterChain.doFilter(request, cachedResponse);</span>
+<span class="fc" id="L130">            byte[] body = cachedResponse.getContentAsByteArray();</span>
+<span class="fc" id="L131">            int status = cachedResponse.getStatus();</span>
+<span class="pc bpc" id="L132" title="1 of 2 branches missed.">            if (status &gt;= 500) {</span>
+<span class="nc" id="L133">                repository.delete(identity);</span>
+            } else {
+<span class="fc" id="L135">                repository.complete(identity, status, cachedResponse.getContentType(),</span>
+<span class="fc" id="L136">                        cachedResponse.getHeader(HttpHeaders.LOCATION), body);</span>
+            }
+<span class="fc" id="L138">            cachedResponse.copyBodyToResponse();</span>
+<span class="nc" id="L139">        } catch (IOException | ServletException | RuntimeException exception) {</span>
+<span class="nc" id="L140">            repository.delete(identity);</span>
+<span class="nc" id="L141">            throw exception;</span>
+<span class="fc" id="L142">        }</span>
+<span class="fc" id="L143">    }</span>
+
+    private static String tenantScope(JwtAuthenticationToken jwt) {
+<span class="fc" id="L146">        Object institution = jwt.getToken().getClaims().get(&quot;institution_id&quot;);</span>
+<span class="pc bpc" id="L147" title="2 of 4 branches missed.">        if (institution != null &amp;&amp; !institution.toString().isBlank()) {</span>
+<span class="fc" id="L148">            return institution.toString();</span>
+        }
+<span class="nc bnc" id="L150" title="All 2 branches missed.">        return Boolean.TRUE.equals(jwt.getToken().getClaims().get(&quot;platform_access&quot;))</span>
+<span class="nc" id="L151">                ? &quot;PLATFORM&quot; : &quot;UNSCOPED&quot;;</span>
+    }
+
+    private static String requestHash(CachedBodyHttpServletRequest request) {
+<span class="fc" id="L155">        MessageDigest digest = sha256Digest();</span>
+<span class="fc" id="L156">        digest.update(request.getMethod().getBytes(StandardCharsets.UTF_8));</span>
+<span class="fc" id="L157">        digest.update((byte) '\n');</span>
+<span class="fc" id="L158">        digest.update(request.getRequestURI().getBytes(StandardCharsets.UTF_8));</span>
+<span class="fc" id="L159">        digest.update((byte) '\n');</span>
+<span class="pc bpc" id="L160" title="1 of 2 branches missed.">        if (request.getQueryString() != null) {</span>
+<span class="nc" id="L161">            digest.update(request.getQueryString().getBytes(StandardCharsets.UTF_8));</span>
+        }
+<span class="fc" id="L163">        digest.update((byte) '\n');</span>
+<span class="fc" id="L164">        digest.update(request.body());</span>
+<span class="fc" id="L165">        return HexFormat.of().formatHex(digest.digest());</span>
+    }
+
+    private static String sha256(String value) {
+<span class="fc" id="L169">        return HexFormat.of().formatHex(sha256Digest().digest(value.getBytes(StandardCharsets.UTF_8)));</span>
+    }
+
+    private static MessageDigest sha256Digest() {
+        try {
+<span class="fc" id="L174">            return MessageDigest.getInstance(&quot;SHA-256&quot;);</span>
+<span class="nc" id="L175">        } catch (NoSuchAlgorithmException exception) {</span>
+<span class="nc" id="L176">            throw new IllegalStateException(&quot;SHA-256 is unavailable&quot;, exception);</span>
+        }
+    }
+
+    private static void replay(
+            HttpServletResponse response,
+            ApiIdempotencyRepository.StoredResponse stored) throws IOException {
+<span class="fc" id="L183">        response.setStatus(stored.responseStatus());</span>
+<span class="pc bpc" id="L184" title="1 of 2 branches missed.">        if (stored.contentType() != null) {</span>
+<span class="fc" id="L185">            response.setContentType(stored.contentType());</span>
+        }
+<span class="pc bpc" id="L187" title="1 of 2 branches missed.">        if (stored.location() != null) {</span>
+<span class="fc" id="L188">            response.setHeader(HttpHeaders.LOCATION, stored.location());</span>
+        }
+<span class="fc" id="L190">        response.setHeader(REPLAYED_HEADER, &quot;true&quot;);</span>
+<span class="pc bpc" id="L191" title="1 of 2 branches missed.">        if (stored.body() != null) {</span>
+<span class="fc" id="L192">            response.getOutputStream().write(stored.body());</span>
+        }
+<span class="fc" id="L194">    }</span>
+
+    private void writeError(HttpServletRequest request, HttpServletResponse response,
+                            int status, ApiErrorCode code, String message) throws IOException {
+<span class="fc" id="L198">        response.setStatus(status);</span>
+<span class="fc" id="L199">        response.setContentType(MediaType.APPLICATION_JSON_VALUE);</span>
+<span class="fc" id="L200">        objectMapper.writeValue(response.getOutputStream(),</span>
+<span class="fc" id="L201">                ApiResponseHelper.error(request, code, message, null));</span>
+<span class="fc" id="L202">    }</span>
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.15.202606040825</span></div></body></html>

@@ -1,0 +1,63 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>RequestIdFilter.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">CMS Core Service</a> &gt; <a href="index.source.html" class="el_package">com.xenomi.cms.core.api</a> &gt; <span class="el_source">RequestIdFilter.java</span></div><h1>RequestIdFilter.java</h1><pre class="source lang-java linenums">package com.xenomi.cms.core.api;
+
+import jakarta.servlet.FilterChain;
+import jakarta.servlet.ServletException;
+import jakarta.servlet.http.HttpServletRequest;
+import jakarta.servlet.http.HttpServletResponse;
+import org.slf4j.MDC;
+import org.springframework.core.Ordered;
+import org.springframework.core.annotation.Order;
+import org.springframework.stereotype.Component;
+import org.springframework.web.filter.OncePerRequestFilter;
+
+import java.io.IOException;
+import java.util.UUID;
+
+/**
+ * Servlet filter for generating and tracking unique request IDs.
+ * Generates a UUID for each HTTP request, stores it as a request attribute,
+ * adds it to MDC for logging, and ensures it's available for response metadata.
+ * Runs with highest precedence to ensure request ID is available early in the request lifecycle.
+ *
+ * @author LogicPoint Systems
+ * @version 1.0.0
+ * @since 2026-01-21
+ */
+@Component
+@Order(Ordered.HIGHEST_PRECEDENCE)
+<span class="fc" id="L28">public class RequestIdFilter extends OncePerRequestFilter {</span>
+
+    public static final String REQUEST_ID_HEADER = &quot;X-Request-Id&quot;;
+    public static final String REQUEST_ID_ATTRIBUTE = &quot;requestId&quot;;
+    public static final String REQUEST_ID_MDC = &quot;requestId&quot;;
+    private static final int MAX_REQUEST_ID_LENGTH = 128;
+    private static final String VALID_REQUEST_ID = &quot;[A-Za-z0-9._:-]+&quot;;
+
+    @Override
+    protected void doFilterInternal(HttpServletRequest request, HttpServletResponse response,
+                                    FilterChain filterChain) throws ServletException, IOException {
+<span class="fc" id="L39">        String suppliedRequestId = request.getHeader(REQUEST_ID_HEADER);</span>
+<span class="fc bfc" id="L40" title="All 2 branches covered.">        String requestId = isValid(suppliedRequestId)</span>
+<span class="fc" id="L41">                ? suppliedRequestId.trim()</span>
+<span class="fc" id="L42">                : UUID.randomUUID().toString();</span>
+<span class="fc" id="L43">        request.setAttribute(REQUEST_ID_ATTRIBUTE, requestId);</span>
+<span class="fc" id="L44">        response.setHeader(REQUEST_ID_HEADER, requestId);</span>
+<span class="fc" id="L45">        MDC.put(REQUEST_ID_MDC, requestId);</span>
+        try {
+<span class="fc" id="L47">            filterChain.doFilter(request, response);</span>
+        } finally {
+<span class="fc" id="L49">            MDC.remove(REQUEST_ID_MDC);</span>
+        }
+<span class="fc" id="L51">    }</span>
+
+    private static boolean isValid(String requestId) {
+<span class="pc bpc" id="L54" title="1 of 2 branches missed.">        if (requestId == null) {</span>
+<span class="nc" id="L55">            return false;</span>
+        }
+<span class="fc" id="L57">        String value = requestId.trim();</span>
+<span class="pc bpc" id="L58" title="1 of 2 branches missed.">        return !value.isEmpty()</span>
+<span class="pc bpc" id="L59" title="1 of 2 branches missed.">                &amp;&amp; value.length() &lt;= MAX_REQUEST_ID_LENGTH</span>
+<span class="fc bfc" id="L60" title="All 2 branches covered.">                &amp;&amp; value.matches(VALID_REQUEST_ID);</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.15.202606040825</span></div></body></html>

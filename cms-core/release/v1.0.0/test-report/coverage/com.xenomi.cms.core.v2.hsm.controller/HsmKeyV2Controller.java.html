@@ -1,0 +1,112 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>HsmKeyV2Controller.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">CMS Core Service</a> &gt; <a href="index.source.html" class="el_package">com.xenomi.cms.core.v2.hsm.controller</a> &gt; <span class="el_source">HsmKeyV2Controller.java</span></div><h1>HsmKeyV2Controller.java</h1><pre class="source lang-java linenums">package com.xenomi.cms.core.v2.hsm.controller;
+
+import java.util.UUID;
+
+import com.xenomi.cms.core.api.ApiResponseEnvelope;
+import com.xenomi.cms.core.api.ApiResponseHelper;
+import com.xenomi.cms.core.api.PageableDefaults;
+import com.xenomi.cms.core.api.PagedResponse;
+import com.xenomi.cms.core.v2.hsm.dto.HsmKeyV2Response;
+import com.xenomi.cms.core.v2.hsm.dto.GenerateHsmKeyV2Request;
+import com.xenomi.cms.core.v2.hsm.dto.RegisterHsmKeyV2Request;
+import com.xenomi.cms.core.v2.hsm.dto.RotateHsmKeyV2Request;
+import com.xenomi.cms.core.v2.hsm.dto.UpdateHsmKeyStatusV2Request;
+import com.xenomi.cms.core.v2.hsm.model.HsmKeyScope;
+import com.xenomi.cms.core.v2.hsm.model.HsmKeyStatus;
+import com.xenomi.cms.core.v2.hsm.model.HsmKeyType;
+import com.xenomi.cms.core.v2.hsm.service.HsmKeyV2Service;
+
+import io.swagger.v3.oas.annotations.Operation;
+import io.swagger.v3.oas.annotations.tags.Tag;
+import jakarta.validation.Valid;
+import jakarta.validation.constraints.NotBlank;
+import jakarta.validation.constraints.Size;
+import org.springframework.data.domain.PageRequest;
+import org.springframework.data.domain.Pageable;
+import org.springframework.data.domain.Sort;
+import org.springframework.http.ResponseEntity;
+import org.springframework.validation.annotation.Validated;
+import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PathVariable;
+import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.PutMapping;
+import org.springframework.web.bind.annotation.RequestBody;
+import org.springframework.web.bind.annotation.RequestHeader;
+import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestParam;
+import org.springframework.web.bind.annotation.RestController;
+
+@Validated
+@RestController
+@RequestMapping(&quot;/cms/api/v2/institutions/{institutionId}/hsm-keys&quot;)
+@Tag(name = &quot;V2 - Key Management&quot;, description = &quot;HSM key generation, registration, exchange and assignment; key material is never returned&quot;)
+public class HsmKeyV2Controller {
+    private static final String ACTOR_HEADER = &quot;X-Actor-Id&quot;;
+    private final HsmKeyV2Service service;
+
+<span class="fc" id="L47">    public HsmKeyV2Controller(HsmKeyV2Service service) { this.service = service; }</span>
+
+    @PostMapping
+    @Operation(summary = &quot;Generate a key using the configured HSM&quot;,
+            description = &quot;Accepts TR-31, double-length TDES, or AES according to the configured HSM provider capabilities. &quot;
+                    + &quot;Clear key material is never returned; provider processing failures return HTTP 500.&quot;)
+    public ResponseEntity&lt;ApiResponseEnvelope&lt;HsmKeyV2Response&gt;&gt; generate(
+            @PathVariable UUID institutionId,
+            @Valid @RequestBody GenerateHsmKeyV2Request request,
+            @RequestHeader(ACTOR_HEADER) @NotBlank @Size(max = 50) String actorId) {
+<span class="fc" id="L57">        return ApiResponseHelper.created(service.generate(institutionId, request, actorId));</span>
+    }
+
+    @PostMapping(&quot;/registrations&quot;)
+    @Operation(summary = &quot;Register an existing HSM-protected key reference&quot;,
+            description = &quot;Import metadata for a key already generated or loaded in an HSM&quot;)
+    public ResponseEntity&lt;ApiResponseEnvelope&lt;HsmKeyV2Response&gt;&gt; register(
+            @PathVariable UUID institutionId,
+            @Valid @RequestBody RegisterHsmKeyV2Request request,
+            @RequestHeader(ACTOR_HEADER) @NotBlank @Size(max = 50) String actorId) {
+<span class="fc" id="L67">        return ApiResponseHelper.created(service.register(institutionId, request, actorId));</span>
+    }
+
+    @GetMapping
+    @Operation(summary = &quot;List HSM key references for an institution&quot;)
+    public ResponseEntity&lt;ApiResponseEnvelope&lt;PagedResponse&lt;HsmKeyV2Response&gt;&gt;&gt; search(
+            @PathVariable UUID institutionId,
+            @RequestParam(required = false) HsmKeyType keyType,
+            @RequestParam(required = false) HsmKeyScope keyScope,
+            @RequestParam(required = false) HsmKeyStatus status,
+            @RequestParam(required = false) UUID binId,
+            @RequestParam(required = false) Integer page,
+            @RequestParam(required = false) Integer limit) {
+<span class="fc" id="L80">        Pageable base = PageableDefaults.ofOneBased(page, limit);</span>
+<span class="fc" id="L81">        Pageable pageable = PageRequest.of(base.getPageNumber(), base.getPageSize(),</span>
+<span class="fc" id="L82">                Sort.by(Sort.Direction.DESC, &quot;createdAt&quot;));</span>
+<span class="fc" id="L83">        return ApiResponseHelper.ok(PagedResponse.of(</span>
+<span class="fc" id="L84">                service.search(institutionId, keyType, keyScope, status, binId, pageable)));</span>
+    }
+
+    @GetMapping(&quot;/{keyId}&quot;)
+    @Operation(summary = &quot;Get HSM key metadata by UUID&quot;)
+    public ResponseEntity&lt;ApiResponseEnvelope&lt;HsmKeyV2Response&gt;&gt; get(
+            @PathVariable UUID institutionId, @PathVariable UUID keyId) {
+<span class="fc" id="L91">        return ApiResponseHelper.ok(service.get(institutionId, keyId));</span>
+    }
+
+    @PutMapping(&quot;/{keyId}/status&quot;)
+    @Operation(summary = &quot;Move an HSM key through its lifecycle&quot;)
+    public ResponseEntity&lt;ApiResponseEnvelope&lt;HsmKeyV2Response&gt;&gt; changeStatus(
+            @PathVariable UUID institutionId, @PathVariable UUID keyId,
+            @Valid @RequestBody UpdateHsmKeyStatusV2Request request,
+            @RequestHeader(ACTOR_HEADER) @NotBlank @Size(max = 50) String actorId) {
+<span class="fc" id="L100">        return ApiResponseHelper.ok(service.changeStatus(institutionId, keyId, request, actorId));</span>
+    }
+
+    @PostMapping(&quot;/{keyId}/rotations&quot;)
+    @Operation(summary = &quot;Register a replacement version without overwriting key history&quot;)
+    public ResponseEntity&lt;ApiResponseEnvelope&lt;HsmKeyV2Response&gt;&gt; rotate(
+            @PathVariable UUID institutionId, @PathVariable UUID keyId,
+            @Valid @RequestBody RotateHsmKeyV2Request request,
+            @RequestHeader(ACTOR_HEADER) @NotBlank @Size(max = 50) String actorId) {
+<span class="fc" id="L109">        return ApiResponseHelper.created(service.rotate(institutionId, keyId, request, actorId));</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.15.202606040825</span></div></body></html>

@@ -1,0 +1,106 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>CardIssuanceV2Controller.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">CMS Core Service</a> &gt; <a href="index.source.html" class="el_package">com.xenomi.cms.core.v2.card.controller</a> &gt; <span class="el_source">CardIssuanceV2Controller.java</span></div><h1>CardIssuanceV2Controller.java</h1><pre class="source lang-java linenums">package com.xenomi.cms.core.v2.card.controller;
+
+import java.util.UUID;
+
+import com.xenomi.cms.core.api.ApiResponseEnvelope;
+import com.xenomi.cms.core.api.ApiResponseHelper;
+import com.xenomi.cms.core.api.PageableDefaults;
+import com.xenomi.cms.core.api.PagedResponse;
+import com.xenomi.cms.core.v2.card.dto.CardV2Response;
+import com.xenomi.cms.core.v2.card.dto.CreateCardV2Request;
+import com.xenomi.cms.core.v2.card.dto.RequestPhysicalCardV2Request;
+import com.xenomi.cms.core.v2.card.service.CardIssuanceV2Service;
+import io.swagger.v3.oas.annotations.Operation;
+import io.swagger.v3.oas.annotations.tags.Tag;
+import jakarta.validation.Valid;
+import jakarta.validation.constraints.NotBlank;
+import jakarta.validation.constraints.Size;
+import org.springframework.data.domain.PageRequest;
+import org.springframework.data.domain.Pageable;
+import org.springframework.data.domain.Sort;
+import org.springframework.http.ResponseEntity;
+import org.springframework.validation.annotation.Validated;
+import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PathVariable;
+import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.RequestBody;
+import org.springframework.web.bind.annotation.RequestHeader;
+import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestParam;
+import org.springframework.web.bind.annotation.RestController;
+
+@Validated
+@RestController
+@RequestMapping(&quot;/cms/api/v2/institutions/{institutionId}/cards&quot;)
+@Tag(name = &quot;V2 - Cards&quot;, description = &quot;Tenant-scoped card issuance and safe card metadata retrieval&quot;)
+public class CardIssuanceV2Controller {
+    private static final String ACTOR_HEADER = &quot;X-Actor-Id&quot;;
+    private final CardIssuanceV2Service service;
+    private final com.xenomi.cms.core.v2.card.lifecycle.command.OriginalCardIssuanceApiV2 issuance;
+
+    public CardIssuanceV2Controller(CardIssuanceV2Service service,
+<span class="fc" id="L42">            com.xenomi.cms.core.v2.card.lifecycle.command.OriginalCardIssuanceApiV2 issuance) {</span>
+<span class="fc" id="L43">        this.service = service;</span>
+<span class="fc" id="L44">        this.issuance = issuance;</span>
+<span class="fc" id="L45">    }</span>
+
+    @PostMapping
+    @Operation(
+            operationId = &quot;issueCardV2&quot;,
+            summary = &quot;Issue a card&quot;,
+            description = &quot;Accepts a durable issuance operation. Returns HTTP 202 and a receipt; poll issuance-operations/{operationId} until CONFIRMED. UNKNOWN requires provider reconciliation and is never automatically redispatched. Actor and tenant permissions come from authenticated JWT claims.&quot;)
+    public ResponseEntity&lt;ApiResponseEnvelope&lt;com.xenomi.cms.core.v2.card.lifecycle.command.LifecycleCommandReceiptV2&gt;&gt; issue(
+            @PathVariable UUID institutionId,
+            @Valid @RequestBody CreateCardV2Request request,
+            @RequestHeader(&quot;Idempotency-Key&quot;) @NotBlank @Size(max = 128) String idempotencyKey,
+            @RequestHeader(ACTOR_HEADER) @NotBlank @Size(max = 100) String actorId) {
+<span class="fc" id="L57">        return ResponseEntity.accepted().body(ApiResponseHelper.success(issuance.submit(institutionId, request, idempotencyKey)));</span>
+    }
+
+    @GetMapping(&quot;/issuance-operations/{operationId}&quot;)
+    public ResponseEntity&lt;ApiResponseEnvelope&lt;com.xenomi.cms.core.v2.card.lifecycle.command.LifecycleCommandReceiptV2&gt;&gt; operation(
+            @PathVariable UUID institutionId, @PathVariable UUID operationId) {
+<span class="fc" id="L63">        return ApiResponseHelper.ok(issuance.get(institutionId, operationId));</span>
+    }
+
+    @PostMapping(&quot;/{cardId}/physical-production-requests&quot;)
+    @Operation(
+            operationId = &quot;requestPhysicalCardV2&quot;,
+            summary = &quot;Request the physical card after virtual-first issuance&quot;,
+            description = &quot;Creates one production request for a VIRTUAL_THEN_PHYSICAL_LATER card. The existing card ID and PAN allocation are preserved; no new PAN is generated.&quot;)
+    public ResponseEntity&lt;ApiResponseEnvelope&lt;CardV2Response&gt;&gt; requestPhysicalCard(
+            @PathVariable UUID institutionId,
+            @PathVariable UUID cardId,
+            @Valid @RequestBody RequestPhysicalCardV2Request request,
+            @RequestHeader(&quot;Idempotency-Key&quot;) @NotBlank @Size(max = 128) String idempotencyKey,
+            @RequestHeader(ACTOR_HEADER) @NotBlank @Size(max = 100) String actorId) {
+<span class="fc" id="L77">        return ApiResponseHelper.created(service.requestPhysicalCard(</span>
+                institutionId, cardId, request, idempotencyKey, actorId));
+    }
+
+    @GetMapping(&quot;/{cardId}&quot;)
+    @Operation(operationId = &quot;getCardV2&quot;, summary = &quot;Get safe card metadata by UUID&quot;)
+    public ResponseEntity&lt;ApiResponseEnvelope&lt;CardV2Response&gt;&gt; get(
+            @PathVariable UUID institutionId, @PathVariable UUID cardId) {
+<span class="fc" id="L85">        return ApiResponseHelper.ok(service.get(institutionId, cardId));</span>
+    }
+
+    @GetMapping
+    @Operation(
+            operationId = &quot;listCardsV2&quot;,
+            summary = &quot;List cards&quot;,
+            description = &quot;Lists institution cards, optionally filtered by customer or external account reference. Only masked PAN metadata is returned.&quot;)
+    public ResponseEntity&lt;ApiResponseEnvelope&lt;PagedResponse&lt;CardV2Response&gt;&gt;&gt; list(
+            @PathVariable UUID institutionId,
+            @RequestParam(required = false) UUID customerReferenceId,
+            @RequestParam(required = false) UUID accountReferenceId,
+            @RequestParam(required = false) Integer page,
+            @RequestParam(required = false) Integer limit) {
+<span class="fc" id="L99">        Pageable base = PageableDefaults.ofOneBased(page, limit);</span>
+<span class="fc" id="L100">        Pageable pageable = PageRequest.of(base.getPageNumber(), base.getPageSize(),</span>
+<span class="fc" id="L101">                Sort.by(Sort.Direction.DESC, &quot;createdAt&quot;));</span>
+<span class="fc" id="L102">        return ApiResponseHelper.ok(PagedResponse.of(</span>
+<span class="fc" id="L103">                service.search(institutionId, customerReferenceId, accountReferenceId, pageable)));</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.15.202606040825</span></div></body></html>

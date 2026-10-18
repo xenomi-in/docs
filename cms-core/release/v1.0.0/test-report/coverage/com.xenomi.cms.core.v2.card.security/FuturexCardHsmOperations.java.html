@@ -1,0 +1,141 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>FuturexCardHsmOperations.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">CMS Core Service</a> &gt; <a href="index.source.html" class="el_package">com.xenomi.cms.core.v2.card.security</a> &gt; <span class="el_source">FuturexCardHsmOperations.java</span></div><h1>FuturexCardHsmOperations.java</h1><pre class="source lang-java linenums">package com.xenomi.cms.core.v2.card.security;
+
+import java.nio.charset.StandardCharsets;
+import java.security.GeneralSecurityException;
+import java.security.SecureRandom;
+import java.util.Arrays;
+import java.util.Base64;
+
+import javax.crypto.Cipher;
+import javax.crypto.Mac;
+import javax.crypto.spec.GCMParameterSpec;
+import javax.crypto.spec.SecretKeySpec;
+
+import com.xenomi.cms.core.hms.service.NettyHsmService;
+import com.xenomi.cms.core.v2.institution.entity.HsmKeyReferenceV2;
+import org.springframework.stereotype.Component;
+
+@Component
+public class FuturexCardHsmOperations implements CardHsmOperations {
+    private static final String ENVELOPE_VERSION = &quot;CMS2&quot;;
+    private static final String ENCRYPTION_ALGORITHM = &quot;A256GCM&quot;;
+    private static final int GCM_NONCE_BYTES = 12;
+    private static final int GCM_TAG_BITS = 128;
+
+    private final NettyHsmService hsm;
+    private final ApplicationKeyMaterialService applicationKeys;
+<span class="fc" id="L27">    private final SecureRandom random = new SecureRandom();</span>
+
+    public FuturexCardHsmOperations(NettyHsmService hsm,
+<span class="fc" id="L30">            ApplicationKeyMaterialService applicationKeys) {</span>
+<span class="fc" id="L31">        this.hsm = hsm;</span>
+<span class="fc" id="L32">        this.applicationKeys = applicationKeys;</span>
+<span class="fc" id="L33">    }</span>
+
+    @Override
+    public String encrypt(String clearText, HsmKeyReferenceV2 key) {
+<span class="fc" id="L37">        byte[] clearKey = applicationKeys.resolve(key, ApplicationKeyUse.CARD_DATA_ENCRYPTION);</span>
+        try {
+<span class="fc" id="L39">            byte[] nonce = new byte[GCM_NONCE_BYTES];</span>
+<span class="fc" id="L40">            random.nextBytes(nonce);</span>
+<span class="fc" id="L41">            Cipher cipher = Cipher.getInstance(&quot;AES/GCM/NoPadding&quot;);</span>
+<span class="fc" id="L42">            cipher.init(Cipher.ENCRYPT_MODE, new SecretKeySpec(clearKey, &quot;AES&quot;),</span>
+                    new GCMParameterSpec(GCM_TAG_BITS, nonce));
+<span class="fc" id="L44">            cipher.updateAAD(aad(key));</span>
+<span class="fc" id="L45">            byte[] encrypted = cipher.doFinal(clearText.getBytes(StandardCharsets.UTF_8));</span>
+<span class="fc" id="L46">            return ENVELOPE_VERSION + &quot;:&quot; + ENCRYPTION_ALGORITHM + &quot;:&quot; + key.getKeyId()</span>
+<span class="fc" id="L47">                    + &quot;:&quot; + Base64.getUrlEncoder().withoutPadding().encodeToString(nonce)</span>
+<span class="fc" id="L48">                    + &quot;:&quot; + Base64.getUrlEncoder().withoutPadding().encodeToString(encrypted);</span>
+<span class="nc" id="L49">        } catch (GeneralSecurityException exception) {</span>
+<span class="nc" id="L50">            throw new CardSecurityException(&quot;Card data encryption failed&quot;, exception);</span>
+        } finally {
+<span class="fc" id="L52">            Arrays.fill(clearKey, (byte) 0);</span>
+        }
+    }
+
+    @Override
+    public String decrypt(String cipherText, HsmKeyReferenceV2 key) {
+<span class="pc bpc" id="L58" title="1 of 4 branches missed.">        if (cipherText != null &amp;&amp; cipherText.startsWith(&quot;HSM1:&quot;)) {</span>
+<span class="fc" id="L59">            return require(hsm.decryptDataWithKeyReference(cipherText,</span>
+<span class="fc" id="L60">                    key.getEncryptedKeyBlock(), algorithm(key)), &quot;legacy decryption&quot;);</span>
+        }
+<span class="pc bpc" id="L62" title="1 of 2 branches missed.">        String[] parts = cipherText == null ? new String[0] : cipherText.split(&quot;:&quot;, 5);</span>
+<span class="pc bpc" id="L63" title="2 of 4 branches missed.">        if (parts.length != 5 || !ENVELOPE_VERSION.equals(parts[0])</span>
+<span class="pc bpc" id="L64" title="1 of 2 branches missed.">                || !ENCRYPTION_ALGORITHM.equals(parts[1])</span>
+<span class="pc bpc" id="L65" title="1 of 2 branches missed.">                || !key.getKeyId().toString().equals(parts[2])) {</span>
+<span class="nc" id="L66">            throw new CardSecurityException(&quot;Invalid or mismatched card data envelope&quot;);</span>
+        }
+<span class="fc" id="L68">        byte[] clearKey = applicationKeys.resolve(key, ApplicationKeyUse.CARD_DATA_ENCRYPTION);</span>
+        try {
+<span class="fc" id="L70">            byte[] nonce = Base64.getUrlDecoder().decode(parts[3]);</span>
+<span class="fc" id="L71">            byte[] encrypted = Base64.getUrlDecoder().decode(parts[4]);</span>
+<span class="pc bpc" id="L72" title="1 of 2 branches missed.">            if (nonce.length != GCM_NONCE_BYTES) {</span>
+<span class="nc" id="L73">                throw new CardSecurityException(&quot;Invalid card data envelope nonce&quot;);</span>
+            }
+<span class="fc" id="L75">            Cipher cipher = Cipher.getInstance(&quot;AES/GCM/NoPadding&quot;);</span>
+<span class="fc" id="L76">            cipher.init(Cipher.DECRYPT_MODE, new SecretKeySpec(clearKey, &quot;AES&quot;),</span>
+                    new GCMParameterSpec(GCM_TAG_BITS, nonce));
+<span class="fc" id="L78">            cipher.updateAAD(aad(key));</span>
+<span class="fc" id="L79">            return new String(cipher.doFinal(encrypted), StandardCharsets.UTF_8);</span>
+<span class="nc" id="L80">        } catch (IllegalArgumentException | GeneralSecurityException exception) {</span>
+<span class="nc" id="L81">            throw new CardSecurityException(&quot;Card data decryption or integrity check failed&quot;, exception);</span>
+        } finally {
+<span class="fc" id="L83">            Arrays.fill(clearKey, (byte) 0);</span>
+        }
+    }
+
+    @Override
+    public String generatePanHmac(String pan, HsmKeyReferenceV2 key) {
+<span class="fc" id="L89">        byte[] clearKey = applicationKeys.resolve(key, ApplicationKeyUse.PAN_HMAC);</span>
+        try {
+<span class="fc" id="L91">            Mac mac = Mac.getInstance(&quot;HmacSHA256&quot;);</span>
+<span class="fc" id="L92">            mac.init(new SecretKeySpec(clearKey, &quot;HmacSHA256&quot;));</span>
+<span class="fc" id="L93">            return java.util.HexFormat.of().withUpperCase().formatHex(</span>
+<span class="fc" id="L94">                    mac.doFinal(pan.getBytes(StandardCharsets.US_ASCII)));</span>
+<span class="nc" id="L95">        } catch (GeneralSecurityException exception) {</span>
+<span class="nc" id="L96">            throw new CardSecurityException(&quot;PAN HMAC generation failed&quot;, exception);</span>
+        } finally {
+<span class="fc" id="L98">            Arrays.fill(clearKey, (byte) 0);</span>
+        }
+    }
+
+    @Override
+    public String generateLegacyPanHmac(String pan, HsmKeyReferenceV2 key) {
+<span class="nc" id="L104">        return require(hsm.generateMacWithKeyReference(pan, key.getEncryptedKeyBlock()),</span>
+                &quot;legacy PAN HMAC&quot;);
+    }
+
+    @Override
+    public CvvPair generateCvv(String pan, String expiryYymm, String serviceCode,
+            HsmKeyReferenceV2 key) {
+<span class="nc" id="L111">        String result = require(hsm.generateCvv(pan, expiryYymm, serviceCode,</span>
+<span class="nc" id="L112">                key.getEncryptedKeyBlock()), &quot;CVV generation&quot;);</span>
+<span class="nc" id="L113">        String[] values = result.split(&quot;;&quot;, -1);</span>
+<span class="nc bnc" id="L114" title="All 4 branches missed.">        if (values.length != 2 || !values[0].matches(&quot;[0-9]{3,4}&quot;)</span>
+<span class="nc bnc" id="L115" title="All 2 branches missed.">                || !values[1].matches(&quot;[0-9]{3,4}&quot;)) {</span>
+<span class="nc" id="L116">            throw new CardSecurityException(&quot;HSM returned invalid CVV generation metadata&quot;);</span>
+        }
+<span class="nc" id="L118">        return new CvvPair(values[0], values[1]);</span>
+    }
+
+    private static String require(String value, String operation) {
+<span class="pc bpc" id="L122" title="2 of 4 branches missed.">        if (value == null || value.isBlank()) {</span>
+<span class="nc" id="L123">            throw new CardSecurityException(&quot;HSM &quot; + operation + &quot; failed&quot;);</span>
+        }
+<span class="fc" id="L125">        return value;</span>
+    }
+
+    private static String algorithm(HsmKeyReferenceV2 key) {
+<span class="pc bpc" id="L129" title="1 of 2 branches missed.">        if (key.getScheme() == com.xenomi.cms.core.v2.hsm.model.HsmKeyScheme.AES) return &quot;AES&quot;;</span>
+<span class="pc bpc" id="L130" title="1 of 2 branches missed.">        if (key.getScheme() == com.xenomi.cms.core.v2.hsm.model.HsmKeyScheme.TR31</span>
+<span class="nc bnc" id="L131" title="All 2 branches missed.">                &amp;&amp; key.getTr31Algorithm() != null</span>
+<span class="nc bnc" id="L132" title="All 2 branches missed.">                &amp;&amp; key.getTr31Algorithm().toUpperCase().startsWith(&quot;A&quot;)) return &quot;AES&quot;;</span>
+<span class="fc" id="L133">        return &quot;TDES&quot;;</span>
+    }
+
+    private static byte[] aad(HsmKeyReferenceV2 key) {
+<span class="fc" id="L137">        return (&quot;CMS2|CARD_DATA|&quot; + key.getInstitutionId() + &quot;|&quot; + key.getKeyId())</span>
+<span class="fc" id="L138">                .getBytes(StandardCharsets.US_ASCII);</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.15.202606040825</span></div></body></html>

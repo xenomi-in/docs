@@ -1,0 +1,235 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>BinConfigurationV2Service.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">CMS Core Service</a> &gt; <a href="index.source.html" class="el_package">com.xenomi.cms.core.v2.bin.service</a> &gt; <span class="el_source">BinConfigurationV2Service.java</span></div><h1>BinConfigurationV2Service.java</h1><pre class="source lang-java linenums">package com.xenomi.cms.core.v2.bin.service;
+
+import java.time.LocalDate;
+import java.time.OffsetDateTime;
+import java.time.ZoneOffset;
+import java.util.Locale;
+import java.util.Objects;
+import java.util.Set;
+import java.util.UUID;
+
+import com.xenomi.cms.core.exception.ImmutableFieldException;
+import com.xenomi.cms.core.exception.ResourceAlreadyExistsException;
+import com.xenomi.cms.core.exception.ResourceNotFoundException;
+import com.xenomi.cms.core.exception.ResourceVersionConflictException;
+import com.xenomi.cms.core.exception.UnknownRequestFieldException;
+import com.xenomi.cms.core.v2.bin.dto.BinConfigurationV2Response;
+import com.xenomi.cms.core.v2.bin.dto.CreateBinConfigurationV2Request;
+import com.xenomi.cms.core.v2.bin.dto.UpdateBinConfigurationV2Request;
+import com.xenomi.cms.core.v2.bin.entity.BinConfigurationV2;
+import com.xenomi.cms.core.v2.bin.model.BinStatus;
+import com.xenomi.cms.core.v2.bin.model.CardTechnology;
+import com.xenomi.cms.core.v2.bin.model.CardNetwork;
+import com.xenomi.cms.core.v2.bin.model.PinMethod;
+import com.xenomi.cms.core.v2.bin.repository.BinConfigurationV2Repository;
+import com.xenomi.cms.core.v2.common.DatabaseUuidV7Generator;
+import com.xenomi.cms.core.v2.event.catalog.BinEventSink;
+import com.xenomi.cms.core.v2.event.correlation.CorrelationIdResolver;
+import com.xenomi.cms.core.v2.institution.repository.InstitutionV2Repository;
+
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
+import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
+
+@Service
+public class BinConfigurationV2Service {
+
+<span class="fc" id="L38">    private static final Set&lt;String&gt; IMMUTABLE_BIN_FIELDS = Set.of(</span>
+            &quot;binId&quot;, &quot;institutionId&quot;, &quot;binNumber&quot;, &quot;binLength&quot;, &quot;cardNetwork&quot;, &quot;binType&quot;,
+            &quot;cardProductClass&quot;, &quot;createdAt&quot;, &quot;createdBy&quot;, &quot;updatedAt&quot;, &quot;updatedBy&quot;);
+
+    private final BinConfigurationV2Repository repository;
+    private final InstitutionV2Repository institutionRepository;
+    private final DatabaseUuidV7Generator uuidGenerator;
+    private final BinEventSink eventSink;
+    private final CorrelationIdResolver correlationIdResolver;
+
+    public BinConfigurationV2Service(BinConfigurationV2Repository repository,
+            InstitutionV2Repository institutionRepository, DatabaseUuidV7Generator uuidGenerator,
+<span class="fc" id="L50">            BinEventSink eventSink, CorrelationIdResolver correlationIdResolver) {</span>
+<span class="fc" id="L51">        this.repository = repository;</span>
+<span class="fc" id="L52">        this.institutionRepository = institutionRepository;</span>
+<span class="fc" id="L53">        this.uuidGenerator = uuidGenerator;</span>
+<span class="fc" id="L54">        this.eventSink = eventSink;</span>
+<span class="fc" id="L55">        this.correlationIdResolver = correlationIdResolver;</span>
+<span class="fc" id="L56">    }</span>
+
+    @Transactional
+    public BinConfigurationV2Response create(UUID institutionId,
+            CreateBinConfigurationV2Request request, String actorId) {
+<span class="fc" id="L61">        requireInstitution(institutionId);</span>
+<span class="fc" id="L62">        String binNumber = request.getBinNumber().trim();</span>
+<span class="fc bfc" id="L63" title="All 2 branches covered.">        int binLength = request.getBinLength() == null ? binNumber.length() : request.getBinLength();</span>
+<span class="fc bfc" id="L64" title="All 2 branches covered.">        if (binLength != binNumber.length()) {</span>
+<span class="fc" id="L65">            throw new IllegalArgumentException(&quot;binLength must equal the number of digits in binNumber&quot;);</span>
+        }
+<span class="pc bpc" id="L67" title="1 of 4 branches missed.">        if (binLength != 6 &amp;&amp; binLength != 8) {</span>
+<span class="fc" id="L68">            throw new IllegalArgumentException(&quot;binLength must be exactly 6 or 8&quot;);</span>
+        }
+<span class="fc bfc" id="L70" title="All 2 branches covered.">        if (repository.existsByBinNumber(binNumber)) {</span>
+<span class="fc" id="L71">            throw new ResourceAlreadyExistsException(&quot;BIN configuration&quot;, binNumber);</span>
+        }
+
+<span class="fc" id="L74">        BinConfigurationV2 entity = BinConfigurationV2.builder()</span>
+<span class="fc" id="L75">                .binId(uuidGenerator.generate())</span>
+<span class="fc" id="L76">                .institutionId(institutionId)</span>
+<span class="fc" id="L77">                .binNumber(binNumber)</span>
+<span class="fc" id="L78">                .binLength(binLength)</span>
+<span class="fc" id="L79">                .panLength(request.getPanLength())</span>
+<span class="fc" id="L80">                .cardNetwork(request.getCardNetwork())</span>
+<span class="fc" id="L81">                .binType(request.getBinType())</span>
+<span class="fc" id="L82">                .cardProductClass(upper(request.getCardProductClass()))</span>
+<span class="pc bpc" id="L83" title="1 of 2 branches missed.">                .cardTechnology(request.getCardTechnology() == null</span>
+<span class="pc" id="L84">                        ? CardTechnology.DUAL_INTERFACE : request.getCardTechnology())</span>
+<span class="pc bpc" id="L85" title="1 of 2 branches missed.">                .pinMethod(request.getPinMethod() == null ? PinMethod.VISA_PVV : request.getPinMethod())</span>
+<span class="pc bpc" id="L86" title="1 of 2 branches missed.">                .pinLength(request.getPinLength() == null ? 4 : request.getPinLength())</span>
+<span class="fc" id="L87">                .issuingCountryCode(upperOrDefault(request.getIssuingCountryCode(), &quot;IND&quot;))</span>
+<span class="fc" id="L88">                .defaultCurrencyCode(upperOrDefault(request.getDefaultCurrencyCode(), &quot;INR&quot;))</span>
+<span class="fc" id="L89">                .defaultChipEnabled(defaultTrue(request.getDefaultChipEnabled()))</span>
+<span class="fc" id="L90">                .defaultDomesticContactEnabled(defaultTrue(request.getDefaultDomesticContactEnabled()))</span>
+<span class="fc" id="L91">                .defaultDomesticContactlessEnabled(Boolean.TRUE.equals(request.getDefaultDomesticContactlessEnabled()))</span>
+<span class="fc" id="L92">                .defaultDomesticEcommerceEnabled(Boolean.TRUE.equals(request.getDefaultDomesticEcommerceEnabled()))</span>
+<span class="fc" id="L93">                .defaultInternationalEnabled(Boolean.TRUE.equals(request.getDefaultInternationalEnabled()))</span>
+<span class="pc bpc" id="L94" title="1 of 2 branches missed.">                .binStatus(request.getBinStatus() == null ? BinStatus.ACTIVE : request.getBinStatus())</span>
+<span class="fc" id="L95">                .effectiveFrom(request.getEffectiveFrom())</span>
+<span class="fc" id="L96">                .effectiveTo(request.getEffectiveTo())</span>
+<span class="fc" id="L97">                .networkProgramIdentifier(trimToNull(request.getNetworkProgramIdentifier()))</span>
+<span class="fc" id="L98">                .networkCertificationReference(trimToNull(request.getNetworkCertificationReference()))</span>
+<span class="fc" id="L99">                .track2Separator(trimToNull(request.getTrack2Separator()))</span>
+<span class="fc" id="L100">                .decimalizationTable(trimToNull(request.getDecimalizationTable()))</span>
+<span class="fc" id="L101">                .pvki(request.getPvki())</span>
+<span class="fc" id="L102">                .createdBy(actorId.trim())</span>
+<span class="fc" id="L103">                .updatedBy(actorId.trim())</span>
+<span class="fc" id="L104">                .build();</span>
+<span class="fc" id="L105">        validateDates(entity.getEffectiveFrom(), entity.getEffectiveTo());</span>
+        try {
+            // Flush here so a concurrent duplicate receives the same API conflict response.
+<span class="fc" id="L108">            BinConfigurationV2Response response = toResponse(repository.saveAndFlush(entity));</span>
+<span class="fc" id="L109">            eventSink.onBinCreated(response, correlationIdResolver.current());</span>
+<span class="fc" id="L110">            return response;</span>
+<span class="fc" id="L111">        } catch (org.springframework.dao.DataIntegrityViolationException failure) {</span>
+<span class="fc bfc" id="L112" title="All 2 branches covered.">            for (Throwable cause = failure; cause != null; cause = cause.getCause()) {</span>
+<span class="fc bfc" id="L113" title="All 2 branches covered.">                if (cause instanceof org.hibernate.exception.ConstraintViolationException constraint</span>
+<span class="fc" id="L114">                        &amp;&amp; Set.of(&quot;uk_bin_number_platform&quot;, &quot;uk_bin_institution_number&quot;)</span>
+<span class="pc bpc" id="L115" title="1 of 2 branches missed.">                                .contains(Objects.toString(constraint.getConstraintName(), &quot;&quot;))) {</span>
+<span class="fc" id="L116">                    throw new ResourceAlreadyExistsException(&quot;BIN configuration&quot;, binNumber);</span>
+                }
+            }
+<span class="fc" id="L119">            throw failure;</span>
+        }
+    }
+
+    @Transactional(readOnly = true)
+    public BinConfigurationV2Response get(UUID institutionId, UUID binId) {
+<span class="nc" id="L125">        return toResponse(find(institutionId, binId));</span>
+    }
+
+    @Transactional(readOnly = true)
+    public Page&lt;BinConfigurationV2Response&gt; search(UUID institutionId, CardNetwork cardNetwork,
+            BinStatus binStatus, Pageable pageable) {
+<span class="nc" id="L131">        requireInstitution(institutionId);</span>
+<span class="nc" id="L132">        return repository.search(institutionId, cardNetwork, binStatus, pageable).map(this::toResponse);</span>
+    }
+
+    @Transactional
+    public BinConfigurationV2Response update(UUID institutionId, UUID binId,
+            UpdateBinConfigurationV2Request request, String actorId) {
+<span class="fc" id="L138">        rejectUnsupportedFields(request);</span>
+<span class="fc" id="L139">        BinConfigurationV2 entity = find(institutionId, binId);</span>
+<span class="fc bfc" id="L140" title="All 2 branches covered.">        if (!Objects.equals(entity.getVersion(), request.getVersion())) {</span>
+<span class="fc" id="L141">            throw new ResourceVersionConflictException(</span>
+<span class="fc" id="L142">                    &quot;BIN configuration&quot;, entity.getVersion(), request.getVersion());</span>
+        }
+
+<span class="fc" id="L145">        entity.setCardTechnology(request.getCardTechnology());</span>
+<span class="fc" id="L146">        entity.setPinMethod(request.getPinMethod());</span>
+<span class="fc" id="L147">        entity.setPinLength(request.getPinLength());</span>
+<span class="fc" id="L148">        entity.setIssuingCountryCode(upper(request.getIssuingCountryCode()));</span>
+<span class="fc" id="L149">        entity.setDefaultCurrencyCode(upper(request.getDefaultCurrencyCode()));</span>
+<span class="fc" id="L150">        entity.setDefaultChipEnabled(request.getDefaultChipEnabled());</span>
+<span class="fc" id="L151">        entity.setDefaultDomesticContactEnabled(request.getDefaultDomesticContactEnabled());</span>
+<span class="fc" id="L152">        entity.setDefaultDomesticContactlessEnabled(request.getDefaultDomesticContactlessEnabled());</span>
+<span class="fc" id="L153">        entity.setDefaultDomesticEcommerceEnabled(request.getDefaultDomesticEcommerceEnabled());</span>
+<span class="fc" id="L154">        entity.setDefaultInternationalEnabled(request.getDefaultInternationalEnabled());</span>
+<span class="fc" id="L155">        entity.setBinStatus(request.getBinStatus());</span>
+<span class="fc" id="L156">        entity.setEffectiveFrom(request.getEffectiveFrom());</span>
+<span class="fc" id="L157">        entity.setEffectiveTo(request.getEffectiveTo());</span>
+<span class="fc" id="L158">        entity.setNetworkProgramIdentifier(trimToNull(request.getNetworkProgramIdentifier()));</span>
+<span class="fc" id="L159">        entity.setNetworkCertificationReference(trimToNull(request.getNetworkCertificationReference()));</span>
+<span class="fc" id="L160">        entity.setTrack2Separator(trimToNull(request.getTrack2Separator()));</span>
+<span class="fc" id="L161">        entity.setDecimalizationTable(trimToNull(request.getDecimalizationTable()));</span>
+<span class="fc" id="L162">        entity.setPvki(request.getPvki());</span>
+<span class="fc" id="L163">        validateDates(request.getEffectiveFrom(), request.getEffectiveTo());</span>
+<span class="fc" id="L164">        entity.setUpdatedBy(actorId.trim());</span>
+<span class="fc" id="L165">        entity.setUpdatedAt(OffsetDateTime.now(ZoneOffset.UTC));</span>
+<span class="fc" id="L166">        BinConfigurationV2Response response = toResponse(repository.saveAndFlush(entity));</span>
+<span class="fc" id="L167">        eventSink.onBinUpdated(response, correlationIdResolver.current());</span>
+<span class="fc" id="L168">        return response;</span>
+    }
+
+    BinConfigurationV2 find(UUID institutionId, UUID binId) {
+<span class="fc" id="L172">        return repository.findByBinIdAndInstitutionId(binId, institutionId)</span>
+<span class="pc" id="L173">                .orElseThrow(() -&gt; new ResourceNotFoundException(&quot;BIN configuration&quot;, binId.toString()));</span>
+    }
+
+    private void requireInstitution(UUID institutionId) {
+<span class="pc bpc" id="L177" title="1 of 2 branches missed.">        if (!institutionRepository.existsById(institutionId)) {</span>
+<span class="nc" id="L178">            throw new ResourceNotFoundException(&quot;Institution&quot;, institutionId.toString());</span>
+        }
+<span class="fc" id="L180">    }</span>
+
+    private static void validateDates(LocalDate from, LocalDate to) {
+<span class="pc bpc" id="L183" title="3 of 4 branches missed.">        if (to != null &amp;&amp; !to.isAfter(from)) {</span>
+<span class="nc" id="L184">            throw new IllegalArgumentException(&quot;effectiveTo must be after effectiveFrom&quot;);</span>
+        }
+<span class="fc" id="L186">    }</span>
+
+    private BinConfigurationV2Response toResponse(BinConfigurationV2 e) {
+<span class="fc" id="L189">        return BinConfigurationV2Response.builder()</span>
+<span class="fc" id="L190">                .binId(e.getBinId()).institutionId(e.getInstitutionId()).binNumber(e.getBinNumber())</span>
+<span class="fc" id="L191">                .binLength(e.getBinLength()).panLength(e.getPanLength()).cardNetwork(e.getCardNetwork()).binType(e.getBinType())</span>
+<span class="fc" id="L192">                .cardProductClass(e.getCardProductClass()).cardTechnology(e.getCardTechnology())</span>
+<span class="fc" id="L193">                .pinMethod(e.getPinMethod()).pinLength(e.getPinLength())</span>
+<span class="fc" id="L194">                .issuingCountryCode(e.getIssuingCountryCode()).defaultCurrencyCode(e.getDefaultCurrencyCode())</span>
+<span class="fc" id="L195">                .defaultChipEnabled(e.isDefaultChipEnabled())</span>
+<span class="fc" id="L196">                .defaultDomesticContactEnabled(e.isDefaultDomesticContactEnabled())</span>
+<span class="fc" id="L197">                .defaultDomesticContactlessEnabled(e.isDefaultDomesticContactlessEnabled())</span>
+<span class="fc" id="L198">                .defaultDomesticEcommerceEnabled(e.isDefaultDomesticEcommerceEnabled())</span>
+<span class="fc" id="L199">                .defaultInternationalEnabled(e.isDefaultInternationalEnabled()).binStatus(e.getBinStatus())</span>
+<span class="fc" id="L200">                .effectiveFrom(e.getEffectiveFrom()).effectiveTo(e.getEffectiveTo())</span>
+<span class="fc" id="L201">                .networkProgramIdentifier(e.getNetworkProgramIdentifier())</span>
+<span class="fc" id="L202">                .networkCertificationReference(e.getNetworkCertificationReference())</span>
+<span class="fc" id="L203">                .track2Separator(e.getTrack2Separator()).decimalizationTable(e.getDecimalizationTable())</span>
+<span class="fc" id="L204">                .pvki(e.getPvki()).createdAt(e.getCreatedAt()).updatedAt(e.getUpdatedAt())</span>
+<span class="fc" id="L205">                .createdBy(e.getCreatedBy()).updatedBy(e.getUpdatedBy()).version(e.getVersion()).build();</span>
+    }
+
+    private static void rejectUnsupportedFields(UpdateBinConfigurationV2Request request) {
+<span class="pc bpc" id="L209" title="1 of 4 branches missed.">        if (request.getUnsupportedFields() == null || request.getUnsupportedFields().isEmpty()) {</span>
+<span class="fc" id="L210">            return;</span>
+        }
+<span class="fc" id="L212">        var immutable = request.getUnsupportedFields().keySet().stream()</span>
+<span class="fc" id="L213">                .filter(IMMUTABLE_BIN_FIELDS::contains)</span>
+<span class="fc" id="L214">                .sorted()</span>
+<span class="fc" id="L215">                .toList();</span>
+<span class="fc bfc" id="L216" title="All 2 branches covered.">        if (!immutable.isEmpty()) {</span>
+<span class="fc" id="L217">            throw new ImmutableFieldException(immutable);</span>
+        }
+<span class="fc" id="L219">        throw new UnknownRequestFieldException(request.getUnsupportedFields().keySet().stream()</span>
+<span class="fc" id="L220">                .sorted()</span>
+<span class="fc" id="L221">                .toList());</span>
+    }
+
+<span class="pc bpc" id="L224" title="3 of 4 branches missed.">    private static boolean defaultTrue(Boolean value) { return value == null || value; }</span>
+<span class="fc" id="L225">    private static String upper(String value) { return value.trim().toUpperCase(Locale.ROOT); }</span>
+    private static String upperOrDefault(String value, String defaultValue) {
+<span class="pc bpc" id="L227" title="3 of 4 branches missed.">        return value == null || value.isBlank() ? defaultValue : upper(value);</span>
+    }
+    private static String trimToNull(String value) {
+<span class="pc bpc" id="L230" title="1 of 2 branches missed.">        if (value == null) return null;</span>
+<span class="nc" id="L231">        String result = value.trim();</span>
+<span class="nc bnc" id="L232" title="All 2 branches missed.">        return result.isEmpty() ? null : result;</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.15.202606040825</span></div></body></html>

@@ -1,0 +1,224 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>BinHsmKeyAssignmentV2Service.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">CMS Core Service</a> &gt; <a href="index.source.html" class="el_package">com.xenomi.cms.core.v2.hsm.service</a> &gt; <span class="el_source">BinHsmKeyAssignmentV2Service.java</span></div><h1>BinHsmKeyAssignmentV2Service.java</h1><pre class="source lang-java linenums">package com.xenomi.cms.core.v2.hsm.service;
+
+import java.time.OffsetDateTime;
+import java.util.EnumMap;
+import java.util.Map;
+import java.util.Set;
+import java.util.UUID;
+
+import com.xenomi.cms.core.exception.ResourceNotFoundException;
+import com.xenomi.cms.core.v2.bin.repository.BinConfigurationV2Repository;
+import com.xenomi.cms.core.v2.common.DatabaseUuidV7Generator;
+import com.xenomi.cms.core.v2.hsm.dto.BinHsmKeyAssignmentV2Response;
+import com.xenomi.cms.core.v2.hsm.dto.CreateBinHsmKeyAssignmentV2Request;
+import com.xenomi.cms.core.v2.hsm.dto.UpdateBinHsmKeyAssignmentV2Request;
+import com.xenomi.cms.core.v2.hsm.entity.BinHsmKeyAssignmentV2;
+import com.xenomi.cms.core.v2.hsm.model.BinHsmKeyAssignmentStatus;
+import com.xenomi.cms.core.v2.hsm.model.HsmKeyStatus;
+import com.xenomi.cms.core.v2.hsm.model.HsmKeyScope;
+import com.xenomi.cms.core.v2.hsm.model.HsmKeyType;
+import com.xenomi.cms.core.v2.hsm.model.KeyPurpose;
+import com.xenomi.cms.core.v2.hsm.repository.BinHsmKeyAssignmentV2Repository;
+import com.xenomi.cms.core.v2.institution.repository.HsmKeyReferenceV2Repository;
+import com.xenomi.cms.core.v2.institution.entity.HsmKeyReferenceV2;
+import com.xenomi.cms.core.v2.institution.repository.InstitutionSecurityPolicyV2Repository;
+
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
+import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
+
+@Service
+public class BinHsmKeyAssignmentV2Service {
+<span class="fc" id="L33">    private static final Set&lt;HsmKeyStatus&gt; ASSIGNABLE_KEYS = Set.of(</span>
+            HsmKeyStatus.PENDING_APPROVAL, HsmKeyStatus.SCHEDULED,
+            HsmKeyStatus.ACTIVE, HsmKeyStatus.DECRYPT_ONLY);
+<span class="fc" id="L36">    private static final Map&lt;BinHsmKeyAssignmentStatus, Set&lt;BinHsmKeyAssignmentStatus&gt;&gt; TRANSITIONS = transitions();</span>
+
+    private final BinConfigurationV2Repository binRepository;
+    private final HsmKeyReferenceV2Repository keyRepository;
+    private final BinHsmKeyAssignmentV2Repository assignmentRepository;
+    private final InstitutionSecurityPolicyV2Repository securityPolicyRepository;
+    private final DatabaseUuidV7Generator uuidGenerator;
+
+    public BinHsmKeyAssignmentV2Service(BinConfigurationV2Repository binRepository,
+            HsmKeyReferenceV2Repository keyRepository,
+            BinHsmKeyAssignmentV2Repository assignmentRepository,
+            InstitutionSecurityPolicyV2Repository securityPolicyRepository,
+<span class="fc" id="L48">            DatabaseUuidV7Generator uuidGenerator) {</span>
+<span class="fc" id="L49">        this.binRepository = binRepository;</span>
+<span class="fc" id="L50">        this.keyRepository = keyRepository;</span>
+<span class="fc" id="L51">        this.assignmentRepository = assignmentRepository;</span>
+<span class="fc" id="L52">        this.securityPolicyRepository = securityPolicyRepository;</span>
+<span class="fc" id="L53">        this.uuidGenerator = uuidGenerator;</span>
+<span class="fc" id="L54">    }</span>
+
+    @Transactional
+    public BinHsmKeyAssignmentV2Response create(UUID institutionId, UUID binId,
+            CreateBinHsmKeyAssignmentV2Request request, String actorId) {
+<span class="fc" id="L59">        requireBin(institutionId, binId, true);</span>
+<span class="fc" id="L60">        HsmKeyReferenceV2 key = keyRepository</span>
+<span class="fc" id="L61">                .findByKeyIdAndInstitutionId(request.getHsmKeyId(), institutionId)</span>
+<span class="pc" id="L62">                .orElseThrow(() -&gt; new IllegalArgumentException(</span>
+                        &quot;hsmKeyId must reference a key owned by the institution&quot;));
+<span class="pc bpc" id="L64" title="1 of 2 branches missed.">        if (!ASSIGNABLE_KEYS.contains(key.getStatus())) {</span>
+<span class="nc" id="L65">            throw new IllegalArgumentException(&quot;hsmKeyId must reference an assignable key owned by the institution&quot;);</span>
+        }
+<span class="pc bpc" id="L67" title="1 of 2 branches missed.">        if (key.getKeyType() == HsmKeyType.KEK) {</span>
+<span class="nc" id="L68">            throw new IllegalArgumentException(</span>
+                    &quot;KEK cannot be used as an operational BIN key&quot;);
+        }
+<span class="pc bpc" id="L71" title="1 of 2 branches missed.">        boolean compatibleScope = key.getKeyScope() == HsmKeyScope.INSTITUTION</span>
+<span class="pc bpc" id="L72" title="2 of 4 branches missed.">                || (key.getKeyScope() == HsmKeyScope.BIN &amp;&amp; binId.equals(key.getBinId()));</span>
+<span class="pc bpc" id="L73" title="1 of 2 branches missed.">        if (!compatibleScope) {</span>
+<span class="nc" id="L74">            throw new IllegalArgumentException(&quot;Only institution-scoped keys or keys scoped to this BIN can be assigned&quot;);</span>
+        }
+<span class="fc" id="L76">        validateDates(request.getEffectiveFrom(), request.getEffectiveTo());</span>
+<span class="fc" id="L77">        KeyPurpose purpose = request.getKeyPurpose();</span>
+<span class="pc bpc" id="L78" title="1 of 2 branches missed.">        if (purpose.scope() != HsmKeyScope.BIN) {</span>
+<span class="nc" id="L79">            throw new IllegalArgumentException(&quot;keyPurpose must be approved for BIN scope&quot;);</span>
+        }
+<span class="pc bpc" id="L81" title="4 of 5 branches missed.">        HsmKeyType requiredType = switch (purpose) {</span>
+<span class="nc" id="L82">            case CVV_GENERATION, CVV_VERIFICATION -&gt; HsmKeyType.CVK;</span>
+<span class="fc" id="L83">            case PIN_VERIFICATION, PIN_GENERATION -&gt; HsmKeyType.PVK;</span>
+<span class="nc" id="L84">            case PIN_BLOCK_ENCRYPTION -&gt; HsmKeyType.ZPK;</span>
+<span class="nc" id="L85">            case EMV_KEY_DERIVATION, PERSONALISATION_DATA_GENERATION -&gt; HsmKeyType.PGK;</span>
+<span class="nc" id="L86">            default -&gt; throw new IllegalArgumentException(&quot;Unsupported BIN key purpose&quot;);</span>
+        };
+<span class="pc bpc" id="L88" title="1 of 2 branches missed.">        if (key.getKeyType() != requiredType) {</span>
+<span class="nc" id="L89">            throw new IllegalArgumentException(purpose + &quot; requires a &quot; + requiredType + &quot; key&quot;);</span>
+        }
+<span class="fc" id="L91">        int version = assignmentRepository.findMaximumVersion(binId, purpose) + 1;</span>
+<span class="fc" id="L92">        String actor = actorId.trim();</span>
+<span class="fc" id="L93">        BinHsmKeyAssignmentV2 assignment = BinHsmKeyAssignmentV2.builder()</span>
+<span class="fc" id="L94">                .assignmentId(uuidGenerator.generate()).institutionId(institutionId).binId(binId)</span>
+<span class="fc" id="L95">                .hsmKeyId(request.getHsmKeyId()).keyPurpose(purpose).assignmentVersion(version)</span>
+<span class="fc" id="L96">                .assignmentStatus(BinHsmKeyAssignmentStatus.PENDING_APPROVAL)</span>
+<span class="fc" id="L97">                .effectiveFrom(request.getEffectiveFrom()).effectiveTo(request.getEffectiveTo())</span>
+<span class="fc" id="L98">                .rotationGroup(trimToNull(request.getRotationGroup()))</span>
+<span class="fc" id="L99">                .approvalRequestId(request.getApprovalRequestId())</span>
+<span class="fc" id="L100">                .createdBy(actor).updatedBy(actor).build();</span>
+<span class="fc" id="L101">        return toResponse(assignmentRepository.save(assignment));</span>
+    }
+
+    @Transactional(readOnly = true)
+    public BinHsmKeyAssignmentV2Response get(UUID institutionId, UUID binId, UUID assignmentId) {
+<span class="fc" id="L106">        requireBin(institutionId, binId, false);</span>
+<span class="fc" id="L107">        return toResponse(find(institutionId, binId, assignmentId));</span>
+    }
+
+    @Transactional(readOnly = true)
+    public Page&lt;BinHsmKeyAssignmentV2Response&gt; search(UUID institutionId, UUID binId,
+            KeyPurpose purpose, BinHsmKeyAssignmentStatus status, Pageable pageable) {
+<span class="fc" id="L113">        requireBin(institutionId, binId, false);</span>
+<span class="fc" id="L114">        return assignmentRepository.search(institutionId, binId, purpose, status, pageable)</span>
+<span class="fc" id="L115">                .map(BinHsmKeyAssignmentV2Service::toResponse);</span>
+    }
+
+    @Transactional
+    public BinHsmKeyAssignmentV2Response changeStatus(UUID institutionId, UUID binId,
+            UUID assignmentId, UpdateBinHsmKeyAssignmentV2Request request, String actorId) {
+<span class="fc" id="L121">        requireBin(institutionId, binId, true);</span>
+<span class="fc" id="L122">        BinHsmKeyAssignmentV2 assignment = find(institutionId, binId, assignmentId);</span>
+<span class="fc" id="L123">        BinHsmKeyAssignmentStatus current = assignment.getAssignmentStatus();</span>
+<span class="fc" id="L124">        BinHsmKeyAssignmentStatus requested = request.getStatus();</span>
+<span class="pc bpc" id="L125" title="1 of 2 branches missed.">        if (!TRANSITIONS.getOrDefault(current, Set.of()).contains(requested)) {</span>
+<span class="nc" id="L126">            throw new IllegalArgumentException(&quot;Invalid BIN key assignment transition: &quot; + current + &quot; -&gt; &quot; + requested);</span>
+        }
+<span class="fc" id="L128">        OffsetDateTime now = OffsetDateTime.now(java.time.ZoneOffset.UTC);</span>
+<span class="pc bpc" id="L129" title="1 of 2 branches missed.">        if (requested == BinHsmKeyAssignmentStatus.SCHEDULED</span>
+<span class="nc bnc" id="L130" title="All 2 branches missed.">                &amp;&amp; !assignment.getEffectiveFrom().isAfter(now)) {</span>
+<span class="nc" id="L131">            throw new IllegalArgumentException(&quot;SCHEDULED assignments require a future effectiveFrom&quot;);</span>
+        }
+<span class="pc bpc" id="L133" title="1 of 2 branches missed.">        if (requested == BinHsmKeyAssignmentStatus.ACTIVE</span>
+<span class="pc bpc" id="L134" title="1 of 2 branches missed.">                &amp;&amp; (assignment.getEffectiveFrom().isAfter(now)</span>
+<span class="pc bpc" id="L135" title="3 of 4 branches missed.">                    || (assignment.getEffectiveTo() != null &amp;&amp; !assignment.getEffectiveTo().isAfter(now)))) {</span>
+<span class="nc" id="L136">            throw new IllegalArgumentException(&quot;ACTIVE assignments must be within their effective period&quot;);</span>
+        }
+<span class="pc bpc" id="L138" title="1 of 2 branches missed.">        if (requested == BinHsmKeyAssignmentStatus.ACTIVE) {</span>
+<span class="fc" id="L139">            HsmKeyReferenceV2 key = keyRepository</span>
+<span class="fc" id="L140">                    .findByKeyIdAndInstitutionId(assignment.getHsmKeyId(), institutionId)</span>
+<span class="pc" id="L141">                    .orElseThrow(() -&gt; new ResourceNotFoundException(</span>
+<span class="nc" id="L142">                            &quot;HSM key&quot;, assignment.getHsmKeyId().toString()));</span>
+<span class="fc bfc" id="L143" title="All 2 branches covered.">            if (key.getStatus() != HsmKeyStatus.ACTIVE) {</span>
+<span class="fc" id="L144">                throw new IllegalArgumentException(&quot;The referenced HSM key must be ACTIVE before assignment activation&quot;);</span>
+            }
+        }
+<span class="pc bpc" id="L147" title="1 of 2 branches missed.">        UUID approvalId = request.getApprovalRequestId() != null</span>
+<span class="pc" id="L148">                ? request.getApprovalRequestId() : assignment.getApprovalRequestId();</span>
+<span class="pc bpc" id="L149" title="3 of 6 branches missed.">        boolean activationFromPending = current == BinHsmKeyAssignmentStatus.PENDING_APPROVAL</span>
+                &amp;&amp; (requested == BinHsmKeyAssignmentStatus.SCHEDULED
+                    || requested == BinHsmKeyAssignmentStatus.ACTIVE);
+<span class="fc" id="L152">        boolean makerChecker = securityPolicyRepository.findById(institutionId)</span>
+<span class="fc" id="L153">                .map(policy -&gt; policy.isMakerCheckerEnabled()).orElse(true);</span>
+<span class="pc bpc" id="L154" title="4 of 6 branches missed.">        if (activationFromPending &amp;&amp; makerChecker &amp;&amp; approvalId == null) {</span>
+<span class="nc" id="L155">            throw new IllegalArgumentException(&quot;approvalRequestId is required before activation&quot;);</span>
+        }
+<span class="pc bpc" id="L157" title="1 of 2 branches missed.">        if (requested == BinHsmKeyAssignmentStatus.SCHEDULED</span>
+<span class="nc bnc" id="L158" title="All 2 branches missed.">                &amp;&amp; assignmentRepository.countOtherAssignmentsInStatuses(binId,</span>
+<span class="nc" id="L159">                        assignment.getKeyPurpose(), assignmentId,</span>
+<span class="nc" id="L160">                        Set.of(BinHsmKeyAssignmentStatus.SCHEDULED)) &gt; 0) {</span>
+<span class="nc" id="L161">            throw new IllegalArgumentException(&quot;Another scheduled assignment already exists for this BIN key purpose&quot;);</span>
+        }
+<span class="pc bpc" id="L163" title="1 of 2 branches missed.">        if (requested == BinHsmKeyAssignmentStatus.ACTIVE) {</span>
+<span class="fc" id="L164">            assignmentRepository</span>
+<span class="fc" id="L165">                    .findFirstByBinIdAndKeyPurposeAndAssignmentStatusAndAssignmentIdNot(</span>
+<span class="fc" id="L166">                            binId, assignment.getKeyPurpose(),</span>
+                            BinHsmKeyAssignmentStatus.ACTIVE, assignmentId)
+<span class="fc" id="L168">                    .ifPresent(previous -&gt; {</span>
+<span class="fc" id="L169">                        previous.setAssignmentStatus(BinHsmKeyAssignmentStatus.VERIFY_ONLY);</span>
+<span class="fc" id="L170">                        previous.setEffectiveTo(now);</span>
+<span class="fc" id="L171">                        previous.setUpdatedBy(actorId.trim());</span>
+<span class="fc" id="L172">                        assignmentRepository.save(previous);</span>
+<span class="fc" id="L173">                    });</span>
+        }
+<span class="fc" id="L175">        OffsetDateTime effectiveTo = request.getEffectiveTo();</span>
+<span class="pc bpc" id="L176" title="4 of 6 branches missed.">        if ((requested == BinHsmKeyAssignmentStatus.RETIRED</span>
+                || requested == BinHsmKeyAssignmentStatus.REVOKED) &amp;&amp; effectiveTo == null) {
+<span class="nc" id="L178">            effectiveTo = OffsetDateTime.now(java.time.ZoneOffset.UTC);</span>
+        }
+<span class="fc" id="L180">        validateDates(assignment.getEffectiveFrom(), effectiveTo);</span>
+<span class="fc" id="L181">        assignment.setAssignmentStatus(requested);</span>
+<span class="fc" id="L182">        assignment.setEffectiveTo(effectiveTo);</span>
+<span class="fc" id="L183">        assignment.setApprovalRequestId(approvalId);</span>
+<span class="fc" id="L184">        assignment.setUpdatedBy(actorId.trim());</span>
+<span class="fc" id="L185">        return toResponse(assignmentRepository.save(assignment));</span>
+    }
+
+    private void requireBin(UUID institutionId, UUID binId, boolean lock) {
+<span class="fc bfc" id="L189" title="All 2 branches covered.">        boolean found = lock</span>
+<span class="fc" id="L190">                ? binRepository.findByTenantAndIdForUpdate(institutionId, binId).isPresent()</span>
+<span class="fc" id="L191">                : binRepository.findByBinIdAndInstitutionId(binId, institutionId).isPresent();</span>
+<span class="pc bpc" id="L192" title="1 of 2 branches missed.">        if (!found) throw new ResourceNotFoundException(&quot;BIN configuration&quot;, binId.toString());</span>
+<span class="fc" id="L193">    }</span>
+    private BinHsmKeyAssignmentV2 find(UUID institutionId, UUID binId, UUID assignmentId) {
+<span class="fc" id="L195">        return assignmentRepository.findByAssignmentIdAndInstitutionIdAndBinId(assignmentId, institutionId, binId)</span>
+<span class="pc" id="L196">                .orElseThrow(() -&gt; new ResourceNotFoundException(&quot;BIN HSM key assignment&quot;, assignmentId.toString()));</span>
+    }
+    private static void validateDates(OffsetDateTime from, OffsetDateTime to) {
+<span class="pc bpc" id="L199" title="3 of 4 branches missed.">        if (to != null &amp;&amp; !to.isAfter(from)) throw new IllegalArgumentException(&quot;effectiveTo must be later than effectiveFrom&quot;);</span>
+<span class="fc" id="L200">    }</span>
+<span class="pc bpc" id="L201" title="2 of 4 branches missed.">    private static String trimToNull(String value) { return value == null || value.isBlank() ? null : value.trim(); }</span>
+
+    private static BinHsmKeyAssignmentV2Response toResponse(BinHsmKeyAssignmentV2 a) {
+<span class="fc" id="L204">        return BinHsmKeyAssignmentV2Response.builder().assignmentId(a.getAssignmentId())</span>
+<span class="fc" id="L205">                .institutionId(a.getInstitutionId()).binId(a.getBinId()).hsmKeyId(a.getHsmKeyId())</span>
+<span class="fc" id="L206">                .keyPurpose(a.getKeyPurpose()).assignmentVersion(a.getAssignmentVersion())</span>
+<span class="fc" id="L207">                .assignmentStatus(a.getAssignmentStatus()).effectiveFrom(a.getEffectiveFrom())</span>
+<span class="fc" id="L208">                .effectiveTo(a.getEffectiveTo()).rotationGroup(a.getRotationGroup())</span>
+<span class="fc" id="L209">                .approvalRequestId(a.getApprovalRequestId()).createdAt(a.getCreatedAt())</span>
+<span class="fc" id="L210">                .updatedAt(a.getUpdatedAt()).createdBy(a.getCreatedBy()).updatedBy(a.getUpdatedBy()).build();</span>
+    }
+
+    private static Map&lt;BinHsmKeyAssignmentStatus, Set&lt;BinHsmKeyAssignmentStatus&gt;&gt; transitions() {
+<span class="fc" id="L214">        Map&lt;BinHsmKeyAssignmentStatus, Set&lt;BinHsmKeyAssignmentStatus&gt;&gt; m = new EnumMap&lt;&gt;(BinHsmKeyAssignmentStatus.class);</span>
+<span class="fc" id="L215">        m.put(BinHsmKeyAssignmentStatus.PENDING_APPROVAL, Set.of(BinHsmKeyAssignmentStatus.SCHEDULED, BinHsmKeyAssignmentStatus.ACTIVE, BinHsmKeyAssignmentStatus.REVOKED));</span>
+<span class="fc" id="L216">        m.put(BinHsmKeyAssignmentStatus.SCHEDULED, Set.of(BinHsmKeyAssignmentStatus.ACTIVE, BinHsmKeyAssignmentStatus.SUSPENDED, BinHsmKeyAssignmentStatus.REVOKED));</span>
+<span class="fc" id="L217">        m.put(BinHsmKeyAssignmentStatus.ACTIVE, Set.of(BinHsmKeyAssignmentStatus.VERIFY_ONLY, BinHsmKeyAssignmentStatus.SUSPENDED, BinHsmKeyAssignmentStatus.RETIRED, BinHsmKeyAssignmentStatus.REVOKED));</span>
+<span class="fc" id="L218">        m.put(BinHsmKeyAssignmentStatus.VERIFY_ONLY, Set.of(BinHsmKeyAssignmentStatus.RETIRED, BinHsmKeyAssignmentStatus.REVOKED));</span>
+<span class="fc" id="L219">        m.put(BinHsmKeyAssignmentStatus.SUSPENDED, Set.of(BinHsmKeyAssignmentStatus.ACTIVE, BinHsmKeyAssignmentStatus.RETIRED, BinHsmKeyAssignmentStatus.REVOKED));</span>
+<span class="fc" id="L220">        m.put(BinHsmKeyAssignmentStatus.RETIRED, Set.of()); m.put(BinHsmKeyAssignmentStatus.REVOKED, Set.of());</span>
+<span class="fc" id="L221">        return Map.copyOf(m);</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.15.202606040825</span></div></body></html>

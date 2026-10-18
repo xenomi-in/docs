@@ -1,0 +1,348 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>OutboxEventDispatcher.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">CMS Core Service</a> &gt; <a href="index.source.html" class="el_package">com.xenomi.cms.core.v2.event.publisher</a> &gt; <span class="el_source">OutboxEventDispatcher.java</span></div><h1>OutboxEventDispatcher.java</h1><pre class="source lang-java linenums">package com.xenomi.cms.core.v2.event.publisher;
+
+import java.net.InetAddress;
+import java.time.Duration;
+import java.time.OffsetDateTime;
+import java.time.ZoneOffset;
+import java.util.ArrayList;
+import java.util.List;
+import java.util.Set;
+import java.util.UUID;
+import java.util.concurrent.Callable;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import java.util.concurrent.Future;
+import java.util.concurrent.ScheduledFuture;
+import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.concurrent.locks.ReentrantLock;
+
+import com.xenomi.cms.core.v2.event.config.CmsNotificationProperties;
+import com.xenomi.cms.core.v2.event.config.EventV2Config;
+import com.xenomi.cms.core.v2.event.config.OutboxV2Properties;
+import com.xenomi.cms.core.v2.event.entity.OutboxEventV2;
+import com.xenomi.cms.core.v2.event.repository.OutboxEventV2Repository;
+import io.github.resilience4j.circuitbreaker.CircuitBreaker;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+import org.springframework.beans.factory.annotation.Qualifier;
+import org.springframework.context.SmartLifecycle;
+import org.springframework.scheduling.concurrent.ThreadPoolTaskScheduler;
+import org.springframework.stereotype.Component;
+import org.springframework.transaction.PlatformTransactionManager;
+import org.springframework.transaction.support.TransactionTemplate;
+
+/**
+ * Polls {@code cms_v2.outbox_event} and publishes to cms_notification.
+ *
+ * &lt;p&gt;Design:
+ * &lt;ul&gt;
+ *   &lt;li&gt;Claims are {@code FOR UPDATE SKIP LOCKED} with a lease, so several instances share
+ *       the table without double-publishing while one is mid-flight.&lt;/li&gt;
+ *   &lt;li&gt;Only the head event of each aggregate is claimable, so per-card / per-product order
+ *       is preserved across instances. Events in a batch therefore never share an aggregate
+ *       and are published in parallel.&lt;/li&gt;
+ *   &lt;li&gt;A cycle drains until the table is empty (bounded by {@code maxBatchesPerCycle}) and
+ *       only then sleeps, so throughput is limited by the hub, not by the poll interval.&lt;/li&gt;
+ *   &lt;li&gt;A circuit breaker pauses claiming while the hub is down instead of burning retries.&lt;/li&gt;
+ *   &lt;li&gt;{@link SmartLifecycle} starts after the context is ready and waits for in-flight
+ *       publishes on shutdown.&lt;/li&gt;
+ * &lt;/ul&gt;
+ */
+@Component
+public class OutboxEventDispatcher implements SmartLifecycle {
+
+<span class="fc" id="L55">    private static final Logger log = LoggerFactory.getLogger(OutboxEventDispatcher.class);</span>
+
+    private final OutboxV2Properties outboxProperties;
+    private final CmsNotificationProperties notificationProperties;
+    private final OutboxEventV2Repository repository;
+    private final CmsNotificationClient notificationClient;
+    private final RetryPolicy retryPolicy;
+    private final CircuitBreaker circuitBreaker;
+    private final ThreadPoolTaskScheduler scheduler;
+    private final TransactionTemplate transactionTemplate;
+    private final String instanceId;
+
+<span class="fc" id="L67">    private final AtomicBoolean running = new AtomicBoolean(false);</span>
+<span class="fc" id="L68">    private final AtomicBoolean stopRequested = new AtomicBoolean(false);</span>
+<span class="fc" id="L69">    private final ReentrantLock cycleLock = new ReentrantLock();</span>
+    private volatile ScheduledFuture&lt;?&gt; pollHandle;
+    private volatile ExecutorService workers;
+
+    public OutboxEventDispatcher(
+            OutboxV2Properties outboxProperties,
+            CmsNotificationProperties notificationProperties,
+            OutboxEventV2Repository repository,
+            CmsNotificationClient notificationClient,
+            RetryPolicy retryPolicy,
+            @Qualifier(EventV2Config.HUB_CIRCUIT_BREAKER) CircuitBreaker circuitBreaker,
+            @Qualifier(EventV2Config.OUTBOX_SCHEDULER) ThreadPoolTaskScheduler scheduler,
+<span class="fc" id="L81">            PlatformTransactionManager transactionManager) {</span>
+<span class="fc" id="L82">        this.outboxProperties = outboxProperties;</span>
+<span class="fc" id="L83">        this.notificationProperties = notificationProperties;</span>
+<span class="fc" id="L84">        this.repository = repository;</span>
+<span class="fc" id="L85">        this.notificationClient = notificationClient;</span>
+<span class="fc" id="L86">        this.retryPolicy = retryPolicy;</span>
+<span class="fc" id="L87">        this.circuitBreaker = circuitBreaker;</span>
+<span class="fc" id="L88">        this.scheduler = scheduler;</span>
+<span class="fc" id="L89">        this.transactionTemplate = new TransactionTemplate(transactionManager);</span>
+<span class="fc" id="L90">        this.instanceId = instanceId();</span>
+<span class="fc" id="L91">    }</span>
+
+    // ---------------------------------------------------------------- lifecycle
+
+    @Override
+    public void start() {
+<span class="fc bfc" id="L97" title="All 4 branches covered.">        if (!outboxProperties.isEnabled() || !notificationProperties.isEnabled()) {</span>
+<span class="fc" id="L98">            log.info(&quot;Outbox dispatcher disabled (cms.outbox.enabled={}, cms.notification.enabled={})&quot;,</span>
+<span class="fc" id="L99">                    outboxProperties.isEnabled(), notificationProperties.isEnabled());</span>
+<span class="fc" id="L100">            return;</span>
+        }
+<span class="fc bfc" id="L102" title="All 2 branches covered.">        if (!running.compareAndSet(false, true)) {</span>
+<span class="fc" id="L103">            return;</span>
+        }
+<span class="fc" id="L105">        stopRequested.set(false);</span>
+<span class="fc" id="L106">        workers();</span>
+<span class="fc bfc" id="L107" title="All 2 branches covered.">        Duration interval = outboxProperties.getPollInterval().compareTo(Duration.ofMillis(200)) &lt; 0</span>
+<span class="fc" id="L108">                ? Duration.ofMillis(200) : outboxProperties.getPollInterval();</span>
+<span class="fc" id="L109">        pollHandle = scheduler.scheduleWithFixedDelay(this::runCycleSafely, interval);</span>
+<span class="fc" id="L110">        log.info(&quot;Outbox dispatcher {} started: interval={} batch={} workers={} lease={}&quot;,</span>
+<span class="fc" id="L111">                instanceId, interval, outboxProperties.getBatchSize(),</span>
+<span class="fc" id="L112">                outboxProperties.getWorkerThreads(), outboxProperties.getLease());</span>
+<span class="fc" id="L113">    }</span>
+
+    @Override
+    public void stop() {
+<span class="fc" id="L117">        stopRequested.set(true);</span>
+<span class="fc bfc" id="L118" title="All 2 branches covered.">        if (!running.compareAndSet(true, false)) {</span>
+<span class="fc" id="L119">            shutdownWorkers(Duration.ZERO);</span>
+<span class="fc" id="L120">            return;</span>
+        }
+<span class="fc bfc" id="L122" title="All 2 branches covered.">        if (pollHandle != null) {</span>
+<span class="fc" id="L123">            pollHandle.cancel(false);</span>
+        }
+<span class="fc" id="L125">        Duration grace = outboxProperties.getShutdownGrace();</span>
+<span class="fc" id="L126">        boolean quiesced = false;</span>
+        try {
+<span class="fc" id="L128">            quiesced = cycleLock.tryLock(grace.toMillis(), TimeUnit.MILLISECONDS);</span>
+<span class="nc" id="L129">        } catch (InterruptedException interrupted) {</span>
+<span class="nc" id="L130">            Thread.currentThread().interrupt();</span>
+        } finally {
+<span class="pc bpc" id="L132" title="1 of 2 branches missed.">            if (quiesced) {</span>
+<span class="fc" id="L133">                cycleLock.unlock();</span>
+            }
+        }
+<span class="fc" id="L136">        shutdownWorkers(grace);</span>
+<span class="fc" id="L137">        log.info(&quot;Outbox dispatcher {} stopped (quiesced={})&quot;, instanceId, quiesced);</span>
+<span class="fc" id="L138">    }</span>
+
+    private synchronized ExecutorService workers() {
+<span class="fc" id="L141">        ExecutorService pool = workers;</span>
+<span class="pc bpc" id="L142" title="1 of 4 branches missed.">        if (pool == null || pool.isShutdown()) {</span>
+<span class="fc" id="L143">            pool = Executors.newFixedThreadPool(Math.max(1, outboxProperties.getWorkerThreads()), runnable -&gt; {</span>
+<span class="fc" id="L144">                Thread thread = new Thread(runnable,</span>
+<span class="fc" id="L145">                        &quot;cms-outbox-publish-&quot; + UUID.randomUUID().toString().substring(0, 8));</span>
+<span class="fc" id="L146">                thread.setDaemon(true);</span>
+<span class="fc" id="L147">                return thread;</span>
+            });
+<span class="fc" id="L149">            workers = pool;</span>
+        }
+<span class="fc" id="L151">        return pool;</span>
+    }
+
+    private void shutdownWorkers(Duration grace) {
+<span class="fc" id="L155">        ExecutorService pool = workers;</span>
+<span class="fc bfc" id="L156" title="All 2 branches covered.">        if (pool == null) {</span>
+<span class="fc" id="L157">            return;</span>
+        }
+<span class="fc" id="L159">        pool.shutdown();</span>
+        try {
+<span class="fc bfc" id="L161" title="All 2 branches covered.">            if (!pool.awaitTermination(grace.toMillis(), TimeUnit.MILLISECONDS)) {</span>
+<span class="fc" id="L162">                pool.shutdownNow();</span>
+            }
+<span class="nc" id="L164">        } catch (InterruptedException interrupted) {</span>
+<span class="nc" id="L165">            pool.shutdownNow();</span>
+<span class="nc" id="L166">            Thread.currentThread().interrupt();</span>
+<span class="fc" id="L167">        }</span>
+<span class="fc" id="L168">    }</span>
+
+    @Override
+    public boolean isRunning() {
+<span class="fc" id="L172">        return running.get();</span>
+    }
+
+    @Override
+    public int getPhase() {
+        // Start after web server and data infrastructure; stop before them.
+<span class="fc" id="L178">        return Integer.MAX_VALUE - 512;</span>
+    }
+
+    // ---------------------------------------------------------------- polling
+
+    void runCycleSafely() {
+<span class="pc bpc" id="L184" title="2 of 6 branches missed.">        if (!running.get() || stopRequested.get() || !cycleLock.tryLock()) {</span>
+<span class="fc" id="L185">            return;</span>
+        }
+        try {
+<span class="fc" id="L188">            runCycle();</span>
+<span class="nc" id="L189">        } catch (Exception exception) {</span>
+<span class="nc" id="L190">            log.error(&quot;Outbox dispatch cycle failed&quot;, exception);</span>
+        } finally {
+<span class="fc" id="L192">            cycleLock.unlock();</span>
+        }
+<span class="fc" id="L194">    }</span>
+
+    /** Drains due events until a batch comes back short or the cycle budget is used. */
+    void runCycle() {
+<span class="fc" id="L198">        int budget = Math.max(1, outboxProperties.getMaxBatchesPerCycle());</span>
+<span class="pc bpc" id="L199" title="2 of 4 branches missed.">        for (int batch = 0; batch &lt; budget &amp;&amp; !stopRequested.get(); batch++) {</span>
+<span class="fc bfc" id="L200" title="All 2 branches covered.">            if (!canBeginCycle()) {</span>
+<span class="fc" id="L201">                return;</span>
+            }
+<span class="fc" id="L203">            List&lt;OutboxEventV2&gt; claimed = claim();</span>
+<span class="fc bfc" id="L204" title="All 2 branches covered.">            if (claimed.isEmpty()) {</span>
+<span class="fc" id="L205">                return;</span>
+            }
+<span class="fc" id="L207">            publishAll(claimed);</span>
+<span class="fc bfc" id="L208" title="All 2 branches covered.">            if (claimed.size() &lt; outboxProperties.getBatchSize()) {</span>
+<span class="fc" id="L209">                return;</span>
+            }
+        }
+<span class="nc" id="L212">    }</span>
+
+    /**
+     * Only probes an open circuit to perform its timed transition to HALF_OPEN.
+     * Actual permits are taken by {@link #publishOne(OutboxEventV2)}, one per
+     * outbound HTTP call.
+     */
+    private boolean canBeginCycle() {
+<span class="fc bfc" id="L220" title="All 2 branches covered.">        if (circuitBreaker.getState() != CircuitBreaker.State.OPEN) {</span>
+<span class="fc" id="L221">            return true;</span>
+        }
+<span class="pc bpc" id="L223" title="1 of 2 branches missed.">        if (!circuitBreaker.tryAcquirePermission()) {</span>
+<span class="fc" id="L224">            log.warn(&quot;cms_notification circuit is {}; outbox dispatch paused&quot;, circuitBreaker.getState());</span>
+<span class="fc" id="L225">            return false;</span>
+        }
+<span class="nc" id="L227">        circuitBreaker.releasePermission();</span>
+<span class="nc" id="L228">        return true;</span>
+    }
+
+    List&lt;OutboxEventV2&gt; claim() {
+<span class="fc" id="L232">        List&lt;OutboxEventV2&gt; claimed = transactionTemplate.execute(status -&gt; {</span>
+<span class="fc" id="L233">            return repository.claimDueEvents(</span>
+                    instanceId,
+<span class="fc" id="L235">                    Math.max(1, outboxProperties.getLease().toSeconds()),</span>
+<span class="fc" id="L236">                    outboxProperties.getBatchSize());</span>
+        });
+<span class="fc bfc" id="L238" title="All 2 branches covered.">        return claimed == null ? List.of() : claimed;</span>
+    }
+
+    private void publishAll(List&lt;OutboxEventV2&gt; events) {
+<span class="fc" id="L242">        List&lt;Callable&lt;Void&gt;&gt; tasks = new ArrayList&lt;&gt;(events.size());</span>
+<span class="fc bfc" id="L243" title="All 2 branches covered.">        for (OutboxEventV2 event : events) {</span>
+<span class="fc" id="L244">            tasks.add(() -&gt; {</span>
+<span class="fc" id="L245">                publishOne(event);</span>
+<span class="fc" id="L246">                return null;</span>
+            });
+<span class="fc" id="L248">        }</span>
+        try {
+<span class="fc" id="L250">            List&lt;Future&lt;Void&gt;&gt; futures = workers().invokeAll(tasks);</span>
+<span class="fc bfc" id="L251" title="All 2 branches covered.">            for (Future&lt;Void&gt; future : futures) {</span>
+                try {
+<span class="fc" id="L253">                    future.get();</span>
+<span class="nc" id="L254">                } catch (Exception exception) {</span>
+<span class="nc bnc" id="L255" title="All 2 branches missed.">                    log.error(&quot;Outbox publish task failed&quot;, exception.getCause() == null ? exception : exception.getCause());</span>
+<span class="fc" id="L256">                }</span>
+<span class="fc" id="L257">            }</span>
+<span class="nc" id="L258">        } catch (InterruptedException interrupted) {</span>
+<span class="nc" id="L259">            Thread.currentThread().interrupt();</span>
+<span class="fc" id="L260">        }</span>
+<span class="fc" id="L261">    }</span>
+
+    void publishOne(OutboxEventV2 event) {
+<span class="fc bfc" id="L264" title="All 2 branches covered.">        if (!circuitBreaker.tryAcquirePermission()) {</span>
+<span class="fc" id="L265">            releaseClaim(event);</span>
+<span class="fc" id="L266">            return;</span>
+        }
+<span class="fc" id="L268">        long started = System.nanoTime();</span>
+        NotificationPublishResult result;
+        try {
+<span class="fc" id="L271">            result = notificationClient.publish(event);</span>
+<span class="fc" id="L272">        } catch (RuntimeException exception) {</span>
+<span class="fc" id="L273">            result = NotificationPublishResult.transientFailure(</span>
+<span class="fc" id="L274">                    exception.getClass().getSimpleName() + &quot;: &quot; + exception.getMessage());</span>
+<span class="fc" id="L275">        }</span>
+<span class="fc" id="L276">        long elapsed = System.nanoTime() - started;</span>
+<span class="fc bfc" id="L277" title="All 2 branches covered.">        if (result.isPublished()) {</span>
+<span class="fc" id="L278">            circuitBreaker.onSuccess(elapsed, TimeUnit.NANOSECONDS);</span>
+<span class="fc bfc" id="L279" title="All 2 branches covered.">        } else if (result.transportFailure()) {</span>
+<span class="fc" id="L280">            circuitBreaker.onError(elapsed, TimeUnit.NANOSECONDS,</span>
+<span class="fc" id="L281">                    new HubUnavailableException(result.error()));</span>
+        } else {
+            // The hub is reachable (or the failure is local), so release a
+            // HALF_OPEN permit without recording a transport failure.
+<span class="fc" id="L285">            circuitBreaker.onSuccess(elapsed, TimeUnit.NANOSECONDS);</span>
+        }
+<span class="fc" id="L287">        record(event, result);</span>
+<span class="fc" id="L288">    }</span>
+
+    private void releaseClaim(OutboxEventV2 event) {
+<span class="fc" id="L291">        transactionTemplate.executeWithoutResult(status -&gt; repository.releaseOwnedClaim(</span>
+<span class="fc" id="L292">                event.getOutboxEventId(),</span>
+                instanceId,
+<span class="fc" id="L294">                event.getDispatchAttempt(),</span>
+<span class="fc" id="L295">                dispatchableStatuses()));</span>
+<span class="fc" id="L296">    }</span>
+
+    void record(OutboxEventV2 claimedEvent, NotificationPublishResult result) {
+<span class="fc" id="L299">        transactionTemplate.executeWithoutResult(status -&gt; {</span>
+<span class="fc" id="L300">            OutboxEventV2 event = repository.findOwnedClaimForUpdate(</span>
+<span class="fc" id="L301">                    claimedEvent.getOutboxEventId(),</span>
+                    instanceId,
+<span class="fc" id="L303">                    claimedEvent.getDispatchAttempt(),</span>
+<span class="fc" id="L304">                    dispatchableStatuses()).orElse(null);</span>
+<span class="fc bfc" id="L305" title="All 2 branches covered.">            if (event == null) {</span>
+<span class="fc" id="L306">                return;</span>
+            }
+<span class="fc" id="L308">            OffsetDateTime now = OffsetDateTime.now(ZoneOffset.UTC);</span>
+<span class="fc" id="L309">            retryPolicy.apply(event, result, now);</span>
+<span class="fc bfc" id="L310" title="All 3 branches covered.">            switch (event.getPublicationStatus()) {</span>
+<span class="fc" id="L311">                case DEAD_LETTER -&gt; log.error(&quot;Outbox event dead-lettered eventId={} eventType={} aggregateId={} error={}&quot;,</span>
+<span class="fc" id="L312">                        claimedEvent.getOutboxEventId(), event.getEventType(), event.getAggregateId(), result.error());</span>
+<span class="fc" id="L313">                case FAILED -&gt; log.warn(&quot;Outbox event retry scheduled eventId={} eventType={} attempt={} nextRetryAt={} error={}&quot;,</span>
+<span class="fc" id="L314">                        claimedEvent.getOutboxEventId(), event.getEventType(), event.getRetryCount(), event.getNextRetryAt(), result.error());</span>
+<span class="fc" id="L315">                default -&gt; log.debug(&quot;Outbox event published eventId={} eventType={}&quot;,</span>
+<span class="fc" id="L316">                        claimedEvent.getOutboxEventId(), event.getEventType());</span>
+            }
+<span class="fc" id="L318">        });</span>
+<span class="fc" id="L319">    }</span>
+
+    private static Set&lt;com.xenomi.cms.core.v2.event.model.OutboxPublicationStatus&gt; dispatchableStatuses() {
+<span class="fc" id="L322">        return Set.of(</span>
+                com.xenomi.cms.core.v2.event.model.OutboxPublicationStatus.PENDING,
+                com.xenomi.cms.core.v2.event.model.OutboxPublicationStatus.FAILED);
+    }
+
+    private static String instanceId() {
+        String host;
+        try {
+<span class="fc" id="L330">            host = InetAddress.getLocalHost().getHostName();</span>
+<span class="nc" id="L331">        } catch (Exception ignored) {</span>
+<span class="nc" id="L332">            host = &quot;unknown-host&quot;;</span>
+<span class="fc" id="L333">        }</span>
+<span class="fc" id="L334">        String suffix = &quot;/&quot; + ProcessHandle.current().pid() + &quot;/&quot;</span>
+<span class="fc" id="L335">                + UUID.randomUUID().toString().substring(0, 8);</span>
+<span class="fc" id="L336">        int maximumHostLength = 120 - suffix.length();</span>
+<span class="pc bpc" id="L337" title="1 of 2 branches missed.">        return host.length() &lt;= maximumHostLength</span>
+<span class="fc" id="L338">                ? host + suffix</span>
+<span class="nc" id="L339">                : host.substring(0, maximumHostLength) + suffix;</span>
+    }
+
+    static final class HubUnavailableException extends RuntimeException {
+        HubUnavailableException(String message) {
+<span class="fc" id="L344">            super(message, null, false, false);</span>
+<span class="fc" id="L345">        }</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.15.202606040825</span></div></body></html>

@@ -1,0 +1,42 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>NotificationPublishResult.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">CMS Core Service</a> &gt; <a href="index.source.html" class="el_package">com.xenomi.cms.core.v2.event.publisher</a> &gt; <span class="el_source">NotificationPublishResult.java</span></div><h1>NotificationPublishResult.java</h1><pre class="source lang-java linenums">package com.xenomi.cms.core.v2.event.publisher;
+
+/**
+ * Outcome of one publish attempt.
+ *
+ * &lt;ul&gt;
+ *   &lt;li&gt;{@code PUBLISHED}: hub accepted the event (or already had it).&lt;/li&gt;
+ *   &lt;li&gt;{@code TRANSIENT_FAILURE}: hub unavailable, throttled, or timed out; retry later.&lt;/li&gt;
+ *   &lt;li&gt;{@code PERMANENT_FAILURE}: hub rejected the event contract; dead-letter for operator review.&lt;/li&gt;
+ * &lt;/ul&gt;
+ */
+<span class="fc" id="L12">public record NotificationPublishResult(Outcome outcome, String error, boolean transportFailure) {</span>
+
+<span class="fc" id="L14">    public enum Outcome {</span>
+<span class="fc" id="L15">        PUBLISHED,</span>
+<span class="fc" id="L16">        TRANSIENT_FAILURE,</span>
+<span class="fc" id="L17">        PERMANENT_FAILURE</span>
+    }
+
+    public static NotificationPublishResult published() {
+<span class="fc" id="L21">        return new NotificationPublishResult(Outcome.PUBLISHED, null, false);</span>
+    }
+
+    /** Hub reachable but asked us to back off (429/503) or failed server-side (5xx). */
+    public static NotificationPublishResult transientFailure(String error) {
+<span class="fc" id="L26">        return new NotificationPublishResult(Outcome.TRANSIENT_FAILURE, error, true);</span>
+    }
+
+    /** Hub reachable and answered, but this instance could not authenticate or was misconfigured. */
+    public static NotificationPublishResult localFailure(String error) {
+<span class="fc" id="L31">        return new NotificationPublishResult(Outcome.TRANSIENT_FAILURE, error, false);</span>
+    }
+
+    public static NotificationPublishResult permanentFailure(String error) {
+<span class="fc" id="L35">        return new NotificationPublishResult(Outcome.PERMANENT_FAILURE, error, false);</span>
+    }
+
+    public boolean isPublished() {
+<span class="fc bfc" id="L39" title="All 2 branches covered.">        return outcome == Outcome.PUBLISHED;</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.15.202606040825</span></div></body></html>

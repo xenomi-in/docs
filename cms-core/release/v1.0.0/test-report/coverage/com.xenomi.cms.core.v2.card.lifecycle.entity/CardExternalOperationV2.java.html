@@ -1,0 +1,58 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>CardExternalOperationV2.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">CMS Core Service</a> &gt; <a href="index.source.html" class="el_package">com.xenomi.cms.core.v2.card.lifecycle.entity</a> &gt; <span class="el_source">CardExternalOperationV2.java</span></div><h1>CardExternalOperationV2.java</h1><pre class="source lang-java linenums">package com.xenomi.cms.core.v2.card.lifecycle.entity;
+
+import jakarta.persistence.*;
+import lombok.*;
+import java.util.UUID;
+import java.util.Map;
+import java.time.OffsetDateTime;
+import com.xenomi.cms.core.v2.card.model.*;
+
+@Entity(name = &quot;CardExternalOperationV2&quot;)
+@Table(name = &quot;card_external_operation&quot;, schema = &quot;cms_v2&quot;)
+@Data @Builder @NoArgsConstructor @AllArgsConstructor
+public class CardExternalOperationV2 {
+    @Id
+    @Column(name = &quot;external_operation_id&quot;, nullable = false, updatable = false)
+    private UUID externalOperationId;
+    @Column(name = &quot;institution_id&quot;, nullable = false)
+    private UUID institutionId;
+    @Column(name = &quot;operation_id&quot;, nullable = false)
+    private UUID operationId;
+    @Column(name = &quot;effect_key&quot;, length = 200, nullable = false)
+    private String effectKey;
+    @Column(name = &quot;provider&quot;, length = 100, nullable = false)
+    private String provider;
+    @Column(name = &quot;operation_kind&quot;, length = 60, nullable = false)
+    private String operationKind;
+    @Builder.Default
+    @Enumerated(EnumType.STRING)
+    @Column(name = &quot;operation_status&quot;, length = 24, nullable = false)
+    private LifecycleOperationStatusV2 operationStatus = LifecycleOperationStatusV2.PENDING;
+    @Column(name = &quot;provider_reference&quot;, length = 300)
+    private String providerReference;
+    @Column(name = &quot;evidence_reference&quot;, length = 500)
+    private String evidenceReference;
+    @org.hibernate.annotations.JdbcTypeCode(org.hibernate.type.SqlTypes.JSON)
+    @Builder.Default
+    @lombok.ToString.Exclude
+    @Column(name = &quot;intent_payload&quot;, columnDefinition = &quot;jsonb&quot;, nullable = false)
+    private Map&lt;String, Object&gt; intentPayload = new java.util.LinkedHashMap&lt;&gt;();
+    @Builder.Default
+    @Column(name = &quot;attempt_count&quot;, nullable = false)
+    private Integer attemptCount = 0;
+    @Version
+    @lombok.Setter(lombok.AccessLevel.NONE)
+    @Column(name = &quot;version&quot;, nullable = false)
+    private Long version;
+    @Column(name = &quot;dispatched_at&quot;)
+    private OffsetDateTime dispatchedAt;
+    @Column(name = &quot;resolved_at&quot;)
+    private OffsetDateTime resolvedAt;
+    @Column(name = &quot;next_attempt_at&quot;)
+    private OffsetDateTime nextAttemptAt;
+    @PrePersist
+    void beforeInsert() {
+<span class="nc bnc" id="L55" title="All 2 branches missed.">        if (version == null) version = 1L;</span>
+<span class="nc" id="L56">    }</span>
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.15.202606040825</span></div></body></html>

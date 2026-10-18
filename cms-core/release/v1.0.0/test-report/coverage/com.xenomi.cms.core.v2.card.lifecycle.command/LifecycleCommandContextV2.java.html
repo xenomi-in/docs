@@ -1,0 +1,183 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>LifecycleCommandContextV2.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">CMS Core Service</a> &gt; <a href="index.source.html" class="el_package">com.xenomi.cms.core.v2.card.lifecycle.command</a> &gt; <span class="el_source">LifecycleCommandContextV2.java</span></div><h1>LifecycleCommandContextV2.java</h1><pre class="source lang-java linenums">package com.xenomi.cms.core.v2.card.lifecycle.command;
+
+import com.fasterxml.jackson.databind.ObjectMapper;
+import com.xenomi.cms.core.v2.card.entity.CardV2;
+import com.xenomi.cms.core.v2.card.entity.PanAllocationV2;
+import com.xenomi.cms.core.v2.card.lifecycle.entity.*;
+import com.xenomi.cms.core.v2.card.model.LifecycleOperationStatusV2;
+import com.xenomi.cms.core.v2.card.repository.CardFactsV2RepositoryImpl;
+import jakarta.persistence.EntityManager;
+import java.time.OffsetDateTime;
+import java.time.ZoneOffset;
+import java.util.*;
+import java.util.function.Consumer;
+
+/** Transaction-local helpers. A handler must perform its transition/ownership guards before mutation. */
+public final class LifecycleCommandContextV2 {
+    private final EntityManager em;
+    private final ObjectMapper mapper;
+    private final LifecycleCommandRequestV2 request;
+    private final CardLifecycleOperationV2 operation;
+    private final LifecycleCommandAuthorizerV2.Actor actor;
+    private final Map&lt;UUID, PanAllocationV2&gt; families;
+    private final Map&lt;UUID, CardV2&gt; cards;
+<span class="fc" id="L24">    private final Set&lt;UUID&gt; changedFamilies = new LinkedHashSet&lt;&gt;();</span>
+<span class="fc" id="L25">    private final List&lt;UUID&gt; events = new ArrayList&lt;&gt;();</span>
+<span class="fc" id="L26">    private final Map&lt;String, CardExternalOperationV2&gt; intents = new LinkedHashMap&lt;&gt;();</span>
+<span class="fc" id="L27">    private final Map&lt;UUID, Long&gt; sequences = new HashMap&lt;&gt;();</span>
+    private boolean awaitingExternalCompletion;
+
+    LifecycleCommandContextV2(EntityManager em, ObjectMapper mapper, LifecycleCommandRequestV2 request,
+            CardLifecycleOperationV2 operation, LifecycleCommandAuthorizerV2.Actor actor,
+<span class="fc" id="L32">            Map&lt;UUID, PanAllocationV2&gt; families, Map&lt;UUID, CardV2&gt; cards) {</span>
+<span class="fc" id="L33">        this.em = em; this.mapper = mapper; this.request = request; this.operation = operation;</span>
+<span class="fc" id="L34">        this.actor = actor; this.families = families; this.cards = cards;</span>
+<span class="fc" id="L35">    }</span>
+
+<span class="fc" id="L37">    public UUID operationId() { return operation.getOperationId(); }</span>
+<span class="fc" id="L38">    public LifecycleCommandAuthorizerV2.Actor actor() { return actor; }</span>
+<span class="fc" id="L39">    public LifecycleCommandRequestV2 request() { return request; }</span>
+<span class="fc" id="L40">    public UUID newId() { return (UUID) em.createNativeQuery(&quot;select uuidv7()&quot;, UUID.class).getSingleResult(); }</span>
+<span class="fc" id="L41">    public OffsetDateTime now() { return OffsetDateTime.now(ZoneOffset.UTC); }</span>
+    public CardV2 card(UUID id) {
+<span class="fc" id="L43">        CardV2 card = cards.get(id);</span>
+<span class="fc bfc" id="L44" title="All 2 branches covered.">        if (card == null) throw new IllegalArgumentException(&quot;Card is outside the locked command plan&quot;);</span>
+<span class="fc" id="L45">        return card;</span>
+    }
+
+    /** All related rows must be in the locked plan. Returns false without an event for unchanged facts. */
+    public boolean changeCard(UUID id, String transition, LifecycleEventTypeV2 eventType,
+            String reason, UUID relatedCardId, Consumer&lt;CardV2&gt; change) {
+<span class="fc" id="L51">        Objects.requireNonNull(eventType);</span>
+<span class="pc bpc" id="L52" title="1 of 4 branches missed.">        if (transition == null || !transition.matches(&quot;[A-Z][A-Z0-9_-]{1,59}&quot;)) throw new IllegalArgumentException(&quot;Invalid transition ID&quot;);</span>
+<span class="fc bfc" id="L53" title="All 4 branches covered.">        if (reason != null &amp;&amp; !reason.matches(&quot;[A-Z_]{1,50}&quot;)) throw new IllegalArgumentException(&quot;Invalid reason code&quot;);</span>
+<span class="pc bpc" id="L54" title="1 of 2 branches missed.">        if (relatedCardId != null) card(relatedCardId);</span>
+<span class="fc" id="L55">        CardV2 card = card(id);</span>
+<span class="fc" id="L56">        Map&lt;String, Object&gt; before = snapshot(card);</span>
+<span class="fc" id="L57">        change.accept(card);</span>
+<span class="fc bfc" id="L58" title="All 2 branches covered.">        if (before.equals(snapshot(card))) return false;</span>
+<span class="fc" id="L59">        card.setUpdatedBy(actor.reference());</span>
+<span class="fc" id="L60">        new CardFactsV2RepositoryImpl(em).saveFactsAndRefresh(card);</span>
+<span class="fc" id="L61">        Map&lt;String, Object&gt; after = snapshot(card);</span>
+<span class="fc" id="L62">        PanAllocationV2 family = families.get(card.getPanAllocationId());</span>
+<span class="pc bpc" id="L63" title="1 of 2 branches missed.">        if (changedFamilies.add(family.getPanAllocationId())) {</span>
+<span class="fc" id="L64">            family.setFamilyRevision(Math.addExact(family.getFamilyRevision(), 1L));</span>
+        }
+<span class="fc" id="L66">        persistEvent(card, transition, eventType, reason, relatedCardId, before, after);</span>
+<span class="fc" id="L67">        return true;</span>
+    }
+
+    /** Records a second event for an already-committed compound fact change. */
+    public void recordCardEvent(UUID id, String transition, LifecycleEventTypeV2 eventType,
+            String reason, UUID relatedCardId) {
+<span class="fc" id="L73">        Objects.requireNonNull(eventType);</span>
+<span class="pc bpc" id="L74" title="2 of 4 branches missed.">        if (transition == null || !transition.matches(&quot;[A-Z][A-Z0-9_-]{1,59}&quot;)) throw new IllegalArgumentException(&quot;Invalid transition ID&quot;);</span>
+<span class="pc bpc" id="L75" title="2 of 4 branches missed.">        if (reason != null &amp;&amp; !reason.matches(&quot;[A-Z_]{1,50}&quot;)) throw new IllegalArgumentException(&quot;Invalid reason code&quot;);</span>
+<span class="pc bpc" id="L76" title="1 of 2 branches missed.">        if (relatedCardId != null) card(relatedCardId);</span>
+<span class="fc" id="L77">        CardV2 card = card(id);</span>
+<span class="fc" id="L78">        Map&lt;String, Object&gt; current = snapshot(card);</span>
+<span class="fc" id="L79">        persistEvent(card, transition, eventType, reason, relatedCardId, current, current);</span>
+<span class="fc" id="L80">    }</span>
+
+    private void persistEvent(CardV2 card, String transition, LifecycleEventTypeV2 eventType,
+            String reason, UUID relatedCardId, Map&lt;String, Object&gt; before,
+            Map&lt;String, Object&gt; after) {
+<span class="fc" id="L85">        UUID id = card.getCardId();</span>
+<span class="fc" id="L86">        PanAllocationV2 family = families.get(card.getPanAllocationId());</span>
+<span class="fc bfc" id="L87" title="All 2 branches covered.">        long sequence = sequences.compute(id, (key, previous) -&gt; previous == null</span>
+<span class="fc" id="L88">                ? Math.addExact(em.createQuery(&quot;select coalesce(max(e.eventSequence), 0) from CardEventV2 e where e.institutionId = :tenant and e.cardId = :card&quot;, Long.class)</span>
+<span class="fc" id="L89">                    .setParameter(&quot;tenant&quot;, request.institutionId()).setParameter(&quot;card&quot;, id).getSingleResult(), 1L)</span>
+<span class="fc" id="L90">                : Math.addExact(previous, 1L));</span>
+<span class="fc" id="L91">        UUID eventId = newId();</span>
+<span class="pc bpc" id="L92" title="1 of 2 branches missed.">        UUID correlation = request.correlationId() == null ? operationId() : request.correlationId();</span>
+<span class="fc" id="L93">        var payload = new LinkedHashMap&lt;String, Object&gt;();</span>
+<span class="fc" id="L94">        payload.put(&quot;eventId&quot;, eventId.toString()); payload.put(&quot;operationId&quot;, operationId().toString());</span>
+<span class="fc" id="L95">        payload.put(&quot;eventSequence&quot;, sequence); payload.put(&quot;transitionId&quot;, transition);</span>
+<span class="fc" id="L96">        payload.put(&quot;source&quot;, &quot;CMS_V2&quot;); payload.put(&quot;schemaVersion&quot;, 1);</span>
+<span class="fc" id="L97">        payload.put(&quot;institutionId&quot;, request.institutionId().toString());</span>
+<span class="pc bpc" id="L98" title="1 of 2 branches missed.">        payload.put(&quot;cardId&quot;, id.toString()); payload.put(&quot;relatedCardId&quot;, relatedCardId == null ? null : relatedCardId.toString());</span>
+<span class="fc" id="L99">        payload.put(&quot;actorReference&quot;, actor.reference()); payload.put(&quot;actorType&quot;, actor.type().name());</span>
+<span class="fc" id="L100">        payload.put(&quot;before&quot;, before); payload.put(&quot;after&quot;, after);</span>
+<span class="fc" id="L101">        var occurredAt = now();</span>
+<span class="fc" id="L102">        em.persist(CardEventV2.builder().cardEventId(eventId).institutionId(request.institutionId()).cardId(id)</span>
+<span class="fc" id="L103">                .operationId(operationId()).eventType(eventType.name()).eventSequence(sequence)</span>
+<span class="fc" id="L104">                .previousStatus((String) before.get(&quot;cardStatus&quot;)).resultingStatus(card.getCardStatus().name())</span>
+<span class="fc" id="L105">                .reasonCode(reason).source(&quot;CMS_V2&quot;).transitionId(transition).relatedCardId(relatedCardId)</span>
+<span class="fc" id="L106">                .actorReference(actor.reference()).correlationId(correlation).occurredAt(occurredAt)</span>
+<span class="fc" id="L107">                .eventPayload(payload).build());</span>
+        // Domain event publication only. This is not a switch installation/acknowledgement.
+<span class="fc" id="L109">        em.persist(OutboxEventV2.builder().outboxEventId(newId()).institutionId(request.institutionId())</span>
+<span class="fc" id="L110">                .operationId(operationId()).aggregateType(&quot;CARD&quot;).aggregateId(id.toString())</span>
+<span class="fc" id="L111">                .eventType(eventType.name()).eventPayload(payload).correlationId(correlation)</span>
+<span class="fc" id="L112">                .idempotencyKey(eventId).familyRevision(family.getFamilyRevision()).occurredAt(occurredAt).build());</span>
+<span class="fc" id="L113">        events.add(eventId);</span>
+<span class="fc" id="L114">    }</span>
+
+    /** Store references only; no clear PAN, PIN, offsets or key material in durable intent JSON. */
+    public UUID stageExternalIntent(String effectKey, String provider, String kind, Map&lt;String, UUID&gt; references) {
+<span class="fc" id="L118">        requireText(effectKey, 200); requireText(provider, 100); requireText(kind, 60);</span>
+<span class="fc" id="L119">        var payload = new TreeMap&lt;String, Object&gt;();</span>
+<span class="fc" id="L120">        references.forEach((key, value) -&gt; {</span>
+<span class="fc" id="L121">            if (!Set.of(&quot;cardId&quot;, &quot;panAllocationId&quot;, &quot;credentialIssuanceRef&quot;, &quot;keyAssignmentId&quot;,</span>
+<span class="fc bfc" id="L122" title="All 2 branches covered.">                    &quot;productionRequestId&quot;, &quot;tokenReferenceId&quot;, &quot;evidenceId&quot;).contains(key)) {</span>
+<span class="fc" id="L123">                throw new IllegalArgumentException(&quot;External intent reference is not allowlisted&quot;);</span>
+            }
+<span class="fc" id="L125">            payload.put(key, Objects.requireNonNull(value).toString());</span>
+<span class="fc" id="L126">        });</span>
+<span class="fc" id="L127">        var existing = intents.get(effectKey);</span>
+<span class="fc bfc" id="L128" title="All 2 branches covered.">        if (existing != null) {</span>
+<span class="pc bpc" id="L129" title="1 of 4 branches missed.">            if (!existing.getProvider().equals(provider) || !existing.getOperationKind().equals(kind)</span>
+<span class="pc bpc" id="L130" title="1 of 2 branches missed.">                    || !existing.getIntentPayload().equals(payload)) throw new IllegalArgumentException(&quot;Conflicting external effect key&quot;);</span>
+<span class="fc" id="L131">            return existing.getExternalOperationId();</span>
+        }
+<span class="fc" id="L133">        var intent = CardExternalOperationV2.builder().externalOperationId(newId()).institutionId(request.institutionId())</span>
+<span class="fc" id="L134">                .operationId(operationId()).effectKey(effectKey).provider(provider).operationKind(kind)</span>
+<span class="fc" id="L135">                .intentPayload(payload).build();</span>
+<span class="fc" id="L136">        em.persist(intent); intents.put(effectKey, intent); return intent.getExternalOperationId();</span>
+    }
+
+<span class="fc" id="L139">    public void awaitExternalCompletion() { awaitingExternalCompletion = true; }</span>
+
+    LifecycleOperationStatusV2 status() {
+<span class="fc bfc" id="L142" title="All 4 branches covered.">        if (awaitingExternalCompletion &amp;&amp; intents.isEmpty()) throw new IllegalStateException(&quot;A pending operation needs durable external work&quot;);</span>
+<span class="fc bfc" id="L143" title="All 2 branches covered.">        return awaitingExternalCompletion ? LifecycleOperationStatusV2.PENDING : LifecycleOperationStatusV2.CONFIRMED;</span>
+    }
+
+    Map&lt;String, Object&gt; result() {
+<span class="fc" id="L147">        var result = new LinkedHashMap&lt;String, Object&gt;();</span>
+<span class="fc" id="L148">        result.put(&quot;cards&quot;, cards.values().stream().map(this::snapshot).toList());</span>
+<span class="fc" id="L149">        result.put(&quot;eventIds&quot;, events.stream().map(UUID::toString).toList());</span>
+<span class="fc" id="L150">        result.put(&quot;externalOperationIds&quot;, intents.values().stream().map(i -&gt; i.getExternalOperationId().toString()).toList());</span>
+<span class="fc" id="L151">        var revisions = new TreeMap&lt;String, Long&gt;();</span>
+<span class="pc" id="L152">        changedFamilies.forEach(id -&gt; revisions.put(id.toString(), families.get(id).getFamilyRevision()));</span>
+<span class="fc" id="L153">        result.put(&quot;familyRevisions&quot;, revisions);</span>
+<span class="fc" id="L154">        return result;</span>
+    }
+
+    private static void requireText(String value, int max) {
+<span class="pc bpc" id="L158" title="2 of 6 branches missed.">        if (value == null || value.isBlank() || value.length() &gt; max) throw new IllegalArgumentException(&quot;Invalid external intent metadata&quot;);</span>
+<span class="fc" id="L159">    }</span>
+
+    /** Explicit allowlist: never serialize the credential-bearing CardV2 entity. */
+    private Map&lt;String, Object&gt; snapshot(CardV2 c) {
+<span class="fc" id="L163">        var s = new LinkedHashMap&lt;String, Object&gt;();</span>
+<span class="fc" id="L164">        s.put(&quot;cardId&quot;, c.getCardId()); s.put(&quot;panAllocationId&quot;, c.getPanAllocationId());</span>
+<span class="fc" id="L165">        s.put(&quot;lifecycleVersion&quot;, c.getLifecycleVersion()); s.put(&quot;cardStatus&quot;, c.getCardStatus());</span>
+<span class="fc" id="L166">        s.put(&quot;cardStatusReason&quot;, c.getCardStatusReason()); s.put(&quot;cardForm&quot;, c.getCardForm());</span>
+<span class="fc" id="L167">        s.put(&quot;digitalAvailable&quot;, c.isDigitalAvailable()); s.put(&quot;cardSequenceNumber&quot;, c.getCardSequenceNumber());</span>
+<span class="fc" id="L168">        s.put(&quot;useReadyAt&quot;, c.getUseReadyAt()); s.put(&quot;useReadyEvidenceId&quot;, c.getUseReadyEvidenceId());</span>
+<span class="fc" id="L169">        s.put(&quot;expiredAt&quot;, c.getExpiredAt()); s.put(&quot;closedAt&quot;, c.getClosedAt()); s.put(&quot;closureReason&quot;, c.getClosureReason());</span>
+<span class="fc" id="L170">        s.put(&quot;replacedAt&quot;, c.getReplacedAt()); s.put(&quot;customerHoldReason&quot;, c.getCustomerHoldReason());</span>
+<span class="fc" id="L171">        s.put(&quot;opsHoldReason&quot;, c.getOpsHoldReason()); s.put(&quot;securityHoldReason&quot;, c.getSecurityHoldReason());</span>
+<span class="fc" id="L172">        s.put(&quot;collectionsHoldReason&quot;, c.getCollectionsHoldReason()); s.put(&quot;complianceHoldReason&quot;, c.getComplianceHoldReason());</span>
+<span class="fc" id="L173">        s.put(&quot;customerLockReason&quot;, c.getCustomerLockReason()); s.put(&quot;issuerLockReason&quot;, c.getIssuerLockReason());</span>
+<span class="fc" id="L174">        s.put(&quot;physicalFulfilmentStatus&quot;, c.getPhysicalFulfilmentStatus()); s.put(&quot;physicalActivationStatus&quot;, c.getPhysicalActivationStatus());</span>
+<span class="fc" id="L175">        s.put(&quot;activatedAt&quot;, c.getActivatedAt()); s.put(&quot;retiredAt&quot;, c.getRetiredAt()); s.put(&quot;physicalRetiredReason&quot;, c.getPhysicalRetiredReason());</span>
+<span class="fc" id="L176">        s.put(&quot;persoFileRef&quot;, c.getPersoFileRef()); s.put(&quot;courierProviderId&quot;, c.getCourierProviderId()); s.put(&quot;awbNumber&quot;, c.getAwbNumber());</span>
+<span class="fc" id="L177">        s.put(&quot;shippingAddressReferenceId&quot;, c.getShippingAddressReferenceId());</span>
+<span class="fc" id="L178">        s.put(&quot;firstIntentAt&quot;, c.getFirstIntentAt()); s.put(&quot;activationTrigger&quot;, c.getActivationTrigger());</span>
+<span class="fc" id="L179">        s.put(&quot;consentRequestedAt&quot;, c.getConsentRequestedAt()); s.put(&quot;closureDueAt&quot;, c.getClosureDueAt());</span>
+<span class="fc" id="L180">        return mapper.convertValue(s, new com.fasterxml.jackson.core.type.TypeReference&lt;LinkedHashMap&lt;String, Object&gt;&gt;() {});</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.15.202606040825</span></div></body></html>

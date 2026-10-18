@@ -1,0 +1,65 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>HttpSwitchCardControlClient.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">CMS Core Service</a> &gt; <a href="index.source.html" class="el_package">com.xenomi.cms.core.v2.cardcontrol.client</a> &gt; <span class="el_source">HttpSwitchCardControlClient.java</span></div><h1>HttpSwitchCardControlClient.java</h1><pre class="source lang-java linenums">package com.xenomi.cms.core.v2.cardcontrol.client;
+
+import java.util.List;
+import java.util.UUID;
+
+import org.springframework.beans.factory.annotation.Value;
+import org.springframework.http.MediaType;
+import org.springframework.stereotype.Component;
+import org.springframework.web.client.RestClient;
+import org.springframework.web.client.RestClientException;
+import org.springframework.http.client.SimpleClientHttpRequestFactory;
+
+@Component
+public class HttpSwitchCardControlClient implements SwitchCardControlClient {
+    @Value(&quot;${cms.switch.sync.enabled:false}&quot;)
+    private boolean durableSyncEnabled;
+    private final RestClient restClient;
+    private final String baseUrl;
+
+    public HttpSwitchCardControlClient(RestClient.Builder builder,
+            @Value(&quot;${cms.switch.base-url:}&quot;) String baseUrl,
+<span class="fc" id="L22">            @Value(&quot;${cms.switch.timeout-ms:3000}&quot;) int timeoutMs) {</span>
+<span class="fc" id="L23">        SimpleClientHttpRequestFactory requestFactory = new SimpleClientHttpRequestFactory();</span>
+<span class="fc" id="L24">        requestFactory.setConnectTimeout(timeoutMs);</span>
+<span class="fc" id="L25">        requestFactory.setReadTimeout(timeoutMs);</span>
+<span class="fc" id="L26">        this.restClient = builder.requestFactory(requestFactory).build();</span>
+<span class="fc bfc" id="L27" title="All 2 branches covered.">        this.baseUrl = baseUrl == null ? &quot;&quot; : baseUrl.trim();</span>
+<span class="fc" id="L28">    }</span>
+
+    @Override
+    public void apply(UUID institutionId, UUID cardId, int controlVersion,
+            boolean internationalEnabled,
+            List&lt;SwitchCardControl&gt; controls, String idempotencyKey, String requestId) {
+<span class="fc bfc" id="L34" title="All 2 branches covered.">        if (durableSyncEnabled) return;</span>
+<span class="fc bfc" id="L35" title="All 2 branches covered.">        if (baseUrl.isBlank()) {</span>
+<span class="fc" id="L36">            throw new IllegalStateException(&quot;Authorization switch is not configured&quot;);</span>
+        }
+        try {
+<span class="fc" id="L39">            SwitchApplyResponse response = restClient.put()</span>
+<span class="fc" id="L40">                    .uri(baseUrl + &quot;/internal/v1/institutions/{institutionId}/cards/{cardId}/controls&quot;,</span>
+                            institutionId, cardId)
+<span class="fc" id="L42">                    .contentType(MediaType.APPLICATION_JSON)</span>
+<span class="fc" id="L43">                    .header(&quot;Idempotency-Key&quot;, idempotencyKey)</span>
+<span class="fc" id="L44">                    .header(&quot;X-Request-Id&quot;, requestId)</span>
+<span class="fc" id="L45">                    .body(new SwitchApplyRequest(controlVersion, internationalEnabled, controls))</span>
+<span class="fc" id="L46">                    .retrieve()</span>
+<span class="fc" id="L47">                    .body(SwitchApplyResponse.class);</span>
+<span class="pc bpc" id="L48" title="1 of 4 branches missed.">            if (response == null || !response.applied()</span>
+<span class="fc bfc" id="L49" title="All 2 branches covered.">                    || response.appliedVersion() != controlVersion) {</span>
+<span class="fc" id="L50">                throw new IllegalStateException(</span>
+                        &quot;Authorization switch did not confirm the requested control version&quot;);
+            }
+<span class="fc" id="L53">        } catch (RestClientException ex) {</span>
+<span class="fc" id="L54">            throw new IllegalStateException(&quot;Authorization switch control update failed&quot;, ex);</span>
+<span class="fc" id="L55">        }</span>
+<span class="fc" id="L56">    }</span>
+
+<span class="fc" id="L58">    private record SwitchApplyRequest(int controlVersion, boolean internationalEnabled,</span>
+            List&lt;SwitchCardControl&gt; controls) {
+    }
+
+<span class="fc" id="L62">    private record SwitchApplyResponse(boolean applied, int appliedVersion) {</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.15.202606040825</span></div></body></html>

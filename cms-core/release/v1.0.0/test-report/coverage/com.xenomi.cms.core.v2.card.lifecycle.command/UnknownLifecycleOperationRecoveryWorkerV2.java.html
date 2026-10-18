@@ -1,0 +1,67 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>UnknownLifecycleOperationRecoveryWorkerV2.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">CMS Core Service</a> &gt; <a href="index.source.html" class="el_package">com.xenomi.cms.core.v2.card.lifecycle.command</a> &gt; <span class="el_source">UnknownLifecycleOperationRecoveryWorkerV2.java</span></div><h1>UnknownLifecycleOperationRecoveryWorkerV2.java</h1><pre class="source lang-java linenums">package com.xenomi.cms.core.v2.card.lifecycle.command;
+
+import java.time.Duration;
+import java.util.concurrent.Executors;
+import java.util.concurrent.ScheduledExecutorService;
+import java.util.concurrent.TimeUnit;
+import org.springframework.beans.factory.DisposableBean;
+import org.springframework.beans.factory.SmartInitializingSingleton;
+import org.springframework.beans.factory.annotation.Value;
+import org.springframework.stereotype.Component;
+
+/** Periodically terminalizes stale UNKNOWN lifecycle commands without provider replay. */
+@Component
+public class UnknownLifecycleOperationRecoveryWorkerV2
+        implements SmartInitializingSingleton, DisposableBean {
+<span class="fc" id="L16">    private static final org.slf4j.Logger log =</span>
+<span class="fc" id="L17">            org.slf4j.LoggerFactory.getLogger(</span>
+                    UnknownLifecycleOperationRecoveryWorkerV2.class);
+
+    private final UnknownLifecycleOperationReconcilerV2 reconciler;
+    private final long pollDelayMillis;
+<span class="fc" id="L22">    private final ScheduledExecutorService executor =</span>
+<span class="fc" id="L23">            Executors.newSingleThreadScheduledExecutor(runnable -&gt; {</span>
+<span class="nc" id="L24">                Thread thread = new Thread(</span>
+                        runnable, &quot;cms-v2-unknown-operation-recovery&quot;);
+<span class="nc" id="L26">                thread.setDaemon(true);</span>
+<span class="nc" id="L27">                return thread;</span>
+            });
+
+    public UnknownLifecycleOperationRecoveryWorkerV2(
+            UnknownLifecycleOperationReconcilerV2 reconciler,
+            @Value(&quot;${cms.lifecycle.external.unknown-recovery-poll-delay:PT30S}&quot;)
+<span class="fc" id="L33">            Duration pollDelay) {</span>
+<span class="pc bpc" id="L34" title="1 of 6 branches missed.">        if (pollDelay == null || pollDelay.isZero() || pollDelay.isNegative()) {</span>
+<span class="fc" id="L35">            throw new IllegalArgumentException(</span>
+                    &quot;cms.lifecycle.external.unknown-recovery-poll-delay must be positive&quot;);
+        }
+<span class="fc" id="L38">        this.reconciler = reconciler;</span>
+<span class="fc" id="L39">        this.pollDelayMillis = Math.max(1_000L, pollDelay.toMillis());</span>
+<span class="fc" id="L40">    }</span>
+
+    @Override
+    public void afterSingletonsInstantiated() {
+<span class="nc" id="L44">        executor.scheduleWithFixedDelay(</span>
+                this::poll, pollDelayMillis, pollDelayMillis, TimeUnit.MILLISECONDS);
+<span class="nc" id="L46">    }</span>
+
+    private void poll() {
+        try {
+<span class="fc" id="L50">            int reconciled = reconciler.reconcileStale();</span>
+<span class="pc bpc" id="L51" title="1 of 2 branches missed.">            if (reconciled &gt; 0) {</span>
+<span class="fc" id="L52">                log.warn(</span>
+                        &quot;Terminalized {} lifecycle operation(s) with unresolved provider outcomes&quot;,
+<span class="fc" id="L54">                        reconciled);</span>
+            }
+<span class="fc" id="L56">        } catch (RuntimeException failure) {</span>
+<span class="fc" id="L57">            log.warn(&quot;UNKNOWN lifecycle reconciliation unavailable ({})&quot;,</span>
+<span class="fc" id="L58">                    failure.getClass().getSimpleName());</span>
+<span class="fc" id="L59">        }</span>
+<span class="fc" id="L60">    }</span>
+
+    @Override
+    public void destroy() {
+<span class="fc" id="L64">        executor.shutdownNow();</span>
+<span class="fc" id="L65">    }</span>
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.15.202606040825</span></div></body></html>

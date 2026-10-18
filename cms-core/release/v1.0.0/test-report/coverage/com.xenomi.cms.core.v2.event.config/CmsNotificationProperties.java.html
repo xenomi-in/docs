@@ -1,0 +1,137 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>CmsNotificationProperties.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">CMS Core Service</a> &gt; <a href="index.source.html" class="el_package">com.xenomi.cms.core.v2.event.config</a> &gt; <span class="el_source">CmsNotificationProperties.java</span></div><h1>CmsNotificationProperties.java</h1><pre class="source lang-java linenums">package com.xenomi.cms.core.v2.event.config;
+
+import java.time.Duration;
+import java.net.URI;
+
+import org.springframework.boot.context.properties.ConfigurationProperties;
+import org.springframework.stereotype.Component;
+
+import lombok.Data;
+
+@Data
+@Component
+@ConfigurationProperties(prefix = &quot;cms.notification&quot;)
+public class CmsNotificationProperties {
+
+    private boolean enabled = true;
+    private String baseUrl = &quot;http://localhost:8085&quot;;
+    private String publishPath = &quot;/api/v2/institutions/{institutionId}/notifications/publish&quot;;
+    private Duration connectTimeout = Duration.ofSeconds(2);
+    private Duration readTimeout = Duration.ofSeconds(5);
+
+    private Pool pool = new Pool();
+    private Auth auth = new Auth();
+
+    /**
+     * Validates configuration that cannot be expressed with field annotations.
+     * Loopback HTTP is permitted only for local development; credentials are always required.
+     */
+    public void validateSecureTransport() {
+        URI uri;
+        try {
+<span class="fc" id="L32">            uri = URI.create(baseUrl);</span>
+<span class="nc" id="L33">        } catch (IllegalArgumentException exception) {</span>
+<span class="nc" id="L34">            throw new IllegalStateException(&quot;cms.notification.base-url must be an absolute URI&quot;, exception);</span>
+<span class="fc" id="L35">        }</span>
+<span class="fc" id="L36">        String scheme = uri.getScheme();</span>
+<span class="fc" id="L37">        String host = uri.getHost();</span>
+<span class="pc bpc" id="L38" title="2 of 4 branches missed.">        if (scheme == null || host == null) {</span>
+<span class="nc" id="L39">            throw new IllegalStateException(&quot;cms.notification.base-url must be an absolute URI&quot;);</span>
+        }
+<span class="pc bpc" id="L41" title="2 of 4 branches missed.">        if (isNonPositive(connectTimeout) || isNonPositive(readTimeout)</span>
+<span class="pc bpc" id="L42" title="1 of 2 branches missed.">                || isNonPositive(pool.idleEviction)) {</span>
+<span class="nc" id="L43">            throw new IllegalStateException(&quot;cms.notification timeouts must be positive&quot;);</span>
+        }
+<span class="pc bpc" id="L45" title="3 of 6 branches missed.">        if (pool.maxTotal &lt; 1 || pool.maxPerRoute &lt; 1 || pool.maxPerRoute &gt; pool.maxTotal) {</span>
+<span class="nc" id="L46">            throw new IllegalStateException(&quot;cms.notification pool sizes must be positive and max-per-route &lt;= max-total&quot;);</span>
+        }
+<span class="fc bfc" id="L48" title="All 2 branches covered.">        boolean loopback = &quot;localhost&quot;.equalsIgnoreCase(host)</span>
+<span class="pc bpc" id="L49" title="1 of 2 branches missed.">                || &quot;127.0.0.1&quot;.equals(host)</span>
+<span class="pc bpc" id="L50" title="1 of 2 branches missed.">                || &quot;::1&quot;.equals(host);</span>
+<span class="pc bpc" id="L51" title="1 of 6 branches missed.">        if (enabled &amp;&amp; !loopback &amp;&amp; !&quot;https&quot;.equalsIgnoreCase(scheme)) {</span>
+<span class="fc" id="L52">            throw new IllegalStateException(</span>
+                    &quot;cms.notification.base-url must use HTTPS outside local development&quot;);
+        }
+<span class="fc bfc" id="L55" title="All 4 branches covered.">        if (enabled &amp;&amp; auth.mode == Auth.Mode.NONE) {</span>
+<span class="fc" id="L56">            throw new IllegalStateException(</span>
+                    &quot;cms.notification.auth.mode must not be NONE: notification requires a Keycloak bearer token&quot;);
+        }
+<span class="fc bfc" id="L59" title="All 2 branches covered.">        if (!enabled) {</span>
+<span class="fc" id="L60">            return;</span>
+        }
+<span class="pc bpc" id="L62" title="3 of 6 branches missed.">        if (publishPath == null || !publishPath.startsWith(&quot;/&quot;) || publishPath.startsWith(&quot;//&quot;)</span>
+<span class="fc bfc" id="L63" title="All 2 branches covered.">                || !publishPath.contains(&quot;/institutions/{institutionId}/&quot;)) {</span>
+<span class="fc" id="L64">            throw new IllegalStateException(&quot;cms.notification.publish-path must contain /institutions/{institutionId}/&quot;);</span>
+        }
+<span class="pc bpc" id="L66" title="2 of 3 branches missed.">        switch (auth.mode) {</span>
+<span class="nc" id="L67">            case STATIC_BEARER -&gt; require(auth.staticToken, &quot;cms.notification.auth.static-token&quot;);</span>
+            case OAUTH2_CLIENT_CREDENTIALS -&gt; {
+<span class="fc" id="L69">                require(auth.tokenUri, &quot;cms.notification.auth.token-uri&quot;);</span>
+<span class="fc" id="L70">                requireHttpsOutsideLoopback(auth.tokenUri, &quot;cms.notification.auth.token-uri&quot;);</span>
+<span class="fc" id="L71">                require(auth.clientId, &quot;cms.notification.auth.client-id&quot;);</span>
+<span class="fc" id="L72">                require(auth.clientSecret, &quot;cms.notification.auth.client-secret&quot;);</span>
+<span class="pc bpc" id="L73" title="1 of 2 branches missed.">                if (isNonPositive(auth.refreshSkew)) {</span>
+<span class="nc" id="L74">                    throw new IllegalStateException(&quot;cms.notification.auth.refresh-skew must be positive&quot;);</span>
+                }
+            }
+            case NONE -&gt; {
+                // Only reachable when publishing is disabled (handled above).
+            }
+        }
+<span class="fc" id="L81">    }</span>
+
+    Duration maximumOutboundCallDuration() {
+<span class="fc" id="L84">        return connectTimeout.plus(readTimeout);</span>
+    }
+
+    private static boolean isNonPositive(Duration value) {
+<span class="pc bpc" id="L88" title="3 of 6 branches missed.">        return value == null || value.isZero() || value.isNegative();</span>
+    }
+
+    private static void require(String value, String property) {
+<span class="pc bpc" id="L92" title="1 of 4 branches missed.">        if (value == null || value.isBlank()) {</span>
+<span class="fc" id="L93">            throw new IllegalStateException(property + &quot; is required&quot;);</span>
+        }
+<span class="fc" id="L95">    }</span>
+
+    private static void requireHttpsOutsideLoopback(String value, String property) {
+        URI uri;
+        try {
+<span class="fc" id="L100">            uri = URI.create(value);</span>
+<span class="nc" id="L101">        } catch (IllegalArgumentException exception) {</span>
+<span class="nc" id="L102">            throw new IllegalStateException(property + &quot; must be an absolute URI&quot;, exception);</span>
+<span class="fc" id="L103">        }</span>
+<span class="fc" id="L104">        String host = uri.getHost();</span>
+<span class="pc bpc" id="L105" title="1 of 2 branches missed.">        boolean loopback = &quot;localhost&quot;.equalsIgnoreCase(host)</span>
+<span class="nc bnc" id="L106" title="All 2 branches missed.">                || &quot;127.0.0.1&quot;.equals(host)</span>
+<span class="pc bnc" id="L107" title="All 2 branches missed.">                || &quot;::1&quot;.equals(host);</span>
+<span class="pc bpc" id="L108" title="3 of 6 branches missed.">        if (uri.getScheme() == null || host == null</span>
+<span class="nc bnc" id="L109" title="All 2 branches missed.">                || (!loopback &amp;&amp; !&quot;https&quot;.equalsIgnoreCase(uri.getScheme()))) {</span>
+<span class="nc" id="L110">            throw new IllegalStateException(property + &quot; must use HTTPS outside local development&quot;);</span>
+        }
+<span class="fc" id="L112">    }</span>
+
+    @Data
+    public static class Pool {
+        private int maxTotal = 32;
+        private int maxPerRoute = 32;
+        private Duration idleEviction = Duration.ofSeconds(30);
+    }
+
+    @Data
+    public static class Auth {
+<span class="fc" id="L123">        public enum Mode { NONE, STATIC_BEARER, OAUTH2_CLIENT_CREDENTIALS }</span>
+
+        private Mode mode = Mode.OAUTH2_CLIENT_CREDENTIALS;
+        /** Pre-issued service token, sourced from a secret store. Used when mode = STATIC_BEARER. */
+        private String staticToken;
+        /** OAuth2 client-credentials settings. Used when mode = OAUTH2_CLIENT_CREDENTIALS. */
+        private String tokenUri;
+        private String clientId;
+        private String clientSecret;
+        private String scope;
+        /** Refresh the cached token this long before it expires. */
+        private Duration refreshSkew = Duration.ofSeconds(30);
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.15.202606040825</span></div></body></html>

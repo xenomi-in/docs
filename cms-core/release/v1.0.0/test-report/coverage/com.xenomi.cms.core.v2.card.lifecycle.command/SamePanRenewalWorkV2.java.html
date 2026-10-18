@@ -1,0 +1,234 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>SamePanRenewalWorkV2.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">CMS Core Service</a> &gt; <a href="index.source.html" class="el_package">com.xenomi.cms.core.v2.card.lifecycle.command</a> &gt; <span class="el_source">SamePanRenewalWorkV2.java</span></div><h1>SamePanRenewalWorkV2.java</h1><pre class="source lang-java linenums">package com.xenomi.cms.core.v2.card.lifecycle.command;
+
+import com.fasterxml.jackson.databind.ObjectMapper;
+import com.fasterxml.jackson.core.type.TypeReference;
+import com.xenomi.cms.core.exception.*;
+import com.xenomi.cms.core.v2.card.dto.CreateCardV2Request;
+import com.xenomi.cms.core.v2.card.entity.*;
+import com.xenomi.cms.core.v2.card.lifecycle.entity.*;
+import com.xenomi.cms.core.v2.card.model.*;
+import com.xenomi.cms.core.v2.card.pin.entity.PinDataV2;
+import com.xenomi.cms.core.v2.card.replacement.entity.CardReplacementRequestV2;
+import com.xenomi.cms.core.v2.card.replacement.model.*;
+import com.xenomi.cms.core.v2.card.security.*;
+import com.xenomi.cms.core.v2.card.service.CardIssuanceV2Service;
+import com.xenomi.cms.core.v2.card.service.CardIssuanceV2Service.Draft;
+import com.xenomi.cms.core.v2.product.entity.ProductReplacementPolicyV2;
+import com.xenomi.cms.core.v2.product.model.*;
+import jakarta.persistence.*;
+import org.springframework.stereotype.Service;
+import org.springframework.transaction.PlatformTransactionManager;
+import org.springframework.transaction.support.*;
+import java.time.*;
+import java.util.*;
+
+/** Same-PAN renewal: account/family locks, durable provider work and atomic successor creation. */
+@Service
+public class SamePanRenewalWorkV2 {
+    private final EntityManager em;
+    private final ObjectMapper mapper;
+    private final CardIssuanceV2Service issuance;
+    private final CmsCardSecurityService security;
+    private final TransactionTemplate tx;
+    public SamePanRenewalWorkV2(EntityManager em, ObjectMapper mapper, CardIssuanceV2Service issuance,
+<span class="fc" id="L34">            CmsCardSecurityService security, PlatformTransactionManager manager) {</span>
+<span class="fc" id="L35">        this.em=em; this.mapper=mapper; this.issuance=issuance; this.security=security;</span>
+<span class="fc" id="L36">        tx=new TransactionTemplate(manager); tx.setTimeout(30);</span>
+<span class="fc" id="L37">    }</span>
+    public UUID account(UUID tenant, UUID sourceId) {
+<span class="fc" id="L39">        return tx.execute(s -&gt; family(source(tenant,sourceId)).getAccountReferenceId());</span>
+    }
+    public LifecycleCommandHandlerV2.LockPlan plan(LifecycleCommandRequestV2 request, SamePanRenewalHandlerV2.Payload payload) {
+<span class="fc" id="L42">        var source=source(request.institutionId(),payload.sourceCardId());</span>
+<span class="fc" id="L43">        var family=family(source);</span>
+<span class="fc" id="L44">        require(family.getAccountReferenceId().equals(request.accountReferenceId()),&quot;Source account mismatch&quot;);</span>
+<span class="fc" id="L45">        return new LifecycleCommandHandlerV2.LockPlan(Set.of(family.getPanAllocationId()),</span>
+<span class="fc" id="L46">                new HashSet&lt;&gt;(em.createQuery(&quot;select c.cardId from CardV2 c where c.institutionId=:t and c.panAllocationId=:f&quot;,UUID.class)</span>
+<span class="fc" id="L47">                        .setParameter(&quot;t&quot;,request.institutionId()).setParameter(&quot;f&quot;,family.getPanAllocationId()).getResultList()));</span>
+    }
+    public void stage(LifecycleCommandContextV2 context, SamePanRenewalHandlerV2.Payload payload) {
+<span class="fc" id="L50">        var source=context.card(payload.sourceCardId());</span>
+<span class="fc" id="L51">        validateSource(source); restrictions(source.getInstitutionId(),context.request().accountReferenceId());</span>
+<span class="fc" id="L52">        var input=payload.replacement();</span>
+<span class="fc bfc" id="L53" title="All 2 branches covered.">        require(input.getReplacementReason()==ReplacementReason.RENEWAL,&quot;This lifecycle command supports RENEWAL only&quot;);</span>
+<span class="fc bfc" id="L54" title="All 4 branches covered.">        require(input.getRequestedPanStrategy()==null || input.getRequestedPanStrategy()==CardReplacementPanStrategy.PRESERVE_EXISTING_PAN,</span>
+                &quot;Same-PAN renewal requires PRESERVE_EXISTING_PAN&quot;);
+<span class="fc bfc" id="L56" title="All 2 branches covered.">        require(context.actor().reference().length()&lt;=100,&quot;Actor reference exceeds storage limit&quot;);</span>
+<span class="fc" id="L57">        require(em.createQuery(&quot;select count(r) from CardReplacementRequestV2 r where r.institutionId=:t and r.sourceCardId=:s&quot;,Long.class)</span>
+<span class="fc bfc" id="L58" title="All 2 branches covered.">                .setParameter(&quot;t&quot;,source.getInstitutionId()).setParameter(&quot;s&quot;,source.getCardId()).getSingleResult()==0,</span>
+                &quot;A replacement request already exists for this source&quot;);
+<span class="fc" id="L60">        var policy=policy(source);</span>
+<span class="fc" id="L61">        validatePolicy(policy);</span>
+<span class="fc" id="L62">        var create=CreateCardV2Request.builder().customerReferenceId(source.getCustomerReferenceId())</span>
+<span class="fc" id="L63">                .accountReferenceId(context.request().accountReferenceId()).productId(source.getProductId())</span>
+<span class="fc" id="L64">                .productVersionId(source.getProductVersionId()).binRangeId(source.getBinRangeId())</span>
+<span class="fc" id="L65">                .activationPolicyVersionId(source.getActivationPolicyVersion())</span>
+<span class="fc" id="L66">                .accountLinkType(CardAccountLinkType.PRIMARY_FUNDING)</span>
+<span class="fc" id="L67">                .cardDesignId(source.getCardDesignId()).technologyProfileId(source.getTechnologyProfileId()).cvmProfileId(source.getCvmProfileId())</span>
+<span class="pc bpc" id="L68" title="1 of 2 branches missed.">                .shippingAddressReferenceId(input.getShippingAddressReferenceId()==null ? source.getShippingAddressReferenceId() : input.getShippingAddressReferenceId())</span>
+<span class="fc" id="L69">                .productionBatchConfigurationId(input.getProductionBatchConfigurationId())</span>
+<span class="fc" id="L70">                .embossedNameLine1(source.getEmbossedNameLine1()).embossedNameLine2(source.getEmbossedNameLine2())</span>
+<span class="fc" id="L71">                .embossedNameLine3(source.getEmbossedNameLine3()).embossedNameLine4(source.getEmbossedNameLine4()).build();</span>
+<span class="fc" id="L72">        var d=issuance.prepareDraft(source.getInstitutionId(),create,context.actor().reference(),context.operationId(),false);</span>
+<span class="pc bpc" id="L73" title="1 of 2 branches missed.">        require(d.cardForm()==source.getCardForm(),&quot;Renewal cannot change card form; use an explicit migration command&quot;);</span>
+<span class="fc" id="L74">        var renewalExpiry=d.expiryDate();</span>
+<span class="pc bpc" id="L75" title="1 of 2 branches missed.">        if (!renewalExpiry.isAfter(source.getExpiryDate())) {</span>
+<span class="nc" id="L76">            var version=em.find(com.xenomi.cms.core.v2.product.entity.ProductVersionV2.class,source.getProductVersionId());</span>
+<span class="nc" id="L77">            renewalExpiry=source.getExpiryDate().plusMonths(version.getValidityMonths()).with(java.time.temporal.TemporalAdjusters.lastDayOfMonth());</span>
+        }
+<span class="fc" id="L79">        Draft draft=new Draft(d.institutionId(),d.request(),d.actor(),d.operationId(),d.cardId(),source.getPanAllocationId(),source.getPinDataRef(),</span>
+<span class="fc" id="L80">                d.issuedAt(),d.issueDate(),renewalExpiry,d.serviceCode(),d.cardForm(),d.formPolicy(),d.profiles(),d.production(),d.range(),d.pinPolicy());</span>
+<span class="fc" id="L81">        UUID external=context.stageExternalIntent(&quot;renew-credentials&quot;,&quot;HSM&quot;,&quot;REISSUE_CREDENTIALS&quot;,</span>
+<span class="fc" id="L82">                Map.of(&quot;cardId&quot;,source.getCardId(),&quot;credentialIssuanceRef&quot;,context.operationId()));</span>
+<span class="fc" id="L83">        em.persist(CardReplacementRequestV2.builder().replacementRequestId(context.operationId()).institutionId(source.getInstitutionId())</span>
+<span class="fc" id="L84">                .sourceCardId(source.getCardId()).replacementReason(ReplacementReason.RENEWAL).policyPanStrategy(policy.getPanStrategy())</span>
+<span class="fc" id="L85">                .requestedPanStrategy(input.getRequestedPanStrategy()).resolvedPanStrategy(CardReplacementPanStrategy.PRESERVE_EXISTING_PAN)</span>
+<span class="fc" id="L86">                .overrideReason(input.getOverrideReason()).requestStatus(CardReplacementRequestStatus.PROCESSING)</span>
+<span class="fc" id="L87">                .policySnapshot(map(policy)).requestedAt(context.now()).idempotencyKey(context.operationId())</span>
+<span class="fc" id="L88">                .createdBy(context.actor().reference()).operationId(context.operationId()).build());</span>
+<span class="fc" id="L89">        var p=new CardRenewalPreparationV2(); p.setOperationId(context.operationId()); p.setInstitutionId(draft.institutionId());</span>
+<span class="fc" id="L90">        p.setAccountReferenceId(context.request().accountReferenceId()); p.setSourceCardId(source.getCardId());</span>
+<span class="fc" id="L91">        p.setExternalOperationId(external); p.setDraft(map(draft)); em.persist(p); context.awaitExternalCompletion();</span>
+<span class="fc" id="L92">    }</span>
+    public List&lt;UUID&gt; pending() {
+<span class="fc" id="L94">        return tx.execute(s -&gt; em.createQuery(&quot;select p.operationId from CardRenewalPreparationV2 p, CardExternalOperationV2 e, CardLifecycleOperationV2 o where p.externalOperationId=e.externalOperationId and p.operationId=o.operationId and o.operationStatus=:pending and (e.nextAttemptAt is null or e.nextAttemptAt&lt;=:now) order by o.createdAt&quot;,UUID.class)</span>
+<span class="fc" id="L95">                .setParameter(&quot;pending&quot;,LifecycleOperationStatusV2.PENDING).setParameter(&quot;now&quot;,now()).setMaxResults(10).getResultList());</span>
+    }
+<span class="fc" id="L97">    private record Claimed(CardRenewalPreparationV2 preparation, CardV2 source, PanAllocationV2 family) {}</span>
+    public void process(UUID id) {
+<span class="fc bfc" id="L99" title="All 2 branches covered.">        if(TransactionSynchronizationManager.isActualTransactionActive()) throw new IllegalStateException(&quot;Renewal worker must own its transactions&quot;);</span>
+<span class="fc" id="L100">        Claimed claim=tx.execute(s -&gt; {</span>
+<span class="fc" id="L101">            var p=lock(id); var op=em.find(CardLifecycleOperationV2.class,id);</span>
+<span class="pc bpc" id="L102" title="1 of 2 branches missed.">            if(op.getOperationStatus()!=LifecycleOperationStatusV2.PENDING) return null;</span>
+<span class="fc" id="L103">            var source=source(p.getInstitutionId(),p.getSourceCardId()); validateSource(source);</span>
+<span class="fc" id="L104">            restrictions(p.getInstitutionId(),p.getAccountReferenceId());</span>
+<span class="pc bpc" id="L105" title="1 of 2 branches missed.">            if(p.getProtectedResult()==null) {</span>
+<span class="fc" id="L106">                var ext=em.find(CardExternalOperationV2.class,p.getExternalOperationId(),LockModeType.PESSIMISTIC_WRITE);</span>
+<span class="pc bpc" id="L107" title="1 of 2 branches missed.">                if(ext.getOperationStatus()!=LifecycleOperationStatusV2.PENDING) return null;</span>
+<span class="fc" id="L108">                ext.setOperationStatus(LifecycleOperationStatusV2.UNKNOWN); ext.setDispatchedAt(now()); ext.setAttemptCount(ext.getAttemptCount()+1);</span>
+<span class="fc" id="L109">                op.setOperationStatus(LifecycleOperationStatusV2.UNKNOWN);</span>
+            }
+<span class="fc" id="L111">            return new Claimed(p,source,family(source));</span>
+        });
+<span class="pc bpc" id="L113" title="1 of 2 branches missed.">        if(claim==null) return;</span>
+<span class="pc bpc" id="L114" title="1 of 2 branches missed.">        if(claim.preparation().getProtectedResult()==null) {</span>
+<span class="fc" id="L115">            Draft d=mapper.convertValue(claim.preparation().getDraft(),Draft.class);</span>
+<span class="fc" id="L116">            var material=security.prepareSamePan(d.institutionId(),claim.source(),claim.family(),d.expiryDate(),d.serviceCode(),&quot;D&quot;);</span>
+<span class="fc" id="L117">            tx.executeWithoutResult(s -&gt; {</span>
+<span class="fc" id="L118">                var p=lock(id); p.setProtectedResult(map(material));</span>
+<span class="fc" id="L119">                var ext=em.find(CardExternalOperationV2.class,p.getExternalOperationId()); ext.setOperationStatus(LifecycleOperationStatusV2.CONFIRMED);</span>
+<span class="fc" id="L120">                ext.setResolvedAt(now()); ext.setEvidenceReference(&quot;cms-renewal-preparation:&quot;+id);</span>
+<span class="fc" id="L121">                em.find(CardLifecycleOperationV2.class,id).setOperationStatus(LifecycleOperationStatusV2.PENDING);</span>
+<span class="fc" id="L122">            });</span>
+        }
+<span class="fc" id="L124">        try { tx.executeWithoutResult(s -&gt; finish(id)); }</span>
+<span class="nc" id="L125">        catch(RuntimeException failure) {</span>
+<span class="nc" id="L126">            tx.executeWithoutResult(s -&gt; em.find(CardExternalOperationV2.class,lock(id).getExternalOperationId()).setNextAttemptAt(now().plusSeconds(30)));</span>
+<span class="nc" id="L127">            throw failure;</span>
+<span class="fc" id="L128">        }</span>
+<span class="fc" id="L129">    }</span>
+    private void finish(UUID id) {
+<span class="fc" id="L131">        var p=lock(id); var op=em.find(CardLifecycleOperationV2.class,id);</span>
+<span class="pc bpc" id="L132" title="1 of 2 branches missed.">        if(op.getOperationStatus()==LifecycleOperationStatusV2.CONFIRMED) return;</span>
+<span class="pc bpc" id="L133" title="1 of 2 branches missed.">        require(p.getProtectedResult()!=null,&quot;Renewal credentials are unresolved&quot;);</span>
+<span class="fc" id="L134">        var source=source(p.getInstitutionId(),p.getSourceCardId()); validateSource(source);</span>
+<span class="fc" id="L135">        var holds=restrictions(p.getInstitutionId(),p.getAccountReferenceId());</span>
+<span class="fc" id="L136">        var request=em.find(CardReplacementRequestV2.class,id);</span>
+<span class="fc" id="L137">        var activePolicy=policy(source); validatePolicy(activePolicy);</span>
+<span class="fc" id="L138">        require(map(activePolicy).equals(request.getPolicySnapshot()),&quot;Replacement policy changed after acceptance; reconciliation required&quot;);</span>
+<span class="fc" id="L139">        var draft=mapper.convertValue(p.getDraft(),Draft.class);</span>
+<span class="fc" id="L140">        require(draft.expiryDate().isAfter(now().toLocalDate()),&quot;Prepared renewal credentials expired&quot;);</span>
+<span class="fc" id="L141">        var material=mapper.convertValue(p.getProtectedResult(),CardSecurityMaterial.class);</span>
+<span class="fc" id="L142">        var family=family(source);</span>
+<span class="fc" id="L143">        var pin=em.find(PinDataV2.class,source.getPinDataRef(),LockModeType.PESSIMISTIC_WRITE);</span>
+<span class="pc bpc" id="L144" title="3 of 6 branches missed.">        require(pin!=null &amp;&amp; pin.getInstitutionId().equals(p.getInstitutionId()) &amp;&amp; pin.getPanAllocationId().equals(family.getPanAllocationId()),&quot;Shared PIN identity mismatch&quot;);</span>
+<span class="fc" id="L145">        var successor=issuance.finalizeDraft(draft,material,pin,holds,em,source);</span>
+<span class="fc" id="L146">        family.setFamilyRevision(Math.addExact(family.getFamilyRevision(),1));</span>
+        // Apply the reissue-off defaults to every live family member, including the successor.
+<span class="fc" id="L148">        List&lt;String&gt; eventIds=new ArrayList&lt;&gt;();</span>
+<span class="fc bfc" id="L149" title="All 2 branches covered.">        for(var member:members(source)) {</span>
+<span class="pc bpc" id="L150" title="3 of 6 branches missed.">            if(member.getClosedAt()!=null || member.getReplacedAt()!=null || member.getExpiredAt()!=null) continue;</span>
+<span class="fc" id="L151">            int changed=em.createNativeQuery(&quot;update cms_v2.card_transaction_control set enabled=false,effective_at=now() where institution_id=:t and card_control_profile_id in (select card_control_profile_id from cms_v2.card_control_profile where institution_id=:t and card_id=:c) and enabled and (geography='INTERNATIONAL' or channel in ('ECOM','MOTO','CONTACTLESS_POS'))&quot;)</span>
+<span class="fc" id="L152">                    .setParameter(&quot;t&quot;,p.getInstitutionId()).setParameter(&quot;c&quot;,member.getCardId()).executeUpdate();</span>
+<span class="pc bpc" id="L153" title="1 of 2 branches missed.">            if(changed&gt;0) {</span>
+<span class="nc" id="L154">                em.createNativeQuery(&quot;update cms_v2.card_control_profile set international_enabled=false,control_version=control_version+1,profile_status='PENDING_SWITCH',updated_at=now(),updated_by=:actor where institution_id=:t and card_id=:c&quot;)</span>
+<span class="nc" id="L155">                        .setParameter(&quot;actor&quot;,op.getActorReference()).setParameter(&quot;t&quot;,p.getInstitutionId()).setParameter(&quot;c&quot;,member.getCardId()).executeUpdate();</span>
+<span class="nc" id="L156">                eventIds.add(event(op,member,successor.getCardId(),&quot;CONTROLS_CHANGED&quot;,&quot;REISSUE_CREDENTIALS&quot;,family.getFamilyRevision()));</span>
+            }
+<span class="fc" id="L158">        }</span>
+<span class="pc bpc" id="L159" title="2 of 4 branches missed.">        eventIds.add(event(op,successor,source.getCardId(),&quot;CARD_CREATED&quot;,successor.getCardStatus()==CardStatusV2.BLOCKED?&quot;CS-03&quot;:successor.getCardStatus()==CardStatusV2.FROZEN?&quot;CS-02&quot;:&quot;CS-01&quot;,family.getFamilyRevision()));</span>
+<span class="pc bpc" id="L160" title="1 of 2 branches missed.">        if(successor.getCardForm()!=CardFormV2.VIRTUAL) eventIds.add(event(op,successor,source.getCardId(),&quot;PHYSICAL_REQUESTED&quot;,&quot;PF-01&quot;,family.getFamilyRevision()));</span>
+<span class="fc" id="L161">        eventIds.add(event(op,successor,source.getCardId(),&quot;CREDENTIALS_REISSUED&quot;,&quot;REISSUE_CREDENTIALS&quot;,family.getFamilyRevision()));</span>
+<span class="fc" id="L162">        request.setReplacementCardId(successor.getCardId()); request.setRequestStatus(CardReplacementRequestStatus.COMPLETED); request.setCompletedAt(now());</span>
+<span class="fc" id="L163">        op.setResultPayload(Map.of(&quot;replacementRequestId&quot;,id.toString(),&quot;cards&quot;,List.of(Map.of(&quot;cardId&quot;,successor.getCardId().toString(),&quot;cardStatus&quot;,successor.getCardStatus().name())),&quot;eventIds&quot;,eventIds));</span>
+<span class="fc" id="L164">        op.setOperationStatus(LifecycleOperationStatusV2.CONFIRMED); op.setCompletedAt(now()); em.flush();</span>
+<span class="fc" id="L165">    }</span>
+    private String event(CardLifecycleOperationV2 op, CardV2 card, UUID related, String type, String transition, long revision) {
+<span class="fc" id="L167">        long sequence=em.createQuery(&quot;select coalesce(max(e.eventSequence),0) from CardEventV2 e where e.institutionId=:t and e.cardId=:c&quot;,Long.class)</span>
+<span class="fc" id="L168">                .setParameter(&quot;t&quot;,op.getInstitutionId()).setParameter(&quot;c&quot;,card.getCardId()).getSingleResult()+1;</span>
+<span class="fc" id="L169">        UUID id=id(); var at=now();</span>
+<span class="fc" id="L170">        var payload=Map.&lt;String,Object&gt;of(&quot;eventId&quot;,id.toString(),&quot;operationId&quot;,op.getOperationId().toString(),&quot;institutionId&quot;,op.getInstitutionId().toString(),</span>
+<span class="fc" id="L171">                &quot;cardId&quot;,card.getCardId().toString(),&quot;relatedCardId&quot;,related.toString(),&quot;eventSequence&quot;,sequence,&quot;transitionId&quot;,transition,</span>
+<span class="fc" id="L172">                &quot;schemaVersion&quot;,1,&quot;cardStatus&quot;,card.getCardStatus().name(),&quot;actorType&quot;,op.getActorType().name());</span>
+<span class="fc" id="L173">        em.persist(CardEventV2.builder().cardEventId(id).institutionId(op.getInstitutionId()).cardId(card.getCardId()).relatedCardId(related)</span>
+<span class="fc" id="L174">                .operationId(op.getOperationId()).eventType(type).eventSequence(sequence).resultingStatus(card.getCardStatus().name())</span>
+<span class="pc bpc" id="L175" title="1 of 2 branches missed.">                .reasonCode(card.getCardStatusReason()==null?null:card.getCardStatusReason().name()).source(&quot;CMS_V2&quot;).transitionId(transition)</span>
+<span class="fc" id="L176">                .actorReference(op.getActorReference()).correlationId(op.getOperationId()).occurredAt(at).eventPayload(payload).build());</span>
+<span class="fc" id="L177">        em.persist(OutboxEventV2.builder().outboxEventId(id()).institutionId(op.getInstitutionId()).operationId(op.getOperationId())</span>
+<span class="fc" id="L178">                .aggregateType(&quot;CARD&quot;).aggregateId(card.getCardId().toString()).eventType(type).eventPayload(payload).correlationId(op.getOperationId())</span>
+<span class="fc" id="L179">                .idempotencyKey(id).familyRevision(revision).occurredAt(at).build()); return id.toString();</span>
+    }
+    private CardRenewalPreparationV2 lock(UUID id) {
+<span class="fc" id="L182">        var p=em.find(CardRenewalPreparationV2.class,id);</span>
+<span class="pc bpc" id="L183" title="1 of 2 branches missed.">        if(p==null) throw new ResourceNotFoundException(&quot;Renewal preparation&quot;,id.toString());</span>
+<span class="fc" id="L184">        em.createQuery(&quot;select a from ExternalAccountReferenceV2 a where a.institutionId=:t and a.externalAccountReferenceId=:a&quot;)</span>
+<span class="fc" id="L185">                .setParameter(&quot;t&quot;,p.getInstitutionId()).setParameter(&quot;a&quot;,p.getAccountReferenceId()).setLockMode(LockModeType.PESSIMISTIC_WRITE).getSingleResult();</span>
+<span class="fc" id="L186">        var source=source(p.getInstitutionId(),p.getSourceCardId());</span>
+<span class="fc" id="L187">        em.refresh(family(source),LockModeType.PESSIMISTIC_WRITE);</span>
+<span class="fc bfc" id="L188" title="All 2 branches covered.">        for(var c:members(source)) em.refresh(c,LockModeType.PESSIMISTIC_WRITE);</span>
+<span class="fc" id="L189">        em.refresh(p,LockModeType.PESSIMISTIC_WRITE); em.refresh(em.find(CardLifecycleOperationV2.class,id),LockModeType.PESSIMISTIC_WRITE); return p;</span>
+    }
+    private CardV2 source(UUID tenant, UUID id) {
+<span class="fc" id="L192">        return em.createQuery(&quot;select c from CardV2 c where c.institutionId=:t and c.cardId=:c&quot;,CardV2.class)</span>
+<span class="pc" id="L193">                .setParameter(&quot;t&quot;,tenant).setParameter(&quot;c&quot;,id).getResultStream().findFirst().orElseThrow(()-&gt;new ResourceNotFoundException(&quot;Card&quot;,id.toString()));</span>
+    }
+<span class="fc" id="L195">    private PanAllocationV2 family(CardV2 source) { return em.find(PanAllocationV2.class,source.getPanAllocationId()); }</span>
+    private List&lt;CardV2&gt; members(CardV2 source) {
+<span class="fc" id="L197">        return em.createQuery(&quot;select c from CardV2 c where c.institutionId=:t and c.panAllocationId=:f order by c.cardId&quot;,CardV2.class)</span>
+<span class="fc" id="L198">                .setParameter(&quot;t&quot;,source.getInstitutionId()).setParameter(&quot;f&quot;,source.getPanAllocationId()).getResultList();</span>
+    }
+    private void validateSource(CardV2 source) {
+<span class="pc bpc" id="L201" title="1 of 4 branches missed.">        require(source.getClosedAt()==null &amp;&amp; source.getReplacedAt()==null,&quot;Closed or replaced sources cannot be renewed&quot;);</span>
+<span class="fc bfc" id="L202" title="All 2 branches covered.">        for(var member:members(source)) {</span>
+<span class="pc bpc" id="L203" title="1 of 4 branches missed.">            require(member.getSecurityHoldReason()==null || member.getSecurityHoldReason()==SecurityHoldReasonV2.RISK_BLOCK,</span>
+                    &quot;A permanently security-restricted PAN family requires a new PAN&quot;);
+<span class="pc bpc" id="L205" title="3 of 6 branches missed.">            if(member.getClosedAt()==null &amp;&amp; member.getReplacedAt()==null &amp;&amp; member.getExpiredAt()==null)</span>
+<span class="fc bfc" id="L206" title="All 2 branches covered.">                require(Objects.equals(member.getCustomerHoldReason(),source.getCustomerHoldReason())</span>
+<span class="pc bpc" id="L207" title="1 of 2 branches missed.">                        &amp;&amp; Objects.equals(member.getOpsHoldReason(),source.getOpsHoldReason())</span>
+<span class="pc bpc" id="L208" title="1 of 2 branches missed.">                        &amp;&amp; Objects.equals(member.getSecurityHoldReason(),source.getSecurityHoldReason()),</span>
+                        &quot;PAN-family holds must be synchronized before same-PAN renewal&quot;);
+<span class="fc" id="L210">        }</span>
+<span class="fc" id="L211">    }</span>
+    private ProductReplacementPolicyV2 policy(CardV2 source) {
+<span class="fc" id="L213">        return em.createQuery(&quot;select p from ProductReplacementPolicyV2 p where p.institutionId=:t and p.productVersionId=:v and p.replacementReason=:r and p.policyStatus=:s&quot;,ProductReplacementPolicyV2.class)</span>
+<span class="fc" id="L214">                .setParameter(&quot;t&quot;,source.getInstitutionId()).setParameter(&quot;v&quot;,source.getProductVersionId()).setParameter(&quot;r&quot;,ReplacementReason.RENEWAL)</span>
+<span class="fc" id="L215">                .setParameter(&quot;s&quot;,ProductPolicyStatus.ACTIVE).getResultStream().findFirst().orElseThrow(()-&gt;new BusinessRuleViolationException(&quot;An ACTIVE renewal policy is required&quot;));</span>
+    }
+    private void validatePolicy(ProductReplacementPolicyV2 p) {
+<span class="pc bpc" id="L218" title="2 of 4 branches missed.">        require(p.isReplacementAllowed() &amp;&amp; p.getPermittedChannels().contains(ReplacementRequestChannel.OPERATIONS),&quot;Renewal is not allowed through OPERATIONS&quot;);</span>
+<span class="fc bfc" id="L219" title="All 2 branches covered.">        require(!p.isApprovalRequired(),&quot;Approval-required renewal needs the approval lifecycle implementation&quot;);</span>
+<span class="pc bpc" id="L220" title="1 of 2 branches missed.">        require(p.getPanStrategy()==ReplacementPanStrategy.PRESERVE_EXISTING_PAN,&quot;Renewal policy must preserve PAN&quot;);</span>
+<span class="pc bpc" id="L221" title="1 of 2 branches missed.">        require(p.getExpiryStrategy()==ReplacementExpiryStrategy.GENERATE_NEW_EXPIRY,&quot;Renewal must generate a new expiry&quot;);</span>
+<span class="pc bpc" id="L222" title="1 of 2 branches missed.">        require(p.getOldCardUsagePolicy()==OldCardUsagePolicy.BLOCK_ON_EXPIRY,&quot;Renewal preserves the source until expiry; configure BLOCK_ON_EXPIRY&quot;);</span>
+<span class="pc bpc" id="L223" title="1 of 2 branches missed.">        require(p.getAccountLinkStrategy()==ReplacementAccountLinkStrategy.PRESERVE_ACCOUNT_LINK,&quot;Same-PAN renewal must preserve the account&quot;);</span>
+<span class="fc" id="L224">    }</span>
+    private AccountRestrictionSnapshotV2 restrictions(UUID tenant,UUID account) {
+<span class="fc" id="L226">        var h=em.find(AccountRestrictionSnapshotV2.class,new AccountRestrictionSnapshotV2.Key(tenant,account),LockModeType.PESSIMISTIC_READ);</span>
+<span class="pc bpc" id="L227" title="2 of 6 branches missed.">        require(h!=null &amp;&amp; h.getValidUntil().isAfter(now()) &amp;&amp; !h.getObservedAt().isAfter(now()),&quot;Fresh authoritative account restrictions required&quot;); return h;</span>
+    }
+<span class="fc" id="L229">    private Map&lt;String,Object&gt; map(Object value) { return mapper.convertValue(value,new TypeReference&lt;LinkedHashMap&lt;String,Object&gt;&gt;(){}); }</span>
+<span class="fc" id="L230">    private UUID id() { return (UUID)em.createNativeQuery(&quot;select uuidv7()&quot;,UUID.class).getSingleResult(); }</span>
+<span class="fc" id="L231">    private static OffsetDateTime now() { return OffsetDateTime.now(ZoneOffset.UTC); }</span>
+<span class="fc bfc" id="L232" title="All 2 branches covered.">    private static void require(boolean ok,String message) { if(!ok) throw new BusinessRuleViolationException(message); }</span>
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.15.202606040825</span></div></body></html>

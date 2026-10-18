@@ -1,0 +1,142 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>ProductIssuanceProfileV2Controller.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">CMS Core Service</a> &gt; <a href="index.source.html" class="el_package">com.xenomi.cms.core.v2.product.controller</a> &gt; <span class="el_source">ProductIssuanceProfileV2Controller.java</span></div><h1>ProductIssuanceProfileV2Controller.java</h1><pre class="source lang-java linenums">package com.xenomi.cms.core.v2.product.controller;
+
+import java.util.UUID;
+import com.xenomi.cms.core.api.ApiResponseEnvelope;
+import com.xenomi.cms.core.api.ApiResponseHelper;
+import com.xenomi.cms.core.api.PageableDefaults;
+import com.xenomi.cms.core.api.PagedResponse;
+import com.xenomi.cms.core.v2.product.dto.*;
+import com.xenomi.cms.core.v2.product.service.ProductDesignAssignmentV2Service;
+import com.xenomi.cms.core.v2.product.service.ProductPaymentProfileV2Service;
+import io.swagger.v3.oas.annotations.Operation;
+import io.swagger.v3.oas.annotations.tags.Tag;
+import jakarta.validation.Valid;
+import org.springframework.data.domain.PageRequest;
+import org.springframework.data.domain.Pageable;
+import org.springframework.data.domain.Sort;
+import org.springframework.http.ResponseEntity;
+import org.springframework.validation.annotation.Validated;
+import org.springframework.web.bind.annotation.*;
+
+@Validated
+@RestController
+@RequestMapping(&quot;/cms/api/v2/institutions/{institutionId}/products/{productId}/versions/{versionId}&quot;)
+@Tag(name = &quot;V2 - Issuance Profiles&quot;, description = &quot;Card designs, assignments, technology capabilities and CVM rules&quot;)
+public class ProductIssuanceProfileV2Controller {
+    private final ProductDesignAssignmentV2Service designService;
+    private final ProductPaymentProfileV2Service profileService;
+    public ProductIssuanceProfileV2Controller(ProductDesignAssignmentV2Service designService,
+<span class="fc" id="L29">            ProductPaymentProfileV2Service profileService) {</span>
+<span class="fc" id="L30">        this.designService = designService;</span>
+<span class="fc" id="L31">        this.profileService = profileService;</span>
+<span class="fc" id="L32">    }</span>
+
+    @PostMapping(&quot;/card-design-assignments&quot;)
+    @Operation(operationId = &quot;createProductCardDesignAssignmentV2&quot;, summary = &quot;Assign a design to a product version&quot;,
+            description = &quot;Creates a version-scoped design assignment. Only a design owned by the same institution can be assigned.&quot;)
+    public ResponseEntity&lt;ApiResponseEnvelope&lt;ProductCardDesignAssignmentV2Response&gt;&gt; createDesignAssignment(
+            @PathVariable UUID institutionId, @PathVariable UUID productId, @PathVariable UUID versionId,
+            @Valid @RequestBody CreateProductCardDesignAssignmentV2Request request) {
+<span class="fc" id="L40">        return ApiResponseHelper.created(designService.create(institutionId, productId, versionId, request));</span>
+    }
+    @GetMapping(&quot;/card-design-assignments&quot;)
+    @Operation(operationId = &quot;listProductCardDesignAssignmentsV2&quot;, summary = &quot;List product-version design assignments&quot;,
+            description = &quot;Returns the paginated physical or virtual card designs assigned to this product configuration version.&quot;)
+    public ResponseEntity&lt;ApiResponseEnvelope&lt;PagedResponse&lt;ProductCardDesignAssignmentV2Response&gt;&gt;&gt; listDesignAssignments(
+            @PathVariable UUID institutionId, @PathVariable UUID productId, @PathVariable UUID versionId,
+            @RequestParam(required = false) Integer page, @RequestParam(required = false) Integer limit) {
+<span class="fc" id="L48">        return ApiResponseHelper.ok(PagedResponse.of(designService.list(institutionId, productId, versionId,</span>
+<span class="fc" id="L49">                page(page, limit, &quot;cardForm&quot;))));</span>
+    }
+    @GetMapping(&quot;/card-design-assignments/{assignmentId}&quot;)
+    @Operation(operationId = &quot;getProductCardDesignAssignmentV2&quot;, summary = &quot;Get a product-version design assignment&quot;,
+            description = &quot;Returns one tenant-scoped design assignment by UUID.&quot;)
+    public ResponseEntity&lt;ApiResponseEnvelope&lt;ProductCardDesignAssignmentV2Response&gt;&gt; getDesignAssignment(
+            @PathVariable UUID institutionId, @PathVariable UUID productId, @PathVariable UUID versionId,
+            @PathVariable UUID assignmentId) {
+<span class="fc" id="L57">        return ApiResponseHelper.ok(designService.get(institutionId, productId, versionId, assignmentId));</span>
+    }
+    @PostMapping(&quot;/card-design-assignments/{assignmentId}/actions/update&quot;)
+    @Operation(operationId = &quot;updateProductCardDesignAssignmentV2&quot;, summary = &quot;Update or transition a design assignment&quot;,
+            description = &quot;Applies editable fields or an explicit lifecycle transition without replacing assignment history.&quot;)
+    public ResponseEntity&lt;ApiResponseEnvelope&lt;ProductCardDesignAssignmentV2Response&gt;&gt; updateDesignAssignment(
+            @PathVariable UUID institutionId, @PathVariable UUID productId, @PathVariable UUID versionId,
+            @PathVariable UUID assignmentId,
+            @Valid @RequestBody UpdateProductCardDesignAssignmentV2Request request) {
+<span class="fc" id="L66">        return ApiResponseHelper.ok(designService.update(institutionId, productId, versionId, assignmentId, request));</span>
+    }
+
+    @PostMapping(&quot;/technology-profiles&quot;)
+    @Operation(operationId = &quot;createProductTechnologyProfileV2&quot;, summary = &quot;Create the next technology profile version&quot;,
+            description = &quot;Creates an immutable version describing magnetic-stripe, EMV contact and contactless capabilities.&quot;)
+    public ResponseEntity&lt;ApiResponseEnvelope&lt;ProductTechnologyProfileV2Response&gt;&gt; createTechnology(
+            @PathVariable UUID institutionId, @PathVariable UUID productId, @PathVariable UUID versionId,
+            @Valid @RequestBody CreateProductTechnologyProfileV2Request request) {
+<span class="fc" id="L75">        return ApiResponseHelper.created(profileService.createTechnology(institutionId, productId, versionId, request));</span>
+    }
+    @GetMapping(&quot;/technology-profiles&quot;)
+    @Operation(operationId = &quot;listProductTechnologyProfilesV2&quot;, summary = &quot;List product technology profiles&quot;,
+            description = &quot;Returns all technology-profile versions for this product configuration version in version order.&quot;)
+    public ResponseEntity&lt;ApiResponseEnvelope&lt;PagedResponse&lt;ProductTechnologyProfileV2Response&gt;&gt;&gt; listTechnology(
+            @PathVariable UUID institutionId, @PathVariable UUID productId, @PathVariable UUID versionId,
+            @RequestParam(required = false) Integer page, @RequestParam(required = false) Integer limit) {
+<span class="fc" id="L83">        return ApiResponseHelper.ok(PagedResponse.of(profileService.listTechnology(institutionId, productId, versionId,</span>
+<span class="fc" id="L84">                page(page, limit, &quot;profileVersion&quot;))));</span>
+    }
+    @GetMapping(&quot;/technology-profiles/{profileId}&quot;)
+    @Operation(operationId = &quot;getProductTechnologyProfileV2&quot;, summary = &quot;Get a product technology profile&quot;,
+            description = &quot;Returns one tenant-scoped technology-profile version by UUID.&quot;)
+    public ResponseEntity&lt;ApiResponseEnvelope&lt;ProductTechnologyProfileV2Response&gt;&gt; getTechnology(
+            @PathVariable UUID institutionId, @PathVariable UUID productId, @PathVariable UUID versionId,
+            @PathVariable UUID profileId) {
+<span class="fc" id="L92">        return ApiResponseHelper.ok(profileService.getTechnology(institutionId, productId, versionId, profileId));</span>
+    }
+    @PostMapping(&quot;/technology-profiles/{profileId}/actions/update&quot;)
+    @Operation(operationId = &quot;updateProductTechnologyProfileV2&quot;, summary = &quot;Update or transition a technology profile&quot;,
+            description = &quot;Updates an editable draft or applies an explicit lifecycle transition; activated profile history is preserved.&quot;)
+    public ResponseEntity&lt;ApiResponseEnvelope&lt;ProductTechnologyProfileV2Response&gt;&gt; updateTechnology(
+            @PathVariable UUID institutionId, @PathVariable UUID productId, @PathVariable UUID versionId,
+            @PathVariable UUID profileId, @Valid @RequestBody UpdateProductTechnologyProfileV2Request request) {
+<span class="fc" id="L100">        return ApiResponseHelper.ok(profileService.updateTechnology(institutionId, productId, versionId, profileId, request));</span>
+    }
+
+    @PostMapping(&quot;/cvm-profiles&quot;)
+    @Operation(operationId = &quot;createProductCvmProfileV2&quot;, summary = &quot;Create a CVM profile and ordered rules&quot;,
+            description = &quot;Creates a versioned cardholder-verification profile. Rules are evaluated by ascending ruleSequence.&quot;)
+    public ResponseEntity&lt;ApiResponseEnvelope&lt;ProductCvmProfileV2Response&gt;&gt; createCvm(
+            @PathVariable UUID institutionId, @PathVariable UUID productId, @PathVariable UUID versionId,
+            @Valid @RequestBody CreateProductCvmProfileV2Request request) {
+<span class="fc" id="L109">        return ApiResponseHelper.created(profileService.createCvm(institutionId, productId, versionId, request));</span>
+    }
+    @GetMapping(&quot;/cvm-profiles&quot;)
+    @Operation(operationId = &quot;listProductCvmProfilesV2&quot;, summary = &quot;List product CVM profiles&quot;,
+            description = &quot;Returns all CVM-profile versions and their ordered rules for this product configuration version.&quot;)
+    public ResponseEntity&lt;ApiResponseEnvelope&lt;PagedResponse&lt;ProductCvmProfileV2Response&gt;&gt;&gt; listCvm(
+            @PathVariable UUID institutionId, @PathVariable UUID productId, @PathVariable UUID versionId,
+            @RequestParam(required = false) Integer page, @RequestParam(required = false) Integer limit) {
+<span class="fc" id="L117">        return ApiResponseHelper.ok(PagedResponse.of(profileService.listCvm(institutionId, productId, versionId,</span>
+<span class="fc" id="L118">                page(page, limit, &quot;profileVersion&quot;))));</span>
+    }
+    @GetMapping(&quot;/cvm-profiles/{profileId}&quot;)
+    @Operation(operationId = &quot;getProductCvmProfileV2&quot;, summary = &quot;Get a product CVM profile&quot;,
+            description = &quot;Returns one tenant-scoped CVM profile and its ordered rules by UUID.&quot;)
+    public ResponseEntity&lt;ApiResponseEnvelope&lt;ProductCvmProfileV2Response&gt;&gt; getCvm(
+            @PathVariable UUID institutionId, @PathVariable UUID productId, @PathVariable UUID versionId,
+            @PathVariable UUID profileId) {
+<span class="fc" id="L126">        return ApiResponseHelper.ok(profileService.getCvm(institutionId, productId, versionId, profileId));</span>
+    }
+    @PostMapping(&quot;/cvm-profiles/{profileId}/actions/update&quot;)
+    @Operation(operationId = &quot;updateProductCvmProfileV2&quot;, summary = &quot;Update or transition a CVM profile&quot;,
+            description = &quot;Updates an editable profile and ordered rule set or applies an explicit lifecycle transition.&quot;)
+    public ResponseEntity&lt;ApiResponseEnvelope&lt;ProductCvmProfileV2Response&gt;&gt; updateCvm(
+            @PathVariable UUID institutionId, @PathVariable UUID productId, @PathVariable UUID versionId,
+            @PathVariable UUID profileId, @Valid @RequestBody UpdateProductCvmProfileV2Request request) {
+<span class="fc" id="L134">        return ApiResponseHelper.ok(profileService.updateCvm(institutionId, productId, versionId, profileId, request));</span>
+    }
+
+    private static Pageable page(Integer page, Integer limit, String property) {
+<span class="fc" id="L138">        Pageable base = PageableDefaults.ofOneBased(page, limit);</span>
+<span class="fc" id="L139">        return PageRequest.of(base.getPageNumber(), base.getPageSize(), Sort.by(Sort.Direction.ASC, property));</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.15.202606040825</span></div></body></html>

@@ -1,0 +1,170 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>ProductDesignAssignmentV2Service.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">CMS Core Service</a> &gt; <a href="index.source.html" class="el_package">com.xenomi.cms.core.v2.product.service</a> &gt; <span class="el_source">ProductDesignAssignmentV2Service.java</span></div><h1>ProductDesignAssignmentV2Service.java</h1><pre class="source lang-java linenums">package com.xenomi.cms.core.v2.product.service;
+
+import java.time.OffsetDateTime;
+import java.util.UUID;
+
+import com.xenomi.cms.core.exception.ResourceNotFoundException;
+import com.xenomi.cms.core.v2.common.DatabaseUuidV7Generator;
+import com.xenomi.cms.core.v2.product.dto.CreateProductCardDesignAssignmentV2Request;
+import com.xenomi.cms.core.v2.product.dto.ProductCardDesignAssignmentV2Response;
+import com.xenomi.cms.core.v2.product.dto.UpdateProductCardDesignAssignmentV2Request;
+import com.xenomi.cms.core.v2.product.entity.CardDesignV2;
+import com.xenomi.cms.core.v2.product.entity.CardProductV2;
+import com.xenomi.cms.core.v2.product.entity.ProductCardDesignAssignmentV2;
+import com.xenomi.cms.core.v2.product.entity.ProductCardFormPolicyV2;
+import com.xenomi.cms.core.v2.product.entity.ProductVersionV2;
+import com.xenomi.cms.core.v2.product.model.CardDesignStatus;
+import com.xenomi.cms.core.v2.product.model.CardForm;
+import com.xenomi.cms.core.v2.product.model.DesignAssignmentStatus;
+import com.xenomi.cms.core.v2.product.model.ProductVersionStatus;
+import com.xenomi.cms.core.v2.product.repository.CardDesignV2Repository;
+import com.xenomi.cms.core.v2.product.repository.CardProductV2Repository;
+import com.xenomi.cms.core.v2.product.repository.ProductCardDesignAssignmentV2Repository;
+import com.xenomi.cms.core.v2.product.repository.ProductCardFormPolicyV2Repository;
+import com.xenomi.cms.core.v2.product.repository.ProductVersionV2Repository;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
+import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
+
+@Service
+public class ProductDesignAssignmentV2Service {
+    private final ProductCardDesignAssignmentV2Repository repository;
+    private final ProductVersionV2Repository versionRepository;
+    private final CardProductV2Repository productRepository;
+    private final CardDesignV2Repository designRepository;
+    private final ProductCardFormPolicyV2Repository cardFormRepository;
+    private final DatabaseUuidV7Generator uuidGenerator;
+
+    public ProductDesignAssignmentV2Service(ProductCardDesignAssignmentV2Repository repository,
+            ProductVersionV2Repository versionRepository, CardProductV2Repository productRepository,
+            CardDesignV2Repository designRepository, ProductCardFormPolicyV2Repository cardFormRepository,
+<span class="fc" id="L42">            DatabaseUuidV7Generator uuidGenerator) {</span>
+<span class="fc" id="L43">        this.repository = repository;</span>
+<span class="fc" id="L44">        this.versionRepository = versionRepository;</span>
+<span class="fc" id="L45">        this.productRepository = productRepository;</span>
+<span class="fc" id="L46">        this.designRepository = designRepository;</span>
+<span class="fc" id="L47">        this.cardFormRepository = cardFormRepository;</span>
+<span class="fc" id="L48">        this.uuidGenerator = uuidGenerator;</span>
+<span class="fc" id="L49">    }</span>
+
+    @Transactional
+    public ProductCardDesignAssignmentV2Response create(UUID institutionId, UUID productId,
+            UUID versionId, CreateProductCardDesignAssignmentV2Request request) {
+<span class="fc" id="L54">        ProductVersionV2 version = requireDraftVersion(institutionId, productId, versionId);</span>
+<span class="fc" id="L55">        CardProductV2 product = requireProduct(institutionId, version.getProductId());</span>
+<span class="fc" id="L56">        CardDesignV2 design = requireDesign(institutionId, request.cardDesignId());</span>
+<span class="fc bfc" id="L57" title="All 2 branches covered.">        if (design.getCardNetwork() != product.getCardNetwork()) {</span>
+<span class="fc" id="L58">            throw new IllegalArgumentException(&quot;Product and card design must use the same card network&quot;);</span>
+        }
+<span class="fc" id="L60">        validateCardForm(institutionId, versionId, request.cardForm());</span>
+<span class="fc" id="L61">        validateDates(request.effectiveFrom(), request.effectiveTo());</span>
+<span class="fc" id="L62">        ProductCardDesignAssignmentV2 entity = ProductCardDesignAssignmentV2.builder()</span>
+<span class="fc" id="L63">                .assignmentId(uuidGenerator.generate()).institutionId(institutionId)</span>
+<span class="fc" id="L64">                .productVersionId(versionId).cardDesignId(request.cardDesignId())</span>
+<span class="fc" id="L65">                .cardForm(request.cardForm()).defaultDesign(Boolean.TRUE.equals(request.defaultDesign()))</span>
+<span class="fc" id="L66">                .assignmentStatus(DesignAssignmentStatus.DRAFT)</span>
+<span class="fc" id="L67">                .effectiveFrom(request.effectiveFrom()).effectiveTo(request.effectiveTo()).build();</span>
+<span class="fc" id="L68">        return toResponse(repository.save(entity));</span>
+    }
+
+    @Transactional(readOnly = true)
+    public Page&lt;ProductCardDesignAssignmentV2Response&gt; list(UUID institutionId, UUID productId,
+            UUID versionId, Pageable pageable) {
+<span class="fc" id="L74">        requireVersion(institutionId, productId, versionId);</span>
+<span class="fc" id="L75">        return repository.findByInstitutionIdAndProductVersionId(institutionId, versionId, pageable)</span>
+<span class="fc" id="L76">                .map(this::toResponse);</span>
+    }
+
+    @Transactional(readOnly = true)
+    public ProductCardDesignAssignmentV2Response get(UUID institutionId, UUID productId,
+            UUID versionId, UUID assignmentId) {
+<span class="fc" id="L82">        requireVersion(institutionId, productId, versionId);</span>
+<span class="fc" id="L83">        return toResponse(find(institutionId, versionId, assignmentId));</span>
+    }
+
+    @Transactional
+    public ProductCardDesignAssignmentV2Response update(UUID institutionId, UUID productId,
+            UUID versionId, UUID assignmentId, UpdateProductCardDesignAssignmentV2Request request) {
+<span class="fc" id="L89">        requireDraftVersion(institutionId, productId, versionId);</span>
+<span class="fc" id="L90">        ProductCardDesignAssignmentV2 entity = find(institutionId, versionId, assignmentId);</span>
+<span class="fc bfc" id="L91" title="All 2 branches covered.">        boolean configurationChange = request.defaultDesign() != null</span>
+<span class="pc bpc" id="L92" title="2 of 4 branches missed.">                || request.effectiveFrom() != null || request.effectiveTo() != null;</span>
+<span class="pc bpc" id="L93" title="1 of 4 branches missed.">        if (configurationChange &amp;&amp; entity.getAssignmentStatus() != DesignAssignmentStatus.DRAFT) {</span>
+<span class="fc" id="L94">            throw new IllegalArgumentException(&quot;Design assignment configuration can be changed only while DRAFT&quot;);</span>
+        }
+<span class="pc bpc" id="L96" title="1 of 2 branches missed.">        if (request.defaultDesign() != null) entity.setDefaultDesign(request.defaultDesign());</span>
+<span class="pc bpc" id="L97" title="1 of 2 branches missed.">        if (request.effectiveFrom() != null) entity.setEffectiveFrom(request.effectiveFrom());</span>
+<span class="pc bpc" id="L98" title="1 of 2 branches missed.">        if (request.effectiveTo() != null) entity.setEffectiveTo(request.effectiveTo());</span>
+<span class="pc bpc" id="L99" title="2 of 4 branches missed.">        if (request.assignmentStatus() != null &amp;&amp; request.assignmentStatus() != entity.getAssignmentStatus()) {</span>
+<span class="fc" id="L100">            validateTransition(entity.getAssignmentStatus(), request.assignmentStatus());</span>
+<span class="pc bpc" id="L101" title="1 of 2 branches missed.">            if (request.assignmentStatus() == DesignAssignmentStatus.ACTIVE) {</span>
+<span class="fc" id="L102">                CardDesignV2 design = requireDesign(institutionId, entity.getCardDesignId());</span>
+<span class="fc bfc" id="L103" title="All 2 branches covered.">                if (design.getDesignStatus() != CardDesignStatus.ACTIVE) {</span>
+<span class="fc" id="L104">                    throw new IllegalArgumentException(&quot;Card design must be ACTIVE before activating its assignment&quot;);</span>
+                }
+<span class="fc bfc" id="L106" title="All 2 branches covered.">                if (entity.isDefaultDesign() &amp;&amp; repository</span>
+<span class="pc bpc" id="L107" title="1 of 2 branches missed.">                        .existsByInstitutionIdAndProductVersionIdAndCardFormAndDefaultDesignTrueAndAssignmentStatus(</span>
+<span class="fc" id="L108">                                institutionId, versionId, entity.getCardForm(), DesignAssignmentStatus.ACTIVE)) {</span>
+<span class="fc" id="L109">                    throw new IllegalArgumentException(&quot;An ACTIVE default design already exists for this card form&quot;);</span>
+                }
+            }
+<span class="fc" id="L112">            entity.setAssignmentStatus(request.assignmentStatus());</span>
+        }
+<span class="fc" id="L114">        validateDates(entity.getEffectiveFrom(), entity.getEffectiveTo());</span>
+<span class="fc" id="L115">        return toResponse(repository.save(entity));</span>
+    }
+
+    private ProductVersionV2 requireVersion(UUID institutionId, UUID productId, UUID versionId) {
+<span class="fc" id="L119">        return versionRepository.findByProductVersionIdAndInstitutionIdAndProductId(versionId, institutionId, productId)</span>
+<span class="pc" id="L120">                .orElseThrow(() -&gt; new ResourceNotFoundException(&quot;Product version&quot;, versionId.toString()));</span>
+    }
+    private ProductVersionV2 requireDraftVersion(UUID institutionId, UUID productId, UUID versionId) {
+<span class="fc" id="L123">        ProductVersionV2 version = requireVersion(institutionId, productId, versionId);</span>
+<span class="fc bfc" id="L124" title="All 2 branches covered.">        if (version.getVersionStatus() != ProductVersionStatus.DRAFT) {</span>
+<span class="fc" id="L125">            throw new IllegalArgumentException(&quot;Design assignments can be changed only while the version is DRAFT&quot;);</span>
+        }
+<span class="fc" id="L127">        return version;</span>
+    }
+    private CardProductV2 requireProduct(UUID institutionId, UUID productId) {
+<span class="fc" id="L130">        return productRepository.findByProductIdAndInstitutionId(productId, institutionId)</span>
+<span class="pc" id="L131">                .orElseThrow(() -&gt; new ResourceNotFoundException(&quot;Card product&quot;, productId.toString()));</span>
+    }
+    private CardDesignV2 requireDesign(UUID institutionId, UUID designId) {
+<span class="fc" id="L134">        return designRepository.findByCardDesignIdAndInstitutionId(designId, institutionId)</span>
+<span class="pc" id="L135">                .orElseThrow(() -&gt; new ResourceNotFoundException(&quot;Card design&quot;, designId.toString()));</span>
+    }
+    private ProductCardDesignAssignmentV2 find(UUID institutionId, UUID versionId, UUID assignmentId) {
+<span class="fc" id="L138">        return repository.findByAssignmentIdAndInstitutionIdAndProductVersionId(assignmentId, institutionId, versionId)</span>
+<span class="pc" id="L139">                .orElseThrow(() -&gt; new ResourceNotFoundException(&quot;Card design assignment&quot;, assignmentId.toString()));</span>
+    }
+    private void validateCardForm(UUID institutionId, UUID versionId, CardForm requested) {
+<span class="fc" id="L142">        ProductCardFormPolicyV2 form = cardFormRepository</span>
+<span class="fc" id="L143">                .findByProductVersionIdAndInstitutionId(versionId, institutionId)</span>
+<span class="fc" id="L144">                .orElseThrow(() -&gt; new IllegalArgumentException(&quot;Configure card-form policy before assigning a design&quot;));</span>
+<span class="fc bfc" id="L145" title="All 4 branches covered.">        if (requested == CardForm.PHYSICAL &amp;&amp; !form.isPhysicalAllowed()) {</span>
+<span class="fc" id="L146">            throw new IllegalArgumentException(&quot;PHYSICAL design cannot be assigned when physical cards are disabled&quot;);</span>
+        }
+<span class="pc bpc" id="L148" title="1 of 4 branches missed.">        if (requested == CardForm.VIRTUAL &amp;&amp; !form.isVirtualAllowed()) {</span>
+<span class="fc" id="L149">            throw new IllegalArgumentException(&quot;VIRTUAL design cannot be assigned when virtual cards are disabled&quot;);</span>
+        }
+<span class="fc" id="L151">    }</span>
+    private static void validateDates(OffsetDateTime from, OffsetDateTime to) {
+<span class="fc bfc" id="L153" title="All 4 branches covered.">        if (to != null &amp;&amp; !to.isAfter(from)) throw new IllegalArgumentException(&quot;effectiveTo must be after effectiveFrom&quot;);</span>
+<span class="fc" id="L154">    }</span>
+    private static void validateTransition(DesignAssignmentStatus current, DesignAssignmentStatus target) {
+<span class="fc bfc" id="L156" title="All 4 branches covered.">        boolean allowed = switch (current) {</span>
+<span class="pc bpc" id="L157" title="1 of 4 branches missed.">            case DRAFT -&gt; target == DesignAssignmentStatus.ACTIVE || target == DesignAssignmentStatus.CLOSED;</span>
+<span class="pc bpc" id="L158" title="2 of 4 branches missed.">            case ACTIVE -&gt; target == DesignAssignmentStatus.SUSPENDED || target == DesignAssignmentStatus.CLOSED;</span>
+<span class="pc bpc" id="L159" title="2 of 4 branches missed.">            case SUSPENDED -&gt; target == DesignAssignmentStatus.ACTIVE || target == DesignAssignmentStatus.CLOSED;</span>
+<span class="fc" id="L160">            case CLOSED -&gt; false;</span>
+        };
+<span class="fc bfc" id="L162" title="All 2 branches covered.">        if (!allowed) throw new IllegalArgumentException(&quot;Invalid design assignment transition: &quot; + current + &quot; -&gt; &quot; + target);</span>
+<span class="fc" id="L163">    }</span>
+    private ProductCardDesignAssignmentV2Response toResponse(ProductCardDesignAssignmentV2 a) {
+<span class="fc" id="L165">        return new ProductCardDesignAssignmentV2Response(a.getAssignmentId(), a.getInstitutionId(),</span>
+<span class="fc" id="L166">                a.getProductVersionId(), a.getCardDesignId(), a.getCardForm(), a.isDefaultDesign(),</span>
+<span class="fc" id="L167">                a.getAssignmentStatus(), a.getEffectiveFrom(), a.getEffectiveTo());</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.15.202606040825</span></div></body></html>

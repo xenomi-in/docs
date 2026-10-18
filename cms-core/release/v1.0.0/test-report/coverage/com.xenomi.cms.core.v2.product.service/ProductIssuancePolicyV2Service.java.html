@@ -1,0 +1,248 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>ProductIssuancePolicyV2Service.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">CMS Core Service</a> &gt; <a href="index.source.html" class="el_package">com.xenomi.cms.core.v2.product.service</a> &gt; <span class="el_source">ProductIssuancePolicyV2Service.java</span></div><h1>ProductIssuancePolicyV2Service.java</h1><pre class="source lang-java linenums">package com.xenomi.cms.core.v2.product.service;
+
+import java.util.UUID;
+
+import com.xenomi.cms.core.exception.ResourceNotFoundException;
+import com.xenomi.cms.core.v2.product.dto.ProductCardFormPolicyV2Response;
+import com.xenomi.cms.core.v2.product.dto.ProductPersonalisationPolicyV2Response;
+import com.xenomi.cms.core.v2.product.dto.UpsertProductCardFormPolicyV2Request;
+import com.xenomi.cms.core.v2.product.dto.UpsertProductPersonalisationPolicyV2Request;
+import com.xenomi.cms.core.v2.product.entity.ProductCardFormPolicyV2;
+import com.xenomi.cms.core.v2.product.entity.ProductPersonalisationPolicyV2;
+import com.xenomi.cms.core.v2.product.entity.ProductPinPolicyV2;
+import com.xenomi.cms.core.v2.product.entity.ProductVersionV2;
+import com.xenomi.cms.core.v2.product.model.CardIssuanceMode;
+import com.xenomi.cms.core.v2.product.model.PersonalisationMode;
+import com.xenomi.cms.core.v2.product.model.PhysicalIssueTiming;
+import com.xenomi.cms.core.v2.product.model.ProductPolicyStatus;
+import com.xenomi.cms.core.v2.product.model.ProductVersionStatus;
+import com.xenomi.cms.core.v2.product.model.VirtualPanStrategy;
+import com.xenomi.cms.core.v2.product.repository.ProductCardFormPolicyV2Repository;
+import com.xenomi.cms.core.v2.product.repository.ProductPersonalisationPolicyV2Repository;
+import com.xenomi.cms.core.v2.product.repository.ProductPinPolicyV2Repository;
+import com.xenomi.cms.core.v2.product.repository.ProductVersionV2Repository;
+import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
+
+@Service
+public class ProductIssuancePolicyV2Service {
+    private final ProductVersionV2Repository versionRepository;
+    private final ProductPersonalisationPolicyV2Repository personalisationRepository;
+    private final ProductCardFormPolicyV2Repository cardFormRepository;
+    private final ProductPinPolicyV2Repository pinPolicyRepository;
+
+    public ProductIssuancePolicyV2Service(
+            ProductVersionV2Repository versionRepository,
+            ProductPersonalisationPolicyV2Repository personalisationRepository,
+            ProductCardFormPolicyV2Repository cardFormRepository,
+<span class="fc" id="L38">            ProductPinPolicyV2Repository pinPolicyRepository) {</span>
+<span class="fc" id="L39">        this.versionRepository = versionRepository;</span>
+<span class="fc" id="L40">        this.personalisationRepository = personalisationRepository;</span>
+<span class="fc" id="L41">        this.cardFormRepository = cardFormRepository;</span>
+<span class="fc" id="L42">        this.pinPolicyRepository = pinPolicyRepository;</span>
+<span class="fc" id="L43">    }</span>
+
+    @Transactional(readOnly = true)
+    public ProductPersonalisationPolicyV2Response getPersonalisation(
+            UUID institutionId, UUID productId, UUID versionId) {
+<span class="nc" id="L48">        requireVersion(institutionId, productId, versionId);</span>
+<span class="nc" id="L49">        return personalisationRepository.findByProductVersionIdAndInstitutionId(versionId, institutionId)</span>
+<span class="nc" id="L50">                .map(this::toPersonalisationResponse)</span>
+<span class="nc" id="L51">                .orElseThrow(() -&gt; new ResourceNotFoundException(</span>
+<span class="nc" id="L52">                        &quot;Product personalisation policy&quot;, versionId.toString()));</span>
+    }
+
+    @Transactional
+    public ProductPersonalisationPolicyV2Response putPersonalisation(
+            UUID institutionId, UUID productId, UUID versionId,
+            UpsertProductPersonalisationPolicyV2Request request) {
+<span class="fc" id="L59">        requireDraftVersion(institutionId, productId, versionId);</span>
+<span class="fc" id="L60">        validatePersonalisationRequest(request);</span>
+<span class="fc" id="L61">        cardFormRepository.findByProductVersionIdAndInstitutionId(versionId, institutionId)</span>
+<span class="pc" id="L62">                .ifPresent(form -&gt; validateFormAndPersonalisation(form, request));</span>
+<span class="fc bfc" id="L63" title="All 2 branches covered.">        if (request.pinMailerRequired()) {</span>
+<span class="fc" id="L64">            ProductPinPolicyV2 pinPolicy = pinPolicyRepository</span>
+<span class="fc" id="L65">                    .findByProductVersionIdAndInstitutionId(versionId, institutionId)</span>
+<span class="pc" id="L66">                    .orElseThrow(() -&gt; new IllegalArgumentException(</span>
+                            &quot;A PIN policy with pinMailerEnabled=true is required when a PIN mailer is requested&quot;));
+<span class="pc bpc" id="L68" title="1 of 2 branches missed.">            if (!pinPolicy.isPinMailerEnabled()) {</span>
+<span class="fc" id="L69">                throw new IllegalArgumentException(</span>
+                        &quot;The product PIN policy must enable PIN mailer before personalisation can require it&quot;);
+            }
+        }
+<span class="fc" id="L73">        ProductPersonalisationPolicyV2 entity = personalisationRepository</span>
+<span class="fc" id="L74">                .findByProductVersionIdAndInstitutionId(versionId, institutionId)</span>
+<span class="fc" id="L75">                .orElseGet(() -&gt; ProductPersonalisationPolicyV2.builder()</span>
+<span class="fc" id="L76">                        .productVersionId(versionId).institutionId(institutionId).build());</span>
+<span class="fc" id="L77">        entity.setPersonalisedAllowed(request.personalisedAllowed());</span>
+<span class="fc" id="L78">        entity.setNonPersonalisedAllowed(false);</span>
+<span class="fc" id="L79">        entity.setDefaultMode(request.defaultMode());</span>
+<span class="fc" id="L80">        entity.setVendorFormatProfileReference(normalize(request.vendorFormatProfileReference()));</span>
+<span class="fc" id="L81">        entity.setEmbossingNameRule(normalize(request.embossingNameRule()));</span>
+<span class="fc" id="L82">        entity.setMaximumEmbossingNameLength(request.maximumEmbossingNameLength());</span>
+<span class="fc" id="L83">        entity.setEmbossingNameLineCount(request.embossingNameLineCount());</span>
+<span class="fc" id="L84">        entity.setPrintCardNumber(request.printCardNumber());</span>
+<span class="fc" id="L85">        entity.setPrintExpiry(request.printExpiry());</span>
+<span class="fc" id="L86">        entity.setPrintCvv2(request.printCvv2());</span>
+<span class="fc" id="L87">        entity.setEncodeMagneticStripe(request.encodeMagneticStripe());</span>
+<span class="fc" id="L88">        entity.setPersonaliseEmvChip(request.personaliseEmvChip());</span>
+<span class="fc" id="L89">        entity.setPinMailerRequired(request.pinMailerRequired());</span>
+<span class="fc" id="L90">        entity.setDefaultVendorId(request.defaultVendorId());</span>
+<span class="fc" id="L91">        entity.setProductionPriority(request.productionPriority());</span>
+<span class="fc" id="L92">        entity.setPolicyStatus(ProductPolicyStatus.DRAFT);</span>
+<span class="fc" id="L93">        return toPersonalisationResponse(personalisationRepository.save(entity));</span>
+    }
+
+    @Transactional(readOnly = true)
+    public ProductCardFormPolicyV2Response getCardForm(
+            UUID institutionId, UUID productId, UUID versionId) {
+<span class="nc" id="L99">        requireVersion(institutionId, productId, versionId);</span>
+<span class="nc" id="L100">        return cardFormRepository.findByProductVersionIdAndInstitutionId(versionId, institutionId)</span>
+<span class="nc" id="L101">                .map(this::toCardFormResponse)</span>
+<span class="nc" id="L102">                .orElseThrow(() -&gt; new ResourceNotFoundException(</span>
+<span class="nc" id="L103">                        &quot;Product card form policy&quot;, versionId.toString()));</span>
+    }
+
+    @Transactional
+    public ProductCardFormPolicyV2Response putCardForm(
+            UUID institutionId, UUID productId, UUID versionId,
+            UpsertProductCardFormPolicyV2Request request) {
+<span class="fc" id="L110">        requireDraftVersion(institutionId, productId, versionId);</span>
+<span class="fc" id="L111">        DerivedCardForm derived = derive(request);</span>
+<span class="fc" id="L112">        personalisationRepository.findByProductVersionIdAndInstitutionId(versionId, institutionId)</span>
+<span class="pc" id="L113">                .ifPresent(policy -&gt; validateFormAndPersonalisation(derived, policy));</span>
+<span class="fc" id="L114">        ProductCardFormPolicyV2 entity = cardFormRepository</span>
+<span class="fc" id="L115">                .findByProductVersionIdAndInstitutionId(versionId, institutionId)</span>
+<span class="fc" id="L116">                .orElseGet(() -&gt; ProductCardFormPolicyV2.builder()</span>
+<span class="fc" id="L117">                        .productVersionId(versionId).institutionId(institutionId).build());</span>
+<span class="fc" id="L118">        entity.setPhysicalAllowed(derived.physicalAllowed());</span>
+<span class="fc" id="L119">        entity.setVirtualAllowed(derived.virtualAllowed());</span>
+<span class="fc" id="L120">        entity.setIssuanceMode(derived.issuanceMode());</span>
+<span class="fc" id="L121">        entity.setPhysicalIssueTiming(derived.physicalIssueTiming());</span>
+<span class="fc" id="L122">        entity.setVirtualPanStrategy(derived.virtualPanStrategy());</span>
+<span class="fc" id="L123">        entity.setMaximumActiveVirtualPans(derived.maximumActiveVirtualPans());</span>
+<span class="fc" id="L124">        entity.setPhysicalConversionAllowed(derived.physicalConversionAllowed());</span>
+<span class="fc" id="L125">        entity.setSamePanForPhysicalConversion(derived.samePanForPhysicalConversion());</span>
+<span class="fc" id="L126">        return toCardFormResponse(cardFormRepository.save(entity));</span>
+    }
+
+    private ProductVersionV2 requireVersion(UUID institutionId, UUID productId, UUID versionId) {
+<span class="fc" id="L130">        return versionRepository.findByProductVersionIdAndInstitutionIdAndProductId(</span>
+                        versionId, institutionId, productId)
+<span class="pc" id="L132">                .orElseThrow(() -&gt; new ResourceNotFoundException(&quot;Product version&quot;, versionId.toString()));</span>
+    }
+
+    private void requireDraftVersion(UUID institutionId, UUID productId, UUID versionId) {
+<span class="fc bfc" id="L136" title="All 2 branches covered.">        if (requireVersion(institutionId, productId, versionId).getVersionStatus() != ProductVersionStatus.DRAFT) {</span>
+<span class="fc" id="L137">            throw new IllegalArgumentException(</span>
+                    &quot;Product issuance policies can be changed only while the version is DRAFT&quot;);
+        }
+<span class="fc" id="L140">    }</span>
+
+    private static void validatePersonalisationRequest(
+            UpsertProductPersonalisationPolicyV2Request request) {
+<span class="pc bpc" id="L144" title="1 of 2 branches missed.">        if (!request.personalisedAllowed()) {</span>
+<span class="nc" id="L145">            throw new IllegalArgumentException(</span>
+                    &quot;personalisedAllowed must be true because non-personalised issuance is currently disabled&quot;);
+        }
+<span class="fc bfc" id="L148" title="All 2 branches covered.">        if (request.defaultMode() != PersonalisationMode.PERSONALISED) {</span>
+<span class="fc" id="L149">            throw new IllegalArgumentException(</span>
+                    &quot;Only PERSONALISED is currently supported as defaultMode&quot;);
+        }
+<span class="fc" id="L152">    }</span>
+
+    private static DerivedCardForm derive(UpsertProductCardFormPolicyV2Request request) {
+<span class="fc bfc" id="L155" title="All 2 branches covered.">        int requestedMaximum = request.maximumActiveVirtualPans() == null</span>
+<span class="fc" id="L156">                ? 1 : request.maximumActiveVirtualPans();</span>
+<span class="pc bpc" id="L157" title="3 of 5 branches missed.">        return switch (request.issuanceMode()) {</span>
+<span class="nc" id="L158">            case VIRTUAL_AND_PHYSICAL_SAME_DAY -&gt; new DerivedCardForm(</span>
+<span class="nc" id="L159">                    true, true, request.issuanceMode(), PhysicalIssueTiming.SAME_DAY,</span>
+                    VirtualPanStrategy.SHARED_WITH_PHYSICAL, 1, false, true);
+<span class="fc" id="L161">            case VIRTUAL_THEN_PHYSICAL_LATER -&gt; new DerivedCardForm(</span>
+<span class="fc" id="L162">                    true, true, request.issuanceMode(), PhysicalIssueTiming.LATER,</span>
+                    VirtualPanStrategy.SHARED_WITH_PHYSICAL, 1, true, true);
+            case PHYSICAL_WITH_MULTIPLE_VIRTUAL_PANS -&gt; {
+<span class="pc bpc" id="L165" title="1 of 2 branches missed.">                if (request.maximumActiveVirtualPans() == null) {</span>
+<span class="nc" id="L166">                    throw new IllegalArgumentException(</span>
+                            &quot;maximumActiveVirtualPans is required for separate virtual PAN issuance&quot;);
+                }
+<span class="fc" id="L169">                yield new DerivedCardForm(</span>
+<span class="fc" id="L170">                        true, true, request.issuanceMode(), PhysicalIssueTiming.SAME_DAY,</span>
+                        VirtualPanStrategy.SEPARATE_PAN_PER_VIRTUAL,
+                        requestedMaximum, false, false);
+            }
+<span class="nc" id="L174">            case PHYSICAL_ONLY -&gt; new DerivedCardForm(</span>
+<span class="nc" id="L175">                    true, false, request.issuanceMode(), PhysicalIssueTiming.SAME_DAY,</span>
+                    VirtualPanStrategy.NOT_APPLICABLE, 0, false, true);
+<span class="nc" id="L177">            case VIRTUAL_ONLY -&gt; new DerivedCardForm(</span>
+<span class="nc" id="L178">                    false, true, request.issuanceMode(), PhysicalIssueTiming.NOT_APPLICABLE,</span>
+                    VirtualPanStrategy.SEPARATE_PAN_PER_VIRTUAL,
+                    requestedMaximum, false, false);
+        };
+    }
+
+    private static void validateFormAndPersonalisation(
+            ProductCardFormPolicyV2 form, UpsertProductPersonalisationPolicyV2Request policy) {
+<span class="pc" id="L186">        validateVirtualOnlyPhysicalFeatures(form.getIssuanceMode(), policy.printCardNumber(),</span>
+<span class="fc" id="L187">                policy.printExpiry(), policy.printCvv2(), policy.encodeMagneticStripe(),</span>
+<span class="fc" id="L188">                policy.personaliseEmvChip(), policy.pinMailerRequired());</span>
+<span class="nc" id="L189">    }</span>
+
+    private static void validateFormAndPersonalisation(
+            DerivedCardForm form, ProductPersonalisationPolicyV2 policy) {
+<span class="nc" id="L193">        validateVirtualOnlyPhysicalFeatures(form.issuanceMode(), policy.isPrintCardNumber(),</span>
+<span class="nc" id="L194">                policy.isPrintExpiry(), policy.isPrintCvv2(), policy.isEncodeMagneticStripe(),</span>
+<span class="nc" id="L195">                policy.isPersonaliseEmvChip(), policy.isPinMailerRequired());</span>
+<span class="nc" id="L196">    }</span>
+
+    private static void validateVirtualOnlyPhysicalFeatures(
+            CardIssuanceMode mode, boolean printCardNumber, boolean printExpiry,
+            boolean printCvv2, boolean encodeMagneticStripe,
+            boolean personaliseEmvChip, boolean pinMailerRequired) {
+<span class="pc bpc" id="L202" title="12 of 14 branches missed.">        if (mode == CardIssuanceMode.VIRTUAL_ONLY</span>
+                &amp;&amp; (printCardNumber || printExpiry || printCvv2 || encodeMagneticStripe
+                    || personaliseEmvChip || pinMailerRequired)) {
+<span class="fc" id="L205">            throw new IllegalArgumentException(</span>
+                    &quot;Physical printing, encoding, chip personalisation and PIN mailer must be disabled for VIRTUAL_ONLY&quot;);
+        }
+<span class="nc" id="L208">    }</span>
+
+    private static String normalize(String value) {
+<span class="pc bpc" id="L211" title="2 of 4 branches missed.">        if (value == null || value.isBlank()) return null;</span>
+<span class="fc" id="L212">        return value.trim();</span>
+    }
+
+    private ProductPersonalisationPolicyV2Response toPersonalisationResponse(
+            ProductPersonalisationPolicyV2 entity) {
+<span class="fc" id="L217">        return new ProductPersonalisationPolicyV2Response(</span>
+<span class="fc" id="L218">                entity.getProductVersionId(), entity.getInstitutionId(),</span>
+<span class="fc" id="L219">                entity.isPersonalisedAllowed(), entity.isNonPersonalisedAllowed(),</span>
+<span class="fc" id="L220">                entity.getDefaultMode(), entity.getVendorFormatProfileReference(),</span>
+<span class="fc" id="L221">                entity.getEmbossingNameRule(), entity.getMaximumEmbossingNameLength(),</span>
+<span class="fc" id="L222">                entity.getEmbossingNameLineCount(), entity.isPrintCardNumber(),</span>
+<span class="fc" id="L223">                entity.isPrintExpiry(), entity.isPrintCvv2(), entity.isEncodeMagneticStripe(),</span>
+<span class="fc" id="L224">                entity.isPersonaliseEmvChip(), entity.isPinMailerRequired(),</span>
+<span class="fc" id="L225">                entity.getDefaultVendorId(), entity.getProductionPriority(), entity.getPolicyStatus());</span>
+    }
+
+    private ProductCardFormPolicyV2Response toCardFormResponse(ProductCardFormPolicyV2 entity) {
+<span class="fc" id="L229">        return new ProductCardFormPolicyV2Response(</span>
+<span class="fc" id="L230">                entity.getProductVersionId(), entity.getInstitutionId(),</span>
+<span class="fc" id="L231">                entity.isPhysicalAllowed(), entity.isVirtualAllowed(), entity.getIssuanceMode(),</span>
+<span class="fc" id="L232">                entity.getPhysicalIssueTiming(), entity.getVirtualPanStrategy(),</span>
+<span class="fc" id="L233">                entity.getMaximumActiveVirtualPans(), entity.isPhysicalConversionAllowed(),</span>
+<span class="fc" id="L234">                entity.isSamePanForPhysicalConversion());</span>
+    }
+
+<span class="fc" id="L237">    private record DerivedCardForm(</span>
+            boolean physicalAllowed,
+            boolean virtualAllowed,
+            CardIssuanceMode issuanceMode,
+            PhysicalIssueTiming physicalIssueTiming,
+            VirtualPanStrategy virtualPanStrategy,
+            int maximumActiveVirtualPans,
+            boolean physicalConversionAllowed,
+            boolean samePanForPhysicalConversion) {
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.15.202606040825</span></div></body></html>

@@ -1,0 +1,148 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>SwitchSyncTransport.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">CMS Core Service</a> &gt; <a href="index.source.html" class="el_package">com.xenomi.cms.core.v2.switchsync</a> &gt; <span class="el_source">SwitchSyncTransport.java</span></div><h1>SwitchSyncTransport.java</h1><pre class="source lang-java linenums">package com.xenomi.cms.core.v2.switchsync;
+
+import com.fasterxml.jackson.databind.JsonNode;
+import com.fasterxml.jackson.databind.ObjectMapper;
+import org.springframework.beans.factory.annotation.Value;
+import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
+import org.springframework.stereotype.Component;
+import org.springframework.http.client.JdkClientHttpRequestFactory;
+import org.springframework.web.client.RestClient;
+import org.springframework.web.client.RestClientResponseException;
+import org.springframework.http.MediaType;
+import org.springframework.util.LinkedMultiValueMap;
+import javax.net.ssl.*;
+import java.net.URI;
+import java.net.http.HttpClient;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.security.KeyStore;
+import java.time.Duration;
+import java.util.UUID;
+
+/** Dedicated authenticated service transport. Never logs bodies or propagates remote error bodies. */
+@Component
+@ConditionalOnProperty(name=&quot;cms.switch.sync.enabled&quot;,havingValue=&quot;true&quot;)
+public class SwitchSyncTransport {
+<span class="fc" id="L26">    private static final org.slf4j.Logger log = org.slf4j.LoggerFactory.getLogger(SwitchSyncTransport.class);</span>
+<span class="fc" id="L27">    private static final ObjectMapper JSON = new ObjectMapper();</span>
+    private final RestClient client;
+    private final String baseUrl, tokenUrl, clientId, secret;
+    public SwitchSyncTransport(@Value(&quot;${cms.switch.base-url}&quot;) String baseUrl,
+            @Value(&quot;${cms.switch.sync.token-url}&quot;) String tokenUrl,
+            @Value(&quot;${cms.switch.sync.client-id:cms-switch-client}&quot;) String clientId,
+            @Value(&quot;${cms.switch.sync.client-secret}&quot;) String secret,
+            @Value(&quot;${cms.switch.sync.keystore:}&quot;) String keystore,
+            @Value(&quot;${cms.switch.sync.keystore-password:}&quot;) String password,
+            @Value(&quot;${cms.switch.sync.truststore:}&quot;) String truststore,
+            @Value(&quot;${cms.switch.sync.truststore-password:}&quot;) String trustPassword,
+            @Value(&quot;${cms.switch.sync.tls-enabled:true}&quot;) boolean tlsEnabled,
+<span class="fc" id="L39">            @Value(&quot;${cms.switch.timeout-ms:3000}&quot;) int timeout) throws Exception {</span>
+<span class="fc" id="L40">        validateEndpoint(baseUrl,tlsEnabled); validateEndpoint(tokenUrl,tlsEnabled);</span>
+<span class="fc" id="L41">        this.baseUrl=baseUrl.replaceAll(&quot;/+$&quot;,&quot;&quot;); this.tokenUrl=tokenUrl; this.clientId=clientId; this.secret=secret;</span>
+<span class="fc" id="L42">        var httpBuilder=HttpClient.newBuilder().connectTimeout(Duration.ofMillis(timeout))</span>
+<span class="fc" id="L43">                .followRedirects(HttpClient.Redirect.NEVER);</span>
+<span class="pc bpc" id="L44" title="1 of 2 branches missed.">        if(tlsEnabled) {</span>
+<span class="nc" id="L45">        KeyStore keys=KeyStore.getInstance(&quot;PKCS12&quot;), trust=KeyStore.getInstance(&quot;PKCS12&quot;);</span>
+<span class="nc" id="L46">        try(var in=Files.newInputStream(Path.of(keystore))) { keys.load(in,password.toCharArray()); }</span>
+<span class="nc" id="L47">        try(var in=Files.newInputStream(Path.of(truststore))) { trust.load(in,trustPassword.toCharArray()); }</span>
+<span class="nc" id="L48">        var km=KeyManagerFactory.getInstance(KeyManagerFactory.getDefaultAlgorithm()); km.init(keys,password.toCharArray());</span>
+<span class="nc" id="L49">        var tm=TrustManagerFactory.getInstance(TrustManagerFactory.getDefaultAlgorithm()); tm.init(trust);</span>
+<span class="nc" id="L50">        var ssl=SSLContext.getInstance(&quot;TLS&quot;); ssl.init(km.getKeyManagers(),tm.getTrustManagers(),null);</span>
+<span class="nc" id="L51">        httpBuilder.sslContext(ssl);</span>
+        }
+<span class="fc" id="L53">        var http=httpBuilder.build();</span>
+<span class="fc" id="L54">        var factory=new JdkClientHttpRequestFactory(http); factory.setReadTimeout(Duration.ofMillis(timeout));</span>
+<span class="fc" id="L55">        client=RestClient.builder().requestFactory(factory).requestInterceptor((request, body, execution) -&gt; {</span>
+            // Log metadata only: the token body contains credentials and registration contains JWE.
+<span class="nc" id="L57">            String endpoint = request.getURI().getScheme() + &quot;://&quot; + request.getURI().getAuthority()</span>
+<span class="nc" id="L58">                    + request.getURI().getPath();</span>
+<span class="nc" id="L59">            String command = request.getHeaders().getFirst(&quot;Idempotency-Key&quot;);</span>
+<span class="nc" id="L60">            long start = System.nanoTime();</span>
+<span class="nc" id="L61">            log.info(&quot;Switch sync HTTP request method={} endpoint={} commandId={} bytes={}&quot;,</span>
+<span class="nc" id="L62">                    request.getMethod(), endpoint, command, body.length);</span>
+            try {
+<span class="nc" id="L64">                var response = execution.execute(request, body);</span>
+<span class="nc" id="L65">                log.info(&quot;Switch sync HTTP response method={} endpoint={} commandId={} status={} elapsedMs={}&quot;,</span>
+<span class="nc" id="L66">                        request.getMethod(), endpoint, command, response.getStatusCode().value(),</span>
+<span class="nc" id="L67">                        (System.nanoTime() - start) / 1_000_000);</span>
+<span class="nc" id="L68">                return response;</span>
+<span class="nc" id="L69">            } catch (java.io.IOException | RuntimeException ex) {</span>
+<span class="nc" id="L70">                log.warn(&quot;Switch sync HTTP failure method={} endpoint={} commandId={} exceptionType={}&quot;,</span>
+<span class="nc" id="L71">                        request.getMethod(), endpoint, command, ex.getClass().getSimpleName());</span>
+<span class="nc" id="L72">                throw ex;</span>
+            }
+<span class="fc" id="L74">        }).build();</span>
+<span class="fc" id="L75">    }</span>
+    static void requireHttps(String url) {
+<span class="fc" id="L77">        validateEndpoint(url,true);</span>
+<span class="fc" id="L78">    }</span>
+    static void validateEndpoint(String url,boolean tlsEnabled) {
+<span class="fc" id="L80">        URI uri=URI.create(url);</span>
+<span class="fc bfc" id="L81" title="All 6 branches covered.">        boolean schemeAllowed=&quot;https&quot;.equals(uri.getScheme()) || (!tlsEnabled &amp;&amp; &quot;http&quot;.equals(uri.getScheme()));</span>
+<span class="pc bpc" id="L82" title="2 of 8 branches missed.">        if(!schemeAllowed || uri.getHost()==null || uri.getUserInfo()!=null || uri.getFragment()!=null)</span>
+<span class="fc" id="L83">            throw new IllegalArgumentException(&quot;Invalid Switch/token endpoint; TLS mode requires HTTPS&quot;);</span>
+<span class="fc" id="L84">    }</span>
+    private String token() {
+<span class="fc" id="L86">        var form=new LinkedMultiValueMap&lt;String,String&gt;();</span>
+<span class="fc" id="L87">        form.add(&quot;grant_type&quot;,&quot;client_credentials&quot;); form.add(&quot;client_id&quot;,clientId); form.add(&quot;client_secret&quot;,secret);</span>
+<span class="fc" id="L88">        form.add(&quot;scope&quot;,&quot;switch:card-authorization:write&quot;);</span>
+        JsonNode response;
+        try {
+<span class="fc" id="L91">            response=parseJson(client.post().uri(tokenUrl)</span>
+<span class="fc" id="L92">                    .contentType(MediaType.APPLICATION_FORM_URLENCODED).body(form)</span>
+<span class="fc" id="L93">                    .retrieve().body(String.class));</span>
+<span class="fc" id="L94">        } catch (RestClientResponseException ex) {</span>
+<span class="fc" id="L95">            log.warn(&quot;Switch sync token acquisition rejected httpStatus={} oauthError={}&quot;,</span>
+<span class="fc" id="L96">                    ex.getStatusCode().value(), safeOAuthError(ex.getResponseBodyAsString()));</span>
+<span class="fc" id="L97">            throw ex;</span>
+<span class="fc" id="L98">        }</span>
+<span class="pc bpc" id="L99" title="1 of 4 branches missed.">        if(response==null || response.path(&quot;access_token&quot;).asText().isBlank()) throw new IllegalStateException(&quot;Missing service token&quot;);</span>
+<span class="fc" id="L100">        return response.path(&quot;access_token&quot;).asText();</span>
+    }
+    static String safeOAuthError(String body) {
+        try {
+<span class="fc" id="L104">            String code = new com.fasterxml.jackson.databind.ObjectMapper().readTree(body).path(&quot;error&quot;).asText();</span>
+<span class="fc bfc" id="L105" title="All 2 branches covered.">            return switch (code) {</span>
+                case &quot;invalid_client&quot;, &quot;invalid_scope&quot;, &quot;unauthorized_client&quot;, &quot;invalid_grant&quot;,
+<span class="fc" id="L107">                     &quot;invalid_request&quot;, &quot;unsupported_grant_type&quot;, &quot;server_error&quot;, &quot;temporarily_unavailable&quot; -&gt; code;</span>
+<span class="fc" id="L108">                default -&gt; &quot;UNRECOGNIZED_ERROR&quot;;</span>
+            };
+<span class="fc" id="L110">        } catch (Exception ignored) {</span>
+<span class="fc" id="L111">            return &quot;UNRECOGNIZED_ERROR&quot;;</span>
+        }
+    }
+    public JsonNode receipt(UUID tenant,UUID command) {
+<span class="fc" id="L115">        try { return parseJson(client.get().uri(baseUrl+&quot;/internal/v1/institutions/&quot;+tenant+&quot;/card-commands/&quot;+command)</span>
+<span class="fc" id="L116">                .headers(h-&gt;h.setBearerAuth(token())).retrieve().body(String.class)); }</span>
+<span class="fc bfc" id="L117" title="All 2 branches covered.">        catch(RestClientResponseException ex) { if(ex.getStatusCode().value()==404) return null; throw ex; }</span>
+    }
+    public JsonNode pinReceipt(UUID tenant, UUID operation) {
+        try {
+<span class="fc" id="L121">            return parseJson(client.get().uri(baseUrl+&quot;/internal/v1/institutions/&quot;+tenant+&quot;/pin-operations/&quot;+operation)</span>
+<span class="fc" id="L122">                    .headers(h-&gt;h.setBearerAuth(token())).retrieve().body(String.class));</span>
+<span class="fc" id="L123">        } catch (RestClientResponseException ex) {</span>
+<span class="pc bpc" id="L124" title="1 of 2 branches missed.">            if (ex.getStatusCode().value()==404) return null;</span>
+<span class="nc" id="L125">            throw ex;</span>
+        }
+    }
+    public JsonNode sendPin(UUID tenant, UUID family, UUID operation, JsonNode body) {
+<span class="fc" id="L129">        return parseJson(client.post().uri(baseUrl+&quot;/internal/v1/institutions/&quot;+tenant+&quot;/pan-families/&quot;+family+&quot;/pin-operations&quot;)</span>
+<span class="fc" id="L130">                .headers(h-&gt;h.setBearerAuth(token())).header(&quot;Idempotency-Key&quot;,operation.toString())</span>
+<span class="fc" id="L131">                .contentType(MediaType.APPLICATION_JSON).body(body.toString()).retrieve().body(String.class));</span>
+    }
+    public JsonNode send(UUID tenant,UUID card,UUID command,String kind,JsonNode body) {
+<span class="fc" id="L134">        return parseJson(client.put().uri(baseUrl+&quot;/internal/v1/institutions/&quot;+tenant+&quot;/cards/&quot;+card+</span>
+<span class="fc bfc" id="L135" title="All 2 branches covered.">                        (&quot;REGISTER&quot;.equals(kind)?&quot;/registration&quot;:&quot;/authorization-profile&quot;))</span>
+<span class="fc" id="L136">                .headers(h-&gt;h.setBearerAuth(token())).header(&quot;Idempotency-Key&quot;,command.toString())</span>
+<span class="fc" id="L137">                .contentType(MediaType.APPLICATION_JSON).body(body.toString()).retrieve().body(String.class));</span>
+    }
+    private static JsonNode parseJson(String body) {
+<span class="pc bpc" id="L140" title="1 of 2 branches missed.">        if (body == null) return null;</span>
+        try {
+<span class="fc" id="L142">            return JSON.readTree(body);</span>
+<span class="nc" id="L143">        } catch (Exception exception) {</span>
+<span class="nc" id="L144">            throw new IllegalStateException(&quot;Invalid JSON response from Switch&quot;, exception);</span>
+        }
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.15.202606040825</span></div></body></html>

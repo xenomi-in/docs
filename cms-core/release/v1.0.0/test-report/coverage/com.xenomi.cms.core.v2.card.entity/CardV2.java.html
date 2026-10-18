@@ -1,0 +1,235 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>CardV2.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">CMS Core Service</a> &gt; <a href="index.source.html" class="el_package">com.xenomi.cms.core.v2.card.entity</a> &gt; <span class="el_source">CardV2.java</span></div><h1>CardV2.java</h1><pre class="source lang-java linenums">package com.xenomi.cms.core.v2.card.entity;
+
+import java.time.LocalDate;
+import java.time.OffsetDateTime;
+import java.util.UUID;
+
+import com.xenomi.cms.core.v2.card.model.CardFormV2;
+import com.xenomi.cms.core.v2.card.model.CardStatusV2;
+import com.xenomi.cms.core.v2.card.model.*;
+import com.xenomi.cms.core.v2.product.model.CardIssuanceMode;
+import com.xenomi.cms.core.v2.product.model.PhysicalIssueTiming;
+import com.xenomi.cms.core.v2.product.model.ReplacementPanStrategy;
+import com.xenomi.cms.core.v2.product.model.ReplacementReason;
+import jakarta.persistence.Column;
+import jakarta.persistence.Entity;
+import jakarta.persistence.EnumType;
+import jakarta.persistence.Enumerated;
+import jakarta.persistence.Id;
+import jakarta.persistence.PrePersist;
+import jakarta.persistence.PreUpdate;
+import jakarta.persistence.Table;
+import lombok.AllArgsConstructor;
+import lombok.Builder;
+import lombok.Data;
+import lombok.NoArgsConstructor;
+
+@Entity(name = &quot;CardV2&quot;)
+@Table(name = &quot;card&quot;, schema = &quot;cms_v2&quot;)
+@Data @Builder @NoArgsConstructor @AllArgsConstructor
+public class CardV2 {
+    @Id @Column(name = &quot;card_id&quot;, nullable = false, updatable = false)
+    private UUID cardId;
+    @Column(name = &quot;institution_id&quot;, nullable = false, updatable = false)
+    private UUID institutionId;
+    @Column(name = &quot;customer_reference_id&quot;, nullable = false, updatable = false)
+    private UUID customerReferenceId;
+    @Column(name = &quot;product_id&quot;, nullable = false, updatable = false)
+    private UUID productId;
+    @Column(name = &quot;product_version_id&quot;, nullable = false, updatable = false)
+    private UUID productVersionId;
+    @Column(name = &quot;bin_id&quot;, nullable = false, updatable = false)
+    private UUID binId;
+    @Column(name = &quot;bin_range_id&quot;, nullable = false, updatable = false)
+    private UUID binRangeId;
+    @Column(name = &quot;pan_allocation_id&quot;, nullable = false, updatable = false)
+    private UUID panAllocationId;
+    @Column(name = &quot;masked_pan&quot;, nullable = false, updatable = false)
+    private String maskedPan;
+    @org.hibernate.annotations.JdbcTypeCode(org.hibernate.type.SqlTypes.CHAR)
+    @Column(name = &quot;pan_last_four&quot;, nullable = false, updatable = false, columnDefinition = &quot;char(4)&quot;)
+    private String panLastFour;
+    @Column(name = &quot;card_design_id&quot;, updatable = false)
+    private UUID cardDesignId;
+    @Column(name = &quot;technology_profile_id&quot;, updatable = false)
+    private UUID technologyProfileId;
+    @Column(name = &quot;cvm_profile_id&quot;, updatable = false)
+    private UUID cvmProfileId;
+    @Column(name = &quot;shipping_address_reference_id&quot;)
+    private UUID shippingAddressReferenceId;
+    @Enumerated(EnumType.STRING)
+    @Column(name = &quot;card_form&quot;, nullable = false)
+    private CardFormV2 cardForm;
+    @Enumerated(EnumType.STRING)
+    @Column(name = &quot;issuance_mode&quot;, nullable = false, updatable = false)
+    private CardIssuanceMode issuanceMode;
+    @Enumerated(EnumType.STRING)
+    @Column(name = &quot;physical_issue_timing&quot;, nullable = false, updatable = false)
+    private PhysicalIssueTiming physicalIssueTiming;
+    @Column(name = &quot;primary_card_id&quot;, updatable = false)
+    private UUID primaryCardId;
+    @org.hibernate.annotations.JdbcTypeCode(org.hibernate.type.SqlTypes.CHAR)
+    @Column(name = &quot;card_sequence_number&quot;, length = 3, columnDefinition = &quot;char(3)&quot;)
+    private String cardSequenceNumber;
+    @Column(name = &quot;embossed_name_line1&quot;)
+    private String embossedNameLine1;
+    @Column(name = &quot;embossed_name_line2&quot;)
+    private String embossedNameLine2;
+    @Column(name = &quot;embossed_name_line3&quot;)
+    private String embossedNameLine3;
+    @Column(name = &quot;embossed_name_line4&quot;)
+    private String embossedNameLine4;
+    @Column(name = &quot;pan_encrypted&quot;, nullable = false, updatable = false, length = 2000)
+    @lombok.ToString.Exclude
+    private String panEncrypted;
+    @Column(name = &quot;cvv1_encrypted&quot;, updatable = false, length = 2000)
+    @lombok.ToString.Exclude
+    private String cvv1Encrypted;
+    @Column(name = &quot;cvv2_encrypted&quot;, updatable = false, length = 2000)
+    @lombok.ToString.Exclude
+    private String cvv2Encrypted;
+    @Column(name = &quot;track2_encrypted&quot;, updatable = false, length = 4000)
+    @lombok.ToString.Exclude
+    private String track2Encrypted;
+    @Column(name = &quot;data_encryption_key_id&quot;, nullable = false, updatable = false)
+    private UUID dataEncryptionKeyId;
+    @Column(name = &quot;pan_hmac_key_id&quot;, nullable = false, updatable = false)
+    private UUID panHmacKeyId;
+    @Column(name = &quot;cvv_key_id&quot;, updatable = false)
+    private UUID cvvKeyId;
+    @Column(name = &quot;issue_date&quot;, nullable = false, updatable = false)
+    private LocalDate issueDate;
+    @Column(name = &quot;expiry_date&quot;, nullable = false, updatable = false)
+    private LocalDate expiryDate;
+    @Column(name = &quot;previous_card_id&quot;, updatable = false)
+    private UUID previousCardId;
+    @Column(name = &quot;root_card_id&quot;, updatable = false)
+    private UUID rootCardId;
+    @Column(name = &quot;issue_sequence&quot;, nullable = false, updatable = false)
+    private int issueSequence;
+    @Enumerated(EnumType.STRING)
+    @Column(name = &quot;replacement_reason&quot;, updatable = false)
+    private ReplacementReason replacementReason;
+    @Enumerated(EnumType.STRING)
+    @Column(name = &quot;pan_replacement_strategy&quot;, updatable = false)
+    private ReplacementPanStrategy panReplacementStrategy;
+    @Column(name = &quot;created_at&quot;, nullable = false, updatable = false)
+    private OffsetDateTime createdAt;
+    @Column(name = &quot;updated_at&quot;, nullable = false)
+    private OffsetDateTime updatedAt;
+    @Column(name = &quot;created_by&quot;, nullable = false, updatable = false)
+    private String createdBy;
+    @Column(name = &quot;updated_by&quot;, nullable = false)
+    private String updatedBy;
+
+    @Column(name = &quot;issued_at&quot;, nullable = false, updatable = false)
+    private OffsetDateTime issuedAt;
+    @Enumerated(EnumType.STRING)
+    @Column(name = &quot;issuance_reason&quot;, nullable = false, updatable = false)
+    private IssuanceReasonV2 issuanceReason;
+    @Column(name = &quot;pin_data_ref&quot;, nullable = false, updatable = false)
+    private UUID pinDataRef;
+    @Column(name = &quot;credential_issuance_ref&quot;, nullable = false, updatable = false)
+    private UUID credentialIssuanceRef;
+    @Column(name = &quot;activation_policy_version&quot;, nullable = false, updatable = false)
+    private UUID activationPolicyVersion;
+    @Builder.Default
+    @Column(name = &quot;digital_available&quot;, nullable = false)
+    private boolean digitalAvailable = false;
+    @Column(name = &quot;use_ready_at&quot;)
+    private OffsetDateTime useReadyAt;
+    @Column(name = &quot;use_ready_evidence_id&quot;)
+    private UUID useReadyEvidenceId;
+    @Column(name = &quot;expired_at&quot;)
+    private OffsetDateTime expiredAt;
+    @Column(name = &quot;closed_at&quot;)
+    private OffsetDateTime closedAt;
+    @Enumerated(EnumType.STRING)
+    @Column(name = &quot;closure_reason&quot;)
+    private ClosureReasonV2 closureReason;
+    @Column(name = &quot;replaced_at&quot;)
+    private OffsetDateTime replacedAt;
+    @Enumerated(EnumType.STRING)
+    @Column(name = &quot;customer_hold_reason&quot;)
+    private CustomerHoldReasonV2 customerHoldReason;
+    @Enumerated(EnumType.STRING)
+    @Column(name = &quot;ops_hold_reason&quot;)
+    private OpsHoldReasonV2 opsHoldReason;
+    @Enumerated(EnumType.STRING)
+    @Column(name = &quot;security_hold_reason&quot;)
+    private SecurityHoldReasonV2 securityHoldReason;
+    @Enumerated(EnumType.STRING)
+    @Column(name = &quot;collections_hold_reason&quot;)
+    private CollectionsHoldReasonV2 collectionsHoldReason;
+    @Enumerated(EnumType.STRING)
+    @Column(name = &quot;compliance_hold_reason&quot;)
+    private ComplianceHoldReasonV2 complianceHoldReason;
+    @Enumerated(EnumType.STRING)
+    @Column(name = &quot;customer_lock_reason&quot;)
+    private CustomerLockReasonV2 customerLockReason;
+    @Enumerated(EnumType.STRING)
+    @Column(name = &quot;issuer_lock_reason&quot;)
+    private IssuerLockReasonV2 issuerLockReason;
+    @Column(name = &quot;first_intent_at&quot;)
+    private OffsetDateTime firstIntentAt;
+    @Enumerated(EnumType.STRING)
+    @Column(name = &quot;activation_trigger&quot;)
+    private ActivationTriggerV2 activationTrigger;
+    @Column(name = &quot;consent_requested_at&quot;)
+    private OffsetDateTime consentRequestedAt;
+    @Column(name = &quot;closure_due_at&quot;)
+    private OffsetDateTime closureDueAt;
+    @Column(name = &quot;perso_file_ref&quot;)
+    private UUID persoFileRef;
+    @Column(name = &quot;courier_provider_id&quot;)
+    private UUID courierProviderId;
+    @Column(name = &quot;awb_number&quot;)
+    private String awbNumber;
+    @Column(name = &quot;activated_at&quot;)
+    private OffsetDateTime activatedAt;
+    @Column(name = &quot;retired_at&quot;)
+    private OffsetDateTime retiredAt;
+    @Enumerated(EnumType.STRING)
+    @Column(name = &quot;physical_retired_reason&quot;)
+    private PhysicalRetiredReasonV2 physicalRetiredReason;
+    @Builder.Default
+    @Enumerated(EnumType.STRING)
+    @Column(name = &quot;physical_fulfilment_status&quot;, nullable = false)
+    private PhysicalFulfilmentStatusV2 physicalFulfilmentStatus = PhysicalFulfilmentStatusV2.NOT_APPLICABLE;
+    // INSERT is refreshed by Hibernate; updates use CardV2Repository.saveFactsAndRefresh.
+    @Enumerated(EnumType.STRING)
+    @lombok.Setter(lombok.AccessLevel.NONE)
+    @org.hibernate.annotations.Generated(event = org.hibernate.generator.EventType.INSERT)
+    @Column(name = &quot;card_status&quot;, nullable = false, insertable = false, updatable = false)
+    private CardStatusV2 cardStatus;
+    // INSERT is refreshed by Hibernate; updates use CardV2Repository.saveFactsAndRefresh.
+    @Enumerated(EnumType.STRING)
+    @lombok.Setter(lombok.AccessLevel.NONE)
+    @org.hibernate.annotations.Generated(event = org.hibernate.generator.EventType.INSERT)
+    @Column(name = &quot;card_status_reason&quot;, insertable = false, updatable = false)
+    private CardStatusReasonV2 cardStatusReason;
+    // INSERT is refreshed by Hibernate; updates use CardV2Repository.saveFactsAndRefresh.
+    @Enumerated(EnumType.STRING)
+    @lombok.Setter(lombok.AccessLevel.NONE)
+    @org.hibernate.annotations.Generated(event = org.hibernate.generator.EventType.INSERT)
+    @Column(name = &quot;physical_activation_status&quot;, nullable = false, insertable = false, updatable = false)
+    private PhysicalActivationStatusV2 physicalActivationStatus;
+    @jakarta.persistence.Version
+    @lombok.Setter(lombok.AccessLevel.NONE)
+    @Column(name = &quot;lifecycle_version&quot;, nullable = false)
+    private Long lifecycleVersion;
+
+    @PrePersist
+    void beforeInsert() {
+<span class="nc" id="L224">        OffsetDateTime now = OffsetDateTime.now(java.time.ZoneOffset.UTC);</span>
+<span class="nc bnc" id="L225" title="All 2 branches missed.">        if (lifecycleVersion == null) lifecycleVersion = 1L;</span>
+<span class="nc bnc" id="L226" title="All 2 branches missed.">        if (createdAt == null) createdAt = now;</span>
+<span class="nc" id="L227">        updatedAt = now;</span>
+<span class="nc" id="L228">    }</span>
+
+    @PreUpdate
+    void beforeUpdate() {
+<span class="nc" id="L232">        updatedAt = OffsetDateTime.now(java.time.ZoneOffset.UTC);</span>
+<span class="nc" id="L233">    }</span>
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.15.202606040825</span></div></body></html>
