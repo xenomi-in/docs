@@ -16,7 +16,7 @@ title: "ISO8583 TCP Listener — v1.0.0"
 | Version | Maven `1.0.0`; executable `switch-1.0.0.jar` |
 | Build identity | Local candidate identity and results: [verification evidence](VERIFICATION_v1.0.0.html). |
 | Switch Core requirement | Requires authenticated mandate-revocation calls; minimum compatible release is **not yet confirmed**. Reviewed source `a33b3a4` does not attach a token |
-| RuPay requirement | Production requires a TLS/mTLS endpoint; NPCI/Falcon link confirmation remains outstanding (T-TCP-10) |
+| RuPay requirement | Production requires a TLS/mTLS endpoint; NPCI/Falcon link confirmation remains outstanding |
 
 Health endpoints are public; business and management APIs require authentication in every profile. Switch Core at `a33b3a4` does not attach a bearer token in `HttpIssuerActionMessageGateway`, so mandate-revocation calls cannot succeed against the protected listener API as implemented. With direct mTLS enforced, missing transport credentials may cause rejection before token validation. Record the minimum compatible release in the [cross-service release list](RELEASE_COMPATIBILITY.html) after the fix and joint verification.
 
@@ -124,15 +124,14 @@ The default Docker build runs Maven verification. CI packages the exact JAR from
 
 ## Known limitations
 
-- **Silent connection loss is not promptly detected by default (T-TCP-12).** RuPay read and idle timeouts are zero, so their timeout handlers are absent. The 30-second check examines local socket/channel state. Silent peer/network loss may remain undetected until socket I/O fails or OS keepalive detects it; timing depends on host settings. Idle-triggered echo code exists but is disabled by the zero idle timeout. There is no independent periodic echo scheduler.
-- **No listener-level duplicate or out-of-order detection (T-TCP-13).** Requests are not protected by a persistent deduplication or sequencing mechanism.
-- **No attributable management audit trail (T-TCP-3).** Sign-on, sign-off, and key-exchange APIs do not record the authenticated initiating identity in a dedicated audit record. Operational logging is not an equivalent audit trail.
-- **Legacy classes remain (T-TCP-15).** `RuPayClientChannel`, `ISOClientChannel`, and `TestClient` are still in production sources outside the active connector path.
+- **Silent connection loss is not promptly detected by default.** RuPay read and idle timeouts are zero, so their timeout handlers are absent. The 30-second check examines local socket/channel state. Silent peer/network loss may remain undetected until socket I/O fails or OS keepalive detects it; timing depends on host settings. Idle-triggered echo code exists but is disabled by the zero idle timeout. There is no independent periodic echo scheduler.
+- **No listener-level duplicate or out-of-order detection.** Requests are not protected by a persistent deduplication or sequencing mechanism.
+- **No attributable management audit trail.** Sign-on, sign-off, and key-exchange APIs do not record the authenticated initiating identity in a dedicated audit record. Operational logging is not an equivalent audit trail.
+- **Legacy classes remain.** `RuPayClientChannel`, `ISOClientChannel`, and `TestClient` are still in sources outside the active connector path will be removed in next release.
 - **Memory/load acceptance remains pending.** Compose now leaves nominal non-heap headroom; validate the 2 GB heap within its 4 GB limit under representative traffic.
-- **Untested audit paths.** End-to-end key exchange (T-TCP-16) and Switch Core outage/message disposition (T-TCP-5) have not been established by the available release evidence and require focused integration tests.
 
 - Only RuPay has a registered connector/handler. Visa and MasterCard configuration entries are placeholders and do not provide working connectors.
-- One application instance supports one active scheme. `app.mode=server` starts the Spring context without opening the outbound scheme connection; it is not an inbound scheme TCP server implementation.
+- Each application instance supports one active scheme connection. Since most schemes operate as TCP servers, the application must connect to them as a TCP client. app.mode=server initializes the Spring context but does not establish the outbound scheme connection or implement an inbound scheme TCP server.
 - Measured line coverage is 80.00% and branch coverage is 64.66%. The build does not enforce a coverage threshold; these metrics do not establish production certification or complete business-scenario coverage.
 
 ## Rollback
