@@ -5,7 +5,7 @@ title: "CMS Notification — v1.0.0"
 
 # CMS Notification — v1.0.0
 
-**Version:** 1.0.0 — planned delivery label; current POM version is `0.0.1-SNAPSHOT`.  
+**Version:** 1.0.0 — initial delivery baseline.  
 **Planned tag:** `1.0.0`.  
 **Release Type:** Major — initial capability baseline  
 **Environment:** Not confirmed  **Scope:** Notification-intent ingestion and source-isolated Avro event publishing to Kafka.  
