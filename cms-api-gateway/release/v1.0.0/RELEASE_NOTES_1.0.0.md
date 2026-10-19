@@ -22,7 +22,6 @@ title: "CMS API Gateway — v1.0.0"
 | Release identity | Planned tag `1.0.0` / `refs/tags/1.0.0`; no local tag verified; tagged SHA, creation date, and tagger not confirmed |
 | Routing compatibility | Dedicated Embossing predicates do not match the current institution-scoped Embossing API |
 | Database | No relational schema or Flyway migrations; Redis required for rate limiting |
-| Deployment readiness | Live Redis/backend integration, final release identity, and environment acceptance not confirmed |
 
 No tag was created. No previous release tag is used for comparison; capabilities describe the supplied baseline. The final release commit must include the selected local changes and the approved version alignment.
 

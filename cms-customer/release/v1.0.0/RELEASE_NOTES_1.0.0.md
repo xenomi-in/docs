@@ -21,7 +21,6 @@ title: "CMS Customer — v1.0.0"
 | Previous release | Not applicable — initial release |
 | API compatibility | V2 only; development-era V1 consumers must migrate |
 | Database | Validate the shared schema and version-12 Flyway baseline before startup |
-| Deployment readiness | Target-environment acceptance and actual deployment not confirmed |
 
 No tag was created for these notes. The source commit is confirmed independently of the planned tag; no tag-to-tag comparison is claimed.
 

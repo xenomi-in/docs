@@ -17,7 +17,6 @@ title: "ISO8583 TCP Listener — v1.0.0"
 | Build identity | Local candidate identity and results: [verification evidence](VERIFICATION_v1.0.0.html). |
 | Switch Core requirement | Requires authenticated mandate-revocation calls; minimum compatible release is **not yet confirmed**. Reviewed source `a33b3a4` does not attach a token |
 | RuPay requirement | Production requires a TLS/mTLS endpoint; NPCI/Falcon link confirmation remains outstanding (T-TCP-10) |
-| UAT / production readiness | **Not approved by the available evidence**; complete service compatibility and environment acceptance remain open |
 
 Health endpoints are public; business and management APIs require authentication in every profile. Switch Core at `a33b3a4` does not attach a bearer token in `HttpIssuerActionMessageGateway`, so mandate-revocation calls cannot succeed against the protected listener API as implemented. With direct mTLS enforced, missing transport credentials may cause rejection before token validation. Record the minimum compatible release in the [cross-service release list](RELEASE_COMPATIBILITY.html) after the fix and joint verification.
 

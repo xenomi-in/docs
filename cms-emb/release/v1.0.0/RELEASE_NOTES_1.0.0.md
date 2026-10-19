@@ -22,7 +22,6 @@ title: "CMS Embossing and Vendor — v1.0.0"
 | Previous release | No previous tag used; initial capability baseline, not a tag comparison |
 | Production card data | Requires an approved secure-data provider; missing provider blocks file generation |
 | Gateway compatibility | Current gateway predicates do not route the institution-scoped Embossing API to this service |
-| Deployment readiness | Live database/SFTP integration, final release identity, and environment acceptance not confirmed |
 
 ## Overview
 
