@@ -1,0 +1,32 @@
+<?xml version='1.0' encoding='utf-8'?>
+<testsuite xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:noNamespaceSchemaLocation="https://maven.apache.org/surefire/maven-surefire-plugin/xsd/surefire-test-report.xsd" version="3.0.2" name="com.lps.cms.customer.v2.boundary.service.BoundaryReferenceV2LinkServiceTest" time="0.271" tests="29" errors="0" skipped="0" failures="0" flakes="0">
+  <testcase name="updateLinkStatusDefaultsEffectiveToAndAllowsInactive" classname="com.lps.cms.customer.v2.boundary.service.BoundaryReferenceV2LinkServiceTest" time="0.172" />
+  <testcase name="listAccountCustomersRejectsLimitAboveMaximumAfterAccountIsConfirmed" classname="com.lps.cms.customer.v2.boundary.service.BoundaryReferenceV2LinkServiceTest" time="0.002" />
+  <testcase name="linkAccountThrowsWhenAccountIsNotInInstitution" classname="com.lps.cms.customer.v2.boundary.service.BoundaryReferenceV2LinkServiceTest" time="0.002" />
+  <testcase name="linkAccountRejectsInactiveAccountBeforeCheckingExistingLinks" classname="com.lps.cms.customer.v2.boundary.service.BoundaryReferenceV2LinkServiceTest" time="0.001" />
+  <testcase name="listCustomerAccountsDoesNotResolveAccountsWhenPageIsEmpty" classname="com.lps.cms.customer.v2.boundary.service.BoundaryReferenceV2LinkServiceTest" time="0.006" />
+  <testcase name="linkAccountRejectsDuplicateActiveRelationshipWithoutSaving" classname="com.lps.cms.customer.v2.boundary.service.BoundaryReferenceV2LinkServiceTest" time="0.003" />
+  <testcase name="linkAccountDoesNotPersistWhenInstitutionAccessIsDenied" classname="com.lps.cms.customer.v2.boundary.service.BoundaryReferenceV2LinkServiceTest" time="0.003" />
+  <testcase name="listAccountCustomersReturnsLinksForTheAccount" classname="com.lps.cms.customer.v2.boundary.service.BoundaryReferenceV2LinkServiceTest" time="0.004" />
+  <testcase name="updateLinkStatusReturnsActiveLinkWithoutSaving" classname="com.lps.cms.customer.v2.boundary.service.BoundaryReferenceV2LinkServiceTest" time="0.002" />
+  <testcase name="listCustomerAccountsReturnsLinksWithAccountType" classname="com.lps.cms.customer.v2.boundary.service.BoundaryReferenceV2LinkServiceTest" time="0.002" />
+  <testcase name="linkAccountRejectsRelationshipThatDoesNotMatchAccountType(AccountType, CustomerAccountRelationshipType)[1]" classname="com.lps.cms.customer.v2.boundary.service.BoundaryReferenceV2LinkServiceTest" time="0.005" />
+  <testcase name="linkAccountRejectsRelationshipThatDoesNotMatchAccountType(AccountType, CustomerAccountRelationshipType)[2]" classname="com.lps.cms.customer.v2.boundary.service.BoundaryReferenceV2LinkServiceTest" time="0.008" />
+  <testcase name="linkAccountRejectsRelationshipThatDoesNotMatchAccountType(AccountType, CustomerAccountRelationshipType)[3]" classname="com.lps.cms.customer.v2.boundary.service.BoundaryReferenceV2LinkServiceTest" time="0.002" />
+  <testcase name="listCustomerAccountsThrowsWhenCustomerIsMissing" classname="com.lps.cms.customer.v2.boundary.service.BoundaryReferenceV2LinkServiceTest" time="0.002" />
+  <testcase name="listCustomerAccountsThrowsWhenLinkedAccountNoLongerExists" classname="com.lps.cms.customer.v2.boundary.service.BoundaryReferenceV2LinkServiceTest" time="0.002" />
+  <testcase name="updateLinkStatusRejectsEffectiveToEqualToEffectiveFrom" classname="com.lps.cms.customer.v2.boundary.service.BoundaryReferenceV2LinkServiceTest" time="0.002" />
+  <testcase name="updateLinkStatusDoesNotQueryWhenInstitutionAccessIsDenied" classname="com.lps.cms.customer.v2.boundary.service.BoundaryReferenceV2LinkServiceTest" time="0.001" />
+  <testcase name="linkAccountDoesNotLookUpTheAccountWhenCustomerIsMissing" classname="com.lps.cms.customer.v2.boundary.service.BoundaryReferenceV2LinkServiceTest" time="0.001" />
+  <testcase name="updateLinkStatusRejectsEffectiveToBeforeEffectiveFrom" classname="com.lps.cms.customer.v2.boundary.service.BoundaryReferenceV2LinkServiceTest" time="0.002" />
+  <testcase name="linkAccountDefaultsEffectiveFromToTheCreationInstant" classname="com.lps.cms.customer.v2.boundary.service.BoundaryReferenceV2LinkServiceTest" time="0.003" />
+  <testcase name="linkAccountCreatesActiveLinkForValidRelationship(AccountType, CustomerAccountRelationshipType)[1]" classname="com.lps.cms.customer.v2.boundary.service.BoundaryReferenceV2LinkServiceTest" time="0.003" />
+  <testcase name="linkAccountCreatesActiveLinkForValidRelationship(AccountType, CustomerAccountRelationshipType)[2]" classname="com.lps.cms.customer.v2.boundary.service.BoundaryReferenceV2LinkServiceTest" time="0.002" />
+  <testcase name="linkAccountCreatesActiveLinkForValidRelationship(AccountType, CustomerAccountRelationshipType)[3]" classname="com.lps.cms.customer.v2.boundary.service.BoundaryReferenceV2LinkServiceTest" time="0.002" />
+  <testcase name="linkAccountCreatesActiveLinkForValidRelationship(AccountType, CustomerAccountRelationshipType)[4]" classname="com.lps.cms.customer.v2.boundary.service.BoundaryReferenceV2LinkServiceTest" time="0.001" />
+  <testcase name="linkAccountCreatesActiveLinkForValidRelationship(AccountType, CustomerAccountRelationshipType)[5]" classname="com.lps.cms.customer.v2.boundary.service.BoundaryReferenceV2LinkServiceTest" time="0.002" />
+  <testcase name="linkAccountRejectsInactiveCustomerBeforeCheckingExistingLinks" classname="com.lps.cms.customer.v2.boundary.service.BoundaryReferenceV2LinkServiceTest" time="0.001" />
+  <testcase name="updateLinkStatusThrowsWhenNoActiveLinkExists" classname="com.lps.cms.customer.v2.boundary.service.BoundaryReferenceV2LinkServiceTest" time="0.002" />
+  <testcase name="listAccountCustomersThrowsWhenAccountIsMissing" classname="com.lps.cms.customer.v2.boundary.service.BoundaryReferenceV2LinkServiceTest" time="0.001" />
+  <testcase name="updateLinkStatusClosesLinkWhenEffectiveToIsAfterEffectiveFrom" classname="com.lps.cms.customer.v2.boundary.service.BoundaryReferenceV2LinkServiceTest" time="0.002" />
+</testsuite>

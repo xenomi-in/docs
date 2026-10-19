@@ -1,0 +1,49 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>CreateCustomerAddressReferenceV2Request.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">customer-service</a> &gt; <a href="index.source.html" class="el_package">com.lps.cms.customer.v2.boundary.dto</a> &gt; <span class="el_source">CreateCustomerAddressReferenceV2Request.java</span></div><h1>CreateCustomerAddressReferenceV2Request.java</h1><pre class="source lang-java linenums">package com.lps.cms.customer.v2.boundary.dto;
+
+import com.lps.cms.customer.v2.boundary.model.ReferenceStatus;
+import com.lps.cms.customer.v2.boundary.model.AddressTypeV2;
+import io.swagger.v3.oas.annotations.media.Schema;
+import jakarta.validation.constraints.NotBlank;
+import jakarta.validation.constraints.NotNull;
+import jakarta.validation.constraints.Pattern;
+import jakarta.validation.constraints.Size;
+
+<span class="fc" id="L11">public record CreateCustomerAddressReferenceV2Request(</span>
+        @NotBlank @Size(max = 50) @Pattern(regexp = &quot;^[A-Za-z0-9._-]+$&quot;)
+        @Schema(description = &quot;System that owns the full address record&quot;, example = &quot;CUSTOMER_SERVICE&quot;)
+        String sourceSystem,
+        @NotBlank @Size(max = 120)
+        @Schema(description = &quot;Opaque address identifier in the owning system&quot;, example = &quot;ADDR-9000123&quot;)
+        String externalAddressId,
+        @NotNull
+        @Schema(description = &quot;Address usage classification&quot;, example = &quot;SHIPPING&quot;)
+        AddressTypeV2 addressType,
+        @NotBlank @Size(max = 200)
+        @Schema(description = &quot;Primary address line&quot;, example = &quot;12 MG Road&quot;)
+        String addressLine1,
+        @Size(max = 200)
+        @Schema(description = &quot;Secondary address line&quot;, example = &quot;Indiranagar&quot;)
+        String addressLine2,
+        @Size(max = 120)
+        @Schema(description = &quot;Nearby landmark&quot;)
+        String landmark,
+        @NotBlank @Size(max = 100)
+        @Schema(description = &quot;City&quot;, example = &quot;Bengaluru&quot;)
+        String city,
+        @Size(max = 100)
+        @Schema(description = &quot;District&quot;)
+        String district,
+        @NotBlank @Size(max = 50)
+        @Schema(description = &quot;State or province code&quot;, example = &quot;KA&quot;)
+        String stateCode,
+        @NotBlank @Size(max = 20) @Pattern(regexp = &quot;^[A-Za-z0-9 -]+$&quot;)
+        @Schema(description = &quot;Postal or ZIP code&quot;, example = &quot;560038&quot;)
+        String postalCode,
+        @NotBlank @Pattern(regexp = &quot;^[A-Za-z]{3}$&quot;)
+        @Schema(description = &quot;ISO 3166-1 alpha-3 country code&quot;, example = &quot;IND&quot;)
+        String countryCode,
+        @Schema(description = &quot;Whether this is the customer's primary address&quot;, example = &quot;true&quot;)
+        Boolean primary,
+        @Schema(description = &quot;Initial reference lifecycle status&quot;, example = &quot;ACTIVE&quot;)
+        ReferenceStatus status) {}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.15.202606040825</span></div></body></html>

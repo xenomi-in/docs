@@ -1,0 +1,155 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>CustomerBoundaryV2Controller.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">customer-service</a> &gt; <a href="index.source.html" class="el_package">com.lps.cms.customer.v2.boundary.controller</a> &gt; <span class="el_source">CustomerBoundaryV2Controller.java</span></div><h1>CustomerBoundaryV2Controller.java</h1><pre class="source lang-java linenums">package com.lps.cms.customer.v2.boundary.controller;
+
+import com.lps.cms.customer.v2.common.ApiSuccessEnvelopeV2;
+import com.lps.cms.customer.v2.common.ApiResponseV2;
+import com.lps.cms.customer.v2.boundary.dto.*;
+import com.lps.cms.customer.v2.boundary.model.ReferenceStatus;
+import com.lps.cms.customer.v2.boundary.service.BoundaryReferenceV2Service;
+import com.lps.cms.customer.v2.common.PagedResponseV2;
+import io.swagger.v3.oas.annotations.Operation;
+import io.swagger.v3.oas.annotations.tags.Tag;
+import jakarta.validation.Valid;
+import lombok.RequiredArgsConstructor;
+import org.springframework.http.HttpStatus;
+import org.springframework.http.ResponseEntity;
+import org.springframework.web.bind.annotation.*;
+import java.util.UUID;
+
+@RestController
+@RequiredArgsConstructor
+@RequestMapping(&quot;/api/v2/institutions/{institutionId}/customers&quot;)
+@Tag(name = &quot;V2 - Customers&quot;, description = &quot;Institution-scoped customer profiles, addresses and account relationships&quot;)
+public class CustomerBoundaryV2Controller {
+    private final BoundaryReferenceV2Service service;
+
+    @PostMapping
+    @Operation(operationId = &quot;createCustomerV2&quot;, summary = &quot;Onboard a customer&quot;,
+            description = &quot;Creates an institution-scoped customer profile and returns the UUID used by CMS Core as customerReferenceId.&quot;)
+    public ResponseEntity&lt;ApiSuccessEnvelopeV2&lt;CustomerReferenceV2Response&gt;&gt; create(
+            @PathVariable UUID institutionId, @Valid @RequestBody CreateCustomerReferenceV2Request request) {
+<span class="fc" id="L30">        return ResponseEntity.status(HttpStatus.CREATED).body(ApiResponseV2.success(service.createCustomer(institutionId, request)));</span>
+    }
+
+    @GetMapping
+    @Operation(operationId = &quot;listCustomersV2&quot;, summary = &quot;List customers&quot;)
+    public ApiSuccessEnvelopeV2&lt;PagedResponseV2&lt;CustomerReferenceV2Response&gt;&gt; list(
+            @PathVariable UUID institutionId, @RequestParam(required = false) ReferenceStatus status,
+            @RequestParam(required = false) Integer page, @RequestParam(required = false) Integer limit) {
+<span class="fc" id="L38">        return ApiResponseV2.success(service.listCustomers(institutionId, status, page, limit));</span>
+    }
+
+    @GetMapping(&quot;/resolve&quot;)
+    @Operation(operationId = &quot;resolveCustomerReferenceV2&quot;, summary = &quot;Resolve a customer reference by external identity&quot;)
+    public ApiSuccessEnvelopeV2&lt;CustomerReferenceV2Response&gt; resolve(
+            @PathVariable UUID institutionId, @RequestParam String sourceSystem,
+            @RequestParam String externalCustomerId) {
+<span class="fc" id="L46">        return ApiResponseV2.success(service.resolveCustomer(institutionId, sourceSystem, externalCustomerId));</span>
+    }
+
+    @GetMapping(&quot;/{customerReferenceId}&quot;)
+    @Operation(operationId = &quot;getCustomerV2&quot;, summary = &quot;Get a customer profile by UUID&quot;)
+    public ApiSuccessEnvelopeV2&lt;CustomerReferenceV2Response&gt; get(
+            @PathVariable UUID institutionId, @PathVariable UUID customerReferenceId) {
+<span class="fc" id="L53">        return ApiResponseV2.success(service.getCustomer(institutionId, customerReferenceId));</span>
+    }
+
+    @PostMapping(&quot;/{customerReferenceId}/actions/update-status&quot;)
+    @Operation(operationId = &quot;updateCustomerReferenceStatusV2&quot;, summary = &quot;Change a customer-reference lifecycle status&quot;)
+    public ApiSuccessEnvelopeV2&lt;CustomerReferenceV2Response&gt; updateStatus(
+            @PathVariable UUID institutionId, @PathVariable UUID customerReferenceId,
+            @Valid @RequestBody UpdateReferenceStatusV2Request request) {
+<span class="fc" id="L61">        return ApiResponseV2.success(service.updateCustomer(institutionId, customerReferenceId, request));</span>
+    }
+
+    @PostMapping(&quot;/{customerReferenceId}/actions/update-profile&quot;)
+    @Operation(operationId = &quot;updateCustomerProfileV2&quot;, summary = &quot;Update customer profile details&quot;,
+            description = &quot;Updates mutable customer PII while preserving source identity and audit history.&quot;)
+    public ApiSuccessEnvelopeV2&lt;CustomerReferenceV2Response&gt; updateProfile(
+            @PathVariable UUID institutionId, @PathVariable UUID customerReferenceId,
+            @Valid @RequestBody UpdateCustomerProfileV2Request request) {
+<span class="fc" id="L70">        return ApiResponseV2.success(service.updateCustomerProfile(</span>
+                institutionId, customerReferenceId, request));
+    }
+
+    @PostMapping(&quot;/{customerReferenceId}/accounts&quot;)
+    @Operation(operationId = &quot;linkCustomerAccountV2&quot;, summary = &quot;Link a credit account or prepaid wallet to a customer&quot;,
+            description = &quot;Creates an active, institution-scoped relationship. CREDIT_CARD_ACCOUNT supports primary/supplementary holders; PREPAID_WALLET supports prepaid owners.&quot;)
+    public ResponseEntity&lt;ApiSuccessEnvelopeV2&lt;CustomerAccountLinkV2Response&gt;&gt; linkAccount(
+            @PathVariable UUID institutionId, @PathVariable UUID customerReferenceId,
+            @Valid @RequestBody CreateCustomerAccountLinkV2Request request) {
+<span class="fc" id="L80">        return ResponseEntity.status(HttpStatus.CREATED)</span>
+<span class="fc" id="L81">                .body(ApiResponseV2.success(service.linkAccount(institutionId, customerReferenceId, request)));</span>
+    }
+
+    @PostMapping(&quot;/{customerReferenceId}/addresses&quot;)
+    @Operation(operationId = &quot;createCustomerAddressV2&quot;, summary = &quot;Add an address to a customer&quot;,
+            description = &quot;Stores the postal address in customer-service and returns the addressReferenceId used by CMS Core and card fulfilment.&quot;)
+    public ResponseEntity&lt;ApiSuccessEnvelopeV2&lt;CustomerAddressReferenceV2Response&gt;&gt; addAddress(
+            @PathVariable UUID institutionId, @PathVariable UUID customerReferenceId,
+            @Valid @RequestBody CreateCustomerAddressReferenceV2Request request) {
+<span class="fc" id="L90">        return ResponseEntity.status(HttpStatus.CREATED)</span>
+<span class="fc" id="L91">                .body(ApiResponseV2.success(service.createAddress(</span>
+                        institutionId, customerReferenceId, request)));
+    }
+
+    @GetMapping(&quot;/{customerReferenceId}/addresses&quot;)
+    @Operation(operationId = &quot;listCustomerAddressesV2&quot;, summary = &quot;List customer addresses&quot;)
+    public ApiSuccessEnvelopeV2&lt;PagedResponseV2&lt;CustomerAddressReferenceV2Response&gt;&gt; listAddresses(
+            @PathVariable UUID institutionId, @PathVariable UUID customerReferenceId,
+            @RequestParam(required = false) ReferenceStatus status,
+            @RequestParam(required = false) Integer page,
+            @RequestParam(required = false) Integer limit) {
+<span class="fc" id="L102">        return ApiResponseV2.success(service.listAddresses(</span>
+                institutionId, customerReferenceId, status, page, limit));
+    }
+
+    @GetMapping(&quot;/{customerReferenceId}/addresses/{addressReferenceId}&quot;)
+    @Operation(operationId = &quot;getCustomerAddressV2&quot;, summary = &quot;Get a customer address&quot;)
+    public ApiSuccessEnvelopeV2&lt;CustomerAddressReferenceV2Response&gt; getAddress(
+            @PathVariable UUID institutionId, @PathVariable UUID customerReferenceId,
+            @PathVariable UUID addressReferenceId) {
+<span class="fc" id="L111">        return ApiResponseV2.success(service.getAddress(</span>
+                institutionId, customerReferenceId, addressReferenceId));
+    }
+
+    @PostMapping(&quot;/{customerReferenceId}/addresses/{addressReferenceId}/actions/update-details&quot;)
+    @Operation(operationId = &quot;updateCustomerAddressV2&quot;, summary = &quot;Update customer address details&quot;)
+    public ApiSuccessEnvelopeV2&lt;CustomerAddressReferenceV2Response&gt; updateAddress(
+            @PathVariable UUID institutionId, @PathVariable UUID customerReferenceId,
+            @PathVariable UUID addressReferenceId,
+            @Valid @RequestBody UpdateCustomerAddressV2Request request) {
+<span class="fc" id="L121">        return ApiResponseV2.success(service.updateAddress(</span>
+                institutionId, customerReferenceId, addressReferenceId, request));
+    }
+
+    @PostMapping(&quot;/{customerReferenceId}/addresses/{addressReferenceId}/actions/update-status&quot;)
+    @Operation(operationId = &quot;updateCustomerAddressStatusV2&quot;, summary = &quot;Change customer address status&quot;,
+            description = &quot;Preserves address history; no DELETE operation is provided.&quot;)
+    public ApiSuccessEnvelopeV2&lt;CustomerAddressReferenceV2Response&gt; updateAddressStatus(
+            @PathVariable UUID institutionId, @PathVariable UUID customerReferenceId,
+            @PathVariable UUID addressReferenceId,
+            @Valid @RequestBody UpdateReferenceStatusV2Request request) {
+<span class="fc" id="L132">        return ApiResponseV2.success(service.updateAddressStatus(</span>
+                institutionId, customerReferenceId, addressReferenceId, request));
+    }
+
+    @GetMapping(&quot;/{customerReferenceId}/accounts&quot;)
+    @Operation(operationId = &quot;listCustomerAccountsV2&quot;, summary = &quot;List accounts linked to a customer&quot;)
+    public ApiSuccessEnvelopeV2&lt;PagedResponseV2&lt;CustomerAccountLinkV2Response&gt;&gt; listAccounts(
+            @PathVariable UUID institutionId, @PathVariable UUID customerReferenceId,
+            @RequestParam(required = false) Integer page, @RequestParam(required = false) Integer limit) {
+<span class="fc" id="L141">        return ApiResponseV2.success(service.listCustomerAccounts(institutionId, customerReferenceId, page, limit));</span>
+    }
+
+    @PostMapping(&quot;/{customerReferenceId}/accounts/{externalAccountReferenceId}/actions/update-status&quot;)
+    @Operation(operationId = &quot;updateCustomerAccountLinkStatusV2&quot;, summary = &quot;Close or deactivate a customer-account relationship&quot;,
+            description = &quot;Preserves relationship history; no DELETE operation is provided.&quot;)
+    public ApiSuccessEnvelopeV2&lt;CustomerAccountLinkV2Response&gt; updateAccountLinkStatus(
+            @PathVariable UUID institutionId, @PathVariable UUID customerReferenceId,
+            @PathVariable UUID externalAccountReferenceId,
+            @Valid @RequestBody UpdateCustomerAccountLinkStatusV2Request request) {
+<span class="fc" id="L151">        return ApiResponseV2.success(service.updateLinkStatus(</span>
+                institutionId, customerReferenceId, externalAccountReferenceId, request));
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.15.202606040825</span></div></body></html>

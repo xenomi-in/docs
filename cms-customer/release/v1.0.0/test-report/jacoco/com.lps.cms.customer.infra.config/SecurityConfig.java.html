@@ -1,0 +1,71 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>SecurityConfig.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">customer-service</a> &gt; <a href="index.source.html" class="el_package">com.lps.cms.customer.infra.config</a> &gt; <span class="el_source">SecurityConfig.java</span></div><h1>SecurityConfig.java</h1><pre class="source lang-java linenums">package com.lps.cms.customer.infra.config;
+
+import tools.jackson.databind.json.JsonMapper;
+import com.lps.cms.customer.v2.common.ApiResponseV2;
+import com.lps.cms.customer.v2.common.idempotency.IdempotencyFilterV2;
+import com.lps.cms.customer.v2.common.idempotency.IdempotencyRepositoryV2;
+import org.springframework.beans.factory.annotation.Value;
+import org.springframework.context.annotation.Bean;
+import org.springframework.context.annotation.Configuration;
+import org.springframework.http.HttpMethod;
+import org.springframework.security.config.annotation.web.builders.HttpSecurity;
+import org.springframework.security.config.http.SessionCreationPolicy;
+import org.springframework.security.oauth2.server.resource.authentication.JwtAuthenticationConverter;
+import org.springframework.security.oauth2.server.resource.authentication.JwtGrantedAuthoritiesConverter;
+import org.springframework.security.web.SecurityFilterChain;
+import org.springframework.security.oauth2.server.resource.web.authentication.BearerTokenAuthenticationFilter;
+import org.springframework.http.MediaType;
+
+@Configuration
+<span class="fc" id="L20">public class SecurityConfig {</span>
+    private static final String V2 = &quot;/api/v2/institutions/*&quot;;
+
+    @Bean
+    IdempotencyFilterV2 idempotencyFilterV2(IdempotencyRepositoryV2 repository, JsonMapper mapper,
+            @Value(&quot;${customer.idempotency.max-body-bytes:2097152}&quot;) int maximumBodyBytes) {
+<span class="fc" id="L26">        return new IdempotencyFilterV2(repository, mapper, maximumBodyBytes);</span>
+    }
+
+    @Bean
+    SecurityFilterChain securityFilterChain(HttpSecurity http, JsonMapper mapper,
+            IdempotencyFilterV2 idempotencyFilter) throws Exception {
+<span class="fc" id="L32">        http.csrf(csrf -&gt; csrf.disable())</span>
+<span class="fc" id="L33">                .sessionManagement(session -&gt; session.sessionCreationPolicy(SessionCreationPolicy.STATELESS))</span>
+<span class="fc" id="L34">                .authorizeHttpRequests(auth -&gt; auth</span>
+<span class="fc" id="L35">                        .requestMatchers(&quot;/actuator/health/**&quot;, &quot;/api-docs/**&quot;, &quot;/v3/api-docs/**&quot;,</span>
+<span class="fc" id="L36">                                &quot;/swagger-ui/**&quot;, &quot;/swagger-ui.html&quot;).permitAll()</span>
+<span class="fc" id="L37">                        .requestMatchers(HttpMethod.GET, V2 + &quot;/customers/**&quot;)</span>
+<span class="fc" id="L38">                            .hasAnyAuthority(&quot;PERM_cms:customer:read&quot;, &quot;PERM_cms:customer:manage&quot;)</span>
+<span class="fc" id="L39">                        .requestMatchers(V2 + &quot;/customers/**&quot;).hasAuthority(&quot;PERM_cms:customer:manage&quot;)</span>
+<span class="fc" id="L40">                        .requestMatchers(HttpMethod.GET, V2 + &quot;/accounts/**&quot;)</span>
+<span class="fc" id="L41">                            .hasAnyAuthority(&quot;PERM_cms:account:read&quot;, &quot;PERM_cms:account:manage&quot;)</span>
+<span class="fc" id="L42">                        .requestMatchers(V2 + &quot;/accounts/**&quot;).hasAuthority(&quot;PERM_cms:account:manage&quot;)</span>
+<span class="fc" id="L43">                        .anyRequest().authenticated())</span>
+<span class="fc" id="L44">                .oauth2ResourceServer(oauth -&gt; oauth</span>
+<span class="fc" id="L45">                        .jwt(jwt -&gt; jwt.jwtAuthenticationConverter(jwtAuthenticationConverter()))</span>
+<span class="fc" id="L46">                        .authenticationEntryPoint((request, response, exception) -&gt; {</span>
+<span class="fc" id="L47">                            response.setStatus(401); response.setContentType(MediaType.APPLICATION_JSON_VALUE);</span>
+<span class="fc" id="L48">                            mapper.writeValue(response.getOutputStream(), ApiResponseV2.error(request,</span>
+                                    &quot;UNAUTHENTICATED&quot;, &quot;A valid bearer access token is required&quot;, null));
+<span class="fc" id="L50">                        }))</span>
+<span class="fc" id="L51">                .exceptionHandling(exceptions -&gt; exceptions.accessDeniedHandler((request, response, exception) -&gt; {</span>
+<span class="fc" id="L52">                    response.setStatus(403); response.setContentType(MediaType.APPLICATION_JSON_VALUE);</span>
+<span class="fc" id="L53">                    mapper.writeValue(response.getOutputStream(), ApiResponseV2.error(request,</span>
+                            &quot;ACCESS_DENIED&quot;, &quot;The authenticated subject is not allowed to perform this operation&quot;, null));
+<span class="fc" id="L55">                }));</span>
+<span class="fc" id="L56">        http.addFilterAfter(idempotencyFilter, BearerTokenAuthenticationFilter.class);</span>
+<span class="fc" id="L57">        return http.build();</span>
+    }
+
+    @Bean
+    JwtAuthenticationConverter jwtAuthenticationConverter() {
+<span class="fc" id="L62">        JwtGrantedAuthoritiesConverter permissions = new JwtGrantedAuthoritiesConverter();</span>
+<span class="fc" id="L63">        permissions.setAuthoritiesClaimName(&quot;permissions&quot;);</span>
+<span class="fc" id="L64">        permissions.setAuthorityPrefix(&quot;PERM_&quot;);</span>
+<span class="fc" id="L65">        JwtAuthenticationConverter converter = new JwtAuthenticationConverter();</span>
+<span class="fc" id="L66">        converter.setJwtGrantedAuthoritiesConverter(permissions);</span>
+<span class="fc" id="L67">        converter.setPrincipalClaimName(&quot;sub&quot;);</span>
+<span class="fc" id="L68">        return converter;</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.15.202606040825</span></div></body></html>

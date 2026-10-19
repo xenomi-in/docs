@@ -1,0 +1,54 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>V2ExceptionHandler.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">customer-service</a> &gt; <a href="index.source.html" class="el_package">com.lps.cms.customer.v2.common</a> &gt; <span class="el_source">V2ExceptionHandler.java</span></div><h1>V2ExceptionHandler.java</h1><pre class="source lang-java linenums">package com.lps.cms.customer.v2.common;
+
+import com.lps.cms.customer.api.exception.BadRequestException;
+import com.lps.cms.customer.api.exception.ResourceNotFoundException;
+import jakarta.servlet.http.HttpServletRequest;
+import jakarta.validation.ConstraintViolationException;
+import org.springframework.core.Ordered;
+import org.springframework.core.annotation.Order;
+import org.springframework.http.*;
+import org.springframework.security.access.AccessDeniedException;
+import org.springframework.web.bind.MethodArgumentNotValidException;
+import org.springframework.web.bind.annotation.*;
+import java.util.List;
+
+@Order(Ordered.HIGHEST_PRECEDENCE)
+@RestControllerAdvice(basePackages = &quot;com.lps.cms.customer.v2&quot;)
+<span class="fc" id="L17">public class V2ExceptionHandler {</span>
+    @ExceptionHandler(ResourceNotFoundException.class)
+    ResponseEntity&lt;ApiErrorEnvelopeV2&gt; notFound(ResourceNotFoundException ex, HttpServletRequest request) {
+<span class="fc" id="L20">        return error(request, 404, &quot;NOT_FOUND&quot;, ex.getMessage(), null);</span>
+    }
+    @ExceptionHandler(V2ConflictException.class)
+    ResponseEntity&lt;ApiErrorEnvelopeV2&gt; conflict(V2ConflictException ex, HttpServletRequest request) {
+<span class="fc" id="L24">        return error(request, 409, &quot;CONFLICT&quot;, ex.getMessage(), null);</span>
+    }
+    @ExceptionHandler(V2BusinessRuleException.class)
+    ResponseEntity&lt;ApiErrorEnvelopeV2&gt; business(V2BusinessRuleException ex, HttpServletRequest request) {
+<span class="fc" id="L28">        return error(request, 422, &quot;BUSINESS_RULE_VIOLATION&quot;, ex.getMessage(), null);</span>
+    }
+    @ExceptionHandler({BadRequestException.class, ConstraintViolationException.class})
+    ResponseEntity&lt;ApiErrorEnvelopeV2&gt; badRequest(Exception ex, HttpServletRequest request) {
+<span class="fc" id="L32">        return error(request, 400, &quot;BAD_REQUEST&quot;, ex.getMessage(), null);</span>
+    }
+    @ExceptionHandler(MethodArgumentNotValidException.class)
+    ResponseEntity&lt;ApiErrorEnvelopeV2&gt; validation(MethodArgumentNotValidException ex, HttpServletRequest request) {
+<span class="fc" id="L36">        List&lt;Object&gt; details = ex.getBindingResult().getFieldErrors().stream()</span>
+<span class="fc" id="L37">                .map(error -&gt; (Object) java.util.Map.of(&quot;field&quot;, error.getField(), &quot;message&quot;, error.getDefaultMessage()))</span>
+<span class="fc" id="L38">                .toList();</span>
+<span class="fc" id="L39">        return error(request, 400, &quot;VALIDATION_ERROR&quot;, &quot;One or more fields are invalid&quot;, details);</span>
+    }
+    @ExceptionHandler(AccessDeniedException.class)
+    ResponseEntity&lt;ApiErrorEnvelopeV2&gt; denied(AccessDeniedException ex, HttpServletRequest request) {
+<span class="fc" id="L43">        return error(request, 403, &quot;ACCESS_DENIED&quot;, &quot;The authenticated subject is not allowed to access this resource&quot;, null);</span>
+    }
+    @ExceptionHandler(Exception.class)
+    ResponseEntity&lt;ApiErrorEnvelopeV2&gt; internal(Exception ex, HttpServletRequest request) {
+<span class="fc" id="L47">        return error(request, 500, &quot;INTERNAL_ERROR&quot;, &quot;An unexpected internal error occurred&quot;, null);</span>
+    }
+    private static ResponseEntity&lt;ApiErrorEnvelopeV2&gt; error(HttpServletRequest request, int status,
+            String code, String message, List&lt;?&gt; details) {
+<span class="fc" id="L51">        return ResponseEntity.status(status).body(ApiResponseV2.error(request, code, message, details));</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.15.202606040825</span></div></body></html>

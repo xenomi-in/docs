@@ -1,0 +1,438 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>BoundaryReferenceV2Service.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">customer-service</a> &gt; <a href="index.source.html" class="el_package">com.lps.cms.customer.v2.boundary.service</a> &gt; <span class="el_source">BoundaryReferenceV2Service.java</span></div><h1>BoundaryReferenceV2Service.java</h1><pre class="source lang-java linenums">package com.lps.cms.customer.v2.boundary.service;
+
+import com.lps.cms.customer.api.exception.BadRequestException;
+import com.lps.cms.customer.api.exception.ResourceNotFoundException;
+import com.lps.cms.customer.v2.boundary.dto.*;
+import com.lps.cms.customer.v2.boundary.entity.CustomerReferenceV2;
+import com.lps.cms.customer.v2.boundary.entity.ExternalAccountReferenceV2;
+import com.lps.cms.customer.v2.boundary.model.ReferenceStatus;
+import com.lps.cms.customer.v2.boundary.repository.CustomerReferenceV2Repository;
+import com.lps.cms.customer.v2.boundary.repository.ExternalAccountReferenceV2Repository;
+import com.lps.cms.customer.v2.boundary.repository.CustomerAccountLinkV2Repository;
+import com.lps.cms.customer.v2.boundary.entity.CustomerAccountLinkV2;
+import com.lps.cms.customer.v2.boundary.entity.CustomerAddressReferenceV2;
+import com.lps.cms.customer.v2.boundary.model.AccountType;
+import com.lps.cms.customer.v2.boundary.model.CustomerAccountRelationshipType;
+import com.lps.cms.customer.v2.boundary.model.LinkStatus;
+import com.lps.cms.customer.v2.boundary.repository.CustomerAddressReferenceV2Repository;
+import com.lps.cms.customer.v2.common.PagedResponseV2;
+import com.lps.cms.customer.v2.security.V2TenantAccess;
+import com.lps.cms.customer.v2.common.V2ConflictException;
+import com.lps.cms.customer.v2.common.V2BusinessRuleException;
+import lombok.RequiredArgsConstructor;
+import org.springframework.dao.DataIntegrityViolationException;
+import org.springframework.data.domain.PageRequest;
+import org.springframework.data.domain.Sort;
+import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
+import java.time.Instant;
+import java.util.UUID;
+
+@Service
+@RequiredArgsConstructor
+public class BoundaryReferenceV2Service {
+    private final CustomerReferenceV2Repository customers;
+    private final ExternalAccountReferenceV2Repository accounts;
+    private final CustomerAccountLinkV2Repository links;
+    private final CustomerAddressReferenceV2Repository addresses;
+    private final V2TenantAccess tenantAccess;
+
+    @Transactional
+    public CustomerReferenceV2Response createCustomer(UUID institutionId, CreateCustomerReferenceV2Request request) {
+<span class="fc" id="L42">        String actor = tenantAccess.require(institutionId);</span>
+<span class="fc" id="L43">        Instant now = Instant.now();</span>
+        try {
+<span class="fc" id="L45">            return customerResponse(customers.saveAndFlush(CustomerReferenceV2.builder()</span>
+<span class="fc" id="L46">                    .institutionId(institutionId).sourceSystem(normalize(request.sourceSystem()))</span>
+<span class="fc" id="L47">                    .externalCustomerId(request.externalCustomerId().trim())</span>
+<span class="fc" id="L48">                    .customerType(request.customerType()).title(trimToNull(request.title()))</span>
+<span class="fc" id="L49">                    .firstName(request.firstName().trim()).middleName(trimToNull(request.middleName()))</span>
+<span class="fc" id="L50">                    .lastName(request.lastName().trim()).dateOfBirth(request.dateOfBirth())</span>
+<span class="fc" id="L51">                    .mobileCountryCode(trimToNull(request.mobileCountryCode()))</span>
+<span class="fc" id="L52">                    .mobileNumber(trimToNull(request.mobileNumber()))</span>
+<span class="fc" id="L53">                    .email(normalizeEmail(request.email()))</span>
+<span class="fc bfc" id="L54" title="All 2 branches covered.">                    .status(request.status() == null ? ReferenceStatus.ACTIVE : request.status())</span>
+<span class="fc" id="L55">                    .createdAt(now).updatedAt(now).createdBy(actor).updatedBy(actor).build()));</span>
+<span class="fc" id="L56">        } catch (DataIntegrityViolationException ex) {</span>
+<span class="fc" id="L57">            throw new V2ConflictException(&quot;Customer reference already exists for institution, sourceSystem and externalCustomerId&quot;, ex);</span>
+        }
+    }
+
+    @Transactional(readOnly = true)
+    public CustomerReferenceV2Response getCustomer(UUID institutionId, UUID id) {
+<span class="fc" id="L63">        tenantAccess.require(institutionId);</span>
+<span class="fc" id="L64">        return customerResponse(customers.findByIdAndInstitutionId(id, institutionId)</span>
+<span class="fc" id="L65">                .orElseThrow(() -&gt; new ResourceNotFoundException(&quot;CustomerReference&quot;, &quot;customerReferenceId&quot;, id)));</span>
+    }
+
+    @Transactional(readOnly = true)
+    public CustomerReferenceV2Response resolveCustomer(UUID institutionId, String sourceSystem, String externalId) {
+<span class="fc" id="L70">        tenantAccess.require(institutionId);</span>
+<span class="fc" id="L71">        return customerResponse(customers.findByInstitutionIdAndSourceSystemAndExternalCustomerId(</span>
+<span class="fc" id="L72">                institutionId, normalize(sourceSystem), externalId.trim())</span>
+<span class="fc" id="L73">                .orElseThrow(() -&gt; new ResourceNotFoundException(&quot;CustomerReference&quot;, &quot;externalCustomerId&quot;, externalId)));</span>
+    }
+
+    @Transactional(readOnly = true)
+    public PagedResponseV2&lt;CustomerReferenceV2Response&gt; listCustomers(
+            UUID institutionId, ReferenceStatus status, Integer page, Integer limit) {
+<span class="fc" id="L79">        tenantAccess.require(institutionId);</span>
+<span class="fc" id="L80">        var pageable = page(page, limit);</span>
+<span class="fc bfc" id="L81" title="All 2 branches covered.">        var result = status == null ? customers.findByInstitutionId(institutionId, pageable)</span>
+<span class="fc" id="L82">                : customers.findByInstitutionIdAndStatus(institutionId, status, pageable);</span>
+<span class="fc" id="L83">        return PagedResponseV2.from(result.map(this::customerResponse));</span>
+    }
+
+    @Transactional
+    public CustomerReferenceV2Response updateCustomer(
+            UUID institutionId, UUID id, UpdateReferenceStatusV2Request request) {
+<span class="fc" id="L89">        String actor = tenantAccess.require(institutionId);</span>
+<span class="fc" id="L90">        var entity = customers.findByIdAndInstitutionId(id, institutionId)</span>
+<span class="fc" id="L91">                .orElseThrow(() -&gt; new ResourceNotFoundException(&quot;CustomerReference&quot;, &quot;customerReferenceId&quot;, id));</span>
+<span class="fc" id="L92">        validateReferenceTransition(entity.getStatus(), request.status());</span>
+<span class="fc" id="L93">        entity.setStatus(request.status()); entity.setUpdatedAt(Instant.now()); entity.setUpdatedBy(actor);</span>
+<span class="fc" id="L94">        return customerResponse(customers.save(entity));</span>
+    }
+
+    @Transactional
+    public CustomerReferenceV2Response updateCustomerProfile(
+            UUID institutionId, UUID id, UpdateCustomerProfileV2Request request) {
+<span class="fc" id="L100">        String actor = tenantAccess.require(institutionId);</span>
+<span class="fc" id="L101">        requireCustomerProfileChange(request);</span>
+<span class="fc" id="L102">        var entity = customers.findByIdAndInstitutionId(id, institutionId)</span>
+<span class="fc" id="L103">                .orElseThrow(() -&gt; new ResourceNotFoundException(</span>
+                        &quot;CustomerReference&quot;, &quot;customerReferenceId&quot;, id));
+<span class="fc bfc" id="L105" title="All 2 branches covered.">        if (entity.getStatus() == ReferenceStatus.CLOSED) {</span>
+<span class="fc" id="L106">            throw new V2BusinessRuleException(&quot;A CLOSED customer profile cannot be updated&quot;);</span>
+        }
+<span class="fc bfc" id="L108" title="All 2 branches covered.">        if (request.title() != null) entity.setTitle(trimToNull(request.title()));</span>
+<span class="fc bfc" id="L109" title="All 2 branches covered.">        if (request.firstName() != null) entity.setFirstName(request.firstName().trim());</span>
+<span class="fc bfc" id="L110" title="All 2 branches covered.">        if (request.middleName() != null) entity.setMiddleName(trimToNull(request.middleName()));</span>
+<span class="fc bfc" id="L111" title="All 2 branches covered.">        if (request.lastName() != null) entity.setLastName(request.lastName().trim());</span>
+<span class="fc bfc" id="L112" title="All 2 branches covered.">        if (request.dateOfBirth() != null) entity.setDateOfBirth(request.dateOfBirth());</span>
+<span class="fc bfc" id="L113" title="All 2 branches covered.">        if (request.mobileCountryCode() != null) entity.setMobileCountryCode(request.mobileCountryCode().trim());</span>
+<span class="fc bfc" id="L114" title="All 2 branches covered.">        if (request.mobileNumber() != null) entity.setMobileNumber(request.mobileNumber().trim());</span>
+<span class="fc bfc" id="L115" title="All 2 branches covered.">        if (request.email() != null) entity.setEmail(normalizeEmail(request.email()));</span>
+<span class="fc" id="L116">        entity.setUpdatedAt(Instant.now());</span>
+<span class="fc" id="L117">        entity.setUpdatedBy(actor);</span>
+<span class="fc" id="L118">        return customerResponse(customers.save(entity));</span>
+    }
+
+    @Transactional
+    public CustomerAddressReferenceV2Response createAddress(
+            UUID institutionId, UUID customerId, CreateCustomerAddressReferenceV2Request request) {
+<span class="fc" id="L124">        String actor = tenantAccess.require(institutionId);</span>
+<span class="fc" id="L125">        var customer = customers.findByIdAndInstitutionId(customerId, institutionId)</span>
+<span class="fc" id="L126">                .orElseThrow(() -&gt; new ResourceNotFoundException(</span>
+                        &quot;CustomerReference&quot;, &quot;customerReferenceId&quot;, customerId));
+<span class="fc bfc" id="L128" title="All 2 branches covered.">        if (customer.getStatus() != ReferenceStatus.ACTIVE) {</span>
+<span class="fc" id="L129">            throw new V2BusinessRuleException(&quot;Customer reference must be ACTIVE&quot;);</span>
+        }
+        try {
+<span class="fc" id="L132">            Instant now = Instant.now();</span>
+<span class="fc" id="L133">            var entity = CustomerAddressReferenceV2.builder()</span>
+<span class="fc" id="L134">                    .institutionId(institutionId)</span>
+<span class="fc" id="L135">                    .customerReferenceId(customerId)</span>
+<span class="fc" id="L136">                    .sourceSystem(normalize(request.sourceSystem()))</span>
+<span class="fc" id="L137">                    .externalAddressId(request.externalAddressId().trim())</span>
+<span class="fc" id="L138">                    .addressType(request.addressType())</span>
+<span class="fc" id="L139">                    .addressLine1(request.addressLine1().trim())</span>
+<span class="fc" id="L140">                    .addressLine2(trimToNull(request.addressLine2()))</span>
+<span class="fc" id="L141">                    .landmark(trimToNull(request.landmark()))</span>
+<span class="fc" id="L142">                    .city(request.city().trim())</span>
+<span class="fc" id="L143">                    .district(trimToNull(request.district()))</span>
+<span class="fc" id="L144">                    .stateCode(normalize(request.stateCode()))</span>
+<span class="fc" id="L145">                    .postalCode(request.postalCode().trim())</span>
+<span class="fc" id="L146">                    .countryCode(normalize(request.countryCode()))</span>
+<span class="fc" id="L147">                    .primary(Boolean.TRUE.equals(request.primary()))</span>
+<span class="fc bfc" id="L148" title="All 2 branches covered.">                    .status(request.status() == null ? ReferenceStatus.ACTIVE : request.status())</span>
+<span class="fc" id="L149">                    .createdAt(now).updatedAt(now).createdBy(actor).updatedBy(actor)</span>
+<span class="fc" id="L150">                    .build();</span>
+<span class="fc" id="L151">            return addressResponse(addresses.saveAndFlush(entity));</span>
+<span class="fc" id="L152">        } catch (DataIntegrityViolationException ex) {</span>
+<span class="fc" id="L153">            throw new V2ConflictException(</span>
+                    &quot;Address reference already exists for institution, sourceSystem and externalAddressId&quot;, ex);
+        }
+    }
+
+    @Transactional(readOnly = true)
+    public CustomerAddressReferenceV2Response getAddress(
+            UUID institutionId, UUID customerId, UUID addressId) {
+<span class="fc" id="L161">        tenantAccess.require(institutionId);</span>
+<span class="fc" id="L162">        requireCustomer(institutionId, customerId);</span>
+<span class="fc" id="L163">        return addressResponse(addresses.findByIdAndInstitutionIdAndCustomerReferenceId(</span>
+                        addressId, institutionId, customerId)
+<span class="fc" id="L165">                .orElseThrow(() -&gt; new ResourceNotFoundException(</span>
+                        &quot;CustomerAddress&quot;, &quot;addressReferenceId&quot;, addressId)));
+    }
+
+    @Transactional(readOnly = true)
+    public PagedResponseV2&lt;CustomerAddressReferenceV2Response&gt; listAddresses(
+            UUID institutionId, UUID customerId, ReferenceStatus status, Integer page, Integer limit) {
+<span class="fc" id="L172">        tenantAccess.require(institutionId);</span>
+<span class="fc" id="L173">        requireCustomer(institutionId, customerId);</span>
+<span class="fc" id="L174">        var pageable = page(page, limit);</span>
+<span class="fc bfc" id="L175" title="All 2 branches covered.">        var result = status == null</span>
+<span class="fc" id="L176">                ? addresses.findByInstitutionIdAndCustomerReferenceId(institutionId, customerId, pageable)</span>
+<span class="fc" id="L177">                : addresses.findByInstitutionIdAndCustomerReferenceIdAndStatus(</span>
+                        institutionId, customerId, status, pageable);
+<span class="fc" id="L179">        return PagedResponseV2.from(result.map(this::addressResponse));</span>
+    }
+
+    @Transactional
+    public CustomerAddressReferenceV2Response updateAddress(
+            UUID institutionId, UUID customerId, UUID addressId,
+            UpdateCustomerAddressV2Request request) {
+<span class="fc" id="L186">        String actor = tenantAccess.require(institutionId);</span>
+<span class="fc" id="L187">        requireAddressChange(request);</span>
+<span class="fc" id="L188">        var entity = addressEntity(institutionId, customerId, addressId);</span>
+<span class="fc bfc" id="L189" title="All 2 branches covered.">        if (entity.getStatus() == ReferenceStatus.CLOSED) {</span>
+<span class="fc" id="L190">            throw new V2BusinessRuleException(&quot;A CLOSED address cannot be updated&quot;);</span>
+        }
+<span class="fc bfc" id="L192" title="All 2 branches covered.">        if (request.addressType() != null) entity.setAddressType(request.addressType());</span>
+<span class="fc bfc" id="L193" title="All 2 branches covered.">        if (request.addressLine1() != null) entity.setAddressLine1(request.addressLine1().trim());</span>
+<span class="fc bfc" id="L194" title="All 2 branches covered.">        if (request.addressLine2() != null) entity.setAddressLine2(trimToNull(request.addressLine2()));</span>
+<span class="fc bfc" id="L195" title="All 2 branches covered.">        if (request.landmark() != null) entity.setLandmark(trimToNull(request.landmark()));</span>
+<span class="fc bfc" id="L196" title="All 2 branches covered.">        if (request.city() != null) entity.setCity(request.city().trim());</span>
+<span class="fc bfc" id="L197" title="All 2 branches covered.">        if (request.district() != null) entity.setDistrict(trimToNull(request.district()));</span>
+<span class="fc bfc" id="L198" title="All 2 branches covered.">        if (request.stateCode() != null) entity.setStateCode(normalize(request.stateCode()));</span>
+<span class="fc bfc" id="L199" title="All 2 branches covered.">        if (request.postalCode() != null) entity.setPostalCode(request.postalCode().trim());</span>
+<span class="fc bfc" id="L200" title="All 2 branches covered.">        if (request.countryCode() != null) entity.setCountryCode(normalize(request.countryCode()));</span>
+<span class="fc bfc" id="L201" title="All 2 branches covered.">        if (request.primary() != null) entity.setPrimary(request.primary());</span>
+<span class="fc" id="L202">        entity.setUpdatedAt(Instant.now());</span>
+<span class="fc" id="L203">        entity.setUpdatedBy(actor);</span>
+        try {
+<span class="fc" id="L205">            return addressResponse(addresses.saveAndFlush(entity));</span>
+<span class="fc" id="L206">        } catch (DataIntegrityViolationException ex) {</span>
+<span class="fc" id="L207">            throw new V2ConflictException(&quot;Only one ACTIVE primary address is allowed per customer&quot;, ex);</span>
+        }
+    }
+
+    @Transactional
+    public CustomerAddressReferenceV2Response updateAddressStatus(
+            UUID institutionId, UUID customerId, UUID addressId,
+            UpdateReferenceStatusV2Request request) {
+<span class="fc" id="L215">        String actor = tenantAccess.require(institutionId);</span>
+<span class="fc" id="L216">        var entity = addressEntity(institutionId, customerId, addressId);</span>
+<span class="fc" id="L217">        validateReferenceTransition(entity.getStatus(), request.status());</span>
+<span class="fc" id="L218">        entity.setStatus(request.status());</span>
+<span class="fc" id="L219">        entity.setUpdatedAt(Instant.now());</span>
+<span class="fc" id="L220">        entity.setUpdatedBy(actor);</span>
+<span class="fc" id="L221">        return addressResponse(addresses.save(entity));</span>
+    }
+
+    @Transactional
+    public ExternalAccountReferenceV2Response createAccount(UUID institutionId, CreateExternalAccountReferenceV2Request request) {
+<span class="fc" id="L226">        String actor = tenantAccess.require(institutionId);</span>
+<span class="fc" id="L227">        Instant now = Instant.now();</span>
+        try {
+<span class="fc" id="L229">            return accountResponse(accounts.saveAndFlush(ExternalAccountReferenceV2.builder()</span>
+<span class="fc" id="L230">                    .institutionId(institutionId).sourceSystem(normalize(request.sourceSystem()))</span>
+<span class="fc" id="L231">                    .externalAccountId(request.externalAccountId().trim())</span>
+<span class="fc" id="L232">                    .accountType(request.accountType())</span>
+<span class="fc bfc" id="L233" title="All 2 branches covered.">                    .status(request.status() == null ? ReferenceStatus.ACTIVE : request.status())</span>
+<span class="fc" id="L234">                    .createdAt(now).updatedAt(now).createdBy(actor).updatedBy(actor).build()));</span>
+<span class="fc" id="L235">        } catch (DataIntegrityViolationException ex) {</span>
+<span class="fc" id="L236">            throw new V2ConflictException(&quot;Account reference already exists for institution, sourceSystem and externalAccountId&quot;, ex);</span>
+        }
+    }
+
+    @Transactional(readOnly = true)
+    public ExternalAccountReferenceV2Response getAccount(UUID institutionId, UUID id) {
+<span class="fc" id="L242">        tenantAccess.require(institutionId);</span>
+<span class="fc" id="L243">        return accountResponse(accounts.findByIdAndInstitutionId(id, institutionId)</span>
+<span class="fc" id="L244">                .orElseThrow(() -&gt; new ResourceNotFoundException(&quot;ExternalAccountReference&quot;, &quot;externalAccountReferenceId&quot;, id)));</span>
+    }
+
+    @Transactional(readOnly = true)
+    public ExternalAccountReferenceV2Response resolveAccount(UUID institutionId, String sourceSystem, String externalId) {
+<span class="fc" id="L249">        tenantAccess.require(institutionId);</span>
+<span class="fc" id="L250">        return accountResponse(accounts.findByInstitutionIdAndSourceSystemAndExternalAccountId(</span>
+<span class="fc" id="L251">                institutionId, normalize(sourceSystem), externalId.trim())</span>
+<span class="fc" id="L252">                .orElseThrow(() -&gt; new ResourceNotFoundException(&quot;ExternalAccountReference&quot;, &quot;externalAccountId&quot;, externalId)));</span>
+    }
+
+    @Transactional(readOnly = true)
+    public PagedResponseV2&lt;ExternalAccountReferenceV2Response&gt; listAccounts(
+            UUID institutionId, ReferenceStatus status, Integer page, Integer limit) {
+<span class="fc" id="L258">        tenantAccess.require(institutionId);</span>
+<span class="fc" id="L259">        var pageable = page(page, limit);</span>
+<span class="fc bfc" id="L260" title="All 2 branches covered.">        var result = status == null ? accounts.findByInstitutionId(institutionId, pageable)</span>
+<span class="fc" id="L261">                : accounts.findByInstitutionIdAndStatus(institutionId, status, pageable);</span>
+<span class="fc" id="L262">        return PagedResponseV2.from(result.map(this::accountResponse));</span>
+    }
+
+    @Transactional
+    public ExternalAccountReferenceV2Response updateAccount(
+            UUID institutionId, UUID id, UpdateReferenceStatusV2Request request) {
+<span class="fc" id="L268">        String actor = tenantAccess.require(institutionId);</span>
+<span class="fc" id="L269">        var entity = accounts.findByIdAndInstitutionId(id, institutionId)</span>
+<span class="fc" id="L270">                .orElseThrow(() -&gt; new ResourceNotFoundException(&quot;ExternalAccountReference&quot;, &quot;externalAccountReferenceId&quot;, id));</span>
+<span class="fc" id="L271">        validateReferenceTransition(entity.getStatus(), request.status());</span>
+<span class="fc" id="L272">        entity.setStatus(request.status()); entity.setUpdatedAt(Instant.now()); entity.setUpdatedBy(actor);</span>
+<span class="fc" id="L273">        return accountResponse(accounts.save(entity));</span>
+    }
+
+    @Transactional
+    public CustomerAccountLinkV2Response linkAccount(
+            UUID institutionId, UUID customerId, CreateCustomerAccountLinkV2Request request) {
+<span class="fc" id="L279">        String actor = tenantAccess.require(institutionId);</span>
+<span class="fc" id="L280">        var customer = customers.findByIdAndInstitutionId(customerId, institutionId)</span>
+<span class="fc" id="L281">                .orElseThrow(() -&gt; new ResourceNotFoundException(&quot;CustomerReference&quot;, &quot;customerReferenceId&quot;, customerId));</span>
+<span class="fc" id="L282">        var account = accounts.findByIdAndInstitutionId(request.externalAccountReferenceId(), institutionId)</span>
+<span class="fc" id="L283">                .orElseThrow(() -&gt; new ResourceNotFoundException(&quot;ExternalAccountReference&quot;,</span>
+<span class="fc" id="L284">                        &quot;externalAccountReferenceId&quot;, request.externalAccountReferenceId()));</span>
+<span class="fc bfc" id="L285" title="All 4 branches covered.">        if (customer.getStatus() != ReferenceStatus.ACTIVE || account.getStatus() != ReferenceStatus.ACTIVE) {</span>
+<span class="fc" id="L286">            throw new V2BusinessRuleException(&quot;Customer and account references must both be ACTIVE&quot;);</span>
+        }
+<span class="fc" id="L288">        validateRelationship(account.getAccountType(), request.relationshipType());</span>
+<span class="fc" id="L289">        if (links.findByInstitutionIdAndCustomerReferenceIdAndExternalAccountReferenceIdAndStatus(</span>
+<span class="fc bfc" id="L290" title="All 2 branches covered.">                institutionId, customerId, account.getId(), LinkStatus.ACTIVE).isPresent()) {</span>
+<span class="fc" id="L291">            throw new V2ConflictException(&quot;An active customer-account relationship already exists&quot;);</span>
+        }
+<span class="fc" id="L293">        Instant now = Instant.now();</span>
+<span class="fc" id="L294">        var link = CustomerAccountLinkV2.builder()</span>
+<span class="fc" id="L295">                .institutionId(institutionId).customerReferenceId(customerId)</span>
+<span class="fc" id="L296">                .externalAccountReferenceId(account.getId()).relationshipType(request.relationshipType())</span>
+<span class="fc" id="L297">                .primary(request.primary()).status(LinkStatus.ACTIVE)</span>
+<span class="fc bfc" id="L298" title="All 2 branches covered.">                .effectiveFrom(request.effectiveFrom() == null ? now : request.effectiveFrom())</span>
+<span class="fc" id="L299">                .createdAt(now).updatedAt(now).createdBy(actor).updatedBy(actor).build();</span>
+<span class="fc" id="L300">        return linkResponse(links.saveAndFlush(link), account.getAccountType());</span>
+    }
+
+    @Transactional(readOnly = true)
+    public PagedResponseV2&lt;CustomerAccountLinkV2Response&gt; listCustomerAccounts(
+            UUID institutionId, UUID customerId, Integer page, Integer limit) {
+<span class="fc" id="L306">        tenantAccess.require(institutionId);</span>
+<span class="fc bfc" id="L307" title="All 2 branches covered.">        if (customers.findByIdAndInstitutionId(customerId, institutionId).isEmpty()) {</span>
+<span class="fc" id="L308">            throw new ResourceNotFoundException(&quot;CustomerReference&quot;, &quot;customerReferenceId&quot;, customerId);</span>
+        }
+<span class="fc" id="L310">        return PagedResponseV2.from(links.findByInstitutionIdAndCustomerReferenceId(</span>
+<span class="fc" id="L311">                institutionId, customerId, page(page, limit)).map(this::linkResponse));</span>
+    }
+
+    @Transactional(readOnly = true)
+    public PagedResponseV2&lt;CustomerAccountLinkV2Response&gt; listAccountCustomers(
+            UUID institutionId, UUID accountId, Integer page, Integer limit) {
+<span class="fc" id="L317">        tenantAccess.require(institutionId);</span>
+<span class="fc bfc" id="L318" title="All 2 branches covered.">        if (accounts.findByIdAndInstitutionId(accountId, institutionId).isEmpty()) {</span>
+<span class="fc" id="L319">            throw new ResourceNotFoundException(&quot;ExternalAccountReference&quot;, &quot;externalAccountReferenceId&quot;, accountId);</span>
+        }
+<span class="fc" id="L321">        return PagedResponseV2.from(links.findByInstitutionIdAndExternalAccountReferenceId(</span>
+<span class="fc" id="L322">                institutionId, accountId, page(page, limit)).map(this::linkResponse));</span>
+    }
+
+    @Transactional
+    public CustomerAccountLinkV2Response updateLinkStatus(UUID institutionId, UUID customerId, UUID accountId,
+            UpdateCustomerAccountLinkStatusV2Request request) {
+<span class="fc" id="L328">        String actor = tenantAccess.require(institutionId);</span>
+<span class="fc" id="L329">        var link = links.findByInstitutionIdAndCustomerReferenceIdAndExternalAccountReferenceIdAndStatus(</span>
+                        institutionId, customerId, accountId, LinkStatus.ACTIVE)
+<span class="fc" id="L331">                .orElseThrow(() -&gt; new ResourceNotFoundException(&quot;ActiveCustomerAccountLink&quot;, &quot;externalAccountReferenceId&quot;, accountId));</span>
+<span class="fc bfc" id="L332" title="All 2 branches covered.">        if (request.status() == LinkStatus.ACTIVE) return linkResponse(link);</span>
+<span class="fc bfc" id="L333" title="All 2 branches covered.">        Instant effectiveTo = request.effectiveTo() == null ? Instant.now() : request.effectiveTo();</span>
+<span class="fc bfc" id="L334" title="All 2 branches covered.">        if (!effectiveTo.isAfter(link.getEffectiveFrom())) {</span>
+<span class="fc" id="L335">            throw new V2BusinessRuleException(&quot;effectiveTo must be later than effectiveFrom&quot;);</span>
+        }
+<span class="fc" id="L337">        link.setStatus(request.status()); link.setEffectiveTo(effectiveTo);</span>
+<span class="fc" id="L338">        link.setUpdatedAt(Instant.now()); link.setUpdatedBy(actor);</span>
+<span class="fc" id="L339">        return linkResponse(links.save(link));</span>
+    }
+
+    private static PageRequest page(Integer page, Integer limit) {
+<span class="fc bfc" id="L343" title="All 2 branches covered.">        int p = page == null ? 1 : page;</span>
+<span class="fc bfc" id="L344" title="All 2 branches covered.">        int l = limit == null ? 20 : limit;</span>
+<span class="fc bfc" id="L345" title="All 6 branches covered.">        if (p &lt; 1 || l &lt; 1 || l &gt; 100) throw new BadRequestException(&quot;page must be &gt;= 1 and limit must be between 1 and 100&quot;);</span>
+<span class="fc" id="L346">        return PageRequest.of(p - 1, l, Sort.by(Sort.Direction.DESC, &quot;createdAt&quot;));</span>
+    }
+<span class="fc" id="L348">    private static String normalize(String value) { return value.trim().toUpperCase(java.util.Locale.ROOT); }</span>
+    private static String normalizeEmail(String value) {
+<span class="fc" id="L350">        String normalized = trimToNull(value);</span>
+<span class="fc bfc" id="L351" title="All 2 branches covered.">        return normalized == null ? null : normalized.toLowerCase(java.util.Locale.ROOT);</span>
+    }
+    private static String trimToNull(String value) {
+<span class="fc bfc" id="L354" title="All 2 branches covered.">        if (value == null) return null;</span>
+<span class="fc" id="L355">        String trimmed = value.trim();</span>
+<span class="fc bfc" id="L356" title="All 2 branches covered.">        return trimmed.isEmpty() ? null : trimmed;</span>
+    }
+    private CustomerReferenceV2 requireCustomer(UUID institutionId, UUID customerId) {
+<span class="fc" id="L359">        return customers.findByIdAndInstitutionId(customerId, institutionId)</span>
+<span class="fc" id="L360">                .orElseThrow(() -&gt; new ResourceNotFoundException(</span>
+                        &quot;CustomerReference&quot;, &quot;customerReferenceId&quot;, customerId));
+    }
+    private CustomerAddressReferenceV2 addressEntity(UUID institutionId, UUID customerId, UUID addressId) {
+<span class="fc" id="L364">        requireCustomer(institutionId, customerId);</span>
+<span class="fc" id="L365">        return addresses.findByIdAndInstitutionIdAndCustomerReferenceId(addressId, institutionId, customerId)</span>
+<span class="fc" id="L366">                .orElseThrow(() -&gt; new ResourceNotFoundException(</span>
+                        &quot;CustomerAddress&quot;, &quot;addressReferenceId&quot;, addressId));
+    }
+    private static void requireCustomerProfileChange(UpdateCustomerProfileV2Request request) {
+<span class="pc bpc" id="L370" title="1 of 6 branches missed.">        if (request.title() == null &amp;&amp; request.firstName() == null &amp;&amp; request.middleName() == null</span>
+<span class="pc bpc" id="L371" title="2 of 4 branches missed.">                &amp;&amp; request.lastName() == null &amp;&amp; request.dateOfBirth() == null</span>
+<span class="pc bpc" id="L372" title="2 of 4 branches missed.">                &amp;&amp; request.mobileCountryCode() == null &amp;&amp; request.mobileNumber() == null</span>
+<span class="pc bpc" id="L373" title="1 of 2 branches missed.">                &amp;&amp; request.email() == null) {</span>
+<span class="fc" id="L374">            throw new BadRequestException(&quot;At least one customer profile field must be provided&quot;);</span>
+        }
+<span class="fc" id="L376">    }</span>
+    private static void requireAddressChange(UpdateCustomerAddressV2Request request) {
+<span class="fc bfc" id="L378" title="All 4 branches covered.">        if (request.addressType() == null &amp;&amp; request.addressLine1() == null</span>
+<span class="pc bpc" id="L379" title="2 of 4 branches missed.">                &amp;&amp; request.addressLine2() == null &amp;&amp; request.landmark() == null</span>
+<span class="pc bpc" id="L380" title="1 of 4 branches missed.">                &amp;&amp; request.city() == null &amp;&amp; request.district() == null</span>
+<span class="pc bpc" id="L381" title="2 of 4 branches missed.">                &amp;&amp; request.stateCode() == null &amp;&amp; request.postalCode() == null</span>
+<span class="pc bpc" id="L382" title="1 of 4 branches missed.">                &amp;&amp; request.countryCode() == null &amp;&amp; request.primary() == null) {</span>
+<span class="fc" id="L383">            throw new BadRequestException(&quot;At least one address field must be provided&quot;);</span>
+        }
+<span class="fc" id="L385">    }</span>
+    private static void validateRelationship(AccountType accountType, CustomerAccountRelationshipType relationship) {
+<span class="fc bfc" id="L387" title="All 2 branches covered.">        boolean valid = accountType == AccountType.CREDIT_CARD_ACCOUNT</span>
+                ? relationship == CustomerAccountRelationshipType.PRIMARY_HOLDER
+                    || relationship == CustomerAccountRelationshipType.SUPPLEMENTARY_HOLDER
+<span class="fc bfc" id="L390" title="All 6 branches covered.">                    || relationship == CustomerAccountRelationshipType.AUTHORIZED_USER</span>
+                : relationship == CustomerAccountRelationshipType.PREPAID_OWNER
+<span class="fc bfc" id="L392" title="All 4 branches covered.">                    || relationship == CustomerAccountRelationshipType.AUTHORIZED_USER;</span>
+<span class="fc bfc" id="L393" title="All 2 branches covered.">        if (!valid) throw new V2BusinessRuleException(&quot;relationshipType is not valid for accountType &quot; + accountType);</span>
+<span class="fc" id="L394">    }</span>
+    private static void validateReferenceTransition(ReferenceStatus current, ReferenceStatus requested) {
+<span class="fc bfc" id="L396" title="All 2 branches covered.">        if (current == requested) return;</span>
+<span class="fc bfc" id="L397" title="All 3 branches covered.">        boolean allowed = switch (current) {</span>
+<span class="pc bpc" id="L398" title="1 of 6 branches missed.">            case ACTIVE -&gt; requested == ReferenceStatus.INACTIVE || requested == ReferenceStatus.BLOCKED</span>
+                    || requested == ReferenceStatus.CLOSED;
+<span class="fc bfc" id="L400" title="All 4 branches covered.">            case INACTIVE, BLOCKED -&gt; requested == ReferenceStatus.ACTIVE || requested == ReferenceStatus.CLOSED;</span>
+<span class="fc" id="L401">            case CLOSED -&gt; false;</span>
+        };
+<span class="fc bfc" id="L403" title="All 2 branches covered.">        if (!allowed) throw new V2BusinessRuleException(&quot;Status transition &quot; + current + &quot; -&gt; &quot; + requested + &quot; is not allowed&quot;);</span>
+<span class="fc" id="L404">    }</span>
+    private CustomerReferenceV2Response customerResponse(CustomerReferenceV2 e) {
+<span class="fc" id="L406">        return new CustomerReferenceV2Response(e.getId(), e.getInstitutionId(), e.getSourceSystem(),</span>
+<span class="fc" id="L407">                e.getExternalCustomerId(), e.getCustomerType(), e.getTitle(), e.getFirstName(),</span>
+<span class="fc" id="L408">                e.getMiddleName(), e.getLastName(), e.getDateOfBirth(), e.getMobileCountryCode(),</span>
+<span class="fc" id="L409">                e.getMobileNumber(), e.getEmail(), e.getStatus(), e.getCreatedAt(), e.getUpdatedAt(),</span>
+<span class="fc" id="L410">                e.getCreatedBy(), e.getUpdatedBy());</span>
+    }
+    private ExternalAccountReferenceV2Response accountResponse(ExternalAccountReferenceV2 e) {
+<span class="fc" id="L413">        return new ExternalAccountReferenceV2Response(e.getId(), e.getInstitutionId(), e.getSourceSystem(),</span>
+<span class="fc" id="L414">                e.getExternalAccountId(), e.getAccountType(), e.getStatus(), e.getCreatedAt(), e.getUpdatedAt(), e.getCreatedBy(), e.getUpdatedBy());</span>
+    }
+    private CustomerAddressReferenceV2Response addressResponse(CustomerAddressReferenceV2 e) {
+<span class="fc" id="L417">        return new CustomerAddressReferenceV2Response(e.getId(), e.getInstitutionId(),</span>
+<span class="fc" id="L418">                e.getCustomerReferenceId(), e.getSourceSystem(), e.getExternalAddressId(),</span>
+<span class="fc" id="L419">                e.getAddressType(), e.getAddressLine1(), e.getAddressLine2(), e.getLandmark(),</span>
+<span class="fc" id="L420">                e.getCity(), e.getDistrict(), e.getStateCode(), e.getPostalCode(), e.getCountryCode(),</span>
+<span class="fc" id="L421">                e.isPrimary(), e.getStatus(), e.getCreatedAt(), e.getUpdatedAt(), e.getCreatedBy(),</span>
+<span class="fc" id="L422">                e.getUpdatedBy());</span>
+    }
+    private CustomerAccountLinkV2Response linkResponse(CustomerAccountLinkV2 link) {
+<span class="fc" id="L425">        AccountType type = accounts.findByIdAndInstitutionId(</span>
+<span class="fc" id="L426">                        link.getExternalAccountReferenceId(), link.getInstitutionId())</span>
+<span class="fc" id="L427">                .orElseThrow(() -&gt; new ResourceNotFoundException(&quot;ExternalAccountReference&quot;,</span>
+<span class="fc" id="L428">                        &quot;externalAccountReferenceId&quot;, link.getExternalAccountReferenceId())).getAccountType();</span>
+<span class="fc" id="L429">        return linkResponse(link, type);</span>
+    }
+    private CustomerAccountLinkV2Response linkResponse(CustomerAccountLinkV2 link, AccountType type) {
+<span class="fc" id="L432">        return new CustomerAccountLinkV2Response(link.getId(), link.getInstitutionId(), link.getCustomerReferenceId(),</span>
+<span class="fc" id="L433">                link.getExternalAccountReferenceId(), type, link.getRelationshipType(), link.isPrimary(),</span>
+<span class="fc" id="L434">                link.getStatus(), link.getEffectiveFrom(), link.getEffectiveTo(), link.getCreatedAt(),</span>
+<span class="fc" id="L435">                link.getUpdatedAt(), link.getCreatedBy(), link.getUpdatedBy());</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.15.202606040825</span></div></body></html>

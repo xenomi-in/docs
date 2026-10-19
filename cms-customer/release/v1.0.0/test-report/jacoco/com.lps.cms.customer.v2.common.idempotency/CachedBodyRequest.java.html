@@ -1,0 +1,33 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>CachedBodyRequest.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">customer-service</a> &gt; <a href="index.source.html" class="el_package">com.lps.cms.customer.v2.common.idempotency</a> &gt; <span class="el_source">CachedBodyRequest.java</span></div><h1>CachedBodyRequest.java</h1><pre class="source lang-java linenums">package com.lps.cms.customer.v2.common.idempotency;
+
+import jakarta.servlet.ReadListener;
+import jakarta.servlet.ServletInputStream;
+import jakarta.servlet.http.HttpServletRequest;
+import jakarta.servlet.http.HttpServletRequestWrapper;
+import java.io.*;
+import java.nio.charset.StandardCharsets;
+
+final class CachedBodyRequest extends HttpServletRequestWrapper {
+    private final byte[] body;
+    CachedBodyRequest(HttpServletRequest request, int maximumBytes) throws IOException {
+<span class="fc" id="L13">        super(request);</span>
+<span class="fc" id="L14">        body = request.getInputStream().readNBytes(maximumBytes + 1);</span>
+<span class="fc bfc" id="L15" title="All 2 branches covered.">        if (body.length &gt; maximumBytes) throw new BodyTooLargeException();</span>
+<span class="fc" id="L16">    }</span>
+<span class="fc" id="L17">    byte[] body() { return body.clone(); }</span>
+    @Override public ServletInputStream getInputStream() {
+<span class="fc" id="L19">        ByteArrayInputStream input = new ByteArrayInputStream(body);</span>
+<span class="fc" id="L20">        return new ServletInputStream() {</span>
+<span class="fc bfc" id="L21" title="All 2 branches covered.">            @Override public boolean isFinished() { return input.available() == 0; }</span>
+<span class="fc" id="L22">            @Override public boolean isReady() { return true; }</span>
+<span class="fc" id="L23">            @Override public void setReadListener(ReadListener listener) {}</span>
+<span class="fc" id="L24">            @Override public int read() { return input.read(); }</span>
+<span class="fc" id="L25">            @Override public int read(byte[] bytes, int offset, int length) { return input.read(bytes, offset, length); }</span>
+        };
+    }
+    @Override public BufferedReader getReader() {
+<span class="fc" id="L29">        return new BufferedReader(new InputStreamReader(getInputStream(), StandardCharsets.UTF_8));</span>
+    }
+<span class="fc" id="L31">    static final class BodyTooLargeException extends IOException {}</span>
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.15.202606040825</span></div></body></html>

@@ -1,0 +1,13 @@
+<?xml version='1.0' encoding='utf-8'?>
+<testsuite xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:noNamespaceSchemaLocation="https://maven.apache.org/surefire/maven-surefire-plugin/xsd/surefire-test-report.xsd" version="3.0.2" name="com.xenomi.cms.gateway.filter.RequestContextWebFilterTest" time="0.012" tests="10" errors="0" skipped="0" failures="0" flakes="0">
+  <testcase name="trimsAndPreservesValidBoundaryIds(String)[1]" classname="com.xenomi.cms.gateway.filter.RequestContextWebFilterTest" time="0.001" />
+  <testcase name="trimsAndPreservesValidBoundaryIds(String)[2]" classname="com.xenomi.cms.gateway.filter.RequestContextWebFilterTest" time="0.001" />
+  <testcase name="replacesInvalidRequestId" classname="com.xenomi.cms.gateway.filter.RequestContextWebFilterTest" time="0.001" />
+  <testcase name="generatesUuidForMissingOrInvalidIds(String)[1]" classname="com.xenomi.cms.gateway.filter.RequestContextWebFilterTest" time="0.001" />
+  <testcase name="generatesUuidForMissingOrInvalidIds(String)[2]" classname="com.xenomi.cms.gateway.filter.RequestContextWebFilterTest" time="0.001" />
+  <testcase name="generatesUuidForMissingOrInvalidIds(String)[3]" classname="com.xenomi.cms.gateway.filter.RequestContextWebFilterTest" time="0.001" />
+  <testcase name="generatesUuidForMissingOrInvalidIds(String)[4]" classname="com.xenomi.cms.gateway.filter.RequestContextWebFilterTest" time="0.001" />
+  <testcase name="generatesUuidForMissingOrInvalidIds(String)[5]" classname="com.xenomi.cms.gateway.filter.RequestContextWebFilterTest" time="0.001" />
+  <testcase name="generatesUuidForMissingOrInvalidIds(String)[6]" classname="com.xenomi.cms.gateway.filter.RequestContextWebFilterTest" time="0.001" />
+  <testcase name="preservesValidRequestIdAndRemovesSpoofableIdentityHeaders" classname="com.xenomi.cms.gateway.filter.RequestContextWebFilterTest" time="0.001" />
+</testsuite>

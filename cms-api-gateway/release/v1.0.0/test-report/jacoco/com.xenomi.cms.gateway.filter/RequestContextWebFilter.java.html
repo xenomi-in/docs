@@ -1,0 +1,53 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>RequestContextWebFilter.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">CMS API Gateway</a> &gt; <a href="index.source.html" class="el_package">com.xenomi.cms.gateway.filter</a> &gt; <span class="el_source">RequestContextWebFilter.java</span></div><h1>RequestContextWebFilter.java</h1><pre class="source lang-java linenums">package com.xenomi.cms.gateway.filter;
+
+import org.springframework.core.Ordered;
+import org.springframework.core.annotation.Order;
+import org.springframework.http.server.reactive.ServerHttpRequest;
+import org.springframework.stereotype.Component;
+import org.springframework.web.server.ServerWebExchange;
+import org.springframework.web.server.WebFilter;
+import org.springframework.web.server.WebFilterChain;
+import reactor.core.publisher.Mono;
+
+import java.util.UUID;
+import java.util.regex.Pattern;
+
+/** Creates a correlation ID and removes identity headers that clients may spoof. */
+@Component
+@Order(Ordered.HIGHEST_PRECEDENCE)
+<span class="fc" id="L18">public class RequestContextWebFilter implements WebFilter {</span>
+
+    public static final String REQUEST_ID = &quot;X-Request-Id&quot;;
+    public static final String ACTOR_ID = &quot;X-Actor-Id&quot;;
+    public static final String INSTITUTION_ID = &quot;X-Institution-Id&quot;;
+    public static final String USER_ID = &quot;X-User-Id&quot;;
+
+    private static final int MAX_REQUEST_ID_LENGTH = 128;
+<span class="fc" id="L26">    private static final Pattern VALID_REQUEST_ID = Pattern.compile(&quot;[A-Za-z0-9._:-]+&quot;);</span>
+
+    @Override
+    public Mono&lt;Void&gt; filter(ServerWebExchange exchange, WebFilterChain chain) {
+<span class="fc" id="L30">        String supplied = exchange.getRequest().getHeaders().getFirst(REQUEST_ID);</span>
+<span class="fc bfc" id="L31" title="All 2 branches covered.">        String requestId = validRequestId(supplied) ? supplied.trim() : UUID.randomUUID().toString();</span>
+
+<span class="fc" id="L33">        ServerHttpRequest trustedRequest = exchange.getRequest().mutate().headers(headers -&gt; {</span>
+<span class="fc" id="L34">            headers.remove(ACTOR_ID);</span>
+<span class="fc" id="L35">            headers.remove(INSTITUTION_ID);</span>
+<span class="fc" id="L36">            headers.remove(USER_ID);</span>
+<span class="fc" id="L37">            headers.set(REQUEST_ID, requestId);</span>
+<span class="fc" id="L38">        }).build();</span>
+<span class="fc" id="L39">        exchange.getResponse().getHeaders().set(REQUEST_ID, requestId);</span>
+<span class="fc" id="L40">        return chain.filter(exchange.mutate().request(trustedRequest).build());</span>
+    }
+
+    private static boolean validRequestId(String value) {
+<span class="fc bfc" id="L44" title="All 2 branches covered.">        if (value == null) {</span>
+<span class="fc" id="L45">            return false;</span>
+        }
+<span class="fc" id="L47">        String trimmed = value.trim();</span>
+<span class="fc bfc" id="L48" title="All 2 branches covered.">        return !trimmed.isEmpty()</span>
+<span class="fc bfc" id="L49" title="All 2 branches covered.">                &amp;&amp; trimmed.length() &lt;= MAX_REQUEST_ID_LENGTH</span>
+<span class="fc bfc" id="L50" title="All 2 branches covered.">                &amp;&amp; VALID_REQUEST_ID.matcher(trimmed).matches();</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.15.202606040825</span></div></body></html>

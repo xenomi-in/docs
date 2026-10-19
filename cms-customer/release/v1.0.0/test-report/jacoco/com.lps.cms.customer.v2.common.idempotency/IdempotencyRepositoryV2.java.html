@@ -1,0 +1,56 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>IdempotencyRepositoryV2.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">customer-service</a> &gt; <a href="index.source.html" class="el_package">com.lps.cms.customer.v2.common.idempotency</a> &gt; <span class="el_source">IdempotencyRepositoryV2.java</span></div><h1>IdempotencyRepositoryV2.java</h1><pre class="source lang-java linenums">package com.lps.cms.customer.v2.common.idempotency;
+
+import org.springframework.beans.factory.annotation.Value;
+import org.springframework.jdbc.core.JdbcTemplate;
+import org.springframework.stereotype.Repository;
+import java.time.OffsetDateTime;
+import java.util.List;
+
+@Repository
+public class IdempotencyRepositoryV2 {
+    private final JdbcTemplate jdbc;
+    private final long retentionHours;
+    public IdempotencyRepositoryV2(JdbcTemplate jdbc,
+<span class="fc" id="L14">            @Value(&quot;${customer.idempotency.retention-hours:24}&quot;) long retentionHours) {</span>
+<span class="fc" id="L15">        this.jdbc = jdbc; this.retentionHours = retentionHours;</span>
+<span class="fc" id="L16">    }</span>
+    public Claim claim(Identity id, String requestHash) {
+<span class="fc" id="L18">        jdbc.update(&quot;DELETE FROM api_idempotency_record WHERE expires_at &lt;= CURRENT_TIMESTAMP&quot;);</span>
+<span class="fc" id="L19">        int inserted = jdbc.update(&quot;&quot;&quot;</span>
+                INSERT INTO api_idempotency_record
+                    (tenant_scope, actor_id, http_method, request_path, idempotency_key_hash, request_hash, expires_at)
+                VALUES (?, ?, ?, ?, ?, ?, ?) ON CONFLICT DO NOTHING
+<span class="fc" id="L23">                &quot;&quot;&quot;, id.tenant(), id.actor(), id.method(), id.path(), id.keyHash(), requestHash,</span>
+<span class="fc" id="L24">                OffsetDateTime.now().plusHours(retentionHours));</span>
+<span class="fc bfc" id="L25" title="All 2 branches covered.">        if (inserted == 1) return new Claim(State.STARTED, null);</span>
+<span class="fc" id="L26">        List&lt;Stored&gt; records = jdbc.query(&quot;&quot;&quot;</span>
+                SELECT request_hash, processing_status, response_status, response_content_type,
+                       response_location, response_body FROM api_idempotency_record
+                 WHERE tenant_scope=? AND actor_id=? AND http_method=? AND request_path=?
+                   AND idempotency_key_hash=? AND expires_at&gt;CURRENT_TIMESTAMP
+<span class="fc" id="L31">                &quot;&quot;&quot;, (rs, row) -&gt; new Stored(rs.getString(1), rs.getString(2),</span>
+<span class="fc" id="L32">                (Integer) rs.getObject(3), rs.getString(4), rs.getString(5), rs.getBytes(6)),</span>
+<span class="fc" id="L33">                id.tenant(), id.actor(), id.method(), id.path(), id.keyHash());</span>
+<span class="fc bfc" id="L34" title="All 2 branches covered.">        if (records.isEmpty()) return claim(id, requestHash);</span>
+<span class="fc" id="L35">        Stored stored = records.getFirst();</span>
+<span class="fc bfc" id="L36" title="All 2 branches covered.">        if (!stored.requestHash().equals(requestHash)) return new Claim(State.CONFLICT, stored);</span>
+<span class="fc bfc" id="L37" title="All 2 branches covered.">        return &quot;COMPLETED&quot;.equals(stored.processingStatus())</span>
+<span class="fc" id="L38">                ? new Claim(State.REPLAY, stored) : new Claim(State.IN_PROGRESS, stored);</span>
+    }
+    public void complete(Identity id, int status, String contentType, String location, byte[] body) {
+<span class="fc" id="L41">        jdbc.update(&quot;&quot;&quot;</span>
+                UPDATE api_idempotency_record SET processing_status='COMPLETED', response_status=?,
+                    response_content_type=?, response_location=?, response_body=?, completed_at=CURRENT_TIMESTAMP
+                 WHERE tenant_scope=? AND actor_id=? AND http_method=? AND request_path=? AND idempotency_key_hash=?
+<span class="fc" id="L45">                &quot;&quot;&quot;, status, contentType, location, body, id.tenant(), id.actor(), id.method(), id.path(), id.keyHash());</span>
+<span class="fc" id="L46">    }</span>
+    public void delete(Identity id) {
+<span class="fc" id="L48">        jdbc.update(&quot;DELETE FROM api_idempotency_record WHERE tenant_scope=? AND actor_id=? AND http_method=? AND request_path=? AND idempotency_key_hash=?&quot;,</span>
+<span class="fc" id="L49">                id.tenant(), id.actor(), id.method(), id.path(), id.keyHash());</span>
+<span class="fc" id="L50">    }</span>
+<span class="fc" id="L51">    public record Identity(String tenant, String actor, String method, String path, String keyHash) {}</span>
+<span class="fc" id="L52">    public record Stored(String requestHash, String processingStatus, Integer status, String contentType, String location, byte[] body) {}</span>
+<span class="fc" id="L53">    public record Claim(State state, Stored stored) {}</span>
+<span class="fc" id="L54">    public enum State { STARTED, REPLAY, CONFLICT, IN_PROGRESS }</span>
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.15.202606040825</span></div></body></html>

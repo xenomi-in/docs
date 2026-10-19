@@ -1,0 +1,26 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>V2TenantAccess.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">customer-service</a> &gt; <a href="index.source.html" class="el_package">com.lps.cms.customer.v2.security</a> &gt; <span class="el_source">V2TenantAccess.java</span></div><h1>V2TenantAccess.java</h1><pre class="source lang-java linenums">package com.lps.cms.customer.v2.security;
+
+import org.springframework.security.access.AccessDeniedException;
+import org.springframework.security.core.context.SecurityContextHolder;
+import org.springframework.security.oauth2.jwt.Jwt;
+import org.springframework.stereotype.Component;
+import java.util.UUID;
+
+@Component
+<span class="fc" id="L10">public class V2TenantAccess {</span>
+    public String require(UUID institutionId) {
+<span class="fc bfc" id="L12" title="All 2 branches covered.">        if (!(SecurityContextHolder.getContext().getAuthentication().getPrincipal() instanceof Jwt jwt)) {</span>
+<span class="fc" id="L13">            throw new AccessDeniedException(&quot;A signed JWT tenant context is required&quot;);</span>
+        }
+<span class="fc" id="L15">        boolean platformAccess = Boolean.TRUE.equals(jwt.getClaim(&quot;platform_access&quot;));</span>
+<span class="fc" id="L16">        String claim = jwt.getClaimAsString(&quot;institution_id&quot;);</span>
+<span class="fc bfc" id="L17" title="All 4 branches covered.">        if (claim == null || claim.isBlank()) {</span>
+<span class="fc" id="L18">            claim = jwt.getClaimAsString(&quot;institution-id&quot;);</span>
+        }
+<span class="fc bfc" id="L20" title="All 6 branches covered.">        if (!platformAccess &amp;&amp; (claim == null || !institutionId.toString().equals(claim))) {</span>
+<span class="fc" id="L21">            throw new AccessDeniedException(&quot;Institution access denied&quot;);</span>
+        }
+<span class="fc" id="L23">        return jwt.getSubject();</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.15.202606040825</span></div></body></html>

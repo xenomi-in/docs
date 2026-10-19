@@ -1,0 +1,45 @@
+{
+  "service": "cms-customer",
+  "generated_at": "2026-10-16T22:39:02+05:30",
+  "tests": {
+    "tests": 202,
+    "failures": 0,
+    "errors": 0,
+    "skipped": 0,
+    "passed": 202,
+    "duration_seconds": 5.203
+  },
+  "coverage_scope": "All compiled production Java classes",
+  "coverage": {
+    "INSTRUCTION": {
+      "covered": 3979,
+      "missed": 24,
+      "percent": 99.4
+    },
+    "BRANCH": {
+      "covered": 223,
+      "missed": 23,
+      "percent": 90.65
+    },
+    "LINE": {
+      "covered": 570,
+      "missed": 5,
+      "percent": 99.13
+    },
+    "COMPLEXITY": {
+      "covered": 280,
+      "missed": 25,
+      "percent": 91.8
+    },
+    "METHOD": {
+      "covered": 178,
+      "missed": 2,
+      "percent": 98.89
+    },
+    "CLASS": {
+      "covered": 47,
+      "missed": 0,
+      "percent": 100.0
+    }
+  }
+}

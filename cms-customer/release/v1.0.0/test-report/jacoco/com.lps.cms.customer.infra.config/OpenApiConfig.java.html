@@ -1,0 +1,127 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>OpenApiConfig.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">customer-service</a> &gt; <a href="index.source.html" class="el_package">com.lps.cms.customer.infra.config</a> &gt; <span class="el_source">OpenApiConfig.java</span></div><h1>OpenApiConfig.java</h1><pre class="source lang-java linenums">package com.lps.cms.customer.infra.config;
+
+import io.swagger.v3.oas.models.OpenAPI;
+import io.swagger.v3.oas.models.Components;
+import io.swagger.v3.oas.models.info.Info;
+import io.swagger.v3.oas.models.info.Contact;
+import io.swagger.v3.oas.models.security.SecurityRequirement;
+import io.swagger.v3.oas.models.security.SecurityScheme;
+import io.swagger.v3.oas.models.tags.Tag;
+import io.swagger.v3.oas.models.parameters.Parameter;
+import io.swagger.v3.oas.models.media.StringSchema;
+import io.swagger.v3.oas.models.media.Content;
+import io.swagger.v3.oas.models.media.MediaType;
+import io.swagger.v3.oas.models.media.Schema;
+import io.swagger.v3.oas.models.responses.ApiResponse;
+import io.swagger.v3.oas.models.headers.Header;
+import io.swagger.v3.core.converter.ModelConverters;
+import com.lps.cms.customer.v2.common.ApiErrorEnvelopeV2;
+import org.springdoc.core.models.GroupedOpenApi;
+import org.springframework.context.annotation.Bean;
+import org.springframework.context.annotation.Configuration;
+import java.util.List;
+import java.util.Map;
+
+@Configuration
+<span class="fc" id="L26">public class OpenApiConfig {</span>
+    @Bean
+    OpenAPI customerOpenApi() {
+<span class="fc" id="L29">        return new OpenAPI()</span>
+<span class="fc" id="L30">                .components(new Components().addSecuritySchemes(&quot;bearerAuth&quot;, new SecurityScheme()</span>
+<span class="fc" id="L31">                        .type(SecurityScheme.Type.HTTP)</span>
+<span class="fc" id="L32">                        .scheme(&quot;bearer&quot;)</span>
+<span class="fc" id="L33">                        .bearerFormat(&quot;JWT&quot;)</span>
+<span class="fc" id="L34">                        .description(&quot;Keycloak access token for audience cms-api&quot;)))</span>
+<span class="fc" id="L35">                .addSecurityItem(new SecurityRequirement().addList(&quot;bearerAuth&quot;))</span>
+<span class="fc" id="L36">                .info(new Info()</span>
+<span class="fc" id="L37">                        .title(&quot;Customer Service API&quot;)</span>
+<span class="fc" id="L38">                        .version(&quot;2.0.0&quot;)</span>
+<span class="fc" id="L39">                        .description(&quot;Customer profiles, postal addresses and institution-scoped account relationships for the CMS platform.&quot;)</span>
+<span class="fc" id="L40">                        .contact(new Contact().name(&quot;CMS API Team&quot;)));</span>
+    }
+
+    @Bean
+    GroupedOpenApi customerV2OpenApi() {
+<span class="fc" id="L45">        return GroupedOpenApi.builder().group(&quot;customer-v2&quot;).displayName(&quot;Customer Service API V2&quot;)</span>
+<span class="fc" id="L46">                .pathsToMatch(&quot;/api/v2/**&quot;)</span>
+<span class="fc" id="L47">                .addOpenApiCustomizer(api -&gt; {</span>
+<span class="fc" id="L48">                    api.setInfo(new Info().title(&quot;Customer Service API V2&quot;).version(&quot;2.0.0&quot;)</span>
+<span class="fc" id="L49">                            .description(&quot;&quot;&quot;</span>
+                                    Institution-scoped APIs for onboarding customer profiles, maintaining postal addresses,
+                                    registering external credit-account references and managing customer-account relationships.
+
+                                    Customer Service owns customer and address PII. CMS Core stores only the returned
+                                    `customerReferenceId`, `addressReferenceId` and `externalAccountReferenceId` UUIDs.
+
+                                    Authentication uses a bearer JWT. Read operations require `customer:read` or
+                                    `customer:manage`; customer writes require `customer:manage`. Account reads require
+                                    `account:read` or `account:manage`; account writes require `account:manage`.
+                                    &quot;&quot;&quot;)
+<span class="fc" id="L60">                            .contact(new Contact().name(&quot;CMS API Team&quot;)));</span>
+<span class="fc" id="L61">                    api.setTags(List.of(</span>
+<span class="fc" id="L62">                            new Tag().name(&quot;V2 - Customers&quot;)</span>
+<span class="fc" id="L63">                                    .description(&quot;Customer onboarding, profile maintenance, postal addresses and account links&quot;),</span>
+<span class="fc" id="L64">                            new Tag().name(&quot;V2 - Account Boundary&quot;)</span>
+<span class="fc" id="L65">                                    .description(&quot;Opaque credit-account references owned by accounting or core banking&quot;)));</span>
+<span class="pc bpc" id="L66" title="1 of 2 branches missed.">                    if (api.getComponents() == null) api.setComponents(new Components());</span>
+<span class="fc" id="L67">                    api.getComponents().addSecuritySchemes(&quot;bearerAuth&quot;, new SecurityScheme()</span>
+<span class="fc" id="L68">                            .type(SecurityScheme.Type.HTTP).scheme(&quot;bearer&quot;).bearerFormat(&quot;JWT&quot;)</span>
+<span class="fc" id="L69">                            .description(&quot;Keycloak access token containing institution context and required permissions&quot;));</span>
+<span class="fc" id="L70">                    api.addSecurityItem(new SecurityRequirement().addList(&quot;bearerAuth&quot;));</span>
+<span class="fc" id="L71">                    ModelConverters.getInstance().readAll(ApiErrorEnvelopeV2.class)</span>
+<span class="fc" id="L72">                            .forEach(api.getComponents()::addSchemas);</span>
+<span class="pc bpc" id="L73" title="1 of 2 branches missed.">                    if (api.getPaths() != null) api.getPaths().values().forEach(path -&gt;</span>
+<span class="fc" id="L74">                            path.readOperationsMap().forEach((method, operation) -&gt; {</span>
+<span class="fc" id="L75">                                describePathParameters(operation.getParameters());</span>
+<span class="fc" id="L76">                                operation.addParametersItem(new Parameter().in(&quot;header&quot;).name(&quot;X-Request-Id&quot;)</span>
+<span class="fc" id="L77">                                        .required(false).description(&quot;Optional caller-generated correlation ID. The service returns the accepted or generated value in the response header and envelope metadata.&quot;)</span>
+<span class="fc" id="L78">                                        .schema(new StringSchema().maxLength(128).pattern(&quot;^[A-Za-z0-9._:-]+$&quot;)));</span>
+<span class="pc bpc" id="L79" title="1 of 4 branches missed.">                                boolean write = method == io.swagger.v3.oas.models.PathItem.HttpMethod.POST</span>
+                                        || method == io.swagger.v3.oas.models.PathItem.HttpMethod.PUT;
+<span class="fc bfc" id="L81" title="All 2 branches covered.">                                if (write) operation.addParametersItem(new Parameter().in(&quot;header&quot;).name(&quot;Idempotency-Key&quot;)</span>
+<span class="fc" id="L82">                                        .required(true).description(&quot;Unique replay-protection key for this institution, route and request body; retained for 24 hours by default&quot;)</span>
+<span class="fc" id="L83">                                        .schema(new StringSchema().minLength(1).maxLength(128)</span>
+<span class="fc" id="L84">                                                .pattern(&quot;^[A-Za-z0-9._:-]+$&quot;)));</span>
+<span class="pc bpc" id="L85" title="1 of 2 branches missed.">                                if (operation.getResponses() != null) {</span>
+<span class="fc" id="L86">                                    operation.getResponses().putIfAbsent(&quot;400&quot;, error(&quot;Validation or idempotency-key failure&quot;));</span>
+<span class="fc" id="L87">                                    operation.getResponses().putIfAbsent(&quot;401&quot;, error(&quot;Bearer token is missing or invalid&quot;));</span>
+<span class="fc" id="L88">                                    operation.getResponses().putIfAbsent(&quot;403&quot;, error(&quot;Permission or tenant access denied&quot;));</span>
+<span class="fc" id="L89">                                    operation.getResponses().putIfAbsent(&quot;404&quot;, error(&quot;Tenant-scoped reference was not found&quot;));</span>
+<span class="fc bfc" id="L90" title="All 2 branches covered.">                                    if (write) operation.getResponses().putIfAbsent(&quot;409&quot;, error(&quot;Conflict or idempotency replay conflict&quot;));</span>
+<span class="fc" id="L91">                                    operation.getResponses().putIfAbsent(&quot;422&quot;, error(&quot;Business rule violation&quot;));</span>
+<span class="fc" id="L92">                                    operation.getResponses().putIfAbsent(&quot;429&quot;, error(&quot;Request rate limit exceeded&quot;));</span>
+<span class="fc" id="L93">                                    operation.getResponses().putIfAbsent(&quot;500&quot;, error(&quot;Unexpected internal error&quot;));</span>
+<span class="fc" id="L94">                                    operation.getResponses().values().forEach(response -&gt; {</span>
+<span class="fc" id="L95">                                        response.addHeaderObject(&quot;X-Request-Id&quot;, new Header()</span>
+<span class="fc" id="L96">                                                .description(&quot;Correlation identifier for this request&quot;)</span>
+<span class="fc" id="L97">                                                .schema(new StringSchema()));</span>
+<span class="fc bfc" id="L98" title="All 2 branches covered.">                                        if (write) response.addHeaderObject(&quot;Idempotency-Replayed&quot;, new Header()</span>
+<span class="fc" id="L99">                                                .description(&quot;True when the stored response was replayed&quot;)</span>
+<span class="fc" id="L100">                                                .schema(new Schema&lt;&gt;().type(&quot;boolean&quot;)));</span>
+<span class="fc" id="L101">                                    });</span>
+                                }
+<span class="fc" id="L103">                            }));</span>
+<span class="fc" id="L104">                }).build();</span>
+    }
+
+    private static void describePathParameters(List&lt;Parameter&gt; parameters) {
+<span class="pc bpc" id="L108" title="1 of 2 branches missed.">        if (parameters == null) return;</span>
+<span class="fc" id="L109">        Map&lt;String, String&gt; descriptions = Map.of(</span>
+                &quot;institutionId&quot;, &quot;Institution UUID that defines the tenant boundary&quot;,
+                &quot;customerReferenceId&quot;, &quot;Customer UUID generated by Customer Service&quot;,
+                &quot;addressReferenceId&quot;, &quot;Customer-address UUID generated by Customer Service&quot;,
+                &quot;externalAccountReferenceId&quot;, &quot;Account-reference UUID generated by Customer Service&quot;);
+<span class="fc" id="L114">        parameters.stream()</span>
+<span class="fc" id="L115">                .filter(parameter -&gt; &quot;path&quot;.equals(parameter.getIn()))</span>
+<span class="fc" id="L116">                .forEach(parameter -&gt; {</span>
+<span class="fc" id="L117">                    String description = descriptions.get(parameter.getName());</span>
+<span class="pc bpc" id="L118" title="1 of 2 branches missed.">                    if (description != null) parameter.setDescription(description);</span>
+<span class="fc" id="L119">                });</span>
+<span class="fc" id="L120">    }</span>
+
+    private static ApiResponse error(String description) {
+<span class="fc" id="L123">        return new ApiResponse().description(description).content(new Content().addMediaType(&quot;application/json&quot;,</span>
+<span class="fc" id="L124">                new MediaType().schema(new Schema&lt;&gt;().$ref(&quot;#/components/schemas/ApiErrorEnvelopeV2&quot;))));</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.15.202606040825</span></div></body></html>

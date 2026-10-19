@@ -1,0 +1,35 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>ApiResponseV2.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">customer-service</a> &gt; <a href="index.source.html" class="el_package">com.lps.cms.customer.v2.common</a> &gt; <span class="el_source">ApiResponseV2.java</span></div><h1>ApiResponseV2.java</h1><pre class="source lang-java linenums">package com.lps.cms.customer.v2.common;
+
+import jakarta.servlet.http.HttpServletRequest;
+import org.springframework.web.context.request.RequestContextHolder;
+import org.springframework.web.context.request.ServletRequestAttributes;
+import java.time.Instant;
+import java.util.List;
+import java.util.UUID;
+
+public final class ApiResponseV2 {
+    private ApiResponseV2() {}
+
+    public static &lt;T&gt; ApiSuccessEnvelopeV2&lt;T&gt; success(T data) {
+<span class="fc" id="L14">        return new ApiSuccessEnvelopeV2&lt;&gt;(true, data, meta(currentRequest()));</span>
+    }
+
+    public static ApiErrorEnvelopeV2 error(HttpServletRequest request, String code, String message, List&lt;?&gt; details) {
+<span class="fc" id="L18">        return new ApiErrorEnvelopeV2(false, new ApiErrorInfoV2(code, message, details), meta(request));</span>
+    }
+
+    public static ApiErrorEnvelopeV2 error(String code, String message, List&lt;?&gt; details) {
+<span class="fc" id="L22">        return error(currentRequest(), code, message, details);</span>
+    }
+
+    private static ApiMetaV2 meta(HttpServletRequest request) {
+<span class="fc bfc" id="L26" title="All 2 branches covered.">        Object value = request == null ? null : request.getAttribute(RequestIdFilter.ATTRIBUTE);</span>
+<span class="fc bfc" id="L27" title="All 2 branches covered.">        return new ApiMetaV2(value == null ? UUID.randomUUID().toString() : value.toString(), Instant.now().toString());</span>
+    }
+
+    private static HttpServletRequest currentRequest() {
+<span class="fc bfc" id="L31" title="All 2 branches covered.">        return RequestContextHolder.getRequestAttributes() instanceof ServletRequestAttributes attributes</span>
+<span class="fc" id="L32">                ? attributes.getRequest() : null;</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.15.202606040825</span></div></body></html>

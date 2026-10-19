@@ -1,0 +1,50 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>CreateCustomerReferenceV2Request.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">customer-service</a> &gt; <a href="index.source.html" class="el_package">com.lps.cms.customer.v2.boundary.dto</a> &gt; <span class="el_source">CreateCustomerReferenceV2Request.java</span></div><h1>CreateCustomerReferenceV2Request.java</h1><pre class="source lang-java linenums">package com.lps.cms.customer.v2.boundary.dto;
+
+import com.lps.cms.customer.v2.boundary.model.ReferenceStatus;
+import com.lps.cms.customer.v2.boundary.model.CustomerTypeV2;
+import io.swagger.v3.oas.annotations.media.Schema;
+import jakarta.validation.constraints.Email;
+import jakarta.validation.constraints.NotBlank;
+import jakarta.validation.constraints.NotNull;
+import jakarta.validation.constraints.Past;
+import jakarta.validation.constraints.Pattern;
+import jakarta.validation.constraints.Size;
+import java.time.LocalDate;
+
+<span class="fc" id="L14">public record CreateCustomerReferenceV2Request(</span>
+        @NotBlank @Size(max = 50) @Pattern(regexp = &quot;^[A-Za-z0-9._-]+$&quot;)
+        @Schema(description = &quot;System that owns the customer record&quot;, example = &quot;CORE_BANKING&quot;)
+        String sourceSystem,
+        @NotBlank @Size(max = 120)
+        @Schema(description = &quot;Customer identifier in the originating system&quot;, example = &quot;CUST-100045&quot;)
+        String externalCustomerId,
+        @NotNull
+        @Schema(description = &quot;Customer classification&quot;, example = &quot;INDIVIDUAL&quot;)
+        CustomerTypeV2 customerType,
+        @Size(max = 20)
+        @Schema(description = &quot;Customer title&quot;, example = &quot;MR&quot;)
+        String title,
+        @NotBlank @Size(max = 100)
+        @Schema(description = &quot;Customer first or given name&quot;, example = &quot;Pavan&quot;)
+        String firstName,
+        @Size(max = 100)
+        @Schema(description = &quot;Customer middle name&quot;)
+        String middleName,
+        @NotBlank @Size(max = 100)
+        @Schema(description = &quot;Customer last or family name&quot;, example = &quot;Kumar&quot;)
+        String lastName,
+        @Past
+        @Schema(description = &quot;Date of birth for an individual customer&quot;, example = &quot;1990-05-15&quot;)
+        LocalDate dateOfBirth,
+        @Pattern(regexp = &quot;^\\+[1-9][0-9]{0,3}$&quot;)
+        @Schema(description = &quot;E.164 country calling code&quot;, example = &quot;+91&quot;)
+        String mobileCountryCode,
+        @Pattern(regexp = &quot;^[0-9]{6,15}$&quot;)
+        @Schema(description = &quot;Mobile subscriber number without the country calling code&quot;, example = &quot;9876543210&quot;)
+        String mobileNumber,
+        @Email @Size(max = 254)
+        @Schema(description = &quot;Customer email address&quot;, example = &quot;pavan@example.com&quot;)
+        String email,
+        @Schema(description = &quot;Initial reference lifecycle status&quot;, example = &quot;ACTIVE&quot;)
+        ReferenceStatus status) {}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.15.202606040825</span></div></body></html>

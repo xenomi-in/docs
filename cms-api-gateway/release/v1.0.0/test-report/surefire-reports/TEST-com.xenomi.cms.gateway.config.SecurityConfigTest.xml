@@ -1,0 +1,23 @@
+<?xml version='1.0' encoding='utf-8'?>
+<testsuite xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:noNamespaceSchemaLocation="https://maven.apache.org/surefire/maven-surefire-plugin/xsd/surefire-test-report.xsd" version="3.0.2" name="com.xenomi.cms.gateway.config.SecurityConfigTest" time="0.758" tests="20" errors="0" skipped="0" failures="0" flakes="0">
+  <testcase name="grantsOnlyTheRelevantAdministrativePermission" classname="com.xenomi.cms.gateway.config.SecurityConfigTest" time="0.377" />
+  <testcase name="configuresExplicitCorsOriginsAndHeaders" classname="com.xenomi.cms.gateway.config.SecurityConfigTest" time="0.011" />
+  <testcase name="rejectsMissingOrInvalidAuthentication(String)[1]" classname="com.xenomi.cms.gateway.config.SecurityConfigTest" time="0.022" />
+  <testcase name="rejectsMissingOrInvalidAuthentication(String)[2]" classname="com.xenomi.cms.gateway.config.SecurityConfigTest" time="0.004" />
+  <testcase name="rejectsMissingOrInvalidAuthentication(String)[3]" classname="com.xenomi.cms.gateway.config.SecurityConfigTest" time="0.004" />
+  <testcase name="rejectsMissingOrInvalidAuthentication(String)[4]" classname="com.xenomi.cms.gateway.config.SecurityConfigTest" time="0.003" />
+  <testcase name="rejectsMissingOrInvalidAuthentication(String)[5]" classname="com.xenomi.cms.gateway.config.SecurityConfigTest" time="0.003" />
+  <testcase name="createsDecoderWithoutContactingIdentityProvider" classname="com.xenomi.cms.gateway.config.SecurityConfigTest" time="0.091" />
+  <testcase name="mapsPermissionsAndSubjectWithoutScopeAuthorities" classname="com.xenomi.cms.gateway.config.SecurityConfigTest" time="0.003" />
+  <testcase name="deniesAuthenticatedSubjectsWithoutPermission(String)[1]" classname="com.xenomi.cms.gateway.config.SecurityConfigTest" time="0.003" />
+  <testcase name="deniesAuthenticatedSubjectsWithoutPermission(String)[2]" classname="com.xenomi.cms.gateway.config.SecurityConfigTest" time="0.005" />
+  <testcase name="deniesAuthenticatedSubjectsWithoutPermission(String)[3]" classname="com.xenomi.cms.gateway.config.SecurityConfigTest" time="0.003" />
+  <testcase name="permitsPublicEndpoints(String)[1]" classname="com.xenomi.cms.gateway.config.SecurityConfigTest" time="0.002" />
+  <testcase name="permitsPublicEndpoints(String)[2]" classname="com.xenomi.cms.gateway.config.SecurityConfigTest" time="0.002" />
+  <testcase name="permitsPublicEndpoints(String)[3]" classname="com.xenomi.cms.gateway.config.SecurityConfigTest" time="0.001" />
+  <testcase name="permitsPublicEndpoints(String)[4]" classname="com.xenomi.cms.gateway.config.SecurityConfigTest" time="0.001" />
+  <testcase name="permitsPublicEndpoints(String)[5]" classname="com.xenomi.cms.gateway.config.SecurityConfigTest" time="0.002" />
+  <testcase name="permitsPublicEndpoints(String)[6]" classname="com.xenomi.cms.gateway.config.SecurityConfigTest" time="0.002" />
+  <testcase name="permitsPublicEndpoints(String)[7]" classname="com.xenomi.cms.gateway.config.SecurityConfigTest" time="0.002" />
+  <testcase name="permitsPublicEndpoints(String)[8]" classname="com.xenomi.cms.gateway.config.SecurityConfigTest" time="0.002" />
+</testsuite>

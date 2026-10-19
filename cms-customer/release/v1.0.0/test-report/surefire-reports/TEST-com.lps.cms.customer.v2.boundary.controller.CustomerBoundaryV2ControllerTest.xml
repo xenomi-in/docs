@@ -1,0 +1,17 @@
+<?xml version='1.0' encoding='utf-8'?>
+<testsuite xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:noNamespaceSchemaLocation="https://maven.apache.org/surefire/maven-surefire-plugin/xsd/surefire-test-report.xsd" version="3.0.2" name="com.lps.cms.customer.v2.boundary.controller.CustomerBoundaryV2ControllerTest" time="0.175" tests="14" errors="0" skipped="0" failures="0" flakes="0">
+  <testcase name="updateStatusPassesTheRequestedStatus" classname="com.lps.cms.customer.v2.boundary.controller.CustomerBoundaryV2ControllerTest" time="0.026" />
+  <testcase name="linkAccountReturnsCreatedLinkEnvelope" classname="com.lps.cms.customer.v2.boundary.controller.CustomerBoundaryV2ControllerTest" time="0.035" />
+  <testcase name="createReturnsCreatedCustomerEnvelope" classname="com.lps.cms.customer.v2.boundary.controller.CustomerBoundaryV2ControllerTest" time="0.021" />
+  <testcase name="addAddressReturnsCreatedAddressEnvelope" classname="com.lps.cms.customer.v2.boundary.controller.CustomerBoundaryV2ControllerTest" time="0.037" />
+  <testcase name="updateAddressPassesTheAddressRequest" classname="com.lps.cms.customer.v2.boundary.controller.CustomerBoundaryV2ControllerTest" time="0.015" />
+  <testcase name="listAccountsPassesPaging" classname="com.lps.cms.customer.v2.boundary.controller.CustomerBoundaryV2ControllerTest" time="0.001" />
+  <testcase name="updateAccountLinkStatusPassesTheLinkRequest" classname="com.lps.cms.customer.v2.boundary.controller.CustomerBoundaryV2ControllerTest" time="0.012" />
+  <testcase name="getAddressPassesAddressId" classname="com.lps.cms.customer.v2.boundary.controller.CustomerBoundaryV2ControllerTest" time="0.001" />
+  <testcase name="listPassesStatusAndPagingToTheService" classname="com.lps.cms.customer.v2.boundary.controller.CustomerBoundaryV2ControllerTest" time="0.005" />
+  <testcase name="getPassesCustomerIdToTheService" classname="com.lps.cms.customer.v2.boundary.controller.CustomerBoundaryV2ControllerTest" time="0.001" />
+  <testcase name="listAddressesPassesStatusAndPaging" classname="com.lps.cms.customer.v2.boundary.controller.CustomerBoundaryV2ControllerTest" time="0.001" />
+  <testcase name="updateProfilePassesTheProfileRequest" classname="com.lps.cms.customer.v2.boundary.controller.CustomerBoundaryV2ControllerTest" time="0.015" />
+  <testcase name="updateAddressStatusPassesTheStatusRequest" classname="com.lps.cms.customer.v2.boundary.controller.CustomerBoundaryV2ControllerTest" time="0.001" />
+  <testcase name="resolvePassesExternalIdentityToTheService" classname="com.lps.cms.customer.v2.boundary.controller.CustomerBoundaryV2ControllerTest" time="0.001" />
+</testsuite>

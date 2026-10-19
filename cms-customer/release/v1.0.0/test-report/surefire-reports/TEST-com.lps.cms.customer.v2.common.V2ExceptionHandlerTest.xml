@@ -1,0 +1,11 @@
+<?xml version='1.0' encoding='utf-8'?>
+<testsuite xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:noNamespaceSchemaLocation="https://maven.apache.org/surefire/maven-surefire-plugin/xsd/surefire-test-report.xsd" version="3.0.2" name="com.lps.cms.customer.v2.common.V2ExceptionHandlerTest" time="0.09" tests="8" errors="0" skipped="0" failures="0" flakes="0">
+  <testcase name="notFoundReturns404WithTheExceptionMessage" classname="com.lps.cms.customer.v2.common.V2ExceptionHandlerTest" time="0.001" />
+  <testcase name="businessRuleReturns422" classname="com.lps.cms.customer.v2.common.V2ExceptionHandlerTest" time="0.0" />
+  <testcase name="validationReturnsFieldDetails" classname="com.lps.cms.customer.v2.common.V2ExceptionHandlerTest" time="0.087" />
+  <testcase name="badRequestReturns400" classname="com.lps.cms.customer.v2.common.V2ExceptionHandlerTest" time="0.0" />
+  <testcase name="constraintViolationUsesTheSameBadRequestResponse" classname="com.lps.cms.customer.v2.common.V2ExceptionHandlerTest" time="0.001" />
+  <testcase name="conflictReturns409" classname="com.lps.cms.customer.v2.common.V2ExceptionHandlerTest" time="0.0" />
+  <testcase name="accessDeniedReturns403WithoutTheExceptionMessage" classname="com.lps.cms.customer.v2.common.V2ExceptionHandlerTest" time="0.0" />
+  <testcase name="unexpectedExceptionReturns500WithoutTheExceptionMessage" classname="com.lps.cms.customer.v2.common.V2ExceptionHandlerTest" time="0.0" />
+</testsuite>

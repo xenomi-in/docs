@@ -1,0 +1,35 @@
+<?xml version='1.0' encoding='utf-8'?>
+<testsuite xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:noNamespaceSchemaLocation="https://maven.apache.org/surefire/maven-surefire-plugin/xsd/surefire-test-report.xsd" version="3.0.2" name="com.lps.cms.customer.v2.boundary.service.BoundaryReferenceV2AddressServiceTest" time="0.036" tests="32" errors="0" skipped="0" failures="0" flakes="0">
+  <testcase name="updateAddressStatusAppliesAllowedTransition(ReferenceStatus, ReferenceStatus)[1]" classname="com.lps.cms.customer.v2.boundary.service.BoundaryReferenceV2AddressServiceTest" time="0.002" />
+  <testcase name="updateAddressStatusAppliesAllowedTransition(ReferenceStatus, ReferenceStatus)[2]" classname="com.lps.cms.customer.v2.boundary.service.BoundaryReferenceV2AddressServiceTest" time="0.001" />
+  <testcase name="updateAddressStatusAppliesAllowedTransition(ReferenceStatus, ReferenceStatus)[3]" classname="com.lps.cms.customer.v2.boundary.service.BoundaryReferenceV2AddressServiceTest" time="0.001" />
+  <testcase name="updateAddressStatusAppliesAllowedTransition(ReferenceStatus, ReferenceStatus)[4]" classname="com.lps.cms.customer.v2.boundary.service.BoundaryReferenceV2AddressServiceTest" time="0.001" />
+  <testcase name="updateAddressStatusAppliesAllowedTransition(ReferenceStatus, ReferenceStatus)[5]" classname="com.lps.cms.customer.v2.boundary.service.BoundaryReferenceV2AddressServiceTest" time="0.001" />
+  <testcase name="updateAddressStatusAppliesAllowedTransition(ReferenceStatus, ReferenceStatus)[6]" classname="com.lps.cms.customer.v2.boundary.service.BoundaryReferenceV2AddressServiceTest" time="0.001" />
+  <testcase name="updateAddressStatusAppliesAllowedTransition(ReferenceStatus, ReferenceStatus)[7]" classname="com.lps.cms.customer.v2.boundary.service.BoundaryReferenceV2AddressServiceTest" time="0.001" />
+  <testcase name="createAddressThrowsWhenCustomerIsNotInInstitution" classname="com.lps.cms.customer.v2.boundary.service.BoundaryReferenceV2AddressServiceTest" time="0.001" />
+  <testcase name="getAddressThrowsWhenAddressIsNotInCustomerScope" classname="com.lps.cms.customer.v2.boundary.service.BoundaryReferenceV2AddressServiceTest" time="0.001" />
+  <testcase name="createAddressStoresExplicitPrimaryFlagAndStatus" classname="com.lps.cms.customer.v2.boundary.service.BoundaryReferenceV2AddressServiceTest" time="0.0" />
+  <testcase name="createAddressStoresPrimaryWhenRequested" classname="com.lps.cms.customer.v2.boundary.service.BoundaryReferenceV2AddressServiceTest" time="0.0" />
+  <testcase name="updateAddressNormalizesProvidedStringsAndCanClearPrimary" classname="com.lps.cms.customer.v2.boundary.service.BoundaryReferenceV2AddressServiceTest" time="0.002" />
+  <testcase name="updateAddressRejectsClosedAddressWithoutSaving" classname="com.lps.cms.customer.v2.boundary.service.BoundaryReferenceV2AddressServiceTest" time="0.001" />
+  <testcase name="updateAddressStatusRejectsClosingAClosedAddress" classname="com.lps.cms.customer.v2.boundary.service.BoundaryReferenceV2AddressServiceTest" time="0.001" />
+  <testcase name="createAddressPersistsNormalizedReferenceAndDefaultsStatusAndPrimary" classname="com.lps.cms.customer.v2.boundary.service.BoundaryReferenceV2AddressServiceTest" time="0.001" />
+  <testcase name="getAddressDoesNotQueryAddressesWhenCustomerIsMissing" classname="com.lps.cms.customer.v2.boundary.service.BoundaryReferenceV2AddressServiceTest" time="0.001" />
+  <testcase name="getAddressReturnsReferenceScopedToCustomerAndInstitution" classname="com.lps.cms.customer.v2.boundary.service.BoundaryReferenceV2AddressServiceTest" time="0.001" />
+  <testcase name="updateAddressThrowsWhenCustomerIsMissing" classname="com.lps.cms.customer.v2.boundary.service.BoundaryReferenceV2AddressServiceTest" time="0.001" />
+  <testcase name="listAddressesFiltersByStatus" classname="com.lps.cms.customer.v2.boundary.service.BoundaryReferenceV2AddressServiceTest" time="0.001" />
+  <testcase name="createAddressRejectsDuplicateInstitutionSourceAndExternalId" classname="com.lps.cms.customer.v2.boundary.service.BoundaryReferenceV2AddressServiceTest" time="0.001" />
+  <testcase name="updateAddressThrowsWhenAddressIsMissing" classname="com.lps.cms.customer.v2.boundary.service.BoundaryReferenceV2AddressServiceTest" time="0.0" />
+  <testcase name="updateAddressRejectsSecondActivePrimaryAddress" classname="com.lps.cms.customer.v2.boundary.service.BoundaryReferenceV2AddressServiceTest" time="0.0" />
+  <testcase name="createAddressRejectsCustomerThatIsNotActive(ReferenceStatus)[1]" classname="com.lps.cms.customer.v2.boundary.service.BoundaryReferenceV2AddressServiceTest" time="0.001" />
+  <testcase name="createAddressRejectsCustomerThatIsNotActive(ReferenceStatus)[2]" classname="com.lps.cms.customer.v2.boundary.service.BoundaryReferenceV2AddressServiceTest" time="0.001" />
+  <testcase name="createAddressRejectsCustomerThatIsNotActive(ReferenceStatus)[3]" classname="com.lps.cms.customer.v2.boundary.service.BoundaryReferenceV2AddressServiceTest" time="0.001" />
+  <testcase name="listAddressesDoesNotQueryAddressesWhenCustomerIsMissing" classname="com.lps.cms.customer.v2.boundary.service.BoundaryReferenceV2AddressServiceTest" time="0.001" />
+  <testcase name="updateAddressStatusThrowsWhenAddressIsMissing" classname="com.lps.cms.customer.v2.boundary.service.BoundaryReferenceV2AddressServiceTest" time="0.001" />
+  <testcase name="listAddressesUsesDefaultPageWhenStatusIsOmitted" classname="com.lps.cms.customer.v2.boundary.service.BoundaryReferenceV2AddressServiceTest" time="0.001" />
+  <testcase name="updateAddressRejectsEmptyChangeBeforeLookup" classname="com.lps.cms.customer.v2.boundary.service.BoundaryReferenceV2AddressServiceTest" time="0.001" />
+  <testcase name="createAddressDoesNotPersistWhenInstitutionAccessIsDenied" classname="com.lps.cms.customer.v2.boundary.service.BoundaryReferenceV2AddressServiceTest" time="0.0" />
+  <testcase name="listAddressesRejectsLimitAboveMaximumAfterCustomerIsConfirmed" classname="com.lps.cms.customer.v2.boundary.service.BoundaryReferenceV2AddressServiceTest" time="0.0" />
+  <testcase name="updateAddressChangesOnlyProvidedFields" classname="com.lps.cms.customer.v2.boundary.service.BoundaryReferenceV2AddressServiceTest" time="0.001" />
+</testsuite>

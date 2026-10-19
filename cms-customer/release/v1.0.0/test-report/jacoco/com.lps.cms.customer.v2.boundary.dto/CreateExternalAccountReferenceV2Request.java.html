@@ -1,0 +1,22 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>CreateExternalAccountReferenceV2Request.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">customer-service</a> &gt; <a href="index.source.html" class="el_package">com.lps.cms.customer.v2.boundary.dto</a> &gt; <span class="el_source">CreateExternalAccountReferenceV2Request.java</span></div><h1>CreateExternalAccountReferenceV2Request.java</h1><pre class="source lang-java linenums">package com.lps.cms.customer.v2.boundary.dto;
+
+import com.lps.cms.customer.v2.boundary.model.ReferenceStatus;
+import com.lps.cms.customer.v2.boundary.model.AccountType;
+import io.swagger.v3.oas.annotations.media.Schema;
+import jakarta.validation.constraints.NotBlank;
+import jakarta.validation.constraints.Pattern;
+import jakarta.validation.constraints.Size;
+
+<span class="fc" id="L10">public record CreateExternalAccountReferenceV2Request(</span>
+        @NotBlank @Size(max = 50) @Pattern(regexp = &quot;^[A-Za-z0-9._-]+$&quot;)
+        @Schema(description = &quot;System that owns the account record&quot;, example = &quot;CORE_BANKING&quot;)
+        String sourceSystem,
+        @NotBlank @Size(max = 120)
+        @Schema(description = &quot;Account identifier in the owning system; not a PAN&quot;, example = &quot;ACC-9000123&quot;)
+        String externalAccountId,
+        @jakarta.validation.constraints.NotNull
+        @Schema(description = &quot;Credit facility or prepaid stored-value account type&quot;, example = &quot;CREDIT_CARD_ACCOUNT&quot;)
+        AccountType accountType,
+        @Schema(description = &quot;Initial reference lifecycle status&quot;, example = &quot;ACTIVE&quot;)
+        ReferenceStatus status) {}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.15.202606040825</span></div></body></html>

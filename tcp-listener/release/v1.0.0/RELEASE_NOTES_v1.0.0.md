@@ -6,7 +6,8 @@ title: "ISO8583 TCP Listener — v1.0.0"
 # ISO8583 TCP Listener — v1.0.0
 
 **Version:** `1.0.0` — initial release candidate, not yet distributed to the client.
-**Planned tag:** `v1.0.0`; the existing tag still points to `a4c085c` and must be refreshed after the reviewed changes are committed.
+**Planned tag:** `v1.0.0`; the existing tag still points to `a4c085c` and must be refreshed after the reviewed changes are committed.  
+**Notes updated:** 19 October 2026
 
 ## Deployment summary
 

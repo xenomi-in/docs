@@ -6,3 +6,7 @@ kramdown:
   input: GFM
 exclude:
   - AGENTS.md
+  - Gemfile
+  - Gemfile.lock
+  - vendor
+  - scripts

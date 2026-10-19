@@ -1,0 +1,18 @@
+<?xml version='1.0' encoding='utf-8'?>
+<testsuite xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:noNamespaceSchemaLocation="https://maven.apache.org/surefire/maven-surefire-plugin/xsd/surefire-test-report.xsd" version="3.0.2" name="com.lps.cms.customer.v2.common.idempotency.IdempotencyFilterV2Test" time="0.251" tests="15" errors="0" skipped="0" failures="0" flakes="0">
+  <testcase name="scopesTheClaimToTheInstitutionAndTrimmedKey" classname="com.lps.cms.customer.v2.common.idempotency.IdempotencyFilterV2Test" time="0.187" />
+  <testcase name="storesASuccessfulResponseAndReturnsItToTheClient" classname="com.lps.cms.customer.v2.common.idempotency.IdempotencyFilterV2Test" time="0.006" />
+  <testcase name="rejectsAMissingOrInvalidIdempotencyKey" classname="com.lps.cms.customer.v2.common.idempotency.IdempotencyFilterV2Test" time="0.037" />
+  <testcase name="includesTheQueryStringInTheRequestHash" classname="com.lps.cms.customer.v2.common.idempotency.IdempotencyFilterV2Test" time="0.002" />
+  <testcase name="replaysAStoredResponseWithoutCallingTheChain" classname="com.lps.cms.customer.v2.common.idempotency.IdempotencyFilterV2Test" time="0.001" />
+  <testcase name="usesUnscopedWhenTheTokenHasNeitherInstitutionNorPlatformAccess" classname="com.lps.cms.customer.v2.common.idempotency.IdempotencyFilterV2Test" time="0.0" />
+  <testcase name="discardsTheRecordWhenTheDownstreamResponseIsAServerError" classname="com.lps.cms.customer.v2.common.idempotency.IdempotencyFilterV2Test" time="0.002" />
+  <testcase name="usesPlatformScopeWhenTheTokenHasNoInstitution" classname="com.lps.cms.customer.v2.common.idempotency.IdempotencyFilterV2Test" time="0.001" />
+  <testcase name="skipsRequestsThatAreNotV2Writes" classname="com.lps.cms.customer.v2.common.idempotency.IdempotencyFilterV2Test" time="0.0" />
+  <testcase name="asksTheClientToRetryWhileAMatchingRequestIsProcessing" classname="com.lps.cms.customer.v2.common.idempotency.IdempotencyFilterV2Test" time="0.003" />
+  <testcase name="rejectsABodyAboveTheConfiguredLimit" classname="com.lps.cms.customer.v2.common.idempotency.IdempotencyFilterV2Test" time="0.002" />
+  <testcase name="replaysWithoutOptionalHeadersWhenTheyWereNotStored" classname="com.lps.cms.customer.v2.common.idempotency.IdempotencyFilterV2Test" time="0.002" />
+  <testcase name="returnsConflictWhenTheKeyWasReusedForADifferentRequest" classname="com.lps.cms.customer.v2.common.idempotency.IdempotencyFilterV2Test" time="0.002" />
+  <testcase name="passesThroughWhenTheCallerIsNotAJwt" classname="com.lps.cms.customer.v2.common.idempotency.IdempotencyFilterV2Test" time="0.001" />
+  <testcase name="discardsTheRecordAndRethrowsWhenProcessingFails" classname="com.lps.cms.customer.v2.common.idempotency.IdempotencyFilterV2Test" time="0.001" />
+</testsuite>

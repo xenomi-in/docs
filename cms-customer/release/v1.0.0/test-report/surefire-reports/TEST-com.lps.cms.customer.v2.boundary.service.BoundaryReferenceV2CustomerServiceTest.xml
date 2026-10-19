@@ -1,0 +1,49 @@
+<?xml version='1.0' encoding='utf-8'?>
+<testsuite xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:noNamespaceSchemaLocation="https://maven.apache.org/surefire/maven-surefire-plugin/xsd/surefire-test-report.xsd" version="3.0.2" name="com.lps.cms.customer.v2.boundary.service.BoundaryReferenceV2CustomerServiceTest" time="0.1" tests="46" errors="0" skipped="0" failures="0" flakes="0">
+  <testcase name="getCustomerDoesNotQueryWhenInstitutionAccessIsDenied" classname="com.lps.cms.customer.v2.boundary.service.BoundaryReferenceV2CustomerServiceTest" time="0.001" />
+  <testcase name="updateCustomerAppliesAllowedStatusTransition(ReferenceStatus, ReferenceStatus)[1]" classname="com.lps.cms.customer.v2.boundary.service.BoundaryReferenceV2CustomerServiceTest" time="0.002" />
+  <testcase name="updateCustomerAppliesAllowedStatusTransition(ReferenceStatus, ReferenceStatus)[2]" classname="com.lps.cms.customer.v2.boundary.service.BoundaryReferenceV2CustomerServiceTest" time="0.002" />
+  <testcase name="updateCustomerAppliesAllowedStatusTransition(ReferenceStatus, ReferenceStatus)[3]" classname="com.lps.cms.customer.v2.boundary.service.BoundaryReferenceV2CustomerServiceTest" time="0.001" />
+  <testcase name="updateCustomerAppliesAllowedStatusTransition(ReferenceStatus, ReferenceStatus)[4]" classname="com.lps.cms.customer.v2.boundary.service.BoundaryReferenceV2CustomerServiceTest" time="0.001" />
+  <testcase name="updateCustomerAppliesAllowedStatusTransition(ReferenceStatus, ReferenceStatus)[5]" classname="com.lps.cms.customer.v2.boundary.service.BoundaryReferenceV2CustomerServiceTest" time="0.002" />
+  <testcase name="updateCustomerAppliesAllowedStatusTransition(ReferenceStatus, ReferenceStatus)[6]" classname="com.lps.cms.customer.v2.boundary.service.BoundaryReferenceV2CustomerServiceTest" time="0.002" />
+  <testcase name="updateCustomerAppliesAllowedStatusTransition(ReferenceStatus, ReferenceStatus)[7]" classname="com.lps.cms.customer.v2.boundary.service.BoundaryReferenceV2CustomerServiceTest" time="0.002" />
+  <testcase name="updateCustomerRejectsDisallowedStatusTransition(ReferenceStatus, ReferenceStatus)[1]" classname="com.lps.cms.customer.v2.boundary.service.BoundaryReferenceV2CustomerServiceTest" time="0.003" />
+  <testcase name="updateCustomerRejectsDisallowedStatusTransition(ReferenceStatus, ReferenceStatus)[2]" classname="com.lps.cms.customer.v2.boundary.service.BoundaryReferenceV2CustomerServiceTest" time="0.003" />
+  <testcase name="updateCustomerRejectsDisallowedStatusTransition(ReferenceStatus, ReferenceStatus)[3]" classname="com.lps.cms.customer.v2.boundary.service.BoundaryReferenceV2CustomerServiceTest" time="0.003" />
+  <testcase name="updateCustomerRejectsDisallowedStatusTransition(ReferenceStatus, ReferenceStatus)[4]" classname="com.lps.cms.customer.v2.boundary.service.BoundaryReferenceV2CustomerServiceTest" time="0.002" />
+  <testcase name="updateCustomerRejectsDisallowedStatusTransition(ReferenceStatus, ReferenceStatus)[5]" classname="com.lps.cms.customer.v2.boundary.service.BoundaryReferenceV2CustomerServiceTest" time="0.001" />
+  <testcase name="getCustomerThrowsWhenReferenceIsNotInInstitution" classname="com.lps.cms.customer.v2.boundary.service.BoundaryReferenceV2CustomerServiceTest" time="0.001" />
+  <testcase name="updateCustomerProfileAllowsCustomerThatIsNotClosed(ReferenceStatus)[1]" classname="com.lps.cms.customer.v2.boundary.service.BoundaryReferenceV2CustomerServiceTest" time="0.002" />
+  <testcase name="updateCustomerProfileAllowsCustomerThatIsNotClosed(ReferenceStatus)[2]" classname="com.lps.cms.customer.v2.boundary.service.BoundaryReferenceV2CustomerServiceTest" time="0.001" />
+  <testcase name="updateCustomerProfileAllowsCustomerThatIsNotClosed(ReferenceStatus)[3]" classname="com.lps.cms.customer.v2.boundary.service.BoundaryReferenceV2CustomerServiceTest" time="0.001" />
+  <testcase name="listCustomersRejectsPageAndLimitOutsideBounds(int, int)[1]" classname="com.lps.cms.customer.v2.boundary.service.BoundaryReferenceV2CustomerServiceTest" time="0.008" />
+  <testcase name="listCustomersRejectsPageAndLimitOutsideBounds(int, int)[2]" classname="com.lps.cms.customer.v2.boundary.service.BoundaryReferenceV2CustomerServiceTest" time="0.001" />
+  <testcase name="listCustomersRejectsPageAndLimitOutsideBounds(int, int)[3]" classname="com.lps.cms.customer.v2.boundary.service.BoundaryReferenceV2CustomerServiceTest" time="0.001" />
+  <testcase name="listCustomersRejectsPageAndLimitOutsideBounds(int, int)[4]" classname="com.lps.cms.customer.v2.boundary.service.BoundaryReferenceV2CustomerServiceTest" time="0.001" />
+  <testcase name="listCustomersRejectsPageAndLimitOutsideBounds(int, int)[5]" classname="com.lps.cms.customer.v2.boundary.service.BoundaryReferenceV2CustomerServiceTest" time="0.001" />
+  <testcase name="updateCustomerThrowsWhenReferenceIsNotInInstitution" classname="com.lps.cms.customer.v2.boundary.service.BoundaryReferenceV2CustomerServiceTest" time="0.001" />
+  <testcase name="resolveCustomerNormalizesSourceSystemAndTrimsExternalId" classname="com.lps.cms.customer.v2.boundary.service.BoundaryReferenceV2CustomerServiceTest" time="0.001" />
+  <testcase name="updateCustomerProfileNormalizesProvidedStrings" classname="com.lps.cms.customer.v2.boundary.service.BoundaryReferenceV2CustomerServiceTest" time="0.001" />
+  <testcase name="createCustomerStoresExplicitStatusAndOptionalContactFields" classname="com.lps.cms.customer.v2.boundary.service.BoundaryReferenceV2CustomerServiceTest" time="0.001" />
+  <testcase name="updateCustomerProfileChangesOnlyProvidedFields" classname="com.lps.cms.customer.v2.boundary.service.BoundaryReferenceV2CustomerServiceTest" time="0.001" />
+  <testcase name="createCustomerRejectsDuplicateInstitutionSourceAndExternalId" classname="com.lps.cms.customer.v2.boundary.service.BoundaryReferenceV2CustomerServiceTest" time="0.001" />
+  <testcase name="updateCustomerRecordsSameStatusWithoutRejectingIt(ReferenceStatus)[1]" classname="com.lps.cms.customer.v2.boundary.service.BoundaryReferenceV2CustomerServiceTest" time="0.001" />
+  <testcase name="updateCustomerRecordsSameStatusWithoutRejectingIt(ReferenceStatus)[2]" classname="com.lps.cms.customer.v2.boundary.service.BoundaryReferenceV2CustomerServiceTest" time="0.001" />
+  <testcase name="updateCustomerRecordsSameStatusWithoutRejectingIt(ReferenceStatus)[3]" classname="com.lps.cms.customer.v2.boundary.service.BoundaryReferenceV2CustomerServiceTest" time="0.001" />
+  <testcase name="updateCustomerRecordsSameStatusWithoutRejectingIt(ReferenceStatus)[4]" classname="com.lps.cms.customer.v2.boundary.service.BoundaryReferenceV2CustomerServiceTest" time="0.001" />
+  <testcase name="listCustomersUsesDefaultPageAndOmitsStatusFilter" classname="com.lps.cms.customer.v2.boundary.service.BoundaryReferenceV2CustomerServiceTest" time="0.002" />
+  <testcase name="getCustomerReturnsReferenceScopedToInstitution" classname="com.lps.cms.customer.v2.boundary.service.BoundaryReferenceV2CustomerServiceTest" time="0.001" />
+  <testcase name="listCustomersDoesNotQueryWhenInstitutionAccessIsDenied" classname="com.lps.cms.customer.v2.boundary.service.BoundaryReferenceV2CustomerServiceTest" time="0.001" />
+  <testcase name="listCustomersAcceptsPageAndLimitBoundaries(int, int)[1]" classname="com.lps.cms.customer.v2.boundary.service.BoundaryReferenceV2CustomerServiceTest" time="0.001" />
+  <testcase name="listCustomersAcceptsPageAndLimitBoundaries(int, int)[2]" classname="com.lps.cms.customer.v2.boundary.service.BoundaryReferenceV2CustomerServiceTest" time="0.001" />
+  <testcase name="updateCustomerProfileRejectsClosedCustomerWithoutSaving" classname="com.lps.cms.customer.v2.boundary.service.BoundaryReferenceV2CustomerServiceTest" time="0.001" />
+  <testcase name="listCustomersFiltersByStatusAndUsesRequestedPage" classname="com.lps.cms.customer.v2.boundary.service.BoundaryReferenceV2CustomerServiceTest" time="0.001" />
+  <testcase name="createCustomerPersistsNormalizedReferenceAndDefaultsMissingStatusToActive" classname="com.lps.cms.customer.v2.boundary.service.BoundaryReferenceV2CustomerServiceTest" time="0.001" />
+  <testcase name="createCustomerDoesNotPersistWhenInstitutionAccessIsDenied" classname="com.lps.cms.customer.v2.boundary.service.BoundaryReferenceV2CustomerServiceTest" time="0.001" />
+  <testcase name="resolveCustomerReportsTheOriginalExternalIdWhenMissing" classname="com.lps.cms.customer.v2.boundary.service.BoundaryReferenceV2CustomerServiceTest" time="0.001" />
+  <testcase name="updateCustomerProfileRejectsEmptyChangeBeforeLookup" classname="com.lps.cms.customer.v2.boundary.service.BoundaryReferenceV2CustomerServiceTest" time="0.0" />
+  <testcase name="updateCustomerDoesNotChangeStatusWhenInstitutionAccessIsDenied" classname="com.lps.cms.customer.v2.boundary.service.BoundaryReferenceV2CustomerServiceTest" time="0.001" />
+  <testcase name="updateCustomerProfileDoesNotQueryWhenInstitutionAccessIsDenied" classname="com.lps.cms.customer.v2.boundary.service.BoundaryReferenceV2CustomerServiceTest" time="0.001" />
+  <testcase name="updateCustomerProfileThrowsWhenReferenceIsNotInInstitution" classname="com.lps.cms.customer.v2.boundary.service.BoundaryReferenceV2CustomerServiceTest" time="0.001" />
+</testsuite>

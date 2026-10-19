@@ -1,0 +1,156 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>SecurityConfig.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">CMS API Gateway</a> &gt; <a href="index.source.html" class="el_package">com.xenomi.cms.gateway.config</a> &gt; <span class="el_source">SecurityConfig.java</span></div><h1>SecurityConfig.java</h1><pre class="source lang-java linenums">package com.xenomi.cms.gateway.config;
+
+import tools.jackson.core.JacksonException;
+import tools.jackson.databind.ObjectMapper;
+import org.springframework.beans.factory.annotation.Value;
+import org.springframework.context.annotation.Bean;
+import org.springframework.context.annotation.Configuration;
+import org.springframework.core.convert.converter.Converter;
+import org.springframework.http.HttpHeaders;
+import org.springframework.http.HttpStatus;
+import org.springframework.http.MediaType;
+import org.springframework.security.authentication.AbstractAuthenticationToken;
+import org.springframework.security.config.Customizer;
+import org.springframework.security.config.annotation.web.reactive.EnableWebFluxSecurity;
+import org.springframework.security.config.web.server.ServerHttpSecurity;
+import org.springframework.security.oauth2.core.DelegatingOAuth2TokenValidator;
+import org.springframework.security.oauth2.core.OAuth2TokenValidator;
+import org.springframework.security.oauth2.jwt.Jwt;
+import org.springframework.security.oauth2.jwt.JwtClaimValidator;
+import org.springframework.security.oauth2.jwt.JwtValidators;
+import org.springframework.security.oauth2.jwt.NimbusReactiveJwtDecoder;
+import org.springframework.security.oauth2.jwt.ReactiveJwtDecoder;
+import org.springframework.security.oauth2.server.resource.authentication.JwtAuthenticationConverter;
+import org.springframework.security.oauth2.server.resource.authentication.JwtGrantedAuthoritiesConverter;
+import org.springframework.security.oauth2.server.resource.authentication.ReactiveJwtAuthenticationConverterAdapter;
+import org.springframework.security.web.server.SecurityWebFilterChain;
+import org.springframework.web.cors.CorsConfiguration;
+import org.springframework.web.cors.reactive.CorsConfigurationSource;
+import org.springframework.web.cors.reactive.UrlBasedCorsConfigurationSource;
+import org.springframework.web.server.ServerWebExchange;
+import reactor.core.publisher.Mono;
+
+import java.time.Instant;
+import java.util.Arrays;
+import java.util.LinkedHashMap;
+import java.util.List;
+import java.util.Map;
+
+@Configuration
+@EnableWebFluxSecurity
+<span class="fc" id="L41">public class SecurityConfig {</span>
+
+    private static final String GATEWAY_ADMIN = &quot;PERM_cms:gateway:admin&quot;;
+    private static final String INTERNAL_ACCESS = &quot;PERM_cms:internal:access&quot;;
+
+    @Bean
+    SecurityWebFilterChain securityWebFilterChain(
+            ServerHttpSecurity http,
+            Converter&lt;Jwt, Mono&lt;AbstractAuthenticationToken&gt;&gt; jwtAuthenticationConverter,
+            CorsConfigurationSource corsConfigurationSource,
+            ObjectMapper objectMapper) {
+<span class="fc" id="L52">        return http</span>
+<span class="fc" id="L53">                .csrf(ServerHttpSecurity.CsrfSpec::disable)</span>
+<span class="fc" id="L54">                .cors(cors -&gt; cors.configurationSource(corsConfigurationSource))</span>
+<span class="fc" id="L55">                .authorizeExchange(exchanges -&gt; exchanges</span>
+<span class="fc" id="L56">                        .pathMatchers(</span>
+                                &quot;/swagger-ui.html&quot;,
+                                &quot;/swagger-ui/**&quot;,
+                                &quot;/v3/api-docs/**&quot;,
+                                &quot;/webjars/**&quot;,
+                                &quot;/docs/**&quot;)
+<span class="fc" id="L62">                            .permitAll()</span>
+<span class="fc" id="L63">                        .pathMatchers(&quot;/actuator/health/**&quot;, &quot;/actuator/info&quot;).permitAll()</span>
+<span class="fc" id="L64">                        .pathMatchers(&quot;/actuator/metrics/**&quot;, &quot;/actuator/gateway/**&quot;)</span>
+<span class="fc" id="L65">                            .hasAuthority(GATEWAY_ADMIN)</span>
+<span class="fc" id="L66">                        .pathMatchers(&quot;/internal/**&quot;).hasAuthority(INTERNAL_ACCESS)</span>
+<span class="fc" id="L67">                        .anyExchange().authenticated())</span>
+<span class="fc" id="L68">                .oauth2ResourceServer(oauth2 -&gt; oauth2</span>
+<span class="fc" id="L69">                        .jwt(jwt -&gt; jwt.jwtAuthenticationConverter(jwtAuthenticationConverter))</span>
+<span class="fc" id="L70">                        .authenticationEntryPoint((exchange, exception) -&gt; writeError(</span>
+                                exchange, objectMapper, HttpStatus.UNAUTHORIZED,
+                                &quot;UNAUTHENTICATED&quot;, &quot;A valid bearer access token is required&quot;)))
+<span class="fc" id="L73">                .exceptionHandling(exceptions -&gt; exceptions</span>
+<span class="fc" id="L74">                        .accessDeniedHandler((exchange, exception) -&gt; writeError(</span>
+                                exchange, objectMapper, HttpStatus.FORBIDDEN,
+                                &quot;ACCESS_DENIED&quot;,
+                                &quot;The authenticated subject is not allowed to access this gateway resource&quot;)))
+<span class="fc" id="L78">                .build();</span>
+    }
+
+    /** Validates signature, time claims, exact issuer and required CMS audience. */
+    @Bean
+    ReactiveJwtDecoder reactiveJwtDecoder(
+            @Value(&quot;${spring.security.oauth2.resourceserver.jwt.issuer-uri}&quot;) String issuer,
+            @Value(&quot;${spring.security.oauth2.resourceserver.jwt.jwk-set-uri}&quot;) String jwkSetUri,
+            @Value(&quot;${cms.security.audience}&quot;) String audience) {
+<span class="fc" id="L87">        NimbusReactiveJwtDecoder decoder = NimbusReactiveJwtDecoder.withJwkSetUri(jwkSetUri).build();</span>
+<span class="fc" id="L88">        OAuth2TokenValidator&lt;Jwt&gt; issuerValidator = JwtValidators.createDefaultWithIssuer(issuer);</span>
+<span class="fc" id="L89">        OAuth2TokenValidator&lt;Jwt&gt; audienceValidator = new JwtClaimValidator&lt;List&lt;String&gt;&gt;(</span>
+<span class="pc bpc" id="L90" title="1 of 4 branches missed.">                &quot;aud&quot;, audiences -&gt; audiences != null &amp;&amp; audiences.contains(audience));</span>
+<span class="fc" id="L91">        decoder.setJwtValidator(new DelegatingOAuth2TokenValidator&lt;&gt;(issuerValidator, audienceValidator));</span>
+<span class="fc" id="L92">        return decoder;</span>
+    }
+
+    /** Converts the top-level Keycloak permissions claim to PERM_* authorities. */
+    @Bean
+    Converter&lt;Jwt, Mono&lt;AbstractAuthenticationToken&gt;&gt; jwtAuthenticationConverter() {
+<span class="fc" id="L98">        JwtGrantedAuthoritiesConverter permissions = new JwtGrantedAuthoritiesConverter();</span>
+<span class="fc" id="L99">        permissions.setAuthoritiesClaimName(&quot;permissions&quot;);</span>
+<span class="fc" id="L100">        permissions.setAuthorityPrefix(&quot;PERM_&quot;);</span>
+
+<span class="fc" id="L102">        JwtAuthenticationConverter delegate = new JwtAuthenticationConverter();</span>
+<span class="fc" id="L103">        delegate.setJwtGrantedAuthoritiesConverter(permissions);</span>
+<span class="fc" id="L104">        delegate.setPrincipalClaimName(&quot;sub&quot;);</span>
+<span class="fc" id="L105">        return new ReactiveJwtAuthenticationConverterAdapter(delegate);</span>
+    }
+
+    @Bean
+    CorsConfigurationSource corsConfigurationSource(
+            @Value(&quot;${cms.security.allowed-origins}&quot;) String allowedOrigins) {
+<span class="fc" id="L111">        CorsConfiguration configuration = new CorsConfiguration();</span>
+<span class="fc" id="L112">        configuration.setAllowedOrigins(Arrays.stream(allowedOrigins.split(&quot;,&quot;))</span>
+<span class="fc bfc" id="L113" title="All 2 branches covered.">                .map(String::trim).filter(value -&gt; !value.isEmpty()).toList());</span>
+<span class="fc" id="L114">        configuration.setAllowedMethods(List.of(&quot;GET&quot;, &quot;POST&quot;, &quot;PUT&quot;, &quot;PATCH&quot;, &quot;DELETE&quot;, &quot;OPTIONS&quot;));</span>
+<span class="fc" id="L115">        configuration.setAllowedHeaders(List.of(</span>
+                HttpHeaders.AUTHORIZATION, HttpHeaders.CONTENT_TYPE, &quot;X-Request-Id&quot;, &quot;Idempotency-Key&quot;));
+<span class="fc" id="L117">        configuration.setExposedHeaders(List.of(&quot;X-Request-Id&quot;, HttpHeaders.LOCATION));</span>
+<span class="fc" id="L118">        configuration.setAllowCredentials(true);</span>
+<span class="fc" id="L119">        configuration.setMaxAge(3600L);</span>
+
+<span class="fc" id="L121">        UrlBasedCorsConfigurationSource source = new UrlBasedCorsConfigurationSource();</span>
+<span class="fc" id="L122">        source.registerCorsConfiguration(&quot;/**&quot;, configuration);</span>
+<span class="fc" id="L123">        return source;</span>
+    }
+
+    private static Mono&lt;Void&gt; writeError(
+            ServerWebExchange exchange,
+            ObjectMapper objectMapper,
+            HttpStatus status,
+            String code,
+            String message) {
+<span class="fc" id="L132">        String requestId = exchange.getRequest().getHeaders().getFirst(&quot;X-Request-Id&quot;);</span>
+<span class="fc" id="L133">        Map&lt;String, Object&gt; error = new LinkedHashMap&lt;&gt;();</span>
+<span class="fc" id="L134">        error.put(&quot;code&quot;, code);</span>
+<span class="fc" id="L135">        error.put(&quot;message&quot;, message);</span>
+<span class="fc" id="L136">        error.put(&quot;details&quot;, null);</span>
+<span class="fc" id="L137">        Map&lt;String, Object&gt; meta = new LinkedHashMap&lt;&gt;();</span>
+<span class="fc" id="L138">        meta.put(&quot;requestId&quot;, requestId);</span>
+<span class="fc" id="L139">        meta.put(&quot;timestamp&quot;, Instant.now().toString());</span>
+<span class="fc" id="L140">        Map&lt;String, Object&gt; envelope = new LinkedHashMap&lt;&gt;();</span>
+<span class="fc" id="L141">        envelope.put(&quot;success&quot;, false);</span>
+<span class="fc" id="L142">        envelope.put(&quot;error&quot;, error);</span>
+<span class="fc" id="L143">        envelope.put(&quot;meta&quot;, meta);</span>
+
+<span class="fc" id="L145">        exchange.getResponse().setStatusCode(status);</span>
+<span class="fc" id="L146">        exchange.getResponse().getHeaders().setContentType(MediaType.APPLICATION_JSON);</span>
+        try {
+<span class="fc" id="L148">            byte[] body = objectMapper.writeValueAsBytes(envelope);</span>
+<span class="fc" id="L149">            return exchange.getResponse().writeWith(Mono.just(</span>
+<span class="fc" id="L150">                    exchange.getResponse().bufferFactory().wrap(body)));</span>
+<span class="nc" id="L151">        } catch (JacksonException exception) {</span>
+<span class="nc" id="L152">            return exchange.getResponse().setComplete();</span>
+        }
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.15.202606040825</span></div></body></html>
