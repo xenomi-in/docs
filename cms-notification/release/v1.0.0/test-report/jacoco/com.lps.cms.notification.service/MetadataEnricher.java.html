@@ -1,0 +1,91 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>MetadataEnricher.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">cms-notification</a> &gt; <a href="index.source.html" class="el_package">com.lps.cms.notification.service</a> &gt; <span class="el_source">MetadataEnricher.java</span></div><h1>MetadataEnricher.java</h1><pre class="source lang-java linenums">package com.lps.cms.notification.service;
+
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+import org.slf4j.MDC;
+import org.springframework.stereotype.Component;
+import org.springframework.util.StringUtils;
+
+import com.lps.cms.notification.config.TraceIdFilter;
+import com.lps.cms.notification.exception.ValidationException;
+import com.lps.cms.notification.model.EventSource;
+import com.lps.cms.notification.model.NotificationEvent;
+import com.lps.cms.notification.model.NotificationMetadata;
+import com.lps.cms.notification.model.NotificationPriority;
+import com.lps.cms.notification.model.NotificationRequest;
+
+import java.time.Instant;
+import java.util.ArrayList;
+import java.util.List;
+import java.util.UUID;
+
+/**
+ * Builds a canonical {@link com.lps.cms.notification.model.NotificationEvent} from an API request
+ * by applying defaults, timestamps, trace correlation, and service-owned metadata.
+ * &lt;p&gt;
+ * {@code eventId}, {@code eventSource}, and {@code tenantId} are caller-supplied and mandatory
+ * (enforced upstream); this enricher never invents identity or routing values.
+ */
+@Component
+<span class="fc" id="L30">public class MetadataEnricher {</span>
+
+<span class="fc" id="L32">    private static final Logger log = LoggerFactory.getLogger(MetadataEnricher.class);</span>
+
+    private static final String EVENT_VERSION = &quot;1.0&quot;;
+
+    /**
+     * Enriches a validated request into a publish-ready domain event.
+     * &lt;p&gt;
+     * Generates {@code traceId} when absent from MDC; resolves {@code eventSource} to an
+     * {@link EventSource}; sets {@code retryCount} to zero for first publish.
+     *
+     * @param req validated notification request
+     * @return fully populated event ready for Avro mapping and Kafka publish
+     */
+    public NotificationEvent enrich(NotificationRequest req) {
+<span class="fc" id="L46">        String traceId = MDC.get(TraceIdFilter.TRACE_ID_MDC_KEY);</span>
+<span class="fc bfc" id="L47" title="All 2 branches covered.">        if (!StringUtils.hasText(traceId)) {</span>
+<span class="fc" id="L48">            traceId = UUID.randomUUID().toString();</span>
+<span class="fc" id="L49">            MDC.put(TraceIdFilter.TRACE_ID_MDC_KEY, traceId);</span>
+<span class="fc" id="L50">            log.debug(&quot;Generated traceId for request without {}&quot;, TraceIdFilter.TRACE_ID_HEADER);</span>
+        }
+
+<span class="pc bpc" id="L53" title="1 of 2 branches missed.">        if (!StringUtils.hasText(req.eventId())) {</span>
+<span class="nc" id="L54">            log.debug(&quot;Generated eventId for request without client-supplied eventId&quot;);</span>
+        }
+<span class="fc" id="L56">        EventSource eventSource = EventSource.fromValue(req.eventSource())</span>
+<span class="fc" id="L57">                .orElseThrow(() -&gt; new ValidationException(&quot;eventSource must be a known source&quot;));</span>
+
+<span class="fc bfc" id="L59" title="All 2 branches covered.">        List&lt;String&gt; channels = req.channels() == null</span>
+<span class="fc" id="L60">                ? List.of()</span>
+<span class="fc" id="L61">                : req.channels().stream()</span>
+<span class="fc" id="L62">                .map(String::trim)</span>
+<span class="fc" id="L63">                .toList();</span>
+<span class="fc bfc" id="L64" title="All 2 branches covered.">        NotificationPriority priority = req.priority() == null ? NotificationPriority.MEDIUM : req.priority();</span>
+
+<span class="fc" id="L66">        return new NotificationEvent(</span>
+<span class="fc" id="L67">                req.eventId().trim(),</span>
+<span class="fc" id="L68">                req.eventType().trim(),</span>
+                eventSource,
+<span class="fc" id="L70">                Instant.now(),</span>
+                EVENT_VERSION,
+<span class="fc" id="L72">                trimToNull(req.aggregateType()),</span>
+<span class="fc" id="L73">                trimToNull(req.aggregateId()),</span>
+<span class="fc" id="L74">                trimToNull(req.customerId()),</span>
+<span class="fc" id="L75">                trimToNull(req.correlationId()),</span>
+                channels,
+                priority,
+<span class="fc" id="L78">                req.payload(),</span>
+<span class="fc" id="L79">                new NotificationMetadata(req.tenantId().trim(), traceId, 0)</span>
+        );
+    }
+
+    private static String trimToNull(String value) {
+<span class="fc bfc" id="L84" title="All 2 branches covered.">        if (!StringUtils.hasText(value)) {</span>
+<span class="fc" id="L85">            return null;</span>
+        }
+<span class="fc" id="L87">        return value.trim();</span>
+    }
+
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.14.202510111229</span></div></body></html>

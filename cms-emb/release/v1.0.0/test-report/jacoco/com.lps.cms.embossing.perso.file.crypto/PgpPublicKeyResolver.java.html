@@ -1,0 +1,91 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>PgpPublicKeyResolver.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">embossing-service</a> &gt; <a href="index.source.html" class="el_package">com.lps.cms.embossing.perso.file.crypto</a> &gt; <span class="el_source">PgpPublicKeyResolver.java</span></div><h1>PgpPublicKeyResolver.java</h1><pre class="source lang-java linenums">package com.lps.cms.embossing.perso.file.crypto;
+
+import java.io.ByteArrayInputStream;
+import java.io.InputStream;
+import java.security.MessageDigest;
+import java.util.HexFormat;
+import java.util.List;
+import java.util.UUID;
+
+import com.lps.cms.embossing.perso.exception.EmbossingErrorCodes;
+import com.lps.cms.embossing.perso.exception.FileGenerationException;
+import org.bouncycastle.openpgp.PGPPublicKey;
+import org.bouncycastle.openpgp.PGPPublicKeyRing;
+import org.bouncycastle.openpgp.PGPUtil;
+import org.bouncycastle.openpgp.operator.jcajce.JcaKeyFingerprintCalculator;
+import org.springframework.jdbc.core.JdbcTemplate;
+import org.springframework.stereotype.Repository;
+
+/**
+ * Loads the single active public key for an institution and vendor from
+ * {@code cms_v2.vendor_pgp_encryption_key} and verifies its fingerprint.
+ */
+@Repository
+public class PgpPublicKeyResolver {
+
+    private final JdbcTemplate jdbc;
+
+<span class="fc" id="L28">    public PgpPublicKeyResolver(JdbcTemplate jdbc) {</span>
+<span class="fc" id="L29">        this.jdbc = jdbc;</span>
+<span class="fc" id="L30">    }</span>
+
+    public PgpEncryptionTarget resolve(UUID institutionId, UUID vendorId) {
+<span class="fc" id="L33">        List&lt;KeyRow&gt; rows = jdbc.query(&quot;&quot;&quot;</span>
+                SELECT vendor_pgp_encryption_key_id, fingerprint, armored_public_key
+                FROM cms_v2.vendor_pgp_encryption_key
+                WHERE institution_id = ?
+                  AND vendor_id = ?
+                  AND key_status = 'ACTIVE'
+                  AND effective_from &lt;= now()
+                  AND (effective_to IS NULL OR effective_to &gt; now())
+                ORDER BY effective_from DESC
+                LIMIT 2
+<span class="fc" id="L43">                &quot;&quot;&quot;, (rs, rowNum) -&gt; new KeyRow(</span>
+<span class="fc" id="L44">                rs.getObject(&quot;vendor_pgp_encryption_key_id&quot;, UUID.class),</span>
+<span class="fc" id="L45">                rs.getString(&quot;fingerprint&quot;),</span>
+<span class="fc" id="L46">                rs.getString(&quot;armored_public_key&quot;)), institutionId, vendorId);</span>
+<span class="fc bfc" id="L47" title="All 2 branches covered.">        if (rows.size() != 1) {</span>
+<span class="fc" id="L48">            throw new FileGenerationException(EmbossingErrorCodes.PGP_KEY_UNAVAILABLE,</span>
+                    &quot;Expected exactly one active PGP encryption key for tenant=&quot;
+<span class="fc" id="L50">                            + institutionId + &quot; vendor=&quot; + vendorId + &quot;; found &quot; + rows.size());</span>
+        }
+<span class="fc" id="L52">        KeyRow row = rows.getFirst();</span>
+<span class="fc" id="L53">        PGPPublicKey key = parseEncryptionKey(row.armoredPublicKey());</span>
+<span class="fc" id="L54">        String actualFingerprint = HexFormat.of().withUpperCase().formatHex(key.getFingerprint());</span>
+<span class="fc bfc" id="L55" title="All 2 branches covered.">        if (!MessageDigest.isEqual(actualFingerprint.getBytes(java.nio.charset.StandardCharsets.US_ASCII),</span>
+<span class="fc" id="L56">                row.fingerprint().trim().toUpperCase(java.util.Locale.ROOT)</span>
+<span class="fc" id="L57">                        .getBytes(java.nio.charset.StandardCharsets.US_ASCII))) {</span>
+<span class="fc" id="L58">            throw new FileGenerationException(EmbossingErrorCodes.PGP_KEY_INVALID,</span>
+<span class="fc" id="L59">                    &quot;Configured PGP key fingerprint does not match key material for key=&quot; + row.keyId());</span>
+        }
+<span class="fc" id="L61">        return new PgpEncryptionTarget(institutionId, vendorId, row.keyId(), actualFingerprint, key);</span>
+    }
+
+    private static PGPPublicKey parseEncryptionKey(String armoredKey) {
+<span class="pc bpc" id="L65" title="1 of 4 branches missed.">        if (armoredKey == null || armoredKey.isBlank()) {</span>
+<span class="fc" id="L66">            throw new FileGenerationException(EmbossingErrorCodes.PGP_KEY_INVALID,</span>
+                    &quot;Configured PGP public key material is empty&quot;);
+        }
+<span class="fc" id="L69">        try (InputStream input = PGPUtil.getDecoderStream(</span>
+<span class="fc" id="L70">                new ByteArrayInputStream(armoredKey.getBytes(java.nio.charset.StandardCharsets.US_ASCII)))) {</span>
+<span class="fc" id="L71">            PGPPublicKeyRing ring = new PGPPublicKeyRing(input, new JcaKeyFingerprintCalculator());</span>
+<span class="pc bpc" id="L72" title="1 of 2 branches missed.">            for (java.util.Iterator&lt;PGPPublicKey&gt; keys = ring.getPublicKeys(); keys.hasNext();) {</span>
+<span class="fc" id="L73">                PGPPublicKey key = keys.next();</span>
+<span class="pc bpc" id="L74" title="2 of 4 branches missed.">                if (key.isEncryptionKey() &amp;&amp; !key.hasRevocation()) {</span>
+<span class="fc" id="L75">                    return key;</span>
+                }
+<span class="nc" id="L77">            }</span>
+<span class="nc" id="L78">            throw new FileGenerationException(EmbossingErrorCodes.PGP_KEY_INVALID,</span>
+                    &quot;Configured PGP key ring has no usable encryption key&quot;);
+<span class="nc" id="L80">        } catch (FileGenerationException exception) {</span>
+<span class="nc" id="L81">            throw exception;</span>
+<span class="fc" id="L82">        } catch (Exception exception) {</span>
+<span class="fc" id="L83">            throw new FileGenerationException(EmbossingErrorCodes.PGP_KEY_INVALID,</span>
+                    &quot;Configured PGP public key is invalid&quot;, exception);
+        }
+    }
+
+<span class="fc" id="L88">    private record KeyRow(UUID keyId, String fingerprint, String armoredPublicKey) {</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.15.202606040825</span></div></body></html>

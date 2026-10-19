@@ -1,0 +1,86 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>NotificationEventAvroMapper.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">cms-notification</a> &gt; <a href="index.source.html" class="el_package">com.lps.cms.notification.producer</a> &gt; <span class="el_source">NotificationEventAvroMapper.java</span></div><h1>NotificationEventAvroMapper.java</h1><pre class="source lang-java linenums">package com.lps.cms.notification.producer;
+
+import com.cms.notification.avro.NotificationEvent;
+import com.cms.notification.avro.NotificationMetadata;
+import com.cms.notification.avro.NotificationPriority;
+import tools.jackson.core.JacksonException;
+import tools.jackson.databind.json.JsonMapper;
+import com.lps.cms.notification.config.NotificationProducerProperties;
+import com.lps.cms.notification.exception.PayloadTooLargeException;
+import com.lps.cms.notification.exception.ValidationException;
+import org.springframework.stereotype.Component;
+
+import java.nio.charset.StandardCharsets;
+
+/**
+ * Maps the internal domain {@link com.lps.cms.notification.model.NotificationEvent}
+ * to the Avro-generated type registered in Schema Registry.
+ * &lt;p&gt;
+ * Serializes {@code payload} to a JSON string for the Avro {@code string} field and
+ * enforces the configured maximum payload size so oversized events are rejected as
+ * client errors before they reach the Kafka producer.
+ */
+@Component
+public class NotificationEventAvroMapper {
+
+    private final JsonMapper jsonMapper;
+    private final long maxPayloadBytes;
+
+    public NotificationEventAvroMapper(JsonMapper jsonMapper,
+<span class="fc" id="L30">                                       NotificationProducerProperties producerProperties) {</span>
+<span class="fc" id="L31">        this.jsonMapper = jsonMapper;</span>
+<span class="fc" id="L32">        this.maxPayloadBytes = producerProperties.maxPayloadSize().toBytes();</span>
+<span class="fc" id="L33">    }</span>
+
+    /**
+     * Converts a domain event to its Avro representation for Kafka produce.
+     *
+     * @param event enriched domain event
+     * @return Avro {@link NotificationEvent} ready for serialization
+     * @throws ValidationException      if {@code payload} cannot be serialized to JSON
+     * @throws PayloadTooLargeException if the serialized payload exceeds the configured maximum
+     */
+    public NotificationEvent toAvro(com.lps.cms.notification.model.NotificationEvent event) {
+<span class="fc" id="L44">        String payloadJson = serializePayload(event);</span>
+
+<span class="fc" id="L46">        NotificationMetadata metadata = NotificationMetadata.newBuilder()</span>
+<span class="fc" id="L47">                .setTenantId(event.metadata().tenantId())</span>
+<span class="fc" id="L48">                .setTraceId(event.metadata().traceId())</span>
+<span class="fc" id="L49">                .setRetryCount(event.metadata().retryCount())</span>
+<span class="fc" id="L50">                .build();</span>
+
+<span class="fc" id="L52">        return NotificationEvent.newBuilder()</span>
+<span class="fc" id="L53">                .setEventId(event.eventId())</span>
+<span class="fc" id="L54">                .setEventType(event.eventType())</span>
+<span class="fc" id="L55">                .setEventSource(event.eventSource().name())</span>
+<span class="fc" id="L56">                .setEventTime(event.eventTime().toString())</span>
+<span class="fc" id="L57">                .setVersion(event.version())</span>
+<span class="fc" id="L58">                .setTenantId(event.metadata().tenantId())</span>
+<span class="fc" id="L59">                .setAggregateType(event.aggregateType())</span>
+<span class="fc" id="L60">                .setAggregateId(event.aggregateId())</span>
+<span class="fc" id="L61">                .setCustomerId(event.customerId())</span>
+<span class="fc" id="L62">                .setCorrelationId(event.correlationId())</span>
+<span class="fc" id="L63">                .setChannels(event.channels())</span>
+<span class="fc" id="L64">                .setPriority(NotificationPriority.valueOf(event.priority().name()))</span>
+<span class="fc" id="L65">                .setPayload(payloadJson)</span>
+<span class="fc" id="L66">                .setMetadata(metadata)</span>
+<span class="fc" id="L67">                .build();</span>
+    }
+
+    private String serializePayload(com.lps.cms.notification.model.NotificationEvent event) {
+        String payloadJson;
+        try {
+<span class="fc" id="L73">            payloadJson = jsonMapper.writeValueAsString(event.payload());</span>
+<span class="fc" id="L74">        } catch (JacksonException ex) {</span>
+<span class="fc" id="L75">            throw new ValidationException(&quot;payload must be JSON-serializable&quot;, ex);</span>
+<span class="fc" id="L76">        }</span>
+
+<span class="fc" id="L78">        long payloadBytes = payloadJson.getBytes(StandardCharsets.UTF_8).length;</span>
+<span class="fc bfc" id="L79" title="All 2 branches covered.">        if (payloadBytes &gt; maxPayloadBytes) {</span>
+<span class="fc" id="L80">            throw new PayloadTooLargeException(</span>
+                    &quot;payload is &quot; + payloadBytes + &quot; bytes; maximum allowed is &quot; + maxPayloadBytes + &quot; bytes&quot;);
+        }
+<span class="fc" id="L83">        return payloadJson;</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.14.202510111229</span></div></body></html>

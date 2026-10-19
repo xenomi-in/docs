@@ -1,0 +1,23 @@
+<?xml version='1.0' encoding='utf-8'?>
+<testsuite xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:noNamespaceSchemaLocation="https://maven.apache.org/surefire/maven-surefire-plugin/xsd/surefire-test-report.xsd" version="3.0.2" name="com.lps.cms.notification.exception.ApiExceptionHandlerTest" time="0.004" tests="10" errors="0" skipped="0" failures="0" flakes="0">
+  <testcase name="beanValidationUsesTheFirstFieldError" classname="com.lps.cms.notification.exception.ApiExceptionHandlerTest" time="0.0">
+    </testcase>
+  <testcase name="validationFailureIsABadRequestWithTheDomainMessage" classname="com.lps.cms.notification.exception.ApiExceptionHandlerTest" time="0.0">
+    </testcase>
+  <testcase name="unexpectedErrorsAre500WithoutARetryHint" classname="com.lps.cms.notification.exception.ApiExceptionHandlerTest" time="0.001">
+    </testcase>
+  <testcase name="missingHeaderNamesTheRequiredHeader" classname="com.lps.cms.notification.exception.ApiExceptionHandlerTest" time="0.0">
+    </testcase>
+  <testcase name="fullBulkheadIs429WithRetryAfter" classname="com.lps.cms.notification.exception.ApiExceptionHandlerTest" time="0.0">
+    </testcase>
+  <testcase name="openCircuitIs503WithALongerRetryAfter" classname="com.lps.cms.notification.exception.ApiExceptionHandlerTest" time="0.001">
+    </testcase>
+  <testcase name="beanValidationWithoutFieldErrorsUsesAGenericDetail" classname="com.lps.cms.notification.exception.ApiExceptionHandlerTest" time="0.0">
+    </testcase>
+  <testcase name="oversizedPayloadIs413WithATitle" classname="com.lps.cms.notification.exception.ApiExceptionHandlerTest" time="0.001">
+    </testcase>
+  <testcase name="idempotencyConflictIs409WithRetryAfter" classname="com.lps.cms.notification.exception.ApiExceptionHandlerTest" time="0.0">
+    </testcase>
+  <testcase name="publishFailureIs503WithRetryAfter" classname="com.lps.cms.notification.exception.ApiExceptionHandlerTest" time="0.0">
+    </testcase>
+</testsuite>

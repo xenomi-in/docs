@@ -1,0 +1,76 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>ApiResponseHelper.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">embossing-service</a> &gt; <a href="index.source.html" class="el_package">com.lps.cms.embossing.perso.api</a> &gt; <span class="el_source">ApiResponseHelper.java</span></div><h1>ApiResponseHelper.java</h1><pre class="source lang-java linenums">package com.lps.cms.embossing.perso.api;
+
+import java.time.Instant;
+import java.util.List;
+import java.util.Optional;
+import java.util.UUID;
+
+import jakarta.servlet.http.HttpServletRequest;
+import org.springframework.http.HttpStatus;
+import org.springframework.http.ResponseEntity;
+import org.springframework.web.context.request.RequestContextHolder;
+import org.springframework.web.context.request.ServletRequestAttributes;
+
+public final class ApiResponseHelper {
+
+    private ApiResponseHelper() {
+    }
+
+    public static String getRequestId() {
+<span class="fc" id="L20">        return Optional.ofNullable(RequestContextHolder.getRequestAttributes())</span>
+<span class="fc" id="L21">                .filter(ServletRequestAttributes.class::isInstance)</span>
+<span class="fc" id="L22">                .map(ServletRequestAttributes.class::cast)</span>
+<span class="fc" id="L23">                .map(ServletRequestAttributes::getRequest)</span>
+<span class="fc" id="L24">                .map(ApiResponseHelper::getRequestId)</span>
+<span class="fc" id="L25">                .orElse(null);</span>
+    }
+
+    public static String getRequestId(HttpServletRequest request) {
+<span class="fc bfc" id="L29" title="All 2 branches covered.">        if (request == null) {</span>
+<span class="fc" id="L30">            return null;</span>
+        }
+<span class="fc" id="L32">        Object value = request.getAttribute(RequestIdFilter.REQUEST_ID_ATTRIBUTE);</span>
+<span class="fc bfc" id="L33" title="All 2 branches covered.">        return value instanceof String requestId ? requestId : null;</span>
+    }
+
+    public static ApiResponseMeta meta() {
+<span class="fc" id="L37">        return meta(getRequestId());</span>
+    }
+
+    public static ApiResponseMeta meta(String requestId) {
+<span class="fc" id="L41">        return new ApiResponseMeta(</span>
+<span class="fc bfc" id="L42" title="All 2 branches covered.">                requestId != null ? requestId : UUID.randomUUID().toString(),</span>
+<span class="fc" id="L43">                Instant.now().toString());</span>
+    }
+
+    public static &lt;T&gt; ApiResponseEnvelope&lt;T&gt; success(T data) {
+<span class="fc" id="L47">        return new ApiResponseEnvelope&lt;&gt;(true, data, meta());</span>
+    }
+
+    public static &lt;T&gt; ResponseEntity&lt;ApiResponseEnvelope&lt;T&gt;&gt; ok(T data) {
+<span class="fc" id="L51">        return ResponseEntity.ok(success(data));</span>
+    }
+
+    public static ApiErrorEnvelope error(String code, String message) {
+<span class="fc" id="L55">        return error(code, message, null);</span>
+    }
+
+    public static ApiErrorEnvelope error(ApiErrorCode code, String message) {
+<span class="fc" id="L59">        return error(code.name(), message, null);</span>
+    }
+
+    public static ApiErrorEnvelope error(HttpServletRequest request, ApiErrorCode code, String message) {
+<span class="fc" id="L63">        return new ApiErrorEnvelope(false,</span>
+<span class="fc" id="L64">                new ApiErrorInfo(code.name(), message, null),</span>
+<span class="fc" id="L65">                meta(getRequestId(request)));</span>
+    }
+
+    public static ApiErrorEnvelope error(String code, String message, List&lt;Object&gt; details) {
+<span class="fc" id="L69">        return new ApiErrorEnvelope(false, new ApiErrorInfo(code, message, details), meta());</span>
+    }
+
+    public static ResponseEntity&lt;ApiErrorEnvelope&gt; status(HttpStatus status, String code, String message) {
+<span class="fc" id="L73">        return ResponseEntity.status(status).body(error(code, message));</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.15.202606040825</span></div></body></html>

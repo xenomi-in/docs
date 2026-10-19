@@ -1,0 +1,146 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>ApiExceptionHandler.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">cms-notification</a> &gt; <a href="index.source.html" class="el_package">com.lps.cms.notification.exception</a> &gt; <span class="el_source">ApiExceptionHandler.java</span></div><h1>ApiExceptionHandler.java</h1><pre class="source lang-java linenums">package com.lps.cms.notification.exception;
+
+import io.github.resilience4j.bulkhead.BulkheadFullException;
+import io.github.resilience4j.circuitbreaker.CallNotPermittedException;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+import org.slf4j.MDC;
+import org.springframework.http.HttpHeaders;
+import org.springframework.http.HttpStatus;
+import org.springframework.http.ProblemDetail;
+import org.springframework.http.ResponseEntity;
+import org.springframework.web.bind.MethodArgumentNotValidException;
+import org.springframework.web.bind.MissingRequestHeaderException;
+import org.springframework.web.bind.annotation.ExceptionHandler;
+import org.springframework.web.bind.annotation.RestControllerAdvice;
+
+import com.lps.cms.notification.config.TraceIdFilter;
+import com.lps.cms.notification.producer.NotificationPublishException;
+
+/**
+ * Maps domain and infrastructure failures to RFC 9457 {@link ProblemDetail} responses
+ * with consistent HTTP status codes for API clients.
+ * &lt;p&gt;
+ * Retryable infrastructure failures (publish errors, open circuit, saturated bulkhead)
+ * carry a {@code Retry-After} header so upstream retry behavior is part of the contract.
+ */
+@RestControllerAdvice
+<span class="fc" id="L28">public class ApiExceptionHandler {</span>
+
+<span class="fc" id="L30">    private static final Logger log = LoggerFactory.getLogger(ApiExceptionHandler.class);</span>
+
+    /** Suggested wait after a publish failure or timeout. */
+    private static final String RETRY_AFTER_PUBLISH_FAILURE_SECONDS = &quot;5&quot;;
+    /** Suggested wait while a circuit is open; aligned with waitDurationInOpenState. */
+    private static final String RETRY_AFTER_CIRCUIT_OPEN_SECONDS = &quot;10&quot;;
+    /** Suggested wait when a source's concurrency cap is reached; contention is transient. */
+    private static final String RETRY_AFTER_BULKHEAD_FULL_SECONDS = &quot;1&quot;;
+    /** Suggested wait when another in-flight publish holds the idempotency claim. */
+    private static final String RETRY_AFTER_IDEMPOTENCY_CONFLICT_SECONDS = &quot;1&quot;;
+
+    /** Business-rule validation failures from {@link com.lps.cms.notification.service.EventValidator}. */
+    @ExceptionHandler(ValidationException.class)
+    public ProblemDetail handleValidationFailure(ValidationException ex) {
+<span class="fc" id="L44">        log.warn(&quot;Bad request: {}&quot;, ex.getMessage());</span>
+<span class="fc" id="L45">        return ProblemDetail.forStatusAndDetail(HttpStatus.BAD_REQUEST, ex.getMessage());</span>
+    }
+
+    /** Missing gateway institution header. */
+    @ExceptionHandler(MissingRequestHeaderException.class)
+    public ProblemDetail handleMissingHeader(MissingRequestHeaderException ex) {
+<span class="fc" id="L51">        String detail = &quot;Required request header '&quot; + ex.getHeaderName() + &quot;' is not present&quot;;</span>
+<span class="fc" id="L52">        log.warn(&quot;Bad request: {}&quot;, detail);</span>
+<span class="fc" id="L53">        return ProblemDetail.forStatusAndDetail(HttpStatus.BAD_REQUEST, detail);</span>
+    }
+
+    /**
+     * Concurrent duplicate submit while the first publish is still in flight and did not
+     * finish within the wait budget.
+     */
+    @ExceptionHandler(IdempotencyConflictException.class)
+    public ResponseEntity&lt;ProblemDetail&gt; handleIdempotencyConflict(IdempotencyConflictException ex) {
+<span class="fc" id="L62">        log.warn(&quot;Returning 409 for idempotency conflict eventId={}: {}&quot;, mdcEventId(), ex.getMessage());</span>
+<span class="fc" id="L63">        ProblemDetail problem = ProblemDetail.forStatusAndDetail(HttpStatus.CONFLICT, ex.getMessage());</span>
+<span class="fc" id="L64">        problem.setTitle(&quot;Publish already in progress&quot;);</span>
+<span class="fc" id="L65">        return withRetryAfter(problem, RETRY_AFTER_IDEMPOTENCY_CONFLICT_SECONDS);</span>
+    }
+
+    /** Jakarta Bean Validation failures on the request body (e.g. missing {@code eventId}). */
+    @ExceptionHandler(MethodArgumentNotValidException.class)
+    public ProblemDetail handleValidation(MethodArgumentNotValidException ex) {
+<span class="fc" id="L71">        String detail = ex.getBindingResult().getFieldErrors().stream()</span>
+<span class="fc" id="L72">                .findFirst()</span>
+<span class="fc" id="L73">                .map(err -&gt; err.getField() + &quot;: &quot; + err.getDefaultMessage())</span>
+<span class="fc" id="L74">                .orElse(&quot;Validation failed&quot;);</span>
+<span class="fc" id="L75">        log.warn(&quot;Request validation failed: {}&quot;, detail);</span>
+<span class="fc" id="L76">        return ProblemDetail.forStatusAndDetail(HttpStatus.BAD_REQUEST, detail);</span>
+    }
+
+    /** Serialized payload exceeds the configured maximum size. */
+    @ExceptionHandler(PayloadTooLargeException.class)
+    public ProblemDetail handlePayloadTooLarge(PayloadTooLargeException ex) {
+<span class="fc" id="L82">        log.warn(&quot;Rejecting oversized payload eventId={}: {}&quot;, mdcEventId(), ex.getMessage());</span>
+<span class="fc" id="L83">        ProblemDetail problem = ProblemDetail.forStatusAndDetail(HttpStatus.PAYLOAD_TOO_LARGE, ex.getMessage());</span>
+<span class="fc" id="L84">        problem.setTitle(&quot;Payload too large&quot;);</span>
+<span class="fc" id="L85">        return problem;</span>
+    }
+
+    /** Kafka publish timeout or broker errors; clients should retry with backoff. */
+    @ExceptionHandler(NotificationPublishException.class)
+    public ResponseEntity&lt;ProblemDetail&gt; handlePublishFailure(NotificationPublishException ex) {
+<span class="fc" id="L91">        log.warn(&quot;Returning 503 for publish failure eventId={}: {}&quot;, mdcEventId(), ex.getMessage());</span>
+<span class="fc" id="L92">        ProblemDetail problem = ProblemDetail.forStatusAndDetail(</span>
+                HttpStatus.SERVICE_UNAVAILABLE,
+                &quot;Notification event could not be published. Please retry with the same eventId.&quot;
+        );
+<span class="fc" id="L96">        problem.setTitle(&quot;Notification publish failed&quot;);</span>
+<span class="fc" id="L97">        return withRetryAfter(problem, RETRY_AFTER_PUBLISH_FAILURE_SECONDS);</span>
+    }
+
+    /** Circuit open for the event's source: Kafka is degraded, fail fast without holding a thread. */
+    @ExceptionHandler(CallNotPermittedException.class)
+    public ResponseEntity&lt;ProblemDetail&gt; handleCircuitOpen(CallNotPermittedException ex) {
+<span class="fc" id="L103">        log.warn(&quot;Returning 503 (circuit open) eventId={}: {}&quot;, mdcEventId(), ex.getMessage());</span>
+<span class="fc" id="L104">        ProblemDetail problem = ProblemDetail.forStatusAndDetail(</span>
+                HttpStatus.SERVICE_UNAVAILABLE,
+                &quot;Publishing is temporarily suspended for this event source. Please retry with the same eventId.&quot;
+        );
+<span class="fc" id="L108">        problem.setTitle(&quot;Notification publishing suspended&quot;);</span>
+<span class="fc" id="L109">        return withRetryAfter(problem, RETRY_AFTER_CIRCUIT_OPEN_SECONDS);</span>
+    }
+
+    /** Concurrency cap reached for the event's source; the caller should back off briefly. */
+    @ExceptionHandler(BulkheadFullException.class)
+    public ResponseEntity&lt;ProblemDetail&gt; handleBulkheadFull(BulkheadFullException ex) {
+<span class="fc" id="L115">        log.warn(&quot;Returning 429 (bulkhead full) eventId={}: {}&quot;, mdcEventId(), ex.getMessage());</span>
+<span class="fc" id="L116">        ProblemDetail problem = ProblemDetail.forStatusAndDetail(</span>
+                HttpStatus.TOO_MANY_REQUESTS,
+                &quot;Too many concurrent publishes for this event source. Please retry with the same eventId.&quot;
+        );
+<span class="fc" id="L120">        problem.setTitle(&quot;Publish concurrency limit reached&quot;);</span>
+<span class="fc" id="L121">        return withRetryAfter(problem, RETRY_AFTER_BULKHEAD_FULL_SECONDS);</span>
+    }
+
+    /** Catch-all for uncategorized server errors. */
+    @ExceptionHandler(Exception.class)
+    public ProblemDetail handleUnexpected(Exception ex) {
+<span class="fc" id="L127">        log.error(&quot;Unhandled notification API error eventId={}&quot;, mdcEventId(), ex);</span>
+<span class="fc" id="L128">        ProblemDetail problem = ProblemDetail.forStatusAndDetail(</span>
+                HttpStatus.INTERNAL_SERVER_ERROR,
+                &quot;Unexpected server error&quot;
+        );
+<span class="fc" id="L132">        problem.setTitle(&quot;Internal server error&quot;);</span>
+<span class="fc" id="L133">        return problem;</span>
+    }
+
+    private static ResponseEntity&lt;ProblemDetail&gt; withRetryAfter(ProblemDetail problem, String retryAfterSeconds) {
+<span class="fc" id="L137">        return ResponseEntity.status(problem.getStatus())</span>
+<span class="fc" id="L138">                .header(HttpHeaders.RETRY_AFTER, retryAfterSeconds)</span>
+<span class="fc" id="L139">                .body(problem);</span>
+    }
+
+    private static String mdcEventId() {
+<span class="fc" id="L143">        return MDC.get(TraceIdFilter.EVENT_ID_MDC_KEY);</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.14.202510111229</span></div></body></html>

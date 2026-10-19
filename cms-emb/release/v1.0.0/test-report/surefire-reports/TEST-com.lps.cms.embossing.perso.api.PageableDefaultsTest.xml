@@ -1,0 +1,7 @@
+<?xml version='1.0' encoding='utf-8'?>
+<testsuite xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:noNamespaceSchemaLocation="https://maven.apache.org/surefire/maven-surefire-plugin/xsd/surefire-test-report.xsd" version="3.0.2" name="com.lps.cms.embossing.perso.api.PageableDefaultsTest" time="0.001" tests="4" errors="0" skipped="0" failures="0" flakes="0">
+  <testcase name="capsThePageSize" classname="com.lps.cms.embossing.perso.api.PageableDefaultsTest" time="0.0" />
+  <testcase name="convertsAOneBasedPageToAZeroBasedPage" classname="com.lps.cms.embossing.perso.api.PageableDefaultsTest" time="0.0" />
+  <testcase name="usesTheDefaultsWhenPageAndSizeAreAbsent" classname="com.lps.cms.embossing.perso.api.PageableDefaultsTest" time="0.0" />
+  <testcase name="treatsANonPositivePageOrSizeAsTheDefault" classname="com.lps.cms.embossing.perso.api.PageableDefaultsTest" time="0.0" />
+</testsuite>

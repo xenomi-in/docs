@@ -1,0 +1,115 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>FileTransmissionStore.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">embossing-service</a> &gt; <a href="index.source.html" class="el_package">com.lps.cms.embossing.perso.file.transmit</a> &gt; <span class="el_source">FileTransmissionStore.java</span></div><h1>FileTransmissionStore.java</h1><pre class="source lang-java linenums">package com.lps.cms.embossing.perso.file.transmit;
+
+import java.util.List;
+import java.util.UUID;
+
+import org.springframework.jdbc.core.JdbcTemplate;
+import org.springframework.stereotype.Repository;
+import org.springframework.transaction.annotation.Transactional;
+
+/** Reads encrypted SFTP files and records the result of one upload attempt. */
+@Repository
+public class FileTransmissionStore {
+
+    private final JdbcTemplate jdbc;
+
+<span class="nc" id="L16">    public FileTransmissionStore(JdbcTemplate jdbc) {</span>
+<span class="nc" id="L17">        this.jdbc = jdbc;</span>
+<span class="nc" id="L18">    }</span>
+
+    public List&lt;ReadyFile&gt; readySftpFiles() {
+<span class="nc" id="L21">        return jdbc.query(&quot;&quot;&quot;</span>
+                SELECT f.personalisation_file_id, f.institution_id, f.batch_id, b.vendor_id,
+                       f.file_name, f.secure_object_reference, f.record_count
+                FROM cms_v2.personalisation_file f
+                JOIN cms_v2.personalisation_batch b
+                  ON b.batch_id = f.batch_id AND b.institution_id = f.institution_id
+                JOIN cms_v2.personalisation_batch_configuration_version v
+                  ON v.batch_configuration_version_id = b.batch_configuration_version_id
+                 AND v.institution_id = b.institution_id
+                WHERE f.file_status = 'ENCRYPTED'
+                  AND v.transmission_channel = 'SFTP'
+                ORDER BY f.generated_at
+<span class="nc" id="L33">                &quot;&quot;&quot;, (rs, row) -&gt; new ReadyFile(</span>
+<span class="nc" id="L34">                rs.getObject(&quot;personalisation_file_id&quot;, UUID.class),</span>
+<span class="nc" id="L35">                rs.getObject(&quot;institution_id&quot;, UUID.class),</span>
+<span class="nc" id="L36">                rs.getObject(&quot;batch_id&quot;, UUID.class),</span>
+<span class="nc" id="L37">                rs.getObject(&quot;vendor_id&quot;, UUID.class),</span>
+<span class="nc" id="L38">                rs.getString(&quot;file_name&quot;),</span>
+<span class="nc" id="L39">                rs.getString(&quot;secure_object_reference&quot;),</span>
+<span class="nc" id="L40">                rs.getInt(&quot;record_count&quot;)));</span>
+    }
+
+    @Transactional
+    public void markSent(ReadyFile file) {
+<span class="nc" id="L45">        int updated = jdbc.update(&quot;&quot;&quot;</span>
+                UPDATE cms_v2.personalisation_file
+                SET file_status = 'SENT'
+                WHERE personalisation_file_id = ? AND institution_id = ? AND file_status = 'ENCRYPTED'
+<span class="nc" id="L49">                &quot;&quot;&quot;, file.fileId(), file.institutionId());</span>
+<span class="nc bnc" id="L50" title="All 2 branches missed.">        if (updated != 1) {</span>
+<span class="nc" id="L51">            throw new IllegalStateException(&quot;Personalisation file was no longer waiting for transmission: &quot; + file.fileId());</span>
+        }
+<span class="nc" id="L53">        jdbc.update(&quot;&quot;&quot;</span>
+                UPDATE cms_v2.personalisation_batch
+                SET batch_status = 'SENT', updated_at = now(), updated_by = 'vendor-service'
+                WHERE batch_id = ? AND institution_id = ?
+                  AND batch_status IN ('FILE_GENERATED', 'TRANSMISSION_FAILED')
+<span class="nc" id="L58">                &quot;&quot;&quot;, file.batchId(), file.institutionId());</span>
+<span class="nc" id="L59">        jdbc.update(&quot;&quot;&quot;</span>
+                UPDATE cms_v2.card_production_request r
+                SET request_status = 'SENT_TO_VENDOR', updated_at = now()
+                FROM cms_v2.personalisation_batch_item i
+                WHERE i.batch_id = ? AND i.institution_id = ?
+                  AND r.institution_id = i.institution_id
+                  AND r.production_request_id = i.production_request_id
+                  AND r.request_status = 'FILE_GENERATED'
+<span class="nc" id="L67">                &quot;&quot;&quot;, file.batchId(), file.institutionId());</span>
+<span class="nc" id="L68">        insertAttempt(file, &quot;SUCCEEDED&quot;, null, null);</span>
+<span class="nc" id="L69">    }</span>
+
+    @Transactional
+    public void markFailed(ReadyFile file, String errorMessage) {
+<span class="nc" id="L73">        jdbc.update(&quot;&quot;&quot;</span>
+                UPDATE cms_v2.personalisation_batch
+                SET batch_status = 'TRANSMISSION_FAILED', updated_at = now(), updated_by = 'vendor-service'
+                WHERE batch_id = ? AND institution_id = ?
+                  AND batch_status IN ('FILE_GENERATED', 'TRANSMISSION_FAILED')
+<span class="nc" id="L78">                &quot;&quot;&quot;, file.batchId(), file.institutionId());</span>
+<span class="nc" id="L79">        insertAttempt(file, &quot;FAILED&quot;, &quot;SFTP_UPLOAD_FAILED&quot;, trim(errorMessage));</span>
+<span class="nc" id="L80">    }</span>
+
+    private void insertAttempt(ReadyFile file, String status, String errorCode, String errorMessage) {
+<span class="nc" id="L83">        Integer next = jdbc.queryForObject(&quot;&quot;&quot;</span>
+                SELECT coalesce(max(attempt_number), 0) + 1
+                FROM cms_v2.file_transmission_attempt
+                WHERE personalisation_file_id = ?
+<span class="nc" id="L87">                &quot;&quot;&quot;, Integer.class, file.fileId());</span>
+<span class="nc" id="L88">        jdbc.update(&quot;&quot;&quot;</span>
+                INSERT INTO cms_v2.file_transmission_attempt (
+                    transmission_attempt_id, institution_id, personalisation_file_id, attempt_number,
+                    transmission_channel, remote_file_name, transmission_status, started_at, completed_at,
+                    error_code, error_message)
+                VALUES (?, ?, ?, ?, 'SFTP', ?, ?, now(), now(), ?, ?)
+<span class="nc bnc" id="L94" title="All 2 branches missed.">                &quot;&quot;&quot;, UUID.randomUUID(), file.institutionId(), file.fileId(), next == null ? 1 : next,</span>
+<span class="nc" id="L95">                file.fileName(), status, errorCode, errorMessage);</span>
+<span class="nc" id="L96">    }</span>
+
+    private static String trim(String message) {
+<span class="nc bnc" id="L99" title="All 4 branches missed.">        if (message == null || message.isBlank()) {</span>
+<span class="nc" id="L100">            return &quot;SFTP upload failed&quot;;</span>
+        }
+<span class="nc bnc" id="L102" title="All 2 branches missed.">        return message.length() &lt;= 500 ? message : message.substring(0, 500);</span>
+    }
+
+<span class="fc" id="L105">    public record ReadyFile(</span>
+            UUID fileId,
+            UUID institutionId,
+            UUID batchId,
+            UUID vendorId,
+            String fileName,
+            String objectReference,
+            int recordCount) {
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.15.202606040825</span></div></body></html>

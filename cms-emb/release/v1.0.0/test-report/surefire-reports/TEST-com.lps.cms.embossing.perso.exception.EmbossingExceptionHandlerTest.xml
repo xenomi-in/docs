@@ -1,0 +1,16 @@
+<?xml version='1.0' encoding='utf-8'?>
+<testsuite xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:noNamespaceSchemaLocation="https://maven.apache.org/surefire/maven-surefire-plugin/xsd/surefire-test-report.xsd" version="3.0.2" name="com.lps.cms.embossing.perso.exception.EmbossingExceptionHandlerTest" time="0.024" tests="8" errors="0" skipped="0" failures="0" flakes="0">
+  <testcase name="reportsAnUnknownRouteAsNotFound" classname="com.lps.cms.embossing.perso.exception.EmbossingExceptionHandlerTest" time="0.001" />
+  <testcase name="rejectsAnUnreadableRequestBody" classname="com.lps.cms.embossing.perso.exception.EmbossingExceptionHandlerTest" time="0.021">
+    </testcase>
+  <testcase name="mapsAMissingResourceTo404" classname="com.lps.cms.embossing.perso.exception.EmbossingExceptionHandlerTest" time="0.0" />
+  <testcase name="mapsAnInternalFailureTo500WithoutDroppingTheCode" classname="com.lps.cms.embossing.perso.exception.EmbossingExceptionHandlerTest" time="0.0">
+    </testcase>
+  <testcase name="mapsAConflictTo409" classname="com.lps.cms.embossing.perso.exception.EmbossingExceptionHandlerTest" time="0.001">
+    </testcase>
+  <testcase name="mapsAnUnprocessableFileFailureTo422" classname="com.lps.cms.embossing.perso.exception.EmbossingExceptionHandlerTest" time="0.0">
+    </testcase>
+  <testcase name="mapsABadRequestTo400" classname="com.lps.cms.embossing.perso.exception.EmbossingExceptionHandlerTest" time="0.0" />
+  <testcase name="hidesTheDetailOfAnUnexpectedFailure" classname="com.lps.cms.embossing.perso.exception.EmbossingExceptionHandlerTest" time="0.001">
+    </testcase>
+</testsuite>

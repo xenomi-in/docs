@@ -1,0 +1,71 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>OutboxEventRepositoryImpl.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">embossing-service</a> &gt; <a href="index.source.html" class="el_package">com.lps.cms.embossing.perso.event.repository</a> &gt; <span class="el_source">OutboxEventRepositoryImpl.java</span></div><h1>OutboxEventRepositoryImpl.java</h1><pre class="source lang-java linenums">package com.lps.cms.embossing.perso.event.repository;
+
+import java.util.UUID;
+
+import jakarta.persistence.EntityManager;
+import jakarta.persistence.PersistenceContext;
+import org.springframework.stereotype.Repository;
+
+@Repository
+<span class="fc" id="L10">public class OutboxEventRepositoryImpl implements OutboxEventRepository {</span>
+
+    private static final String INSERT_IF_ABSENT = &quot;&quot;&quot;
+            INSERT INTO cms_v2.outbox_event (
+                outbox_event_id, institution_id, aggregate_type, aggregate_id, event_type,
+                event_version, aggregate_sequence, event_payload, correlation_id, idempotency_key,
+                publication_status, occurred_at, retry_count)
+            VALUES (
+                :id, :institutionId, :aggregateType, :aggregateId, :eventType,
+                1, :aggregateSequence, CAST(:payload AS jsonb), :correlationId, :idempotencyKey,
+                'PENDING', now(), 0)
+            ON CONFLICT (institution_id, idempotency_key) DO NOTHING
+            &quot;&quot;&quot;;
+
+    private static final String NEXT_AGGREGATE_SEQUENCE = &quot;&quot;&quot;
+            INSERT INTO cms_v2.outbox_aggregate_sequence (
+                institution_id, aggregate_type, aggregate_id, next_sequence
+            )
+            VALUES (:institutionId, :aggregateType, :aggregateId, 2)
+            ON CONFLICT (institution_id, aggregate_type, aggregate_id)
+            DO UPDATE SET next_sequence = cms_v2.outbox_aggregate_sequence.next_sequence + 1
+            RETURNING next_sequence - 1
+            &quot;&quot;&quot;;
+
+    @PersistenceContext
+    private EntityManager entityManager;
+
+    @Override
+    public int insertIfAbsent(
+            UUID id,
+            UUID institutionId,
+            String aggregateType,
+            String aggregateId,
+            String eventType,
+            long aggregateSequence,
+            String payload,
+            UUID correlationId,
+            UUID idempotencyKey) {
+<span class="fc" id="L48">        return entityManager.createNativeQuery(INSERT_IF_ABSENT)</span>
+<span class="fc" id="L49">                .setParameter(&quot;id&quot;, id)</span>
+<span class="fc" id="L50">                .setParameter(&quot;institutionId&quot;, institutionId)</span>
+<span class="fc" id="L51">                .setParameter(&quot;aggregateType&quot;, aggregateType)</span>
+<span class="fc" id="L52">                .setParameter(&quot;aggregateId&quot;, aggregateId)</span>
+<span class="fc" id="L53">                .setParameter(&quot;eventType&quot;, eventType)</span>
+<span class="fc" id="L54">                .setParameter(&quot;aggregateSequence&quot;, aggregateSequence)</span>
+<span class="fc" id="L55">                .setParameter(&quot;payload&quot;, payload)</span>
+<span class="fc" id="L56">                .setParameter(&quot;correlationId&quot;, correlationId)</span>
+<span class="fc" id="L57">                .setParameter(&quot;idempotencyKey&quot;, idempotencyKey)</span>
+<span class="fc" id="L58">                .executeUpdate();</span>
+    }
+
+    @Override
+    public long nextAggregateSequence(UUID institutionId, String aggregateType, String aggregateId) {
+<span class="fc" id="L63">        Number sequence = (Number) entityManager.createNativeQuery(NEXT_AGGREGATE_SEQUENCE)</span>
+<span class="fc" id="L64">                .setParameter(&quot;institutionId&quot;, institutionId)</span>
+<span class="fc" id="L65">                .setParameter(&quot;aggregateType&quot;, aggregateType)</span>
+<span class="fc" id="L66">                .setParameter(&quot;aggregateId&quot;, aggregateId)</span>
+<span class="fc" id="L67">                .getSingleResult();</span>
+<span class="fc" id="L68">        return sequence.longValue();</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.15.202606040825</span></div></body></html>

@@ -1,0 +1,60 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>EmbossingDetailLineParams.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">embossing-service</a> &gt; <a href="index.source.html" class="el_package">com.lps.cms.embossing.perso.file.model</a> &gt; <span class="el_source">EmbossingDetailLineParams.java</span></div><h1>EmbossingDetailLineParams.java</h1><pre class="source lang-java linenums">package com.lps.cms.embossing.perso.file.model;
+
+/**
+ * Fields for one DET record. Lengths noted on each component are maximums.
+ * The detail formatter truncates longer values and writes shorter values unchanged.
+ * Optional fields may be null.
+ */
+<span class="fc" id="L8">public record EmbossingDetailLineParams(</span>
+        String recordType,             // M 3
+        String airwayBillNumber,       // M 30
+        String cardNumber,             // M 19 - PAN
+        String cardSequenceNumber,     // M 2
+        String cardName,               // M 27
+        String startDate,              // M 4 - YYMM
+        String expiryDate,             // M 4 - YYMM
+        String cvc2,                   // M 3
+        String track1Data,             // M 76
+        String track2Data,             // M 37
+        String iCvv,                   // M 3
+        String crnProxyNumber,         // M 16
+        String arnCifId,               // M 16
+        String salutation,             // O 5
+        String address1,               // O 30
+        String address2,               // O 30
+        String address3,               // O 30
+        String address4,               // O 30
+        String city,                   // O 30
+        String state,                  // O 30
+        String country,                // O 30
+        String postalCode,             // O 30
+        String firstName,              // O 30
+        String middleName,             // O 30
+        String lastName,               // O 30
+        String embossedName,           // O 35
+        String templateId,             // M 20
+        String typeOfDelivery,         // M 1 - N/1 or Y/2
+        String cardHolderStatus,       // M 1 - P or A
+        String newCustomer,             // M 1 - Y/N
+        String applicationPreferredName, // M 16
+        String thirdLineEmbossing,     // O 27
+        String fourthLineEmbossing,    // O 27
+        String deliveryAddress1,       // O 50
+        String deliveryAddress2,       // O 50
+        String deliveryAddress3,       // O 50
+        String deliveryAddress4,       // O 50
+        String deliveryCity,            // O 30
+        String deliveryState,          // O 30
+        String deliveryCountry,        // O 30
+        String deliveryPostcode,       // O 30
+        String deliveryContact,        // O 30
+        String deliveryMobileNo,       // O 30
+        String deliveryEmailId,        // O 100
+        String plasticCode,           // M 6
+        String productCode,            // M 6
+        String imageFileName,          // O 20 (after 2 empty placeholders in output)
+        String provisionalField1,      // O 100
+        String provisionalField2,      // O 50
+        String provisionalField3      // O 25 - line ends with ~ after this
+) {}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.15.202606040825</span></div></body></html>

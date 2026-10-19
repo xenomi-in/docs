@@ -1,0 +1,44 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>ReconciliationException.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">embossing-service</a> &gt; <a href="index.source.html" class="el_package">com.lps.cms.embossing.perso.reconciliation</a> &gt; <span class="el_source">ReconciliationException.java</span></div><h1>ReconciliationException.java</h1><pre class="source lang-java linenums">package com.lps.cms.embossing.perso.reconciliation;
+
+import jakarta.persistence.Column;
+import jakarta.persistence.Entity;
+import jakarta.persistence.Id;
+import jakarta.persistence.Table;
+import lombok.Getter;
+import lombok.Setter;
+
+import java.time.OffsetDateTime;
+import java.util.UUID;
+
+@Entity
+@Table(name = &quot;reconciliation_exception&quot;, schema = &quot;cms_v2&quot;)
+@Getter
+@Setter
+<span class="fc" id="L17">public class ReconciliationException {</span>
+
+    @Id
+    @Column(name = &quot;exception_id&quot;)
+    private UUID exceptionId;
+
+    @Column(name = &quot;institution_id&quot;)
+    private UUID institutionId;
+
+    @Column(name = &quot;exception_code&quot;, nullable = false, length = 80)
+    private String exceptionCode;
+
+    @Column(name = &quot;aggregate_type&quot;, length = 60)
+    private String aggregateType;
+
+    @Column(name = &quot;aggregate_id&quot;, length = 120)
+    private String aggregateId;
+
+    @Column(nullable = false, length = 1000)
+    private String detail;
+
+    @Column(name = &quot;detected_at&quot;, nullable = false)
+    private OffsetDateTime detectedAt;
+
+    @Column(name = &quot;resolved_at&quot;)
+    private OffsetDateTime resolvedAt;
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.15.202606040825</span></div></body></html>

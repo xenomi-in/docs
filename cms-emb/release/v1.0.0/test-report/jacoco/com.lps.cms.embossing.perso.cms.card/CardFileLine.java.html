@@ -1,0 +1,35 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>CardFileLine.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">embossing-service</a> &gt; <a href="index.source.html" class="el_package">com.lps.cms.embossing.perso.cms.card</a> &gt; <span class="el_source">CardFileLine.java</span></div><h1>CardFileLine.java</h1><pre class="source lang-java linenums">package com.lps.cms.embossing.perso.cms.card;
+
+import java.time.LocalDate;
+import java.util.UUID;
+
+/** Clear file fields for one batch item. Encrypted PAN, CVV, and track data are not loaded here. */
+<span class="fc" id="L7">public record CardFileLine(</span>
+        UUID cardId,
+        UUID institutionId,
+        String institutionCode,
+        String productCode,
+        String panLastFour,
+        String embossedName1,
+        String embossedName2,
+        String embossedName3,
+        String embossedName4,
+        LocalDate issueDate,
+        LocalDate expiryDate,
+        String cardSequence,
+        String reservedSequence,
+        String title,
+        String firstName,
+        String middleName,
+        String lastName,
+        String mobile,
+        String email,
+        String address1,
+        String address2,
+        String city,
+        String state,
+        String country,
+        String postalCode,
+        String waybillNumber) {
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.15.202606040825</span></div></body></html>

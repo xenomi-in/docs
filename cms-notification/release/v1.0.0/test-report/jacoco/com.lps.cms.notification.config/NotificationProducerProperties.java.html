@@ -1,0 +1,43 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>NotificationProducerProperties.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">cms-notification</a> &gt; <a href="index.source.html" class="el_package">com.lps.cms.notification.config</a> &gt; <span class="el_source">NotificationProducerProperties.java</span></div><h1>NotificationProducerProperties.java</h1><pre class="source lang-java linenums">package com.lps.cms.notification.config;
+
+import jakarta.validation.constraints.NotNull;
+import org.springframework.boot.context.properties.ConfigurationProperties;
+import org.springframework.util.unit.DataSize;
+import org.springframework.validation.annotation.Validated;
+
+import java.time.Duration;
+
+/**
+ * Producer tuning bound from {@code app.notification.producer.*} in application YAML.
+ * &lt;p&gt;
+ * {@code deliveryTimeout} is the single source of truth for how long a publish may take:
+ * it is applied to the Kafka producer's {@code delivery.timeout.ms} and the application waits
+ * {@code deliveryTimeout + awaitBuffer} on the send future. Because the application always waits
+ * longer than the producer's own delivery deadline, the future resolves with the producer's
+ * authoritative outcome before the wait elapses, so a failure can never be reported while a
+ * record is still in flight (which would otherwise be delivered later and cause a duplicate).
+ *
+ * @param deliveryTimeout maximum time the Kafka producer may spend delivering a record (drives {@code delivery.timeout.ms})
+ * @param awaitBuffer     extra time the application waits beyond {@code deliveryTimeout} so the producer always resolves first
+ * @param maxPayloadSize  maximum serialized payload size accepted for a single event; oversized payloads are rejected
+ *                        with HTTP 413 before publish instead of failing at the broker's {@code max.request.size}
+ */
+@Validated
+@ConfigurationProperties(prefix = &quot;app.notification.producer&quot;)
+<span class="fc" id="L27">public record NotificationProducerProperties(</span>
+        @NotNull
+        Duration deliveryTimeout,
+        @NotNull
+        Duration awaitBuffer,
+        @NotNull
+        DataSize maxPayloadSize
+) {
+
+    /**
+     * @return how long the application blocks on the send future: {@code deliveryTimeout + awaitBuffer}
+     */
+    public Duration publishAwaitTimeout() {
+<span class="fc" id="L40">        return deliveryTimeout.plus(awaitBuffer);</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.14.202510111229</span></div></body></html>

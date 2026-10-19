@@ -1,0 +1,11 @@
+<?xml version='1.0' encoding='utf-8'?>
+<testsuite xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:noNamespaceSchemaLocation="https://maven.apache.org/surefire/maven-surefire-plugin/xsd/surefire-test-report.xsd" version="3.0.2" name="com.lps.cms.embossing.perso.file.EmbossingDataFactoryTest" time="0.021" tests="8" errors="0" skipped="0" failures="0" flakes="0">
+  <testcase name="rejectsAnInvalidCvv" classname="com.lps.cms.embossing.perso.file.EmbossingDataFactoryTest" time="0.016" />
+  <testcase name="rejectsAnInvalidPan" classname="com.lps.cms.embossing.perso.file.EmbossingDataFactoryTest" time="0.0" />
+  <testcase name="usesTheReservedSequenceWhenOneIsPresent" classname="com.lps.cms.embossing.perso.file.EmbossingDataFactoryTest" time="0.001" />
+  <testcase name="rejectsAnEmptyBatch" classname="com.lps.cms.embossing.perso.file.EmbossingDataFactoryTest" time="0.0" />
+  <testcase name="rejectsMissingTrackData" classname="com.lps.cms.embossing.perso.file.EmbossingDataFactoryTest" time="0.0" />
+  <testcase name="buildsANewCardFileFromTheSecureExport" classname="com.lps.cms.embossing.perso.file.EmbossingDataFactoryTest" time="0.001" />
+  <testcase name="marksAReplacementRequest" classname="com.lps.cms.embossing.perso.file.EmbossingDataFactoryTest" time="0.0" />
+  <testcase name="rejectsABatchThatMixesProducts" classname="com.lps.cms.embossing.perso.file.EmbossingDataFactoryTest" time="0.001" />
+</testsuite>

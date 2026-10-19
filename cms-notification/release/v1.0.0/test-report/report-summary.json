@@ -1,0 +1,52 @@
+{
+  "service": "cms-notification",
+  "generated_at": "2026-10-19T06:38:43+05:30",
+  "source_commit": "e2f4ad84bb2df59f6ba78a6b62374136e9b8275f",
+  "source_fingerprint_sha256": "b5c239e8aabecf7cd01d883e1a4619f58e9ed7a42d534bcb55a02dde9b69f0b9",
+  "command": "mvn clean verify",
+  "build_exit_code": 0,
+  "tests": {
+    "tests": 109,
+    "failures": 0,
+    "errors": 0,
+    "skipped": 0,
+    "passed": 109,
+    "suites": 18,
+    "duration_seconds": 3.521
+  },
+  "coverage_scope": "Configured production Java scope; excludes generated Avro classes and CmsNotificationApplication",
+  "coverage": {
+    "INSTRUCTION": {
+      "covered": 1793,
+      "missed": 57,
+      "percent": 96.92
+    },
+    "BRANCH": {
+      "covered": 84,
+      "missed": 10,
+      "percent": 89.36
+    },
+    "LINE": {
+      "covered": 390,
+      "missed": 9,
+      "percent": 97.74
+    },
+    "COMPLEXITY": {
+      "covered": 132,
+      "missed": 10,
+      "percent": 92.96
+    },
+    "METHOD": {
+      "covered": 95,
+      "missed": 0,
+      "percent": 100.0
+    },
+    "CLASS": {
+      "covered": 32,
+      "missed": 0,
+      "percent": 100.0
+    }
+  },
+  "coverage_gate": "passed: 95% line / 80% branch",
+  "build_location": "isolated source copy"
+}

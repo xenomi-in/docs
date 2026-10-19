@@ -1,0 +1,47 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>IdempotencyConfig.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">cms-notification</a> &gt; <a href="index.source.html" class="el_package">com.lps.cms.notification.idempotency</a> &gt; <span class="el_source">IdempotencyConfig.java</span></div><h1>IdempotencyConfig.java</h1><pre class="source lang-java linenums">package com.lps.cms.notification.idempotency;
+
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
+import org.springframework.context.annotation.Bean;
+import org.springframework.context.annotation.Configuration;
+import org.springframework.data.redis.connection.RedisConnectionFactory;
+import org.springframework.data.redis.core.StringRedisTemplate;
+
+/**
+ * Wires the {@link IdempotencyStore} implementation selected by
+ * {@code app.notification.idempotency.store}.
+ */
+@Configuration
+<span class="fc" id="L16">public class IdempotencyConfig {</span>
+
+<span class="fc" id="L18">    private static final Logger log = LoggerFactory.getLogger(IdempotencyConfig.class);</span>
+
+    @Bean
+    @ConditionalOnProperty(prefix = &quot;app.notification.idempotency&quot;, name = &quot;store&quot;, havingValue = &quot;memory&quot;)
+    IdempotencyStore inMemoryIdempotencyStore(IdempotencyProperties properties) {
+<span class="fc" id="L23">        log.info(&quot;Using in-memory idempotency store (ttl={})&quot;, properties.ttl());</span>
+<span class="fc" id="L24">        return new InMemoryIdempotencyStore(properties.ttl());</span>
+    }
+
+    @Bean
+    @ConditionalOnProperty(prefix = &quot;app.notification.idempotency&quot;, name = &quot;store&quot;, havingValue = &quot;redis&quot;,
+            matchIfMissing = true)
+    IdempotencyStore redisIdempotencyStore(StringRedisTemplate stringRedisTemplate,
+                                           IdempotencyProperties properties) {
+<span class="fc" id="L32">        log.info(&quot;Using Redis idempotency store (prefix={}, ttl={})&quot;,</span>
+<span class="fc" id="L33">                properties.keyPrefix(), properties.ttl());</span>
+<span class="fc" id="L34">        return new RedisIdempotencyStore(</span>
+                stringRedisTemplate,
+<span class="fc" id="L36">                properties.keyPrefix(),</span>
+<span class="fc" id="L37">                properties.ttl());</span>
+    }
+
+    @Bean
+    @ConditionalOnProperty(prefix = &quot;app.notification.idempotency&quot;, name = &quot;store&quot;, havingValue = &quot;redis&quot;,
+            matchIfMissing = true)
+    StringRedisTemplate stringRedisTemplate(RedisConnectionFactory connectionFactory) {
+<span class="fc" id="L44">        return new StringRedisTemplate(connectionFactory);</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.14.202510111229</span></div></body></html>

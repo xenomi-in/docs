@@ -1,0 +1,62 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>NotificationController.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">cms-notification</a> &gt; <a href="index.source.html" class="el_package">com.lps.cms.notification.controller</a> &gt; <span class="el_source">NotificationController.java</span></div><h1>NotificationController.java</h1><pre class="source lang-java linenums">package com.lps.cms.notification.controller;
+
+import jakarta.validation.Valid;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+import org.springframework.http.ResponseEntity;
+import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.RequestBody;
+import org.springframework.web.bind.annotation.RequestHeader;
+import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RestController;
+
+import com.lps.cms.notification.config.InstitutionHeaders;
+import com.lps.cms.notification.model.NotificationRequest;
+import com.lps.cms.notification.service.NotificationService;
+import com.lps.cms.notification.service.PublishResult;
+
+/**
+ * REST ingress for upstream systems (CMS, Switch, and others) to submit notification events.
+ * &lt;p&gt;
+ * Expects {@code cms-api-gateway} to stamp {@link InstitutionHeaders#INSTITUTION_ID} on every call.
+ */
+@RestController
+@RequestMapping(&quot;/notifications&quot;)
+public class NotificationController {
+
+<span class="fc" id="L27">    private static final Logger log = LoggerFactory.getLogger(NotificationController.class);</span>
+
+    /** Set on idempotent replays so callers/ops can distinguish first accept from retry. */
+    public static final String IDEMPOTENT_REPLAY_HEADER = &quot;X-Idempotent-Replay&quot;;
+
+    private final NotificationService notificationService;
+
+<span class="fc" id="L34">    public NotificationController(NotificationService notificationService) {</span>
+<span class="fc" id="L35">        this.notificationService = notificationService;</span>
+<span class="fc" id="L36">    }</span>
+
+    /**
+     * Accepts a notification intent, publishes it to Kafka (once per idempotency key), and
+     * returns {@code 202 Accepted}. The event id is returned in {@code X-Event-Id}.
+     *
+     * @param institutionId gateway institution id; must match body {@code tenantId}
+     * @param request       validated notification payload from the caller
+     * @return empty body with {@code 202} and {@code X-Event-Id} on success
+     */
+    @PostMapping(&quot;/publish&quot;)
+    public ResponseEntity&lt;Void&gt; publish(
+            @RequestHeader(InstitutionHeaders.INSTITUTION_ID) String institutionId,
+            @RequestBody @Valid NotificationRequest request) {
+<span class="fc" id="L50">        PublishResult result = notificationService.handle(institutionId, request);</span>
+<span class="fc" id="L51">        log.info(&quot;Accepted notification eventId={} eventType={} eventSource={} replay={}&quot;,</span>
+<span class="fc" id="L52">                result.eventId(), request.eventType(), request.eventSource(), result.replay());</span>
+
+<span class="fc" id="L54">        ResponseEntity.BodyBuilder response = ResponseEntity.accepted()</span>
+<span class="fc" id="L55">                .header(&quot;X-Event-Id&quot;, result.eventId());</span>
+<span class="fc bfc" id="L56" title="All 2 branches covered.">        if (result.replay()) {</span>
+<span class="fc" id="L57">            response.header(IDEMPOTENT_REPLAY_HEADER, &quot;true&quot;);</span>
+        }
+<span class="fc" id="L59">        return response.build();</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.14.202510111229</span></div></body></html>

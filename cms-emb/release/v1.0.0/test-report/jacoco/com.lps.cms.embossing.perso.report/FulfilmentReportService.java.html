@@ -1,0 +1,148 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>FulfilmentReportService.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">embossing-service</a> &gt; <a href="index.source.html" class="el_package">com.lps.cms.embossing.perso.report</a> &gt; <span class="el_source">FulfilmentReportService.java</span></div><h1>FulfilmentReportService.java</h1><pre class="source lang-java linenums">package com.lps.cms.embossing.perso.report;
+
+import java.nio.charset.StandardCharsets;
+import java.security.MessageDigest;
+import java.security.NoSuchAlgorithmException;
+import java.time.Instant;
+import java.util.HexFormat;
+import java.util.LinkedHashMap;
+import java.util.Map;
+import java.util.UUID;
+
+import tools.jackson.core.JacksonException;
+import tools.jackson.databind.json.JsonMapper;
+import com.lps.cms.embossing.perso.api.report.CourierEventRequest;
+import com.lps.cms.embossing.perso.api.report.FulfilmentCommandResponse;
+import com.lps.cms.embossing.perso.api.report.VendorResultRequest;
+import com.lps.cms.embossing.perso.event.mapper.PayloadValues;
+import com.lps.cms.embossing.perso.exception.EmbossingErrorCodes;
+import com.lps.cms.embossing.perso.exception.EmbossingSystemException;
+import com.lps.cms.embossing.perso.exception.FulfilmentConflictException;
+import com.lps.cms.embossing.perso.exception.ResourceNotFoundException;
+import com.lps.cms.embossing.perso.report.FulfilmentCommandPlan.Decision;
+import com.lps.cms.embossing.perso.report.FulfilmentReportStore.InboxDraft;
+import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
+
+/** Accepts a vendor or courier report and enqueues the matching CMS fulfilment command. */
+@Service
+public class FulfilmentReportService {
+
+    private final FulfilmentReportStore store;
+    private final FulfilmentCommandPublisher publisher;
+    private final JsonMapper objectMapper;
+
+    public FulfilmentReportService(FulfilmentReportStore store, FulfilmentCommandPublisher publisher,
+<span class="fc" id="L36">                                   JsonMapper objectMapper) {</span>
+<span class="fc" id="L37">        this.store = store;</span>
+<span class="fc" id="L38">        this.publisher = publisher;</span>
+<span class="fc" id="L39">        this.objectMapper = objectMapper;</span>
+<span class="fc" id="L40">    }</span>
+
+    @Transactional
+    public FulfilmentCommandResponse reportVendor(UUID institutionId, VendorResultRequest report) {
+<span class="fc" id="L44">        ReportSubject subject = subject(institutionId, report.productionRequestId());</span>
+<span class="fc" id="L45">        Decision decision = FulfilmentCommandPlan.vendor(report, subject,</span>
+<span class="fc" id="L46">                store.priorCommands(institutionId, report.productionRequestId(), report.externalEventId()));</span>
+<span class="fc" id="L47">        Map&lt;String, Object&gt; payload = commandPayload(report.externalEventId(), decision.command(), subject,</span>
+<span class="fc" id="L48">                subject.vendorId(), report.occurredAt(), decision.evidence());</span>
+<span class="fc" id="L49">        return commit(FulfilmentCommands.SOURCE_VENDOR, report.result().name(), report.externalEventId(),</span>
+                subject, decision, payload);
+    }
+
+    @Transactional
+    public FulfilmentCommandResponse reportCourier(UUID institutionId, CourierEventRequest report) {
+<span class="fc" id="L55">        ReportSubject subject = subject(institutionId, report.productionRequestId());</span>
+<span class="fc" id="L56">        Decision decision = FulfilmentCommandPlan.courier(report, subject,</span>
+<span class="fc" id="L57">                store.priorCommands(institutionId, report.productionRequestId(), report.externalEventId()));</span>
+<span class="fc" id="L58">        Map&lt;String, Object&gt; payload = commandPayload(report.externalEventId(), decision.command(), subject,</span>
+<span class="fc" id="L59">                subject.vendorId(), report.eventTime(), decision.evidence());</span>
+<span class="fc" id="L60">        return commit(FulfilmentCommands.SOURCE_COURIER, report.eventType().name(), report.externalEventId(),</span>
+                subject, decision, payload);
+    }
+
+    private FulfilmentCommandResponse commit(String source, String eventType, String externalEventId,
+                                             ReportSubject subject, Decision decision, Map&lt;String, Object&gt; payload) {
+<span class="fc" id="L66">        String json = toJson(payload);</span>
+<span class="fc" id="L67">        String hash = sha256(json);</span>
+<span class="fc" id="L68">        var inserted = store.insert(new InboxDraft(source, externalEventId, subject.institutionId(), eventType,</span>
+<span class="fc" id="L69">                decision.command(), subject.productionRequestId(), subject.cardId(), json, hash));</span>
+<span class="fc bfc" id="L70" title="All 2 branches covered.">        if (inserted.isEmpty()) {</span>
+<span class="fc" id="L71">            return duplicate(source, externalEventId, subject, decision, hash);</span>
+        }
+<span class="fc" id="L73">        String requestStatus = advance(subject, decision);</span>
+<span class="fc" id="L74">        UUID commandEventId = publisher.publish(subject.institutionId(), subject.cardId(), decision.command(),</span>
+                externalEventId, payload);
+<span class="fc" id="L76">        return new FulfilmentCommandResponse(inserted.get(), decision.command(), subject.cardId(),</span>
+<span class="fc" id="L77">                subject.productionRequestId(), requestStatus, commandEventId, false);</span>
+    }
+
+    private FulfilmentCommandResponse duplicate(String source, String externalEventId, ReportSubject subject,
+                                                Decision decision, String hash) {
+<span class="fc" id="L82">        InboxEvent existing = store.findInbox(source, externalEventId)</span>
+<span class="pc" id="L83">                .orElseThrow(() -&gt; new EmbossingSystemException(EmbossingErrorCodes.UNEXPECTED,</span>
+                        &quot;Provider event disappeared after a duplicate insert&quot;));
+<span class="pc bpc" id="L85" title="1 of 2 branches missed.">        if (!existing.institutionId().equals(subject.institutionId())</span>
+<span class="pc bpc" id="L86" title="1 of 2 branches missed.">                || !existing.productionRequestId().equals(subject.productionRequestId())</span>
+<span class="pc bpc" id="L87" title="1 of 2 branches missed.">                || !existing.cardId().equals(subject.cardId())</span>
+<span class="pc bpc" id="L88" title="1 of 2 branches missed.">                || !existing.commandName().equals(decision.command())</span>
+<span class="pc bpc" id="L89" title="1 of 2 branches missed.">                || !existing.payloadSha256().equals(hash)) {</span>
+<span class="nc" id="L90">            throw new FulfilmentConflictException(EmbossingErrorCodes.REQUEST_STATUS_CHANGED,</span>
+                    &quot;Provider event id was reused with a different report&quot;);
+        }
+<span class="fc" id="L93">        return new FulfilmentCommandResponse(existing.inboxEventId(), existing.commandName(), existing.cardId(),</span>
+<span class="fc" id="L94">                existing.productionRequestId(), subject.requestStatus(), null, true);</span>
+    }
+
+    private String advance(ReportSubject subject, Decision decision) {
+<span class="fc bfc" id="L98" title="All 2 branches covered.">        if (decision.nextRequestStatus() == null) {</span>
+<span class="fc" id="L99">            return subject.requestStatus();</span>
+        }
+<span class="fc" id="L101">        int updated = store.advanceStatus(subject.institutionId(), subject.productionRequestId(),</span>
+<span class="fc" id="L102">                subject.requestStatus(), decision.nextRequestStatus());</span>
+<span class="pc bpc" id="L103" title="1 of 2 branches missed.">        if (updated != 1) {</span>
+<span class="nc" id="L104">            throw new FulfilmentConflictException(EmbossingErrorCodes.REQUEST_STATUS_CHANGED,</span>
+                    &quot;Production request status changed before the command was recorded&quot;);
+        }
+<span class="fc" id="L107">        return decision.nextRequestStatus();</span>
+    }
+
+    private ReportSubject subject(UUID institutionId, UUID productionRequestId) {
+<span class="fc" id="L111">        return store.findSubject(institutionId, productionRequestId)</span>
+<span class="pc" id="L112">                .orElseThrow(() -&gt; new ResourceNotFoundException(&quot;Production request was not found&quot;));</span>
+    }
+
+    private static Map&lt;String, Object&gt; commandPayload(String externalEventId, String command, ReportSubject subject,
+                                                      UUID vendorId, Instant occurredAt, Map&lt;String, Object&gt; evidence) {
+<span class="fc" id="L117">        Map&lt;String, Object&gt; payload = new LinkedHashMap&lt;&gt;();</span>
+<span class="fc" id="L118">        payload.put(&quot;schemaVersion&quot;, 1);</span>
+<span class="fc" id="L119">        payload.put(&quot;externalEventId&quot;, externalEventId);</span>
+<span class="fc" id="L120">        payload.put(&quot;eventType&quot;, command);</span>
+<span class="fc" id="L121">        payload.put(&quot;institutionId&quot;, PayloadValues.uuid(subject.institutionId()));</span>
+<span class="fc" id="L122">        payload.put(&quot;cardId&quot;, PayloadValues.uuid(subject.cardId()));</span>
+<span class="fc" id="L123">        payload.put(&quot;productionRequestId&quot;, PayloadValues.uuid(subject.productionRequestId()));</span>
+<span class="fc" id="L124">        payload.put(&quot;vendorId&quot;, PayloadValues.uuid(vendorId));</span>
+<span class="fc" id="L125">        payload.put(&quot;occurredAt&quot;, PayloadValues.instant(occurredAt));</span>
+<span class="fc" id="L126">        payload.put(&quot;evidence&quot;, evidence);</span>
+<span class="fc" id="L127">        return payload;</span>
+    }
+
+    private String toJson(Map&lt;String, Object&gt; payload) {
+        try {
+<span class="fc" id="L132">            return objectMapper.writeValueAsString(payload);</span>
+<span class="nc" id="L133">        } catch (JacksonException ex) {</span>
+<span class="nc" id="L134">            throw new EmbossingSystemException(EmbossingErrorCodes.OUTBOX_WRITE_FAILED,</span>
+                    &quot;Fulfilment command payload could not be serialized&quot;);
+        }
+    }
+
+    private static String sha256(String value) {
+        try {
+<span class="fc" id="L141">            byte[] digest = MessageDigest.getInstance(&quot;SHA-256&quot;).digest(value.getBytes(StandardCharsets.UTF_8));</span>
+<span class="fc" id="L142">            return HexFormat.of().formatHex(digest);</span>
+<span class="nc" id="L143">        } catch (NoSuchAlgorithmException ex) {</span>
+<span class="nc" id="L144">            throw new EmbossingSystemException(EmbossingErrorCodes.UNEXPECTED, &quot;SHA-256 is not available&quot;);</span>
+        }
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.15.202606040825</span></div></body></html>

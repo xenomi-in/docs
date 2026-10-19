@@ -1,0 +1,15 @@
+<?xml version='1.0' encoding='utf-8'?>
+<testsuite xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:noNamespaceSchemaLocation="https://maven.apache.org/surefire/maven-surefire-plugin/xsd/surefire-test-report.xsd" version="3.0.2" name="com.lps.cms.notification.service.EventValidatorTest" time="0.005" tests="12" errors="0" skipped="0" failures="0" flakes="0">
+  <testcase name="acceptsKnownEventSourcesCaseInsensitively(String)[1]" classname="com.lps.cms.notification.service.EventValidatorTest" time="0.0" />
+  <testcase name="acceptsKnownEventSourcesCaseInsensitively(String)[2]" classname="com.lps.cms.notification.service.EventValidatorTest" time="0.0" />
+  <testcase name="acceptsKnownEventSourcesCaseInsensitively(String)[3]" classname="com.lps.cms.notification.service.EventValidatorTest" time="0.0" />
+  <testcase name="acceptsKnownEventSourcesCaseInsensitively(String)[4]" classname="com.lps.cms.notification.service.EventValidatorTest" time="0.001" />
+  <testcase name="rejectsUnknownEventSource" classname="com.lps.cms.notification.service.EventValidatorTest" time="0.0" />
+  <testcase name="rejectsNullTenantIdAgainstTheInstitutionHeader" classname="com.lps.cms.notification.service.EventValidatorTest" time="0.0" />
+  <testcase name="rejectsAggregateIdWithoutAggregateType" classname="com.lps.cms.notification.service.EventValidatorTest" time="0.001" />
+  <testcase name="rejectsAggregateTypeWithoutAggregateId" classname="com.lps.cms.notification.service.EventValidatorTest" time="0.0" />
+  <testcase name="rejectsTenantMismatchWithInstitutionHeader" classname="com.lps.cms.notification.service.EventValidatorTest" time="0.0" />
+  <testcase name="acceptsCompleteAggregatePair" classname="com.lps.cms.notification.service.EventValidatorTest" time="0.0" />
+  <testcase name="rejectsBlankEventSource" classname="com.lps.cms.notification.service.EventValidatorTest" time="0.0" />
+  <testcase name="matchesTenantAfterTrimmingTheBodyValue" classname="com.lps.cms.notification.service.EventValidatorTest" time="0.0" />
+</testsuite>

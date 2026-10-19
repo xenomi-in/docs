@@ -1,0 +1,99 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>FileTransmitter.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">embossing-service</a> &gt; <a href="index.source.html" class="el_package">com.lps.cms.embossing.perso.file.transmit</a> &gt; <span class="el_source">FileTransmitter.java</span></div><h1>FileTransmitter.java</h1><pre class="source lang-java linenums">package com.lps.cms.embossing.perso.file.transmit;
+
+import java.io.IOException;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.time.Instant;
+
+import com.lps.cms.embossing.perso.event.catalog.EmbossingEventSink;
+import com.lps.cms.embossing.perso.file.transmit.FileTransmissionStore.ReadyFile;
+import lombok.extern.slf4j.Slf4j;
+import org.springframework.beans.factory.annotation.Value;
+import org.springframework.stereotype.Service;
+
+/**
+ * Uploads encrypted personalisation files whose batch configuration uses SFTP.
+ * Each file is transmitted independently.
+ */
+<span class="fc" id="L18">@Slf4j</span>
+@Service
+public class FileTransmitter {
+
+    private final FileTransmissionStore files;
+    private final SftpFileUploader uploader;
+    private final SftpTransmissionProperties properties;
+    private final EmbossingEventSink events;
+    private final Path outputBasePath;
+
+    public FileTransmitter(FileTransmissionStore files, SftpFileUploader uploader,
+                           SftpTransmissionProperties properties, EmbossingEventSink events,
+<span class="fc" id="L30">                           @Value(&quot;${embossing.output-path:./embossing-output}&quot;) Path outputBasePath) {</span>
+<span class="fc" id="L31">        this.files = files;</span>
+<span class="fc" id="L32">        this.uploader = uploader;</span>
+<span class="fc" id="L33">        this.properties = properties;</span>
+<span class="fc" id="L34">        this.events = events;</span>
+<span class="fc" id="L35">        this.outputBasePath = outputBasePath;</span>
+<span class="fc" id="L36">    }</span>
+
+    public int transmitReady() {
+<span class="fc bfc" id="L39" title="All 2 branches covered.">        if (!properties.isEnabled()) {</span>
+<span class="fc" id="L40">            log.info(&quot;SFTP transmission is disabled&quot;);</span>
+<span class="fc" id="L41">            return 0;</span>
+        }
+<span class="pc bpc" id="L43" title="2 of 4 branches missed.">        if (properties.getHost() == null || properties.getHost().isBlank()</span>
+<span class="pc bpc" id="L44" title="2 of 4 branches missed.">                || properties.getUsername() == null || properties.getUsername().isBlank()) {</span>
+<span class="nc" id="L45">            log.error(&quot;SFTP transmission is enabled without a host and username&quot;);</span>
+<span class="nc" id="L46">            return 0;</span>
+        }
+<span class="fc" id="L48">        int sent = 0;</span>
+<span class="fc bfc" id="L49" title="All 2 branches covered.">        for (ReadyFile file : files.readySftpFiles()) {</span>
+<span class="fc bfc" id="L50" title="All 2 branches covered.">            if (send(file)) {</span>
+<span class="fc" id="L51">                sent++;</span>
+            }
+<span class="fc" id="L53">        }</span>
+<span class="fc" id="L54">        return sent;</span>
+    }
+
+    private boolean send(ReadyFile file) {
+        try {
+<span class="fc" id="L59">            Path localFile = localFile(file);</span>
+<span class="fc" id="L60">            uploadWithRetry(localFile, file.fileName());</span>
+<span class="fc" id="L61">            files.markSent(file);</span>
+<span class="fc" id="L62">            events.fileTransmitted(file.institutionId(), file.fileId(), file.batchId(), file.vendorId(),</span>
+<span class="fc" id="L63">                    file.recordCount(), Instant.now().toString());</span>
+<span class="fc" id="L64">            log.info(&quot;Transmitted personalisation file {} for batch {}&quot;, file.fileId(), file.batchId());</span>
+<span class="fc" id="L65">            return true;</span>
+<span class="fc" id="L66">        } catch (RuntimeException | IOException ex) {</span>
+<span class="fc" id="L67">            log.error(&quot;SFTP transmission failed for file {} batch {}&quot;, file.fileId(), file.batchId(), ex);</span>
+<span class="fc" id="L68">            files.markFailed(file, ex.getMessage());</span>
+<span class="fc" id="L69">            events.transmissionFailed(file.institutionId(), file.fileId(), file.batchId(), file.vendorId(),</span>
+<span class="fc" id="L70">                    file.recordCount(), &quot;SFTP_UPLOAD_FAILED&quot;);</span>
+<span class="fc" id="L71">            return false;</span>
+        }
+    }
+
+    private void uploadWithRetry(Path localFile, String remoteFileName) throws IOException {
+<span class="fc" id="L76">        int attempts = Math.max(properties.getMaxRetries(), 1);</span>
+<span class="fc" id="L77">        IOException lastFailure = null;</span>
+<span class="fc bfc" id="L78" title="All 2 branches covered.">        for (int attempt = 1; attempt &lt;= attempts; attempt++) {</span>
+            try {
+<span class="fc" id="L80">                uploader.upload(localFile, remoteFileName);</span>
+<span class="fc" id="L81">                return;</span>
+<span class="fc" id="L82">            } catch (IOException ex) {</span>
+<span class="fc" id="L83">                lastFailure = ex;</span>
+<span class="fc" id="L84">                log.warn(&quot;SFTP upload attempt {}/{} failed for {}&quot;, attempt, attempts, remoteFileName);</span>
+            }
+        }
+<span class="pc bpc" id="L87" title="1 of 2 branches missed.">        throw lastFailure == null ? new IOException(&quot;SFTP upload failed&quot;) : lastFailure;</span>
+    }
+
+    private Path localFile(ReadyFile file) {
+<span class="fc" id="L91">        Path base = outputBasePath.toAbsolutePath().normalize();</span>
+<span class="fc" id="L92">        Path local = base.resolve(file.objectReference()).normalize();</span>
+<span class="pc bpc" id="L93" title="1 of 4 branches missed.">        if (!local.startsWith(base) || !Files.isRegularFile(local)) {</span>
+<span class="fc" id="L94">            throw new IllegalStateException(&quot;Personalisation file is not in the output directory: &quot; + file.fileId());</span>
+        }
+<span class="fc" id="L96">        return local;</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.15.202606040825</span></div></body></html>

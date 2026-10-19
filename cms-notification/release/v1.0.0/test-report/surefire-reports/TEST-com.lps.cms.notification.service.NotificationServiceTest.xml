@@ -1,0 +1,25 @@
+<?xml version='1.0' encoding='utf-8'?>
+<testsuite xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:noNamespaceSchemaLocation="https://maven.apache.org/surefire/maven-surefire-plugin/xsd/surefire-test-report.xsd" version="3.0.2" name="com.lps.cms.notification.service.NotificationServiceTest" time="0.116" tests="11" errors="0" skipped="0" failures="0" flakes="0">
+  <testcase name="subMillisecondPollStillSleepsAtLeastOneMillisecond" classname="com.lps.cms.notification.service.NotificationServiceTest" time="0.079">
+    </testcase>
+  <testcase name="publishFailureAbandonsTheClaimSoARetryCanClaimAgain" classname="com.lps.cms.notification.service.NotificationServiceTest" time="0.002">
+    </testcase>
+  <testcase name="completedClaimReplaysWithoutPublishing" classname="com.lps.cms.notification.service.NotificationServiceTest" time="0.001">
+    </testcase>
+  <testcase name="inProgressRecordIsNotTreatedAsAReplay" classname="com.lps.cms.notification.service.NotificationServiceTest" time="0.001">
+    </testcase>
+  <testcase name="inProgressClaimThatCompletesDuringTheWaitReplays" classname="com.lps.cms.notification.service.NotificationServiceTest" time="0.001">
+    </testcase>
+  <testcase name="interruptedWhileWaitingForAnInFlightPublish" classname="com.lps.cms.notification.service.NotificationServiceTest" time="0.002">
+    </testcase>
+  <testcase name="waitsOutAnInProgressClaimThenPublishesWhenTheClaimIsReleased" classname="com.lps.cms.notification.service.NotificationServiceTest" time="0.021">
+    </testcase>
+  <testcase name="idempotencyKeyUsesTheEnrichedSourceAndEventId" classname="com.lps.cms.notification.service.NotificationServiceTest" time="0.001">
+    </testcase>
+  <testcase name="publishesOnceAndCompletesTheClaim" classname="com.lps.cms.notification.service.NotificationServiceTest" time="0.003">
+    </testcase>
+  <testcase name="validationFailureDoesNotTouchTheStoreOrProducer" classname="com.lps.cms.notification.service.NotificationServiceTest" time="0.002">
+    </testcase>
+  <testcase name="inProgressClaimThatDoesNotFinishConflicts" classname="com.lps.cms.notification.service.NotificationServiceTest" time="0.001">
+    </testcase>
+</testsuite>

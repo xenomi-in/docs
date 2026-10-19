@@ -1,0 +1,23 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>EmbossingHeaderParams.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">embossing-service</a> &gt; <a href="index.source.html" class="el_package">com.lps.cms.embossing.perso.file.model</a> &gt; <span class="el_source">EmbossingHeaderParams.java</span></div><h1>EmbossingHeaderParams.java</h1><pre class="source lang-java linenums">package com.lps.cms.embossing.perso.file.model;
+
+/**
+ * Fields for one EMB header. Lengths are maximums; the header formatter truncates longer values.
+ */
+<span class="fc" id="L6">public record EmbossingHeaderParams(</span>
+
+        /** Record type. Maximum 3 characters. Blank values become {@code EMB}. */
+        String recordType,
+        /** Bank name. Maximum 3 characters. */
+        String bankName,
+        /** File timestamp in {@code MMDDHHMMSS}. Maximum 10 characters. */
+        String date,
+        /** Bank identifier. Maximum 10 characters. */
+        String bankId,
+        /** New or replacement indicator. Maximum 1 character: {@code N} or {@code R}. Blank values become {@code N}. */
+        String newOrReplacement,
+        /** Product code. Maximum 6 characters. */
+        String productCode,
+        /** Plastic code. Maximum 6 characters. */
+        String plasticCode
+) {}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.15.202606040825</span></div></body></html>

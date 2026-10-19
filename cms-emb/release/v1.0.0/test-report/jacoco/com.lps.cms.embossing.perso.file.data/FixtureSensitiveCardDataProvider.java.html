@@ -1,0 +1,30 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>FixtureSensitiveCardDataProvider.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">embossing-service</a> &gt; <a href="index.source.html" class="el_package">com.lps.cms.embossing.perso.file.data</a> &gt; <span class="el_source">FixtureSensitiveCardDataProvider.java</span></div><h1>FixtureSensitiveCardDataProvider.java</h1><pre class="source lang-java linenums">package com.lps.cms.embossing.perso.file.data;
+
+import java.time.format.DateTimeFormatter;
+
+import com.lps.cms.embossing.perso.cms.card.CardFileLine;
+
+/**
+ * Test stand-in for the cms-core secure-data export. It builds a PAN from the card's last four
+ * digits and fixed CVVs. Enable it with {@code embossing.v2.fixture-card-data=true}.
+ */
+<span class="fc" id="L11">public class FixtureSensitiveCardDataProvider implements SensitiveCardDataProvider {</span>
+
+<span class="fc" id="L13">    private static final DateTimeFormatter YYMM = DateTimeFormatter.ofPattern(&quot;yyMM&quot;);</span>
+
+    @Override
+    public SensitiveCardData resolve(CardFileLine card) {
+<span class="fc" id="L17">        String pan = &quot;411111111111&quot; + lastFour(card.panLastFour());</span>
+<span class="pc bpc" id="L18" title="1 of 2 branches missed.">        String expiry = card.expiryDate() == null ? &quot;0000&quot; : card.expiryDate().format(YYMM);</span>
+<span class="fc" id="L19">        return new SensitiveCardData(pan, &quot;123&quot;, &quot;456&quot;, pan + &quot;=&quot; + expiry + &quot;101&quot;);</span>
+    }
+
+    private static String lastFour(String panLastFour) {
+<span class="pc bpc" id="L23" title="1 of 2 branches missed.">        String digits = panLastFour == null ? &quot;&quot; : panLastFour.replaceAll(&quot;\\D&quot;, &quot;&quot;);</span>
+<span class="pc bpc" id="L24" title="1 of 2 branches missed.">        if (digits.length() &gt; 4) {</span>
+<span class="nc" id="L25">            digits = digits.substring(digits.length() - 4);</span>
+        }
+<span class="fc" id="L27">        return &quot;0&quot;.repeat(4 - digits.length()) + digits;</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.15.202606040825</span></div></body></html>

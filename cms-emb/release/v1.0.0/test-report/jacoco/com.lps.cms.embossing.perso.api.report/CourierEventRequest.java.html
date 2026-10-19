@@ -1,0 +1,26 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>CourierEventRequest.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">embossing-service</a> &gt; <a href="index.source.html" class="el_package">com.lps.cms.embossing.perso.api.report</a> &gt; <span class="el_source">CourierEventRequest.java</span></div><h1>CourierEventRequest.java</h1><pre class="source lang-java linenums">package com.lps.cms.embossing.perso.api.report;
+
+import java.time.Instant;
+import java.util.UUID;
+
+import com.lps.cms.embossing.perso.report.CourierOutcome;
+import jakarta.validation.constraints.Min;
+import jakarta.validation.constraints.NotBlank;
+import jakarta.validation.constraints.NotNull;
+import jakarta.validation.constraints.Size;
+
+<span class="fc" id="L12">public record CourierEventRequest(</span>
+        @NotBlank @Size(max = 255) String externalEventId,
+        @NotNull UUID institutionId,
+        @NotNull UUID courierProviderId,
+        UUID shipmentId,
+        @NotNull UUID cardId,
+        @NotNull UUID productionRequestId,
+        @NotBlank @Size(max = 200) String awbNumber,
+        @NotNull @Min(1) Integer shipmentAttempt,
+        @NotNull CourierOutcome eventType,
+        @NotNull Instant eventTime,
+        @Size(max = 255) String locationReference,
+        @Size(max = 255) String evidenceReference) {
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.15.202606040825</span></div></body></html>

@@ -1,0 +1,52 @@
+{
+  "service": "cms-emb-vendor-service",
+  "generated_at": "2026-10-19T06:38:43+05:30",
+  "source_commit": "e2bf9361704c0b036b995f253def861ada40828f",
+  "source_fingerprint_sha256": "4a95b80afe6bf23474edeb68a540f45850ea5f602d1876b532c6f93a3ab4ab5a",
+  "command": "mvn clean test org.jacoco:jacoco-maven-plugin:0.8.15:report",
+  "build_exit_code": 0,
+  "tests": {
+    "tests": 199,
+    "failures": 0,
+    "errors": 0,
+    "skipped": 0,
+    "passed": 199,
+    "suites": 46,
+    "duration_seconds": 3.795
+  },
+  "coverage_scope": "All compiled production Java classes; no package exclusions",
+  "coverage": {
+    "INSTRUCTION": {
+      "covered": 7427,
+      "missed": 1476,
+      "percent": 83.42
+    },
+    "BRANCH": {
+      "covered": 360,
+      "missed": 151,
+      "percent": 70.45
+    },
+    "LINE": {
+      "covered": 1346,
+      "missed": 290,
+      "percent": 82.27
+    },
+    "COMPLEXITY": {
+      "covered": 475,
+      "missed": 171,
+      "percent": 73.53
+    },
+    "METHOD": {
+      "covered": 325,
+      "missed": 61,
+      "percent": 84.2
+    },
+    "CLASS": {
+      "covered": 97,
+      "missed": 10,
+      "percent": 90.65
+    }
+  },
+  "coverage_gate": "No coverage gate configured",
+  "build_location": "service checkout"
+}

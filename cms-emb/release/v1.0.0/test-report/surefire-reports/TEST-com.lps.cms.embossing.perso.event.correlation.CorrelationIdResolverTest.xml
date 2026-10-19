@@ -1,0 +1,9 @@
+<?xml version='1.0' encoding='utf-8'?>
+<testsuite xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:noNamespaceSchemaLocation="https://maven.apache.org/surefire/maven-surefire-plugin/xsd/surefire-test-report.xsd" version="3.0.2" name="com.lps.cms.embossing.perso.event.correlation.CorrelationIdResolverTest" time="0.002" tests="6" errors="0" skipped="0" failures="0" flakes="0">
+  <testcase name="prefersAnExplicitCorrelationIdOverTheJobRun" classname="com.lps.cms.embossing.perso.event.correlation.CorrelationIdResolverTest" time="0.001" />
+  <testcase name="mintsAFreshIdWhenNothingElseIsAvailable" classname="com.lps.cms.embossing.perso.event.correlation.CorrelationIdResolverTest" time="0.0" />
+  <testcase name="mapsABlankCorrelationToTheSameSentinel" classname="com.lps.cms.embossing.perso.event.correlation.CorrelationIdResolverTest" time="0.0" />
+  <testcase name="usesTheJobRunWhenNoExplicitIdIsPresent" classname="com.lps.cms.embossing.perso.event.correlation.CorrelationIdResolverTest" time="0.001" />
+  <testcase name="mapsAUuidStringOntoItself" classname="com.lps.cms.embossing.perso.event.correlation.CorrelationIdResolverTest" time="0.0" />
+  <testcase name="mapsANonUuidStringToAStableNameUuid" classname="com.lps.cms.embossing.perso.event.correlation.CorrelationIdResolverTest" time="0.0" />
+</testsuite>

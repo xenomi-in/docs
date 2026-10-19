@@ -1,0 +1,11 @@
+<?xml version='1.0' encoding='utf-8'?>
+<testsuite xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:noNamespaceSchemaLocation="https://maven.apache.org/surefire/maven-surefire-plugin/xsd/surefire-test-report.xsd" version="3.0.2" name="com.lps.cms.embossing.perso.event.catalog.EmbossingEventSinkTest" time="0.046" tests="8" errors="0" skipped="0" failures="0" flakes="0">
+  <testcase name="enqueuesTransmissionAndAcknowledgementWithoutAFailureCategory" classname="com.lps.cms.embossing.perso.event.catalog.EmbossingEventSinkTest" time="0.019" />
+  <testcase name="skipsABatchEventWithoutAnInstitutionOrBatch" classname="com.lps.cms.embossing.perso.event.catalog.EmbossingEventSinkTest" time="0.0" />
+  <testcase name="repeatsTheSameIdempotencyKeyForTheSameBatchEvent" classname="com.lps.cms.embossing.perso.event.catalog.EmbossingEventSinkTest" time="0.001" />
+  <testcase name="enqueuesABatchCreatedEventWithTheCardList" classname="com.lps.cms.embossing.perso.event.catalog.EmbossingEventSinkTest" time="0.022" />
+  <testcase name="marksATransmissionFailureAsHighPriority" classname="com.lps.cms.embossing.perso.event.catalog.EmbossingEventSinkTest" time="0.0" />
+  <testcase name="skipsAFileEventWithoutAnInstitutionOrFile" classname="com.lps.cms.embossing.perso.event.catalog.EmbossingEventSinkTest" time="0.0" />
+  <testcase name="enqueuesAFileGeneratedEventJoinedToTheBatch" classname="com.lps.cms.embossing.perso.event.catalog.EmbossingEventSinkTest" time="0.0" />
+  <testcase name="enqueuesABatchFailureAndTreatsAMissingCardListAsEmpty" classname="com.lps.cms.embossing.perso.event.catalog.EmbossingEventSinkTest" time="0.001" />
+</testsuite>

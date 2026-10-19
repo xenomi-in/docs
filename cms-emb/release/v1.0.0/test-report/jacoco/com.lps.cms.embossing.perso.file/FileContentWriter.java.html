@@ -1,0 +1,44 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>FileContentWriter.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">embossing-service</a> &gt; <a href="index.source.html" class="el_package">com.lps.cms.embossing.perso.file</a> &gt; <span class="el_source">FileContentWriter.java</span></div><h1>FileContentWriter.java</h1><pre class="source lang-java linenums">package com.lps.cms.embossing.perso.file;
+
+import com.lps.cms.embossing.perso.file.format.EmbossingDetailLineFormatter;
+import com.lps.cms.embossing.perso.file.format.EmbossingFooterFormatter;
+import com.lps.cms.embossing.perso.file.format.EmbossingHeaderFormatter;
+import com.lps.cms.embossing.perso.file.model.EmbossingDetailLineParams;
+import com.lps.cms.embossing.perso.file.model.EmbossingFileData;
+import org.springframework.stereotype.Component;
+
+import java.io.BufferedWriter;
+import java.io.IOException;
+import java.io.OutputStream;
+import java.io.OutputStreamWriter;
+import java.nio.charset.StandardCharsets;
+
+/**
+ * Writes the EMB header, DET lines, and END footer as UTF-8.
+ * The supplied stream is flushed and left open for the caller to close.
+ */
+@Component
+<span class="fc" id="L21">public class FileContentWriter {</span>
+
+    private static final int BUFFER_SIZE = 64 * 1024;
+
+<span class="fc" id="L25">    private final EmbossingHeaderFormatter headerFormatter = new EmbossingHeaderFormatter();</span>
+<span class="fc" id="L26">    private final EmbossingDetailLineFormatter detailFormatter = new EmbossingDetailLineFormatter();</span>
+<span class="fc" id="L27">    private final EmbossingFooterFormatter footerFormatter = new EmbossingFooterFormatter();</span>
+
+    public void write(EmbossingFileData data, OutputStream out) throws IOException {
+        // The caller owns the OpenPGP stream and must close it exactly once to write its
+        // integrity packet. Closing this writer would close that stream prematurely.
+<span class="fc" id="L32">        BufferedWriter writer = new BufferedWriter(new OutputStreamWriter(out, StandardCharsets.UTF_8), BUFFER_SIZE);</span>
+<span class="fc" id="L33">        writer.write(headerFormatter.format(data.header()));</span>
+<span class="fc" id="L34">        writer.write('\n');</span>
+<span class="fc bfc" id="L35" title="All 2 branches covered.">        for (EmbossingDetailLineParams line : (Iterable&lt;EmbossingDetailLineParams&gt;) data.details()::iterator) {</span>
+<span class="fc" id="L36">            writer.write(detailFormatter.format(line));</span>
+<span class="fc" id="L37">            writer.write('\n');</span>
+<span class="fc" id="L38">        }</span>
+<span class="fc" id="L39">        writer.write(footerFormatter.format(data.footer()));</span>
+<span class="fc" id="L40">        writer.write('\n');</span>
+<span class="fc" id="L41">        writer.flush();</span>
+<span class="fc" id="L42">    }</span>
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.15.202606040825</span></div></body></html>

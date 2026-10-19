@@ -1,0 +1,63 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>TraceIdFilter.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">cms-notification</a> &gt; <a href="index.source.html" class="el_package">com.lps.cms.notification.config</a> &gt; <span class="el_source">TraceIdFilter.java</span></div><h1>TraceIdFilter.java</h1><pre class="source lang-java linenums">package com.lps.cms.notification.config;
+
+import jakarta.servlet.FilterChain;
+import jakarta.servlet.ServletException;
+import jakarta.servlet.http.HttpServletRequest;
+import jakarta.servlet.http.HttpServletResponse;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+import org.slf4j.MDC;
+import org.springframework.stereotype.Component;
+import org.springframework.util.StringUtils;
+import org.springframework.web.filter.OncePerRequestFilter;
+
+import java.io.IOException;
+import java.util.UUID;
+
+/**
+ * Propagates a correlation id for each HTTP request via MDC and response headers.
+ * &lt;p&gt;
+ * Accepts {@value #TRACE_ID_HEADER} from the client or generates a UUID. Clears MDC after
+ * the request completes so thread-pool workers do not leak context.
+ */
+@Component
+<span class="fc" id="L24">public class TraceIdFilter extends OncePerRequestFilter {</span>
+
+<span class="fc" id="L26">    private static final Logger log = LoggerFactory.getLogger(TraceIdFilter.class);</span>
+
+    /** Request/response header carrying the distributed trace id. */
+    public static final String TRACE_ID_HEADER = &quot;X-Trace-Id&quot;;
+
+    /** MDC key for the trace id, included in log patterns. */
+    public static final String TRACE_ID_MDC_KEY = &quot;traceId&quot;;
+
+    /** MDC key for the notification event id, set after enrichment. */
+    public static final String EVENT_ID_MDC_KEY = &quot;eventId&quot;;
+
+    @Override
+    protected void doFilterInternal(HttpServletRequest request,
+                                    HttpServletResponse response,
+                                    FilterChain filterChain) throws ServletException, IOException {
+<span class="fc" id="L41">        String traceId = resolveTraceId(request);</span>
+<span class="fc" id="L42">        MDC.put(TRACE_ID_MDC_KEY, traceId);</span>
+<span class="fc" id="L43">        response.setHeader(TRACE_ID_HEADER, traceId);</span>
+
+        try {
+<span class="fc" id="L46">            filterChain.doFilter(request, response);</span>
+        } finally {
+<span class="fc bfc" id="L48" title="All 2 branches covered.">            if (log.isDebugEnabled()) {</span>
+<span class="fc" id="L49">                log.debug(&quot;{} {} -&gt; {}&quot;, request.getMethod(), request.getRequestURI(), response.getStatus());</span>
+            }
+<span class="fc" id="L51">            MDC.clear();</span>
+        }
+<span class="fc" id="L53">    }</span>
+
+    private static String resolveTraceId(HttpServletRequest request) {
+<span class="fc" id="L56">        String headerValue = request.getHeader(TRACE_ID_HEADER);</span>
+<span class="fc bfc" id="L57" title="All 2 branches covered.">        if (StringUtils.hasText(headerValue)) {</span>
+<span class="fc" id="L58">            return headerValue.trim();</span>
+        }
+<span class="fc" id="L60">        return UUID.randomUUID().toString();</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.14.202510111229</span></div></body></html>

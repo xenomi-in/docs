@@ -1,0 +1,10 @@
+<?xml version='1.0' encoding='utf-8'?>
+<testsuite xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:noNamespaceSchemaLocation="https://maven.apache.org/surefire/maven-surefire-plugin/xsd/surefire-test-report.xsd" version="3.0.2" name="com.lps.cms.notification.service.MetadataEnricherTest" time="0.003" tests="4" errors="0" skipped="0" failures="0" flakes="0">
+  <testcase name="blanksOptionalIdentifiers" classname="com.lps.cms.notification.service.MetadataEnricherTest" time="0.0">
+    </testcase>
+  <testcase name="rejectsAnUnknownSourceThatBypassedTheValidator" classname="com.lps.cms.notification.service.MetadataEnricherTest" time="0.001">
+    </testcase>
+  <testcase name="generatesTraceIdWhenAbsentFromMdc" classname="com.lps.cms.notification.service.MetadataEnricherTest" time="0.0">
+    </testcase>
+  <testcase name="normalizesRequestFields" classname="com.lps.cms.notification.service.MetadataEnricherTest" time="0.0" />
+</testsuite>

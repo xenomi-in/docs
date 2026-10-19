@@ -1,0 +1,143 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>PersonalisationReadStore.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">embossing-service</a> &gt; <a href="index.source.html" class="el_package">com.lps.cms.embossing.perso.cms.batch</a> &gt; <span class="el_source">PersonalisationReadStore.java</span></div><h1>PersonalisationReadStore.java</h1><pre class="source lang-java linenums">package com.lps.cms.embossing.perso.cms.batch;
+
+import java.sql.ResultSet;
+import java.sql.SQLException;
+import java.sql.Timestamp;
+import java.time.OffsetDateTime;
+import java.time.ZoneOffset;
+import java.util.List;
+import java.util.Optional;
+import java.util.UUID;
+
+import org.springframework.jdbc.core.JdbcTemplate;
+import org.springframework.stereotype.Repository;
+
+/** Reads personalisation batches and files for one institution. */
+@Repository
+public class PersonalisationReadStore {
+
+    private final JdbcTemplate jdbc;
+
+<span class="fc" id="L21">    public PersonalisationReadStore(JdbcTemplate jdbc) {</span>
+<span class="fc" id="L22">        this.jdbc = jdbc;</span>
+<span class="fc" id="L23">    }</span>
+
+    public List&lt;BatchRow&gt; listBatches(UUID institutionId, String status, int limit, long offset) {
+<span class="fc bfc" id="L26" title="All 2 branches covered.">        if (status == null) {</span>
+<span class="fc" id="L27">            return jdbc.query(&quot;&quot;&quot;</span>
+                    SELECT batch_id, institution_id, vendor_id, batch_configuration_version_id,
+                           batch_reference, batch_status, item_count, created_at, updated_at
+                    FROM cms_v2.personalisation_batch
+                    WHERE institution_id = ?
+                    ORDER BY created_at DESC
+                    LIMIT ? OFFSET ?
+<span class="fc" id="L34">                    &quot;&quot;&quot;, this::batch, institutionId, limit, offset);</span>
+        }
+<span class="fc" id="L36">        return jdbc.query(&quot;&quot;&quot;</span>
+                SELECT batch_id, institution_id, vendor_id, batch_configuration_version_id,
+                       batch_reference, batch_status, item_count, created_at, updated_at
+                FROM cms_v2.personalisation_batch
+                WHERE institution_id = ? AND batch_status = ?
+                ORDER BY created_at DESC
+                LIMIT ? OFFSET ?
+<span class="fc" id="L43">                &quot;&quot;&quot;, this::batch, institutionId, status, limit, offset);</span>
+    }
+
+    public long countBatches(UUID institutionId, String status) {
+<span class="fc bfc" id="L47" title="All 2 branches covered.">        Number count = status == null</span>
+<span class="fc" id="L48">                ? jdbc.queryForObject(&quot;&quot;&quot;</span>
+                        SELECT count(*) FROM cms_v2.personalisation_batch WHERE institution_id = ?
+                        &quot;&quot;&quot;, Number.class, institutionId)
+<span class="fc" id="L51">                : jdbc.queryForObject(&quot;&quot;&quot;</span>
+                        SELECT count(*) FROM cms_v2.personalisation_batch
+                        WHERE institution_id = ? AND batch_status = ?
+                        &quot;&quot;&quot;, Number.class, institutionId, status);
+<span class="fc bfc" id="L55" title="All 2 branches covered.">        return count == null ? 0 : count.longValue();</span>
+    }
+
+    public Optional&lt;BatchRow&gt; findBatch(UUID institutionId, UUID batchId) {
+<span class="fc" id="L59">        List&lt;BatchRow&gt; rows = jdbc.query(&quot;&quot;&quot;</span>
+                SELECT batch_id, institution_id, vendor_id, batch_configuration_version_id,
+                       batch_reference, batch_status, item_count, created_at, updated_at
+                FROM cms_v2.personalisation_batch
+                WHERE institution_id = ? AND batch_id = ?
+                &quot;&quot;&quot;, this::batch, institutionId, batchId);
+<span class="fc" id="L65">        return rows.stream().findFirst();</span>
+    }
+
+    public List&lt;FileRow&gt; listFiles(UUID institutionId, UUID batchId) {
+<span class="fc" id="L69">        return jdbc.query(&quot;&quot;&quot;</span>
+                SELECT personalisation_file_id, institution_id, batch_id, file_sequence, file_name,
+                       schema_version, record_count, file_status, generated_at
+                FROM cms_v2.personalisation_file
+                WHERE institution_id = ? AND batch_id = ?
+                ORDER BY file_sequence
+                &quot;&quot;&quot;, this::file, institutionId, batchId);
+    }
+
+    public Optional&lt;FileRow&gt; findFile(UUID institutionId, UUID fileId) {
+<span class="fc" id="L79">        List&lt;FileRow&gt; rows = jdbc.query(&quot;&quot;&quot;</span>
+                SELECT personalisation_file_id, institution_id, batch_id, file_sequence, file_name,
+                       schema_version, record_count, file_status, generated_at
+                FROM cms_v2.personalisation_file
+                WHERE institution_id = ? AND personalisation_file_id = ?
+                &quot;&quot;&quot;, this::file, institutionId, fileId);
+<span class="fc" id="L85">        return rows.stream().findFirst();</span>
+    }
+
+    private BatchRow batch(ResultSet rs, int row) throws SQLException {
+<span class="fc" id="L89">        return new BatchRow(</span>
+<span class="fc" id="L90">                rs.getObject(&quot;batch_id&quot;, UUID.class),</span>
+<span class="fc" id="L91">                rs.getObject(&quot;institution_id&quot;, UUID.class),</span>
+<span class="fc" id="L92">                rs.getObject(&quot;vendor_id&quot;, UUID.class),</span>
+<span class="fc" id="L93">                rs.getObject(&quot;batch_configuration_version_id&quot;, UUID.class),</span>
+<span class="fc" id="L94">                rs.getString(&quot;batch_reference&quot;),</span>
+<span class="fc" id="L95">                rs.getString(&quot;batch_status&quot;),</span>
+<span class="fc" id="L96">                rs.getInt(&quot;item_count&quot;),</span>
+<span class="fc" id="L97">                utc(rs, &quot;created_at&quot;),</span>
+<span class="fc" id="L98">                utc(rs, &quot;updated_at&quot;));</span>
+    }
+
+    private FileRow file(ResultSet rs, int row) throws SQLException {
+<span class="fc" id="L102">        return new FileRow(</span>
+<span class="fc" id="L103">                rs.getObject(&quot;personalisation_file_id&quot;, UUID.class),</span>
+<span class="fc" id="L104">                rs.getObject(&quot;institution_id&quot;, UUID.class),</span>
+<span class="fc" id="L105">                rs.getObject(&quot;batch_id&quot;, UUID.class),</span>
+<span class="fc" id="L106">                rs.getInt(&quot;file_sequence&quot;),</span>
+<span class="fc" id="L107">                rs.getString(&quot;file_name&quot;),</span>
+<span class="fc" id="L108">                rs.getString(&quot;schema_version&quot;),</span>
+<span class="fc" id="L109">                rs.getInt(&quot;record_count&quot;),</span>
+<span class="fc" id="L110">                rs.getString(&quot;file_status&quot;),</span>
+<span class="fc" id="L111">                utc(rs, &quot;generated_at&quot;));</span>
+    }
+
+    private static OffsetDateTime utc(ResultSet rs, String column) throws SQLException {
+<span class="fc" id="L115">        Timestamp timestamp = rs.getTimestamp(column);</span>
+<span class="fc bfc" id="L116" title="All 2 branches covered.">        return timestamp == null ? null : timestamp.toInstant().atOffset(ZoneOffset.UTC);</span>
+    }
+
+<span class="fc" id="L119">    public record BatchRow(</span>
+            UUID batchId,
+            UUID institutionId,
+            UUID vendorId,
+            UUID configurationVersionId,
+            String batchReference,
+            String batchStatus,
+            int itemCount,
+            OffsetDateTime createdAt,
+            OffsetDateTime updatedAt) {
+    }
+
+<span class="fc" id="L131">    public record FileRow(</span>
+            UUID fileId,
+            UUID institutionId,
+            UUID batchId,
+            int fileSequence,
+            String fileName,
+            String schemaVersion,
+            int recordCount,
+            String fileStatus,
+            OffsetDateTime generatedAt) {
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.15.202606040825</span></div></body></html>

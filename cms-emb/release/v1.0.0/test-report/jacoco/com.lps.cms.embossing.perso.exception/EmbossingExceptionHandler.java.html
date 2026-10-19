@@ -1,0 +1,73 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>EmbossingExceptionHandler.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">embossing-service</a> &gt; <a href="index.source.html" class="el_package">com.lps.cms.embossing.perso.exception</a> &gt; <span class="el_source">EmbossingExceptionHandler.java</span></div><h1>EmbossingExceptionHandler.java</h1><pre class="source lang-java linenums">package com.lps.cms.embossing.perso.exception;
+
+import com.lps.cms.embossing.perso.V2EmbossingModule;
+import com.lps.cms.embossing.perso.api.ApiErrorCode;
+import com.lps.cms.embossing.perso.api.ApiErrorEnvelope;
+import com.lps.cms.embossing.perso.api.ApiResponseHelper;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+import org.springframework.http.HttpStatus;
+import org.springframework.http.ResponseEntity;
+import org.springframework.http.converter.HttpMessageNotReadableException;
+import org.springframework.web.bind.MethodArgumentNotValidException;
+import org.springframework.web.bind.annotation.ExceptionHandler;
+import org.springframework.web.bind.annotation.RestControllerAdvice;
+import org.springframework.web.method.annotation.MethodArgumentTypeMismatchException;
+import org.springframework.web.servlet.resource.NoResourceFoundException;
+
+/**
+ * Maps personalisation failures onto the cms-core error envelope.
+ * Unexpected failures are logged and returned as {@link ApiErrorCode#INTERNAL_ERROR}.
+ */
+@RestControllerAdvice(basePackageClasses = V2EmbossingModule.class)
+<span class="fc" id="L23">public class EmbossingExceptionHandler {</span>
+
+<span class="fc" id="L25">    private static final Logger log = LoggerFactory.getLogger(EmbossingExceptionHandler.class);</span>
+
+    @ExceptionHandler(EmbossingException.class)
+    public ResponseEntity&lt;ApiErrorEnvelope&gt; handleEmbossing(EmbossingException exception) {
+<span class="pc bpc" id="L29" title="1 of 4 branches missed.">        switch (exception.kind()) {</span>
+<span class="fc" id="L30">            case INTERNAL -&gt; log.error(&quot;Embossing failure code={}&quot;, exception.code(), exception);</span>
+            case NOT_FOUND, BAD_REQUEST -&gt;
+<span class="fc" id="L32">                    log.debug(&quot;Embossing rejection code={} message={}&quot;, exception.code(), exception.getMessage());</span>
+            case CONFLICT, UNPROCESSABLE -&gt;
+<span class="fc" id="L34">                    log.warn(&quot;Embossing rejection code={} message={}&quot;, exception.code(), exception.getMessage());</span>
+        }
+<span class="fc" id="L36">        return ApiResponseHelper.status(status(exception.kind()), exception.code(), exception.getMessage());</span>
+    }
+
+    @ExceptionHandler({
+            MethodArgumentNotValidException.class,
+            MethodArgumentTypeMismatchException.class,
+            HttpMessageNotReadableException.class
+    })
+    public ResponseEntity&lt;ApiErrorEnvelope&gt; handleInvalidRequest(Exception exception) {
+<span class="fc" id="L45">        log.warn(&quot;Embossing request could not be accepted&quot;);</span>
+<span class="fc" id="L46">        return ApiResponseHelper.status(HttpStatus.BAD_REQUEST, ApiErrorCode.VALIDATION_ERROR.name(),</span>
+                &quot;Request could not be accepted&quot;);
+    }
+
+    @ExceptionHandler(NoResourceFoundException.class)
+    public ResponseEntity&lt;ApiErrorEnvelope&gt; handleMissing(NoResourceFoundException exception) {
+<span class="fc" id="L52">        return ApiResponseHelper.status(HttpStatus.NOT_FOUND, ApiErrorCode.NOT_FOUND.name(),</span>
+                &quot;The requested resource was not found&quot;);
+    }
+
+    @ExceptionHandler(Exception.class)
+    public ResponseEntity&lt;ApiErrorEnvelope&gt; handleUnexpected(Exception exception) {
+<span class="fc" id="L58">        log.error(&quot;Unhandled embossing failure&quot;, exception);</span>
+<span class="fc" id="L59">        return ApiResponseHelper.status(HttpStatus.INTERNAL_SERVER_ERROR, ApiErrorCode.INTERNAL_ERROR.name(),</span>
+                &quot;The embossing request could not be completed&quot;);
+    }
+
+    private static HttpStatus status(EmbossingErrorKind kind) {
+<span class="fc bfc" id="L64" title="All 5 branches covered.">        return switch (kind) {</span>
+<span class="fc" id="L65">            case BAD_REQUEST -&gt; HttpStatus.BAD_REQUEST;</span>
+<span class="fc" id="L66">            case NOT_FOUND -&gt; HttpStatus.NOT_FOUND;</span>
+<span class="fc" id="L67">            case CONFLICT -&gt; HttpStatus.CONFLICT;</span>
+<span class="fc" id="L68">            case UNPROCESSABLE -&gt; HttpStatus.UNPROCESSABLE_ENTITY;</span>
+<span class="fc" id="L69">            case INTERNAL -&gt; HttpStatus.INTERNAL_SERVER_ERROR;</span>
+        };
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.15.202606040825</span></div></body></html>

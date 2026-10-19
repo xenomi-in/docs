@@ -1,0 +1,134 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>EmbossingEventSink.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">embossing-service</a> &gt; <a href="index.source.html" class="el_package">com.lps.cms.embossing.perso.event.catalog</a> &gt; <span class="el_source">EmbossingEventSink.java</span></div><h1>EmbossingEventSink.java</h1><pre class="source lang-java linenums">package com.lps.cms.embossing.perso.event.catalog;
+
+import java.time.Instant;
+import java.util.List;
+import java.util.Map;
+import java.util.UUID;
+
+import com.lps.cms.embossing.perso.event.mapper.PayloadValues;
+import com.lps.cms.embossing.perso.event.model.EventTypes;
+import com.lps.cms.embossing.perso.event.model.IdempotencyKeys;
+import com.lps.cms.embossing.perso.event.model.NotificationPriority;
+import com.lps.cms.embossing.perso.event.model.OutboxEventCommand;
+import com.lps.cms.embossing.perso.event.writer.OutboxEventWriter;
+import org.springframework.stereotype.Component;
+
+/**
+ * Embossing lifecycle notifications. The envelope {@code customerId} stays null.
+ * File events join the batch through {@code payload.batchId}.
+ */
+@Component
+public class EmbossingEventSink {
+
+    private final OutboxEventWriter writer;
+
+<span class="fc" id="L25">    public EmbossingEventSink(OutboxEventWriter writer) {</span>
+<span class="fc" id="L26">        this.writer = writer;</span>
+<span class="fc" id="L27">    }</span>
+
+    public void batchCreated(UUID institutionId, UUID batchId, String batchReference, String productId,
+                             UUID vendorId, int cardCount, List&lt;CardRef&gt; cards) {
+<span class="pc bpc" id="L31" title="1 of 4 branches missed.">        if (institutionId == null || batchId == null) {</span>
+<span class="fc" id="L32">            return;</span>
+        }
+<span class="fc bfc" id="L34" title="All 2 branches covered.">        List&lt;Map&lt;String, Object&gt;&gt; cardPayload = cards == null ? List.of() : cards.stream()</span>
+<span class="fc" id="L35">                .map(CardRef::toMap)</span>
+<span class="fc" id="L36">                .toList();</span>
+<span class="fc" id="L37">        Map&lt;String, Object&gt; payload = batchPayload(batchId, batchReference, productId, vendorId, institutionId, cardCount);</span>
+<span class="fc" id="L38">        payload.put(&quot;cards&quot;, cardPayload);</span>
+<span class="fc" id="L39">        enqueue(institutionId, EventTypes.CARD_PRODUCTION_BATCH_CREATED, EventTypes.AGGREGATE_PRODUCTION_BATCH,</span>
+                batchId, NotificationPriority.MEDIUM, payload);
+<span class="fc" id="L41">    }</span>
+
+    public void batchFailed(UUID institutionId, UUID batchId, String batchReference, String productId,
+                            UUID vendorId, int cardCount) {
+<span class="pc bpc" id="L45" title="1 of 4 branches missed.">        if (institutionId == null || batchId == null) {</span>
+<span class="fc" id="L46">            return;</span>
+        }
+<span class="fc" id="L48">        Map&lt;String, Object&gt; payload = batchPayload(batchId, batchReference, productId, vendorId, institutionId, cardCount);</span>
+<span class="fc" id="L49">        payload.put(&quot;failureStage&quot;, &quot;FILE_GENERATION&quot;);</span>
+<span class="fc" id="L50">        payload.put(&quot;occurredAt&quot;, PayloadValues.instant(Instant.now()));</span>
+<span class="fc" id="L51">        enqueue(institutionId, EventTypes.CARD_PRODUCTION_BATCH_FAILED, EventTypes.AGGREGATE_PRODUCTION_BATCH,</span>
+                batchId, NotificationPriority.HIGH, payload);
+<span class="fc" id="L53">    }</span>
+
+    public void fileGenerated(UUID institutionId, UUID fileId, UUID batchId, UUID vendorId,
+                              int cardCount, String generatedAt) {
+<span class="fc" id="L57">        fileEvent(institutionId, fileId, batchId, vendorId, cardCount, EventTypes.EMBOSSING_FILE_GENERATED,</span>
+                NotificationPriority.MEDIUM, &quot;generatedAt&quot;, generatedAt, null);
+<span class="fc" id="L59">    }</span>
+
+    public void fileTransmitted(UUID institutionId, UUID fileId, UUID batchId, UUID vendorId,
+                                int cardCount, String transmittedAt) {
+<span class="fc" id="L63">        fileEvent(institutionId, fileId, batchId, vendorId, cardCount, EventTypes.EMBOSSING_FILE_TRANSMITTED,</span>
+                NotificationPriority.MEDIUM, &quot;transmittedAt&quot;, transmittedAt, null);
+<span class="fc" id="L65">    }</span>
+
+    public void fileAcknowledged(UUID institutionId, UUID fileId, UUID batchId, UUID vendorId,
+                                 int cardCount, String acknowledgedAt) {
+<span class="fc" id="L69">        fileEvent(institutionId, fileId, batchId, vendorId, cardCount, EventTypes.EMBOSSING_FILE_ACKNOWLEDGED,</span>
+                NotificationPriority.MEDIUM, &quot;acknowledgedAt&quot;, acknowledgedAt, null);
+<span class="fc" id="L71">    }</span>
+
+    public void transmissionFailed(UUID institutionId, UUID fileId, UUID batchId, UUID vendorId,
+                                   int cardCount, String errorCategory) {
+<span class="fc" id="L75">        fileEvent(institutionId, fileId, batchId, vendorId, cardCount, EventTypes.EMBOSSING_FILE_TRANSMISSION_FAILED,</span>
+<span class="fc" id="L76">                NotificationPriority.HIGH, &quot;occurredAt&quot;, PayloadValues.instant(Instant.now()), errorCategory);</span>
+<span class="fc" id="L77">    }</span>
+
+    private void fileEvent(UUID institutionId, UUID fileId, UUID batchId, UUID vendorId, int cardCount,
+                           String eventType, NotificationPriority priority, String timestampKey, String timestamp,
+                           String errorCategory) {
+<span class="fc bfc" id="L82" title="All 4 branches covered.">        if (institutionId == null || fileId == null) {</span>
+<span class="fc" id="L83">            return;</span>
+        }
+<span class="fc" id="L85">        Map&lt;String, Object&gt; payload = PayloadValues.entries(</span>
+<span class="fc" id="L86">                &quot;fileId&quot;, PayloadValues.uuid(fileId),</span>
+<span class="fc" id="L87">                &quot;batchId&quot;, PayloadValues.uuid(batchId),</span>
+<span class="fc" id="L88">                &quot;vendorId&quot;, PayloadValues.uuid(vendorId),</span>
+<span class="fc" id="L89">                &quot;institutionId&quot;, PayloadValues.uuid(institutionId),</span>
+<span class="fc" id="L90">                &quot;cardCount&quot;, cardCount,</span>
+                &quot;fileFormat&quot;, &quot;EMV&quot;);
+<span class="fc" id="L92">        payload.put(timestampKey, timestamp);</span>
+<span class="fc bfc" id="L93" title="All 2 branches covered.">        if (errorCategory != null) {</span>
+<span class="fc" id="L94">            payload.put(&quot;failureStage&quot;, &quot;TRANSMISSION&quot;);</span>
+<span class="fc" id="L95">            payload.put(&quot;errorCategory&quot;, errorCategory);</span>
+        }
+<span class="fc" id="L97">        enqueue(institutionId, eventType, EventTypes.AGGREGATE_EMBOSSING_FILE, fileId, priority, payload);</span>
+<span class="fc" id="L98">    }</span>
+
+    private void enqueue(UUID institutionId, String eventType, String aggregateType, UUID aggregateId,
+                         NotificationPriority priority, Map&lt;String, Object&gt; payload) {
+<span class="fc" id="L102">        writer.enqueue(OutboxEventCommand.builder()</span>
+<span class="fc" id="L103">                .institutionId(institutionId)</span>
+<span class="fc" id="L104">                .eventType(eventType)</span>
+<span class="fc" id="L105">                .aggregateType(aggregateType)</span>
+<span class="fc" id="L106">                .aggregateId(aggregateId)</span>
+<span class="fc" id="L107">                .priority(priority)</span>
+<span class="fc" id="L108">                .idempotencyKey(IdempotencyKeys.of(institutionId, eventType, aggregateId))</span>
+<span class="fc" id="L109">                .payload(payload)</span>
+<span class="fc" id="L110">                .build());</span>
+<span class="fc" id="L111">    }</span>
+
+    private static Map&lt;String, Object&gt; batchPayload(UUID batchId, String batchReference, String productId,
+                                                    UUID vendorId, UUID institutionId, int cardCount) {
+<span class="fc" id="L115">        return PayloadValues.entries(</span>
+<span class="fc" id="L116">                &quot;batchId&quot;, PayloadValues.uuid(batchId),</span>
+                &quot;batchReference&quot;, batchReference,
+                &quot;batchType&quot;, &quot;BULK&quot;,
+                &quot;productId&quot;, productId,
+<span class="fc" id="L120">                &quot;vendorId&quot;, PayloadValues.uuid(vendorId),</span>
+<span class="fc" id="L121">                &quot;institutionId&quot;, PayloadValues.uuid(institutionId),</span>
+<span class="fc" id="L122">                &quot;cardCount&quot;, cardCount);</span>
+    }
+
+<span class="fc" id="L125">    public record CardRef(UUID cardId, String customerId, String lastFour) {</span>
+        private Map&lt;String, Object&gt; toMap() {
+<span class="fc" id="L127">            return PayloadValues.entries(</span>
+<span class="fc" id="L128">                    &quot;cardId&quot;, PayloadValues.uuid(cardId),</span>
+                    &quot;customerId&quot;, customerId,
+                    &quot;lastFour&quot;, lastFour);
+        }
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.15.202606040825</span></div></body></html>

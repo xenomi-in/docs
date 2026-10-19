@@ -1,0 +1,62 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>KafkaProducerConfig.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">cms-notification</a> &gt; <a href="index.source.html" class="el_package">com.lps.cms.notification.config</a> &gt; <span class="el_source">KafkaProducerConfig.java</span></div><h1>KafkaProducerConfig.java</h1><pre class="source lang-java linenums">package com.lps.cms.notification.config;
+
+import com.cms.notification.avro.NotificationEvent;
+import io.confluent.kafka.serializers.AbstractKafkaSchemaSerDeConfig;
+import io.confluent.kafka.serializers.KafkaAvroSerializer;
+import org.apache.kafka.clients.producer.ProducerConfig;
+import org.apache.kafka.common.serialization.StringSerializer;
+import org.springframework.beans.factory.annotation.Value;
+import org.springframework.boot.kafka.autoconfigure.KafkaProperties;
+import org.springframework.context.annotation.Bean;
+import org.springframework.context.annotation.Configuration;
+import org.springframework.context.annotation.Profile;
+import org.springframework.kafka.core.DefaultKafkaProducerFactory;
+import org.springframework.kafka.core.KafkaTemplate;
+import org.springframework.kafka.core.ProducerFactory;
+
+import java.util.HashMap;
+import java.util.Map;
+
+/**
+ * Kafka producer wiring for Avro-encoded {@link NotificationEvent} values.
+ * &lt;p&gt;
+ * Disabled under the {@code test} profile so tests can supply a {@link org.apache.kafka.clients.producer.MockProducer}.
+ */
+@Configuration
+@Profile(&quot;!test&quot;)
+<span class="fc" id="L27">public class KafkaProducerConfig {</span>
+
+    /**
+     * Builds a producer factory with String keys and Confluent Avro values.
+     * &lt;p&gt;
+     * {@code delivery.timeout.ms} is derived from {@link NotificationProducerProperties#deliveryTimeout()}
+     * so the broker-side delivery deadline and the application-side await (see
+     * {@link com.lps.cms.notification.producer.NotificationProducer}) share a single source of truth and
+     * cannot drift apart.
+     * &lt;p&gt;
+     * Schema auto-registration is governed by {@code spring.kafka.properties.auto.register.schemas}:
+     * enabled in {@code dev} for local iteration, disabled elsewhere so production schemas can only
+     * change through the CI/CD registration pipeline with compatibility checks.
+     */
+    @Bean
+    public ProducerFactory&lt;String, NotificationEvent&gt; notificationProducerFactory(
+            KafkaProperties kafkaProperties,
+            NotificationProducerProperties producerProperties,
+            @Value(&quot;${spring.kafka.properties.schema.registry.url}&quot;) String schemaRegistryUrl) {
+<span class="fc" id="L46">        Map&lt;String, Object&gt; props = new HashMap&lt;&gt;(kafkaProperties.buildProducerProperties());</span>
+<span class="fc" id="L47">        props.put(ProducerConfig.KEY_SERIALIZER_CLASS_CONFIG, StringSerializer.class);</span>
+<span class="fc" id="L48">        props.put(ProducerConfig.VALUE_SERIALIZER_CLASS_CONFIG, KafkaAvroSerializer.class);</span>
+<span class="fc" id="L49">        props.put(AbstractKafkaSchemaSerDeConfig.SCHEMA_REGISTRY_URL_CONFIG, schemaRegistryUrl);</span>
+<span class="fc" id="L50">        props.put(ProducerConfig.DELIVERY_TIMEOUT_MS_CONFIG,</span>
+<span class="fc" id="L51">                (int) producerProperties.deliveryTimeout().toMillis());</span>
+<span class="fc" id="L52">        return new DefaultKafkaProducerFactory&lt;&gt;(props);</span>
+    }
+
+    /** Kafka template used by {@link com.lps.cms.notification.producer.NotificationProducer}. */
+    @Bean
+    public KafkaTemplate&lt;String, NotificationEvent&gt; notificationKafkaTemplate(
+            ProducerFactory&lt;String, NotificationEvent&gt; notificationProducerFactory) {
+<span class="fc" id="L59">        return new KafkaTemplate&lt;&gt;(notificationProducerFactory);</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.14.202510111229</span></div></body></html>

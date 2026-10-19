@@ -1,0 +1,43 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>NotificationPartitionKey.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">cms-notification</a> &gt; <a href="index.source.html" class="el_package">com.lps.cms.notification.producer</a> &gt; <span class="el_source">NotificationPartitionKey.java</span></div><h1>NotificationPartitionKey.java</h1><pre class="source lang-java linenums">package com.lps.cms.notification.producer;
+
+import org.springframework.util.StringUtils;
+
+import com.lps.cms.notification.model.NotificationEvent;
+
+/**
+ * Resolves Kafka record keys for the per-source event topics and their aligned retry/DLQ topics.
+ * &lt;p&gt;
+ * {@code tenantId} is mandatory on every event, so every key is tenant-prefixed and the same
+ * event content always yields the same key regardless of which producer sent it. Resolution order:
+ * &lt;ol&gt;
+ *   &lt;li&gt;{@code tenantId:customerId} — per-customer ordering within a tenant&lt;/li&gt;
+ *   &lt;li&gt;{@code tenantId:aggregateType:aggregateId} — per-aggregate ordering when no customer is set&lt;/li&gt;
+ *   &lt;li&gt;{@code tenantId} — tenant-level ordering as the fallback&lt;/li&gt;
+ * &lt;/ol&gt;
+ */
+public final class NotificationPartitionKey {
+
+    /** Separator between key segments in composite keys. */
+    static final String KEY_SEPARATOR = &quot;:&quot;;
+
+    private NotificationPartitionKey() {
+    }
+
+    /**
+     * Derives the Kafka message key for the given event.
+     *
+     * @param event enriched notification event (tenant always present in metadata)
+     * @return deterministic, tenant-prefixed partition key (never blank)
+     */
+    public static String resolve(NotificationEvent event) {
+<span class="fc" id="L33">        String tenantId = event.metadata().tenantId();</span>
+<span class="fc bfc" id="L34" title="All 2 branches covered.">        if (StringUtils.hasText(event.customerId())) {</span>
+<span class="fc" id="L35">            return tenantId + KEY_SEPARATOR + event.customerId();</span>
+        }
+<span class="fc bfc" id="L37" title="All 4 branches covered.">        if (StringUtils.hasText(event.aggregateType()) &amp;&amp; StringUtils.hasText(event.aggregateId())) {</span>
+<span class="fc" id="L38">            return tenantId + KEY_SEPARATOR + event.aggregateType() + KEY_SEPARATOR + event.aggregateId();</span>
+        }
+<span class="fc" id="L40">        return tenantId;</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.14.202510111229</span></div></body></html>

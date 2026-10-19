@@ -1,0 +1,178 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>PersonalisationBatchStore.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">embossing-service</a> &gt; <a href="index.source.html" class="el_package">com.lps.cms.embossing.perso.cms.batch</a> &gt; <span class="el_source">PersonalisationBatchStore.java</span></div><h1>PersonalisationBatchStore.java</h1><pre class="source lang-java linenums">package com.lps.cms.embossing.perso.cms.batch;
+
+import java.util.List;
+import java.util.Optional;
+import java.util.UUID;
+
+import com.lps.cms.embossing.perso.cms.batch.BatchRecords.ActiveConfiguration;
+import com.lps.cms.embossing.perso.cms.batch.BatchRecords.BatchHeader;
+import com.lps.cms.embossing.perso.cms.batch.BatchRecords.NewBatchItem;
+import com.lps.cms.embossing.perso.cms.batch.BatchRecords.NoticeCard;
+import com.lps.cms.embossing.perso.cms.batch.BatchRecords.ReservedBatchItem;
+import org.springframework.jdbc.core.JdbcTemplate;
+import org.springframework.stereotype.Repository;
+
+/**
+ * Reads the active batch configuration and persists personalisation batches, items, and file rows.
+ */
+@Repository
+public class PersonalisationBatchStore {
+
+    private final JdbcTemplate jdbc;
+
+<span class="fc" id="L23">    public PersonalisationBatchStore(JdbcTemplate jdbc) {</span>
+<span class="fc" id="L24">        this.jdbc = jdbc;</span>
+<span class="fc" id="L25">    }</span>
+
+    public Optional&lt;ActiveConfiguration&gt; activeConfiguration(UUID institutionId, UUID configurationId) {
+<span class="fc" id="L28">        List&lt;ActiveConfiguration&gt; configurations = jdbc.query(&quot;&quot;&quot;</span>
+                SELECT batch_configuration_version_id, maximum_batch_size, file_format_profile_reference,
+                       transmission_channel, transmission_profile_reference
+                FROM cms_v2.personalisation_batch_configuration_version
+                WHERE institution_id = ? AND batch_configuration_id = ?
+                  AND version_status = 'ACTIVE'
+                  AND effective_from &lt;= now()
+                  AND (effective_to IS NULL OR effective_to &gt; now())
+                ORDER BY version_number DESC
+                LIMIT 1
+<span class="fc" id="L38">                &quot;&quot;&quot;, (rs, row) -&gt; new ActiveConfiguration(</span>
+<span class="fc" id="L39">                rs.getObject(&quot;batch_configuration_version_id&quot;, UUID.class),</span>
+<span class="fc" id="L40">                rs.getInt(&quot;maximum_batch_size&quot;),</span>
+<span class="fc" id="L41">                rs.getString(&quot;file_format_profile_reference&quot;),</span>
+<span class="fc" id="L42">                rs.getString(&quot;transmission_channel&quot;),</span>
+<span class="fc" id="L43">                rs.getString(&quot;transmission_profile_reference&quot;)), institutionId, configurationId);</span>
+<span class="fc" id="L44">        return configurations.stream().findFirst();</span>
+    }
+
+    public void insertBatch(UUID batchId, UUID institutionId, UUID vendorId, UUID versionId,
+                            String reference, int itemCount) {
+<span class="fc" id="L49">        jdbc.update(&quot;&quot;&quot;</span>
+                INSERT INTO cms_v2.personalisation_batch (
+                    batch_id, institution_id, vendor_id, batch_configuration_version_id, batch_reference,
+                    scheduled_at, cutoff_at, batch_status, item_count, created_at, updated_at, created_by, updated_by)
+                VALUES (?, ?, ?, ?, ?, clock_timestamp(), clock_timestamp(), 'CREATED', ?, now(), now(), 'vendor-service', 'vendor-service')
+<span class="fc" id="L54">                &quot;&quot;&quot;, batchId, institutionId, vendorId, versionId, reference, itemCount);</span>
+<span class="fc" id="L55">    }</span>
+
+    public void insertItems(UUID batchId, List&lt;NewBatchItem&gt; items) {
+<span class="fc" id="L58">        jdbc.batchUpdate(&quot;&quot;&quot;</span>
+                INSERT INTO cms_v2.personalisation_batch_item (
+                    batch_item_id, institution_id, batch_id, production_request_id, card_id,
+                    courier_waybill_id, waybill_number_snapshot, item_sequence, item_status, added_at)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, 'RESERVED', now())
+<span class="fc" id="L63">                &quot;&quot;&quot;, items, items.size(), (statement, item) -&gt; {</span>
+<span class="fc" id="L64">            statement.setObject(1, item.batchItemId());</span>
+<span class="fc" id="L65">            statement.setObject(2, item.institutionId());</span>
+<span class="fc" id="L66">            statement.setObject(3, batchId);</span>
+<span class="fc" id="L67">            statement.setObject(4, item.productionRequestId());</span>
+<span class="fc" id="L68">            statement.setObject(5, item.cardId());</span>
+<span class="fc" id="L69">            statement.setObject(6, item.waybillId());</span>
+<span class="fc" id="L70">            statement.setString(7, item.waybillNumber());</span>
+<span class="fc" id="L71">            statement.setInt(8, item.sequence());</span>
+<span class="fc" id="L72">        });</span>
+<span class="fc" id="L73">    }</span>
+
+    public List&lt;ReservedBatchItem&gt; lockReservedItems(UUID batchId, UUID institutionId) {
+<span class="fc" id="L76">        return jdbc.query(&quot;&quot;&quot;</span>
+                SELECT i.batch_item_id, i.institution_id, i.production_request_id, i.card_id,
+                       i.waybill_number_snapshot, i.item_sequence, i.courier_waybill_id, r.request_status
+                FROM cms_v2.personalisation_batch_item i
+                JOIN cms_v2.card_production_request r
+                  ON r.institution_id = i.institution_id
+                 AND r.production_request_id = i.production_request_id
+                WHERE i.batch_id = ? AND i.institution_id = ?
+                ORDER BY i.item_sequence
+                FOR UPDATE OF i, r
+<span class="fc" id="L86">                &quot;&quot;&quot;, (rs, row) -&gt; new ReservedBatchItem(</span>
+<span class="fc" id="L87">                rs.getObject(&quot;batch_item_id&quot;, UUID.class),</span>
+<span class="fc" id="L88">                rs.getObject(&quot;institution_id&quot;, UUID.class),</span>
+<span class="fc" id="L89">                rs.getObject(&quot;production_request_id&quot;, UUID.class),</span>
+<span class="fc" id="L90">                rs.getObject(&quot;card_id&quot;, UUID.class),</span>
+<span class="fc" id="L91">                rs.getString(&quot;waybill_number_snapshot&quot;),</span>
+<span class="fc" id="L92">                rs.getInt(&quot;item_sequence&quot;),</span>
+<span class="fc" id="L93">                rs.getObject(&quot;courier_waybill_id&quot;, UUID.class),</span>
+<span class="fc" id="L94">                rs.getString(&quot;request_status&quot;)), batchId, institutionId);</span>
+    }
+
+    public void cancelReserved(UUID batchId, UUID institutionId) {
+<span class="fc" id="L98">        jdbc.update(&quot;&quot;&quot;</span>
+                UPDATE cms_v2.personalisation_batch
+                SET batch_status = 'CANCELLED', updated_at = now(), updated_by = 'vendor-service'
+                WHERE batch_id = ? AND institution_id = ? AND batch_status IN ('CREATED', 'GENERATING')
+                &quot;&quot;&quot;, batchId, institutionId);
+<span class="fc" id="L103">        jdbc.update(&quot;&quot;&quot;</span>
+                UPDATE cms_v2.courier_waybill w
+                SET waybill_status = 'AVAILABLE', reserved_at = NULL
+                FROM cms_v2.personalisation_batch_item i
+                WHERE i.batch_id = ? AND i.institution_id = ?
+                  AND w.courier_waybill_id = i.courier_waybill_id
+                  AND w.institution_id = i.institution_id
+                  AND w.waybill_status = 'RESERVED'
+                &quot;&quot;&quot;, batchId, institutionId);
+<span class="fc" id="L112">        jdbc.update(&quot;&quot;&quot;</span>
+                UPDATE cms_v2.card_production_request r
+                SET request_status = 'ELIGIBLE', updated_at = now()
+                FROM cms_v2.personalisation_batch_item i
+                WHERE i.batch_id = ? AND i.institution_id = ?
+                  AND r.institution_id = i.institution_id
+                  AND r.production_request_id = i.production_request_id
+                  AND r.request_status = 'RESERVED_FOR_BATCH'
+                &quot;&quot;&quot;, batchId, institutionId);
+<span class="fc" id="L121">    }</span>
+
+    public void updateStatus(UUID batchId, String status) {
+<span class="fc" id="L124">        jdbc.update(&quot;&quot;&quot;</span>
+                UPDATE cms_v2.personalisation_batch
+                SET batch_status = ?, updated_at = now(), updated_by = 'vendor-service'
+                WHERE batch_id = ?
+                &quot;&quot;&quot;, status, batchId);
+<span class="fc" id="L129">    }</span>
+
+    public Optional&lt;BatchHeader&gt; header(UUID batchId) {
+<span class="fc" id="L132">        List&lt;BatchHeader&gt; rows = jdbc.query(&quot;&quot;&quot;</span>
+                SELECT b.batch_reference, b.vendor_id, b.institution_id, b.item_count,
+                       (SELECT c.product_id
+                        FROM cms_v2.personalisation_batch_item i
+                        JOIN cms_v2.card c
+                          ON c.institution_id = i.institution_id AND c.card_id = i.card_id
+                        WHERE i.batch_id = b.batch_id
+                        ORDER BY i.item_sequence
+                        LIMIT 1) AS product_id
+                FROM cms_v2.personalisation_batch b
+                WHERE b.batch_id = ?
+<span class="fc" id="L143">                &quot;&quot;&quot;, (rs, row) -&gt; new BatchHeader(</span>
+<span class="fc" id="L144">                rs.getString(&quot;batch_reference&quot;),</span>
+<span class="fc" id="L145">                rs.getObject(&quot;vendor_id&quot;, UUID.class),</span>
+<span class="fc" id="L146">                rs.getObject(&quot;institution_id&quot;, UUID.class),</span>
+<span class="fc" id="L147">                rs.getInt(&quot;item_count&quot;),</span>
+<span class="fc" id="L148">                rs.getObject(&quot;product_id&quot;, UUID.class)), batchId);</span>
+<span class="fc" id="L149">        return rows.stream().findFirst();</span>
+    }
+
+    public List&lt;NoticeCard&gt; noticeCards(UUID batchId) {
+<span class="fc" id="L153">        return jdbc.query(&quot;&quot;&quot;</span>
+                SELECT c.card_id, cu.external_customer_id, c.pan_last_four, c.product_id
+                FROM cms_v2.personalisation_batch_item i
+                JOIN cms_v2.card c ON c.institution_id = i.institution_id AND c.card_id = i.card_id
+                JOIN cms_v2.customer_reference cu ON cu.customer_reference_id = c.customer_reference_id
+                WHERE i.batch_id = ?
+                ORDER BY i.item_sequence
+<span class="fc" id="L160">                &quot;&quot;&quot;, (rs, row) -&gt; new NoticeCard(</span>
+<span class="fc" id="L161">                rs.getObject(&quot;card_id&quot;, UUID.class),</span>
+<span class="fc" id="L162">                rs.getString(&quot;external_customer_id&quot;),</span>
+<span class="fc" id="L163">                rs.getString(&quot;pan_last_four&quot;),</span>
+<span class="fc" id="L164">                rs.getObject(&quot;product_id&quot;, UUID.class)), batchId);</span>
+    }
+
+    public void insertFile(UUID fileId, UUID institutionId, UUID batchId, String fileName,
+                           int recordCount, String clearHash, String encryptedHash, String objectRef) {
+<span class="fc" id="L169">        jdbc.update(&quot;&quot;&quot;</span>
+                INSERT INTO cms_v2.personalisation_file (
+                    personalisation_file_id, institution_id, batch_id, file_sequence, file_name, schema_version,
+                    record_count, clear_payload_hash, encrypted_payload_hash, secure_object_reference,
+                    file_status, generated_at)
+                VALUES (?, ?, ?, 1, ?, 'EMB-1', ?, ?, ?, ?, 'ENCRYPTED', now())
+<span class="fc" id="L175">                &quot;&quot;&quot;, fileId, institutionId, batchId, fileName, recordCount, clearHash, encryptedHash, objectRef);</span>
+<span class="fc" id="L176">    }</span>
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.15.202606040825</span></div></body></html>

@@ -1,0 +1,13 @@
+<?xml version='1.0' encoding='utf-8'?>
+<testsuite xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:noNamespaceSchemaLocation="https://maven.apache.org/surefire/maven-surefire-plugin/xsd/surefire-test-report.xsd" version="3.0.2" name="com.lps.cms.embossing.perso.api.security.EmbossingJwtRequestContextFilterTest" time="0.02" tests="10" errors="0" skipped="0" failures="0" flakes="0">
+  <testcase name="letsANonJwtOrUnauthenticatedTokenThrough" classname="com.lps.cms.embossing.perso.api.security.EmbossingJwtRequestContextFilterTest" time="0.001" />
+  <testcase name="rejectsATokenWithoutASubject" classname="com.lps.cms.embossing.perso.api.security.EmbossingJwtRequestContextFilterTest" time="0.002" />
+  <testcase name="rejectsATokenWhoseInstitutionClaimIsNotAUuid" classname="com.lps.cms.embossing.perso.api.security.EmbossingJwtRequestContextFilterTest" time="0.005" />
+  <testcase name="letsAnUnauthenticatedRequestThrough" classname="com.lps.cms.embossing.perso.api.security.EmbossingJwtRequestContextFilterTest" time="0.001" />
+  <testcase name="rejectsATokenForADifferentInstitution" classname="com.lps.cms.embossing.perso.api.security.EmbossingJwtRequestContextFilterTest" time="0.001" />
+  <testcase name="replacesTheActorHeaderWithTheTokenSubject" classname="com.lps.cms.embossing.perso.api.security.EmbossingJwtRequestContextFilterTest" time="0.0" />
+  <testcase name="letsATokenThroughWhenThePathIsNotInstitutionScoped" classname="com.lps.cms.embossing.perso.api.security.EmbossingJwtRequestContextFilterTest" time="0.001" />
+  <testcase name="rejectsATokenWithoutAnInstitutionClaim" classname="com.lps.cms.embossing.perso.api.security.EmbossingJwtRequestContextFilterTest" time="0.004" />
+  <testcase name="rejectsACallerSuppliedInstitutionHeader" classname="com.lps.cms.embossing.perso.api.security.EmbossingJwtRequestContextFilterTest" time="0.001" />
+  <testcase name="allowsAPlatformTokenToReadAnotherInstitution" classname="com.lps.cms.embossing.perso.api.security.EmbossingJwtRequestContextFilterTest" time="0.001" />
+</testsuite>

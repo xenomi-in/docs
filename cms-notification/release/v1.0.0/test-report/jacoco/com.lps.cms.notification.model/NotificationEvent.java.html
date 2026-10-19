@@ -1,0 +1,43 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>NotificationEvent.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">cms-notification</a> &gt; <a href="index.source.html" class="el_package">com.lps.cms.notification.model</a> &gt; <span class="el_source">NotificationEvent.java</span></div><h1>NotificationEvent.java</h1><pre class="source lang-java linenums">package com.lps.cms.notification.model;
+
+import java.time.Instant;
+import java.util.List;
+import java.util.Map;
+
+/**
+ * Canonical notification event produced by this service and published to Kafka.
+ * &lt;p&gt;
+ * Populated by {@link com.lps.cms.notification.service.MetadataEnricher} after validation.
+ *
+ * @param eventId        unique event identifier
+ * @param eventType      business event name
+ * @param eventSource    upstream system; determines the Kafka topic the event is routed to
+ * @param eventTime      server timestamp at enrichment
+ * @param version        schema/event contract version
+ * @param aggregateType  optional aggregate type for routing
+ * @param aggregateId    optional aggregate id for routing
+ * @param customerId     optional customer id for routing
+ * @param correlationId  optional cross-service correlation id
+ * @param channels       normalized delivery channel list (may be empty)
+ * @param priority       delivery priority
+ * @param payload        event body map
+ * @param metadata       service-owned metadata (trace, tenant, retry count)
+ */
+<span class="fc" id="L26">public record NotificationEvent(</span>
+        String eventId,
+        String eventType,
+        EventSource eventSource,
+        Instant eventTime,
+        String version,
+        String aggregateType,
+        String aggregateId,
+        String customerId,
+        String correlationId,
+        List&lt;String&gt; channels,
+        NotificationPriority priority,
+        Map&lt;String, Object&gt; payload,
+        NotificationMetadata metadata
+) {
+}
+
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.14.202510111229</span></div></body></html>

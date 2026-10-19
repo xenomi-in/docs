@@ -1,0 +1,115 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>FulfilmentReportStore.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">embossing-service</a> &gt; <a href="index.source.html" class="el_package">com.lps.cms.embossing.perso.report</a> &gt; <span class="el_source">FulfilmentReportStore.java</span></div><h1>FulfilmentReportStore.java</h1><pre class="source lang-java linenums">package com.lps.cms.embossing.perso.report;
+
+import java.util.List;
+import java.util.Optional;
+import java.util.Set;
+import java.util.UUID;
+
+import org.springframework.jdbc.core.JdbcTemplate;
+import org.springframework.stereotype.Repository;
+
+/** Reads the production request for a provider report and stores the deduplicated inbox row. */
+@Repository
+public class FulfilmentReportStore {
+
+    private final JdbcTemplate jdbc;
+
+<span class="nc" id="L17">    public FulfilmentReportStore(JdbcTemplate jdbc) {</span>
+<span class="nc" id="L18">        this.jdbc = jdbc;</span>
+<span class="nc" id="L19">    }</span>
+
+    public Optional&lt;ReportSubject&gt; findSubject(UUID institutionId, UUID productionRequestId) {
+<span class="nc" id="L22">        List&lt;ReportSubject&gt; rows = jdbc.query(&quot;&quot;&quot;</span>
+                SELECT r.institution_id, r.production_request_id, r.card_id, r.vendor_id, r.request_status,
+                       item.personalisation_file_id, item.file_name, item.waybill_number_snapshot,
+                       item.courier_provider_id
+                FROM cms_v2.card_production_request r
+                LEFT JOIN LATERAL (
+                    SELECT f.personalisation_file_id, f.file_name, i.waybill_number_snapshot, w.courier_provider_id
+                    FROM cms_v2.personalisation_batch_item i
+                    LEFT JOIN cms_v2.courier_waybill w
+                      ON w.institution_id = i.institution_id AND w.courier_waybill_id = i.courier_waybill_id
+                    LEFT JOIN cms_v2.personalisation_file f
+                      ON f.institution_id = i.institution_id AND f.batch_id = i.batch_id
+                    WHERE i.institution_id = r.institution_id
+                      AND i.production_request_id = r.production_request_id
+                    ORDER BY i.added_at DESC
+                    LIMIT 1
+                ) item ON true
+                WHERE r.institution_id = ? AND r.production_request_id = ?
+<span class="nc" id="L40">                &quot;&quot;&quot;, (rs, row) -&gt; new ReportSubject(</span>
+<span class="nc" id="L41">                rs.getObject(&quot;institution_id&quot;, UUID.class),</span>
+<span class="nc" id="L42">                rs.getObject(&quot;production_request_id&quot;, UUID.class),</span>
+<span class="nc" id="L43">                rs.getObject(&quot;card_id&quot;, UUID.class),</span>
+<span class="nc" id="L44">                rs.getObject(&quot;vendor_id&quot;, UUID.class),</span>
+<span class="nc" id="L45">                rs.getString(&quot;request_status&quot;),</span>
+<span class="nc" id="L46">                rs.getObject(&quot;personalisation_file_id&quot;, UUID.class),</span>
+<span class="nc" id="L47">                rs.getString(&quot;file_name&quot;),</span>
+<span class="nc" id="L48">                rs.getString(&quot;waybill_number_snapshot&quot;),</span>
+<span class="nc" id="L49">                rs.getObject(&quot;courier_provider_id&quot;, UUID.class)), institutionId, productionRequestId);</span>
+<span class="nc" id="L50">        return rows.stream().findFirst();</span>
+    }
+
+    public Set&lt;String&gt; priorCommands(UUID institutionId, UUID productionRequestId, String sourceEventId) {
+<span class="nc" id="L54">        List&lt;String&gt; commands = jdbc.query(&quot;&quot;&quot;</span>
+                SELECT command_name
+                FROM cms_v2.provider_inbox_event
+                WHERE institution_id = ? AND production_request_id = ? AND source_event_id &lt;&gt; ?
+<span class="nc" id="L58">                &quot;&quot;&quot;, (rs, row) -&gt; rs.getString(&quot;command_name&quot;), institutionId, productionRequestId, sourceEventId);</span>
+<span class="nc" id="L59">        return Set.copyOf(commands);</span>
+    }
+
+    public Optional&lt;UUID&gt; insert(InboxDraft draft) {
+<span class="nc" id="L63">        List&lt;UUID&gt; inserted = jdbc.query(&quot;&quot;&quot;</span>
+                INSERT INTO cms_v2.provider_inbox_event (
+                    inbox_event_id, source, source_event_id, institution_id, event_type, command_name,
+                    production_request_id, card_id, payload, payload_sha256, processing_status,
+                    received_at, processed_at)
+                VALUES (uuidv7(), ?, ?, ?, ?, ?, ?, ?, CAST(? AS jsonb), ?, 'PROCESSED', now(), now())
+                ON CONFLICT (source, source_event_id) DO NOTHING
+                RETURNING inbox_event_id
+<span class="nc" id="L71">                &quot;&quot;&quot;, (rs, row) -&gt; rs.getObject(&quot;inbox_event_id&quot;, UUID.class),</span>
+<span class="nc" id="L72">                draft.source(), draft.sourceEventId(), draft.institutionId(), draft.eventType(),</span>
+<span class="nc" id="L73">                draft.commandName(), draft.productionRequestId(), draft.cardId(), draft.payloadJson(),</span>
+<span class="nc" id="L74">                draft.payloadSha256());</span>
+<span class="nc" id="L75">        return inserted.stream().findFirst();</span>
+    }
+
+    public Optional&lt;InboxEvent&gt; findInbox(String source, String sourceEventId) {
+<span class="nc" id="L79">        List&lt;InboxEvent&gt; rows = jdbc.query(&quot;&quot;&quot;</span>
+                SELECT inbox_event_id, institution_id, event_type, command_name,
+                       production_request_id, card_id, payload_sha256
+                FROM cms_v2.provider_inbox_event
+                WHERE source = ? AND source_event_id = ?
+<span class="nc" id="L84">                &quot;&quot;&quot;, (rs, row) -&gt; new InboxEvent(</span>
+<span class="nc" id="L85">                rs.getObject(&quot;inbox_event_id&quot;, UUID.class),</span>
+<span class="nc" id="L86">                rs.getObject(&quot;institution_id&quot;, UUID.class),</span>
+<span class="nc" id="L87">                rs.getString(&quot;event_type&quot;),</span>
+<span class="nc" id="L88">                rs.getString(&quot;command_name&quot;),</span>
+<span class="nc" id="L89">                rs.getObject(&quot;production_request_id&quot;, UUID.class),</span>
+<span class="nc" id="L90">                rs.getObject(&quot;card_id&quot;, UUID.class),</span>
+<span class="nc" id="L91">                rs.getString(&quot;payload_sha256&quot;)), source, sourceEventId);</span>
+<span class="nc" id="L92">        return rows.stream().findFirst();</span>
+    }
+
+    public int advanceStatus(UUID institutionId, UUID productionRequestId, String currentStatus, String nextStatus) {
+<span class="nc" id="L96">        return jdbc.update(&quot;&quot;&quot;</span>
+                UPDATE cms_v2.card_production_request
+                SET request_status = ?, updated_at = now()
+                WHERE institution_id = ? AND production_request_id = ? AND request_status = ?
+                &quot;&quot;&quot;, nextStatus, institutionId, productionRequestId, currentStatus);
+    }
+
+<span class="fc" id="L103">    public record InboxDraft(</span>
+            String source,
+            String sourceEventId,
+            UUID institutionId,
+            String eventType,
+            String commandName,
+            UUID productionRequestId,
+            UUID cardId,
+            String payloadJson,
+            String payloadSha256) {
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.15.202606040825</span></div></body></html>

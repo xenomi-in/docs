@@ -1,0 +1,20 @@
+<?xml version='1.0' encoding='utf-8'?>
+<testsuite xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:noNamespaceSchemaLocation="https://maven.apache.org/surefire/maven-surefire-plugin/xsd/surefire-test-report.xsd" version="3.0.2" name="com.lps.cms.notification.producer.NotificationProducerTest" time="0.64" tests="9" errors="0" skipped="0" failures="0" flakes="0">
+  <testcase name="wrapsSendFailureInPublishException" classname="com.lps.cms.notification.producer.NotificationProducerTest" time="0.589">
+    </testcase>
+  <testcase name="rejectsWhenTheSourceBulkheadIsFull" classname="com.lps.cms.notification.producer.NotificationProducerTest" time="0.014">
+    </testcase>
+  <testcase name="opensCircuitAfterSustainedFailuresAndFailsFast" classname="com.lps.cms.notification.producer.NotificationProducerTest" time="0.006">
+    </testcase>
+  <testcase name="wrapsAwaitTimeoutInPublishException" classname="com.lps.cms.notification.producer.NotificationProducerTest" time="0.002">
+    </testcase>
+  <testcase name="routesSwitchEventToSwitchTopic" classname="com.lps.cms.notification.producer.NotificationProducerTest" time="0.003">
+    </testcase>
+  <testcase name="routesCmsEventToCmsTopicWithCustomerPartitionKey" classname="com.lps.cms.notification.producer.NotificationProducerTest" time="0.003">
+    </testcase>
+  <testcase name="wrapsInterruptionAndRestoresTheInterruptFlag" classname="com.lps.cms.notification.producer.NotificationProducerTest" time="0.002">
+    </testcase>
+  <testcase name="mappingFailureDoesNotPublishOrTripTheCircuit" classname="com.lps.cms.notification.producer.NotificationProducerTest" time="0.003" />
+  <testcase name="circuitIsIsolatedPerSource" classname="com.lps.cms.notification.producer.NotificationProducerTest" time="0.003">
+    </testcase>
+</testsuite>

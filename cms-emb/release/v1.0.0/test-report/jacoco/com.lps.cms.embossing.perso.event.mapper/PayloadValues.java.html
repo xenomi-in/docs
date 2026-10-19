@@ -1,0 +1,61 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>PayloadValues.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">embossing-service</a> &gt; <a href="index.source.html" class="el_package">com.lps.cms.embossing.perso.event.mapper</a> &gt; <span class="el_source">PayloadValues.java</span></div><h1>PayloadValues.java</h1><pre class="source lang-java linenums">package com.lps.cms.embossing.perso.event.mapper;
+
+import com.lps.cms.embossing.perso.exception.EmbossingErrorCodes;
+import com.lps.cms.embossing.perso.exception.EmbossingSystemException;
+
+import java.time.Instant;
+import java.time.LocalDate;
+import java.time.OffsetDateTime;
+import java.time.ZoneOffset;
+import java.time.format.DateTimeFormatter;
+import java.util.LinkedHashMap;
+import java.util.Map;
+import java.util.UUID;
+
+/** Formats payload values per the notification contract: ISO-8601 UTC instants, ISO dates, UUID strings. */
+public final class PayloadValues {
+
+    private PayloadValues() {
+    }
+
+    /**
+     * Builds an insertion-ordered payload from key/value pairs. Unlike {@link Map#of}, null
+     * values are kept so the envelope serialises absent fields explicitly as {@code null}.
+     */
+    public static Map&lt;String, Object&gt; entries(Object... keyValues) {
+<span class="fc bfc" id="L26" title="All 2 branches covered.">        if (keyValues.length % 2 != 0) {</span>
+<span class="fc" id="L27">            throw new EmbossingSystemException(EmbossingErrorCodes.OUTBOX_WRITE_FAILED,</span>
+                    &quot;Payload entries must be key/value pairs&quot;);
+        }
+<span class="fc" id="L30">        Map&lt;String, Object&gt; payload = new LinkedHashMap&lt;&gt;();</span>
+<span class="fc bfc" id="L31" title="All 2 branches covered.">        for (int i = 0; i &lt; keyValues.length; i += 2) {</span>
+<span class="fc" id="L32">            payload.put((String) keyValues[i], keyValues[i + 1]);</span>
+        }
+<span class="fc" id="L34">        return payload;</span>
+    }
+
+    public static String instant(OffsetDateTime value) {
+<span class="fc bfc" id="L38" title="All 2 branches covered.">        if (value == null) {</span>
+<span class="fc" id="L39">            return null;</span>
+        }
+<span class="fc" id="L41">        Instant utc = value.withOffsetSameInstant(ZoneOffset.UTC).toInstant();</span>
+<span class="fc" id="L42">        return DateTimeFormatter.ISO_INSTANT.format(utc);</span>
+    }
+
+    public static String instant(Instant value) {
+<span class="fc bfc" id="L46" title="All 2 branches covered.">        return value == null ? null : DateTimeFormatter.ISO_INSTANT.format(value);</span>
+    }
+
+    public static String date(LocalDate value) {
+<span class="fc bfc" id="L50" title="All 2 branches covered.">        return value == null ? null : value.toString();</span>
+    }
+
+    public static String uuid(UUID value) {
+<span class="fc bfc" id="L54" title="All 2 branches covered.">        return value == null ? null : value.toString();</span>
+    }
+
+    public static String name(Enum&lt;?&gt; value) {
+<span class="fc bfc" id="L58" title="All 2 branches covered.">        return value == null ? null : value.name();</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.15.202606040825</span></div></body></html>

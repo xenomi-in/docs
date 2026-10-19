@@ -1,0 +1,248 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>FulfilmentJob.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">embossing-service</a> &gt; <a href="index.source.html" class="el_package">com.lps.cms.embossing.perso.pipeline</a> &gt; <span class="el_source">FulfilmentJob.java</span></div><h1>FulfilmentJob.java</h1><pre class="source lang-java linenums">package com.lps.cms.embossing.perso.pipeline;
+
+import com.lps.cms.embossing.perso.cms.batch.BatchRecords.ActiveConfiguration;
+import com.lps.cms.embossing.perso.cms.batch.BatchRecords.BatchHeader;
+import com.lps.cms.embossing.perso.cms.batch.BatchRecords.NewBatchItem;
+import com.lps.cms.embossing.perso.cms.batch.BatchRecords.ReservedBatchItem;
+import com.lps.cms.embossing.perso.cms.batch.PersonalisationBatchStore;
+import com.lps.cms.embossing.perso.cms.card.CardFileStore;
+import com.lps.cms.embossing.perso.cms.request.EligibleRequest;
+import com.lps.cms.embossing.perso.cms.request.ProductionRequestStore;
+import com.lps.cms.embossing.perso.cms.waybill.Waybill;
+import com.lps.cms.embossing.perso.cms.waybill.WaybillStore;
+import com.lps.cms.embossing.perso.exception.BatchNoLongerEligibleException;
+import com.lps.cms.embossing.perso.exception.EmbossingErrorCodes;
+import com.lps.cms.embossing.perso.exception.EmbossingSystemException;
+import com.lps.cms.embossing.perso.exception.FileGenerationException;
+import com.lps.cms.embossing.perso.exception.FulfilmentConflictException;
+import com.lps.cms.embossing.perso.event.catalog.EmbossingEventSink;
+import com.lps.cms.embossing.perso.event.catalog.EmbossingEventSink.CardRef;
+import com.lps.cms.embossing.perso.file.EmbossingDataFactory;
+import com.lps.cms.embossing.perso.file.EncryptedFileWriter;
+import com.lps.cms.embossing.perso.file.crypto.PgpPublicKeyResolver;
+import com.lps.cms.embossing.perso.production.ProductionAttempt;
+import com.lps.cms.embossing.perso.production.ProductionAttemptRepository;
+import com.lps.cms.embossing.perso.reconciliation.ReconciliationException;
+import com.lps.cms.embossing.perso.reconciliation.ReconciliationExceptionRepository;
+import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
+import org.springframework.beans.factory.annotation.Value;
+import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
+
+import java.nio.file.Path;
+import java.time.LocalDate;
+import java.time.OffsetDateTime;
+import java.time.ZoneOffset;
+import java.util.ArrayList;
+import java.util.LinkedHashMap;
+import java.util.List;
+import java.util.Map;
+import java.util.UUID;
+
+/**
+ * Reserves eligible production requests into personalisation batches and writes
+ * one encrypted file for a batch that is still reserved.
+ */
+<span class="fc" id="L47">@Slf4j</span>
+@Service
+@RequiredArgsConstructor
+public class FulfilmentJob {
+
+    private final ProductionRequestStore requests;
+    private final PersonalisationBatchStore batches;
+    private final WaybillStore waybills;
+    private final CardFileStore cardFiles;
+    private final EmbossingDataFactory dataFactory;
+    private final EncryptedFileWriter encryptedFileWriter;
+    private final PgpPublicKeyResolver pgpPublicKeyResolver;
+    private final EmbossingEventSink events;
+    private final ProductionAttemptRepository attempts;
+    private final ReconciliationExceptionRepository exceptions;
+
+    @Value(&quot;${embossing.v2.claim-limit:500}&quot;)
+    private int claimLimit;
+
+    @Value(&quot;${embossing.output-path:./embossing-output}&quot;)
+    private Path outputBasePath;
+
+    @Transactional
+    public List&lt;CreatedBatch&gt; claimAndBatch() {
+<span class="fc" id="L71">        List&lt;EligibleRequest&gt; locked = requests.lockEligible(claimLimit);</span>
+<span class="fc bfc" id="L72" title="All 2 branches covered.">        if (requests.reserve(ids(locked)) != locked.size()) {</span>
+<span class="fc" id="L73">            throw new FulfilmentConflictException(EmbossingErrorCodes.REQUEST_RESERVATION_LOST,</span>
+                    &quot;Eligible request lock was not fully reserved&quot;);
+        }
+<span class="fc" id="L76">        Map&lt;String, List&lt;EligibleRequest&gt;&gt; groups = new LinkedHashMap&lt;&gt;();</span>
+<span class="fc bfc" id="L77" title="All 2 branches covered.">        for (EligibleRequest request : locked) {</span>
+<span class="fc" id="L78">            groups.computeIfAbsent(groupKey(request), key -&gt; new ArrayList&lt;&gt;()).add(request);</span>
+<span class="fc" id="L79">        }</span>
+<span class="fc" id="L80">        List&lt;CreatedBatch&gt; created = new ArrayList&lt;&gt;();</span>
+<span class="fc bfc" id="L81" title="All 2 branches covered.">        for (List&lt;EligibleRequest&gt; group : groups.values()) {</span>
+<span class="fc" id="L82">            EligibleRequest first = group.getFirst();</span>
+<span class="fc" id="L83">            var configuration = batches.activeConfiguration(first.institutionId(), first.configurationId());</span>
+<span class="fc bfc" id="L84" title="All 2 branches covered.">            if (configuration.isEmpty()) {</span>
+<span class="fc" id="L85">                requests.release(ids(group));</span>
+<span class="fc" id="L86">                recordException(first.institutionId(), &quot;BATCH_CONFIGURATION_VERSION_MISSING&quot;, &quot;BATCH_CONFIGURATION&quot;,</span>
+<span class="fc" id="L87">                        first.configurationId().toString(), &quot;No ACTIVE personalisation batch configuration version&quot;);</span>
+<span class="fc" id="L88">                continue;</span>
+            }
+<span class="fc" id="L90">            int maximumBatchSize = configuration.get().maximumBatchSize();</span>
+<span class="fc bfc" id="L91" title="All 2 branches covered.">            for (int start = 0; start &lt; group.size(); start += maximumBatchSize) {</span>
+<span class="fc" id="L92">                createBatch(group.subList(start, Math.min(group.size(), start + maximumBatchSize)),</span>
+<span class="fc" id="L93">                        configuration.get()).ifPresent(created::add);</span>
+            }
+<span class="fc" id="L95">        }</span>
+<span class="fc" id="L96">        return created;</span>
+    }
+
+    private java.util.Optional&lt;CreatedBatch&gt; createBatch(List&lt;EligibleRequest&gt; group, ActiveConfiguration configuration) {
+<span class="fc" id="L100">        EligibleRequest first = group.getFirst();</span>
+<span class="fc" id="L101">        List&lt;Waybill&gt; available = waybills.lockAvailable(first.institutionId(), group.size());</span>
+<span class="fc bfc" id="L102" title="All 2 branches covered.">        if (available.size() &lt; group.size()) {</span>
+<span class="fc" id="L103">            List&lt;EligibleRequest&gt; unfilled = group.subList(available.size(), group.size());</span>
+<span class="fc" id="L104">            requests.release(ids(unfilled));</span>
+<span class="fc" id="L105">            unfilled.forEach(request -&gt; recordException(request.institutionId(), &quot;WAYBILL_UNAVAILABLE&quot;,</span>
+<span class="fc" id="L106">                    &quot;PRODUCTION_REQUEST&quot;, request.productionRequestId().toString(),</span>
+                    &quot;No AVAILABLE waybill; request left ELIGIBLE&quot;));
+        }
+<span class="fc bfc" id="L109" title="All 2 branches covered.">        if (available.isEmpty()) {</span>
+<span class="fc" id="L110">            return java.util.Optional.empty();</span>
+        }
+<span class="fc" id="L112">        List&lt;EligibleRequest&gt; paired = group.subList(0, available.size());</span>
+<span class="fc" id="L113">        waybills.reserve(available.stream().map(Waybill::waybillId).toList());</span>
+
+<span class="fc" id="L115">        UUID batchId = UUID.randomUUID();</span>
+<span class="fc" id="L116">        String reference = &quot;V2-&quot; + LocalDate.now(ZoneOffset.UTC) + &quot;-&quot; + batchId.toString().substring(0, 8);</span>
+<span class="fc" id="L117">        batches.insertBatch(batchId, first.institutionId(), first.vendorId(), configuration.configurationVersionId(),</span>
+<span class="fc" id="L118">                reference, paired.size());</span>
+<span class="fc" id="L119">        List&lt;NewBatchItem&gt; items = new ArrayList&lt;&gt;(paired.size());</span>
+<span class="fc bfc" id="L120" title="All 2 branches covered.">        for (int index = 0; index &lt; paired.size(); index++) {</span>
+<span class="fc" id="L121">            EligibleRequest request = paired.get(index);</span>
+<span class="fc" id="L122">            Waybill waybill = available.get(index);</span>
+<span class="fc" id="L123">            UUID itemId = UUID.randomUUID();</span>
+<span class="fc" id="L124">            items.add(new NewBatchItem(itemId, request.institutionId(), request.productionRequestId(),</span>
+<span class="fc" id="L125">                    request.cardId(), waybill.waybillId(), waybill.waybillNumber(), index + 1));</span>
+<span class="fc" id="L126">            saveAttempt(request, itemId);</span>
+        }
+<span class="fc" id="L128">        batches.insertItems(batchId, items);</span>
+<span class="fc" id="L129">        publishBatchCreated(batchId, reference, first);</span>
+<span class="fc" id="L130">        log.info(&quot;Created personalisation batch {} with {} item(s)&quot;, batchId, paired.size());</span>
+<span class="fc" id="L131">        return java.util.Optional.of(new CreatedBatch(batchId, first.institutionId(), first.requestType()));</span>
+    }
+
+    @Transactional
+    public void markGenerationFailed(UUID batchId, UUID institutionId, String message) {
+<span class="fc" id="L136">        batches.updateStatus(batchId, &quot;GENERATION_FAILED&quot;);</span>
+<span class="fc" id="L137">        recordException(institutionId, &quot;FILE_GENERATION_FAILED&quot;, &quot;PRODUCTION_BATCH&quot;, batchId.toString(), message);</span>
+<span class="fc" id="L138">        batches.header(batchId).ifPresent(batch -&gt; events.batchFailed(</span>
+<span class="fc" id="L139">                institutionId, batchId, batch.batchReference(),</span>
+<span class="pc bpc" id="L140" title="1 of 2 branches missed.">                batch.productId() == null ? null : batch.productId().toString(),</span>
+<span class="fc" id="L141">                batch.vendorId(), batch.itemCount()));</span>
+<span class="fc" id="L142">    }</span>
+
+    /**
+     * Writes one reserved batch. A batch that lost eligibility is cancelled in this same
+     * transaction and reported as skipped, so the cancellation commits instead of rolling back
+     * with the exception.
+     */
+    @Transactional
+    public boolean generateOne(UUID batchId, String requestType, UUID institutionId) {
+        try {
+<span class="fc" id="L152">            writeReservedBatch(batchId, requestType, institutionId);</span>
+<span class="fc" id="L153">            return true;</span>
+<span class="fc" id="L154">        } catch (BatchNoLongerEligibleException ex) {</span>
+<span class="fc" id="L155">            log.info(&quot;Skipped cancelled or ineligible personalisation batch {} code={}&quot;, batchId, ex.code());</span>
+<span class="fc" id="L156">            return false;</span>
+        }
+    }
+
+    private void writeReservedBatch(UUID batchId, String requestType, UUID institutionId) {
+<span class="fc" id="L161">        List&lt;ReservedBatchItem&gt; lockedItems = batches.lockReservedItems(batchId, institutionId);</span>
+<span class="pc bpc" id="L162" title="1 of 6 branches missed.">        if (lockedItems.isEmpty() || lockedItems.stream().anyMatch(item -&gt; !&quot;RESERVED_FOR_BATCH&quot;.equals(item.requestStatus()))) {</span>
+<span class="fc" id="L163">            batches.cancelReserved(batchId, institutionId);</span>
+<span class="fc" id="L164">            throw new BatchNoLongerEligibleException(batchId);</span>
+        }
+<span class="fc" id="L166">        batches.updateStatus(batchId, &quot;GENERATING&quot;);</span>
+<span class="fc" id="L167">        BatchHeader batch = batches.header(batchId)</span>
+<span class="fc" id="L168">                .orElseThrow(() -&gt; new EmbossingSystemException(EmbossingErrorCodes.BATCH_NOT_FOUND,</span>
+                        &quot;Personalisation batch not found: &quot; + batchId));
+<span class="fc" id="L170">        var lines = cardFiles.loadBatch(batchId);</span>
+<span class="fc bfc" id="L171" title="All 2 branches covered.">        if (lines.size() != lockedItems.size()) {</span>
+<span class="fc" id="L172">            throw new FileGenerationException(EmbossingErrorCodes.BATCH_LINE_MISMATCH,</span>
+                    &quot;Card file lines do not match reserved batch items for &quot; + batchId);
+        }
+<span class="fc" id="L175">        var data = dataFactory.load(requestType, lines);</span>
+<span class="fc" id="L176">        EncryptedFileWriter.WrittenFile result = encryptedFileWriter.write(batchId.toString(), data,</span>
+<span class="fc" id="L177">                pgpPublicKeyResolver.resolve(institutionId, batch.vendorId()));</span>
+<span class="fc" id="L178">        String relative = outputBasePath.toAbsolutePath().normalize()</span>
+<span class="fc" id="L179">                .relativize(result.outputPath().toAbsolutePath().normalize())</span>
+<span class="fc" id="L180">                .toString().replace('\\', '/');</span>
+<span class="fc" id="L181">        UUID fileId = UUID.randomUUID();</span>
+<span class="fc" id="L182">        batches.insertFile(fileId, institutionId, batchId, result.outputPath().getFileName().toString(),</span>
+<span class="fc" id="L183">                result.recordCount(), &quot;sha256:&quot; + result.clearChecksum(),</span>
+<span class="fc" id="L184">                &quot;sha256:&quot; + result.encryptedChecksum(), relative);</span>
+<span class="fc" id="L185">        batches.updateStatus(batchId, &quot;FILE_GENERATED&quot;);</span>
+<span class="fc" id="L186">        events.fileGenerated(institutionId, fileId, batchId, batch.vendorId(),</span>
+<span class="fc" id="L187">                result.recordCount(), java.time.Instant.now().toString());</span>
+<span class="fc" id="L188">        waybills.assign(lockedItems.stream().map(ReservedBatchItem::waybillId).toList());</span>
+<span class="fc" id="L189">        requests.markFileGenerated(lockedItems.stream().map(ReservedBatchItem::productionRequestId).toList());</span>
+<span class="fc" id="L190">    }</span>
+
+    private void publishBatchCreated(UUID batchId, String reference, EligibleRequest first) {
+<span class="fc" id="L193">        var cards = batches.noticeCards(batchId);</span>
+<span class="fc" id="L194">        events.batchCreated(first.institutionId(), batchId, reference,</span>
+<span class="fc" id="L195">                first.productId().toString(), first.vendorId(), cards.size(),</span>
+<span class="fc" id="L196">                cards.stream().map(card -&gt; new CardRef(card.cardId(), card.customerRef(), card.lastFour())).toList());</span>
+<span class="fc" id="L197">    }</span>
+
+    private void saveAttempt(EligibleRequest request, UUID itemId) {
+<span class="fc" id="L200">        int next = attempts.findFirstByInstitutionIdAndProductionRequestIdOrderByAttemptNumberDesc(</span>
+<span class="fc" id="L201">                request.institutionId(), request.productionRequestId()).map(a -&gt; a.getAttemptNumber() + 1).orElse(1);</span>
+<span class="fc" id="L202">        ProductionAttempt attempt = new ProductionAttempt();</span>
+<span class="fc" id="L203">        attempt.setAttemptId(UUID.randomUUID());</span>
+<span class="fc" id="L204">        attempt.setInstitutionId(request.institutionId());</span>
+<span class="fc" id="L205">        attempt.setProductionRequestId(request.productionRequestId());</span>
+<span class="fc" id="L206">        attempt.setCardId(request.cardId());</span>
+<span class="fc" id="L207">        attempt.setAttemptNumber(next);</span>
+<span class="fc" id="L208">        attempt.setBatchItemId(itemId);</span>
+<span class="fc" id="L209">        attempt.setAttemptStatus(&quot;BATCHED&quot;);</span>
+<span class="fc" id="L210">        attempt.setStartedAt(OffsetDateTime.now(ZoneOffset.UTC));</span>
+<span class="fc" id="L211">        attempts.save(attempt);</span>
+<span class="fc" id="L212">    }</span>
+
+    private void recordException(UUID institutionId, String code, String aggregateType, String aggregateId, String detail) {
+<span class="fc bfc" id="L215" title="All 2 branches covered.">        if (exceptions.existsByExceptionCodeAndAggregateIdAndResolvedAtIsNull(code, aggregateId)) {</span>
+<span class="fc" id="L216">            return;</span>
+        }
+<span class="fc" id="L218">        ReconciliationException row = new ReconciliationException();</span>
+<span class="fc" id="L219">        row.setExceptionId(UUID.randomUUID());</span>
+<span class="fc" id="L220">        row.setInstitutionId(institutionId);</span>
+<span class="fc" id="L221">        row.setExceptionCode(code);</span>
+<span class="fc" id="L222">        row.setAggregateType(aggregateType);</span>
+<span class="fc" id="L223">        row.setAggregateId(aggregateId);</span>
+<span class="fc" id="L224">        row.setDetail(safe(detail));</span>
+<span class="fc" id="L225">        row.setDetectedAt(OffsetDateTime.now(ZoneOffset.UTC));</span>
+<span class="fc" id="L226">        exceptions.save(row);</span>
+<span class="fc" id="L227">    }</span>
+
+    private static List&lt;UUID&gt; ids(List&lt;EligibleRequest&gt; requests) {
+<span class="fc" id="L230">        return requests.stream().map(EligibleRequest::productionRequestId).toList();</span>
+    }
+
+    private static String safe(String message) {
+<span class="pc bpc" id="L234" title="1 of 2 branches missed.">        if (message == null) {</span>
+<span class="nc" id="L235">            return &quot;unknown&quot;;</span>
+        }
+<span class="fc bfc" id="L237" title="All 2 branches covered.">        return message.length() &lt;= 1000 ? message : message.substring(0, 1000);</span>
+    }
+
+    private static String groupKey(EligibleRequest request) {
+<span class="fc" id="L241">        return request.institutionId() + &quot;:&quot; + request.vendorId() + &quot;:&quot; + request.configurationId() + &quot;:&quot;</span>
+<span class="fc" id="L242">                + request.productId() + &quot;:&quot; + request.requestType();</span>
+    }
+
+<span class="fc" id="L245">    public record CreatedBatch(UUID batchId, UUID institutionId, String requestType) {}</span>
+
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.15.202606040825</span></div></body></html>

@@ -1,0 +1,35 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>VendorResultController.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">embossing-service</a> &gt; <a href="index.source.html" class="el_package">com.lps.cms.embossing.perso.api.report</a> &gt; <span class="el_source">VendorResultController.java</span></div><h1>VendorResultController.java</h1><pre class="source lang-java linenums">package com.lps.cms.embossing.perso.api.report;
+
+import java.util.UUID;
+
+import com.lps.cms.embossing.perso.api.ApiResponseEnvelope;
+import com.lps.cms.embossing.perso.api.ApiResponseHelper;
+import com.lps.cms.embossing.perso.report.FulfilmentReportService;
+import jakarta.validation.Valid;
+import org.springframework.http.ResponseEntity;
+import org.springframework.validation.annotation.Validated;
+import org.springframework.web.bind.annotation.PathVariable;
+import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.RequestBody;
+import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RestController;
+
+@Validated
+@RestController
+@RequestMapping(&quot;/cms/api/v2/institutions/{institutionId}/vendor-results&quot;)
+public class VendorResultController {
+
+    private final FulfilmentReportService reports;
+
+<span class="nc" id="L24">    public VendorResultController(FulfilmentReportService reports) {</span>
+<span class="nc" id="L25">        this.reports = reports;</span>
+<span class="nc" id="L26">    }</span>
+
+    @PostMapping
+    public ResponseEntity&lt;ApiResponseEnvelope&lt;FulfilmentCommandResponse&gt;&gt; report(
+            @PathVariable UUID institutionId,
+            @Valid @RequestBody VendorResultRequest request) {
+<span class="nc" id="L32">        return ApiResponseHelper.ok(reports.reportVendor(institutionId, request));</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.15.202606040825</span></div></body></html>

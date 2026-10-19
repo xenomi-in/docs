@@ -1,0 +1,193 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>FulfilmentCommandPlan.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">embossing-service</a> &gt; <a href="index.source.html" class="el_package">com.lps.cms.embossing.perso.report</a> &gt; <span class="el_source">FulfilmentCommandPlan.java</span></div><h1>FulfilmentCommandPlan.java</h1><pre class="source lang-java linenums">package com.lps.cms.embossing.perso.report;
+
+import java.util.LinkedHashMap;
+import java.util.Map;
+import java.util.Set;
+import java.util.UUID;
+
+import com.lps.cms.embossing.perso.api.report.CourierEventRequest;
+import com.lps.cms.embossing.perso.api.report.VendorResultRequest;
+import com.lps.cms.embossing.perso.event.mapper.PayloadValues;
+import com.lps.cms.embossing.perso.exception.EmbossingErrorCodes;
+import com.lps.cms.embossing.perso.exception.EmbossingRequestException;
+import com.lps.cms.embossing.perso.exception.FulfilmentConflictException;
+
+/** Maps one normalized provider report onto the CMS command and the production-request status. */
+final class FulfilmentCommandPlan {
+
+    private FulfilmentCommandPlan() {
+    }
+
+    static Decision vendor(VendorResultRequest report, ReportSubject subject, Set&lt;String&gt; priorCommands) {
+<span class="fc" id="L22">        requireSame(report.institutionId(), subject.institutionId(), &quot;Institution does not match the request path&quot;);</span>
+<span class="fc" id="L23">        requireSame(report.cardId(), subject.cardId(), &quot;Card does not match the production request&quot;);</span>
+<span class="fc" id="L24">        requireSame(report.vendorId(), subject.vendorId(), &quot;Vendor does not match the production request&quot;);</span>
+<span class="pc bpc" id="L25" title="2 of 4 branches missed.">        return switch (report.result()) {</span>
+<span class="fc" id="L26">            case ACCEPTED -&gt; accepted(subject, report.vendorReference());</span>
+<span class="nc" id="L27">            case PERSONALIZED -&gt; personalized(subject, priorCommands, report);</span>
+<span class="fc" id="L28">            case FILE_COMMITTED -&gt; fileCommitted(subject, priorCommands, report.fileReference());</span>
+<span class="nc" id="L29">            case FAILED -&gt; failed(subject, report);</span>
+        };
+    }
+
+    static Decision courier(CourierEventRequest report, ReportSubject subject, Set&lt;String&gt; priorCommands) {
+<span class="fc" id="L34">        requireSame(report.institutionId(), subject.institutionId(), &quot;Institution does not match the request path&quot;);</span>
+<span class="fc" id="L35">        requireSame(report.cardId(), subject.cardId(), &quot;Card does not match the production request&quot;);</span>
+<span class="pc bpc" id="L36" title="2 of 4 branches missed.">        if (subject.courierProviderId() != null &amp;&amp; !subject.courierProviderId().equals(report.courierProviderId())) {</span>
+<span class="nc" id="L37">            throw new EmbossingRequestException(EmbossingErrorCodes.REQUEST_INVALID,</span>
+                    &quot;Courier does not match the waybill on the production request&quot;);
+        }
+<span class="pc bpc" id="L40" title="3 of 4 branches missed.">        return switch (report.eventType()) {</span>
+<span class="nc" id="L41">            case DISPATCHED -&gt; dispatched(subject, priorCommands, report);</span>
+<span class="fc" id="L42">            case DELIVERED -&gt; delivered(subject, priorCommands, report);</span>
+<span class="nc" id="L43">            case RETURNED -&gt; returned(subject, priorCommands, report);</span>
+<span class="nc" id="L44">            case REDISPATCHED -&gt; redispatch(subject, priorCommands, report);</span>
+        };
+    }
+
+    private static Decision accepted(ReportSubject subject, String vendorReference) {
+<span class="fc" id="L49">        requireStatus(subject, Set.of(&quot;FILE_GENERATED&quot;, &quot;SENT_TO_VENDOR&quot;), FulfilmentCommands.START_PERSONALIZATION);</span>
+<span class="fc" id="L50">        return new Decision(FulfilmentCommands.START_PERSONALIZATION, &quot;VENDOR_ACCEPTED&quot;,</span>
+<span class="fc" id="L51">                evidence(&quot;vendorReference&quot;, vendorReference));</span>
+    }
+
+    private static Decision personalized(ReportSubject subject, Set&lt;String&gt; priorCommands, VendorResultRequest report) {
+<span class="fc" id="L55">        requirePrior(priorCommands, FulfilmentCommands.START_PERSONALIZATION, FulfilmentCommands.CONFIRM_PERSONALIZATION);</span>
+<span class="fc" id="L56">        requireStatus(subject, Set.of(&quot;VENDOR_ACCEPTED&quot;), FulfilmentCommands.CONFIRM_PERSONALIZATION);</span>
+<span class="fc" id="L57">        String sequence = report.verifiedCardSequenceNumber();</span>
+<span class="pc bpc" id="L58" title="3 of 4 branches missed.">        if (sequence == null || !sequence.matches(&quot;[0-9]{3}&quot;)) {</span>
+<span class="fc" id="L59">            throw new EmbossingRequestException(EmbossingErrorCodes.REQUEST_INVALID,</span>
+                    &quot;Verified card sequence must be three digits&quot;);
+        }
+<span class="nc" id="L62">        Map&lt;String, Object&gt; evidence = evidence(</span>
+                &quot;verifiedCardSequenceNumber&quot;, sequence,
+<span class="nc" id="L64">                &quot;vendorReference&quot;, report.vendorReference());</span>
+<span class="nc" id="L65">        return new Decision(FulfilmentCommands.CONFIRM_PERSONALIZATION, &quot;IN_PRODUCTION&quot;, evidence);</span>
+    }
+
+    private static Decision fileCommitted(ReportSubject subject, Set&lt;String&gt; priorCommands, String fileReference) {
+<span class="fc" id="L69">        requirePrior(priorCommands, FulfilmentCommands.CONFIRM_PERSONALIZATION, FulfilmentCommands.CONFIRM_BUREAU_FILE);</span>
+<span class="fc" id="L70">        requireStatus(subject, Set.of(&quot;IN_PRODUCTION&quot;), FulfilmentCommands.CONFIRM_BUREAU_FILE);</span>
+<span class="pc bpc" id="L71" title="1 of 2 branches missed.">        if (priorCommands.contains(FulfilmentCommands.CONFIRM_BUREAU_FILE)) {</span>
+<span class="nc" id="L72">            throw new FulfilmentConflictException(EmbossingErrorCodes.REQUEST_STATUS_CHANGED,</span>
+                    &quot;A bureau file was already reported for this production request&quot;);
+        }
+<span class="pc bpc" id="L75" title="1 of 2 branches missed.">        if (subject.personalisationFileId() == null) {</span>
+<span class="nc" id="L76">            throw new FulfilmentConflictException(EmbossingErrorCodes.REQUEST_STATUS_CHANGED,</span>
+                    &quot;Personalisation file is not available for this production request&quot;);
+        }
+<span class="pc bpc" id="L79" title="3 of 4 branches missed.">        if (fileReference != null &amp;&amp; !fileReference.isBlank()</span>
+<span class="nc bnc" id="L80" title="All 2 branches missed.">                &amp;&amp; !fileReference.equals(subject.personalisationFileId().toString())) {</span>
+<span class="nc" id="L81">            throw new EmbossingRequestException(EmbossingErrorCodes.REQUEST_INVALID,</span>
+                    &quot;File reference does not match the personalisation file&quot;);
+        }
+<span class="fc" id="L84">        return new Decision(FulfilmentCommands.CONFIRM_BUREAU_FILE, null, evidence(</span>
+<span class="fc" id="L85">                &quot;personalisationFileId&quot;, PayloadValues.uuid(subject.personalisationFileId()),</span>
+<span class="fc" id="L86">                &quot;fileName&quot;, subject.fileName()));</span>
+    }
+
+    private static Decision failed(ReportSubject subject, VendorResultRequest report) {
+<span class="nc" id="L90">        requireStatus(subject, Set.of(&quot;FILE_GENERATED&quot;, &quot;SENT_TO_VENDOR&quot;, &quot;VENDOR_ACCEPTED&quot;),</span>
+                FulfilmentCommands.FAIL_PERSONALIZATION);
+<span class="nc bnc" id="L92" title="All 4 branches missed.">        if (report.failureCode() == null || !report.failureCode().matches(&quot;[A-Z0-9_]{1,50}&quot;)) {</span>
+<span class="nc" id="L93">            throw new EmbossingRequestException(EmbossingErrorCodes.REQUEST_INVALID,</span>
+                    &quot;Failure code must contain only uppercase letters, digits, and underscores&quot;);
+        }
+<span class="nc" id="L96">        return new Decision(FulfilmentCommands.FAIL_PERSONALIZATION, &quot;VENDOR_REJECTED&quot;, evidence(</span>
+<span class="nc" id="L97">                &quot;failureCode&quot;, report.failureCode(),</span>
+<span class="nc" id="L98">                &quot;failureMessage&quot;, blankToNull(report.failureMessage()),</span>
+<span class="nc" id="L99">                &quot;vendorReference&quot;, report.vendorReference()));</span>
+    }
+
+    private static Decision dispatched(ReportSubject subject, Set&lt;String&gt; priorCommands, CourierEventRequest report) {
+<span class="nc" id="L103">        requirePrior(priorCommands, FulfilmentCommands.CONFIRM_BUREAU_FILE, FulfilmentCommands.CONFIRM_DISPATCH);</span>
+<span class="nc" id="L104">        requireStatus(subject, Set.of(&quot;IN_PRODUCTION&quot;), FulfilmentCommands.CONFIRM_DISPATCH);</span>
+<span class="nc" id="L105">        requireAwb(subject, report.awbNumber());</span>
+<span class="nc" id="L106">        return new Decision(FulfilmentCommands.CONFIRM_DISPATCH, null, courierEvidence(report));</span>
+    }
+
+    private static Decision delivered(ReportSubject subject, Set&lt;String&gt; priorCommands, CourierEventRequest report) {
+<span class="fc" id="L110">        requirePrior(priorCommands, FulfilmentCommands.CONFIRM_DISPATCH, FulfilmentCommands.CONFIRM_DELIVERY);</span>
+<span class="pc bpc" id="L111" title="1 of 2 branches missed.">        if (priorCommands.contains(FulfilmentCommands.CONFIRM_RETURN)) {</span>
+<span class="nc" id="L112">            throw new FulfilmentConflictException(EmbossingErrorCodes.REQUEST_STATUS_CHANGED,</span>
+                    &quot;Production request is not ready for &quot; + FulfilmentCommands.CONFIRM_DELIVERY);
+        }
+<span class="fc" id="L115">        requireStatus(subject, Set.of(&quot;IN_PRODUCTION&quot;), FulfilmentCommands.CONFIRM_DELIVERY);</span>
+<span class="fc" id="L116">        requireAwb(subject, report.awbNumber());</span>
+<span class="fc" id="L117">        return new Decision(FulfilmentCommands.CONFIRM_DELIVERY, &quot;COMPLETED&quot;, courierEvidence(report));</span>
+    }
+
+    private static Decision returned(ReportSubject subject, Set&lt;String&gt; priorCommands, CourierEventRequest report) {
+<span class="nc" id="L121">        requirePrior(priorCommands, FulfilmentCommands.CONFIRM_DISPATCH, FulfilmentCommands.CONFIRM_RETURN);</span>
+<span class="nc bnc" id="L122" title="All 2 branches missed.">        if (priorCommands.contains(FulfilmentCommands.CONFIRM_DELIVERY)) {</span>
+<span class="nc" id="L123">            throw new FulfilmentConflictException(EmbossingErrorCodes.REQUEST_STATUS_CHANGED,</span>
+                    &quot;A delivered shipment cannot be reported as returned&quot;);
+        }
+<span class="nc" id="L126">        requireStatus(subject, Set.of(&quot;IN_PRODUCTION&quot;), FulfilmentCommands.CONFIRM_RETURN);</span>
+<span class="nc" id="L127">        requireAwb(subject, report.awbNumber());</span>
+<span class="nc" id="L128">        return new Decision(FulfilmentCommands.CONFIRM_RETURN, null, courierEvidence(report));</span>
+    }
+
+    private static Decision redispatch(ReportSubject subject, Set&lt;String&gt; priorCommands, CourierEventRequest report) {
+<span class="nc" id="L132">        requirePrior(priorCommands, FulfilmentCommands.CONFIRM_RETURN, FulfilmentCommands.REDISPATCH_SAME_PLASTIC);</span>
+<span class="nc" id="L133">        requireStatus(subject, Set.of(&quot;IN_PRODUCTION&quot;), FulfilmentCommands.REDISPATCH_SAME_PLASTIC);</span>
+<span class="nc bnc" id="L134" title="All 4 branches missed.">        if (subject.waybillNumber() != null &amp;&amp; subject.waybillNumber().equals(report.awbNumber())) {</span>
+<span class="nc" id="L135">            throw new EmbossingRequestException(EmbossingErrorCodes.REQUEST_INVALID,</span>
+                    &quot;Redispatch requires a new airway bill&quot;);
+        }
+<span class="nc" id="L138">        return new Decision(FulfilmentCommands.REDISPATCH_SAME_PLASTIC, null, courierEvidence(report));</span>
+    }
+
+    private static void requireAwb(ReportSubject subject, String awbNumber) {
+<span class="pc bpc" id="L142" title="2 of 4 branches missed.">        if (subject.waybillNumber() != null &amp;&amp; !subject.waybillNumber().equals(awbNumber)) {</span>
+<span class="nc" id="L143">            throw new EmbossingRequestException(EmbossingErrorCodes.REQUEST_INVALID,</span>
+                    &quot;Airway bill does not match the waybill on the production request&quot;);
+        }
+<span class="fc" id="L146">    }</span>
+
+    private static void requireStatus(ReportSubject subject, Set&lt;String&gt; allowed, String command) {
+<span class="pc bpc" id="L149" title="1 of 2 branches missed.">        if (!allowed.contains(subject.requestStatus())) {</span>
+<span class="nc" id="L150">            throw new FulfilmentConflictException(EmbossingErrorCodes.REQUEST_STATUS_CHANGED,</span>
+                    &quot;Production request is not ready for &quot; + command);
+        }
+<span class="fc" id="L153">    }</span>
+
+    private static void requirePrior(Set&lt;String&gt; priorCommands, String required, String command) {
+<span class="fc bfc" id="L156" title="All 2 branches covered.">        if (!priorCommands.contains(required)) {</span>
+<span class="fc" id="L157">            throw new FulfilmentConflictException(EmbossingErrorCodes.REQUEST_STATUS_CHANGED,</span>
+                    &quot;Production request is not ready for &quot; + command);
+        }
+<span class="fc" id="L160">    }</span>
+
+    private static void requireSame(UUID reported, UUID actual, String message) {
+<span class="pc bpc" id="L163" title="1 of 2 branches missed.">        if (!reported.equals(actual)) {</span>
+<span class="nc" id="L164">            throw new EmbossingRequestException(EmbossingErrorCodes.REQUEST_INVALID, message);</span>
+        }
+<span class="fc" id="L166">    }</span>
+
+    private static Map&lt;String, Object&gt; courierEvidence(CourierEventRequest report) {
+<span class="fc" id="L169">        return evidence(</span>
+<span class="fc" id="L170">                &quot;courierProviderId&quot;, PayloadValues.uuid(report.courierProviderId()),</span>
+<span class="fc" id="L171">                &quot;shipmentId&quot;, PayloadValues.uuid(report.shipmentId()),</span>
+<span class="fc" id="L172">                &quot;awbNumber&quot;, report.awbNumber(),</span>
+<span class="fc" id="L173">                &quot;shipmentAttempt&quot;, report.shipmentAttempt(),</span>
+<span class="fc" id="L174">                &quot;locationReference&quot;, blankToNull(report.locationReference()),</span>
+<span class="fc" id="L175">                &quot;evidenceReference&quot;, blankToNull(report.evidenceReference()));</span>
+    }
+
+    private static Map&lt;String, Object&gt; evidence(Object... keyValues) {
+<span class="fc" id="L179">        Map&lt;String, Object&gt; evidence = new LinkedHashMap&lt;&gt;();</span>
+<span class="fc bfc" id="L180" title="All 2 branches covered.">        for (int i = 0; i &lt; keyValues.length; i += 2) {</span>
+<span class="fc" id="L181">            evidence.put((String) keyValues[i], keyValues[i + 1]);</span>
+        }
+<span class="fc" id="L183">        return evidence;</span>
+    }
+
+    private static String blankToNull(String value) {
+<span class="pc bpc" id="L187" title="3 of 4 branches missed.">        return value == null || value.isBlank() ? null : value;</span>
+    }
+
+<span class="fc" id="L190">    record Decision(String command, String nextRequestStatus, Map&lt;String, Object&gt; evidence) {</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.15.202606040825</span></div></body></html>

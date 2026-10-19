@@ -1,0 +1,128 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>NotificationService.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">cms-notification</a> &gt; <a href="index.source.html" class="el_package">com.lps.cms.notification.service</a> &gt; <span class="el_source">NotificationService.java</span></div><h1>NotificationService.java</h1><pre class="source lang-java linenums">package com.lps.cms.notification.service;
+
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+import org.slf4j.MDC;
+import org.springframework.stereotype.Service;
+
+import com.lps.cms.notification.config.InstitutionHeaders;
+import com.lps.cms.notification.config.TraceIdFilter;
+import com.lps.cms.notification.exception.IdempotencyConflictException;
+import com.lps.cms.notification.idempotency.IdempotencyKey;
+import com.lps.cms.notification.idempotency.IdempotencyProperties;
+import com.lps.cms.notification.idempotency.IdempotencyRecord;
+import com.lps.cms.notification.idempotency.IdempotencyStatus;
+import com.lps.cms.notification.idempotency.IdempotencyStore;
+import com.lps.cms.notification.model.NotificationEvent;
+import com.lps.cms.notification.model.NotificationRequest;
+import com.lps.cms.notification.producer.NotificationProducer;
+
+import java.time.Duration;
+import java.util.Optional;
+
+/**
+ * Orchestrates the ingest pipeline: validate, enrich, idempotency gate, publish to Kafka.
+ * &lt;p&gt;
+ * HTTP retries with the same {@code (institutionId, eventSource, eventId)} return the original
+ * acceptance without a second Kafka produce. Kafka producer idempotence alone does not provide
+ * that guarantee.
+ */
+@Service
+public class NotificationService {
+
+<span class="fc" id="L33">    private static final Logger log = LoggerFactory.getLogger(NotificationService.class);</span>
+
+    private final EventValidator validator;
+    private final MetadataEnricher enricher;
+    private final NotificationProducer producer;
+    private final IdempotencyStore idempotencyStore;
+    private final Duration inProgressWait;
+    private final Duration inProgressPoll;
+
+    public NotificationService(EventValidator validator,
+                               MetadataEnricher enricher,
+                               NotificationProducer producer,
+                               IdempotencyStore idempotencyStore,
+<span class="fc" id="L46">                               IdempotencyProperties idempotencyProperties) {</span>
+<span class="fc" id="L47">        this.validator = validator;</span>
+<span class="fc" id="L48">        this.enricher = enricher;</span>
+<span class="fc" id="L49">        this.producer = producer;</span>
+<span class="fc" id="L50">        this.idempotencyStore = idempotencyStore;</span>
+<span class="fc" id="L51">        this.inProgressWait = idempotencyProperties.inProgressWait();</span>
+<span class="fc" id="L52">        this.inProgressPoll = idempotencyProperties.inProgressPoll();</span>
+<span class="fc" id="L53">    }</span>
+
+    /**
+     * Processes a single publish request end-to-end under the institution-scoped idempotency key.
+     *
+     * @param institutionId gateway {@code X-Institution-Id} (must match body {@code tenantId})
+     * @param request       incoming notification intent
+     * @return event id and whether this call was an idempotent replay
+     */
+    public PublishResult handle(String institutionId, NotificationRequest request) {
+<span class="fc" id="L63">        String normalizedInstitutionId = institutionId.trim();</span>
+<span class="fc" id="L64">        MDC.put(InstitutionHeaders.INSTITUTION_ID_MDC_KEY, normalizedInstitutionId);</span>
+
+<span class="pc bpc" id="L66" title="1 of 2 branches missed.">        if (log.isDebugEnabled()) {</span>
+<span class="fc" id="L67">            log.debug(&quot;Handling publish eventType={} institutionId={}&quot;,</span>
+<span class="fc" id="L68">                    request.eventType(), normalizedInstitutionId);</span>
+        }
+
+<span class="fc" id="L71">        validator.validate(normalizedInstitutionId, request);</span>
+<span class="fc" id="L72">        NotificationEvent event = enricher.enrich(request);</span>
+<span class="fc" id="L73">        MDC.put(TraceIdFilter.EVENT_ID_MDC_KEY, event.eventId());</span>
+
+<span class="fc" id="L75">        IdempotencyKey key = new IdempotencyKey(</span>
+                normalizedInstitutionId,
+<span class="fc" id="L77">                event.eventSource(),</span>
+<span class="fc" id="L78">                event.eventId());</span>
+
+<span class="fc" id="L80">        Optional&lt;PublishResult&gt; earlyReplay = completedReplay(key);</span>
+<span class="fc bfc" id="L81" title="All 2 branches covered.">        if (earlyReplay.isPresent()) {</span>
+<span class="fc" id="L82">            return earlyReplay.get();</span>
+        }
+
+<span class="fc" id="L85">        long deadlineNanos = System.nanoTime() + inProgressWait.toNanos();</span>
+<span class="fc bfc" id="L86" title="All 2 branches covered.">        while (!idempotencyStore.tryBegin(key)) {</span>
+<span class="fc" id="L87">            Optional&lt;PublishResult&gt; replay = completedReplay(key);</span>
+<span class="fc bfc" id="L88" title="All 2 branches covered.">            if (replay.isPresent()) {</span>
+<span class="fc" id="L89">                return replay.get();</span>
+            }
+<span class="fc bfc" id="L91" title="All 2 branches covered.">            if (System.nanoTime() &gt;= deadlineNanos) {</span>
+<span class="fc" id="L92">                throw new IdempotencyConflictException(</span>
+                        &quot;Another request is publishing this event; please retry with the same eventId&quot;);
+            }
+<span class="fc" id="L95">            sleep(inProgressPoll);</span>
+<span class="fc" id="L96">        }</span>
+
+        try {
+<span class="fc" id="L99">            producer.publish(event);</span>
+<span class="fc" id="L100">            idempotencyStore.complete(key);</span>
+<span class="fc" id="L101">            return PublishResult.accepted(event.eventId());</span>
+<span class="fc" id="L102">        } catch (RuntimeException ex) {</span>
+<span class="fc" id="L103">            idempotencyStore.abandon(key);</span>
+<span class="fc" id="L104">            throw ex;</span>
+        }
+    }
+
+    private Optional&lt;PublishResult&gt; completedReplay(IdempotencyKey key) {
+<span class="fc" id="L109">        Optional&lt;IdempotencyRecord&gt; record = idempotencyStore.find(key);</span>
+<span class="fc bfc" id="L110" title="All 4 branches covered.">        if (record.isEmpty() || record.get().status() != IdempotencyStatus.COMPLETED) {</span>
+<span class="fc" id="L111">            return Optional.empty();</span>
+        }
+<span class="fc" id="L113">        log.info(&quot;Idempotent replay eventId={} institutionId={} source={}&quot;,</span>
+<span class="fc" id="L114">                record.get().eventId(), key.institutionId(), key.source());</span>
+<span class="fc" id="L115">        return Optional.of(PublishResult.replay(record.get().eventId()));</span>
+    }
+
+    private static void sleep(Duration duration) {
+        try {
+<span class="fc" id="L120">            Thread.sleep(Math.max(1L, duration.toMillis()));</span>
+<span class="fc" id="L121">        } catch (InterruptedException ex) {</span>
+<span class="fc" id="L122">            Thread.currentThread().interrupt();</span>
+<span class="fc" id="L123">            throw new IdempotencyConflictException(</span>
+                    &quot;Interrupted while waiting for an in-flight publish of this event&quot;);
+<span class="fc" id="L125">        }</span>
+<span class="fc" id="L126">    }</span>
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.14.202510111229</span></div></body></html>

@@ -1,0 +1,9 @@
+<?xml version='1.0' encoding='utf-8'?>
+<testsuite xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:noNamespaceSchemaLocation="https://maven.apache.org/surefire/maven-surefire-plugin/xsd/surefire-test-report.xsd" version="3.0.2" name="com.lps.cms.embossing.perso.event.writer.OutboxEventWriterTest" time="0.098" tests="5" errors="0" skipped="0" failures="0" flakes="0">
+  <testcase name="returnsNullWithoutWritingWhenTheOutboxIsDisabled" classname="com.lps.cms.embossing.perso.event.writer.OutboxEventWriterTest" time="0.032" />
+  <testcase name="refusesToWriteOutsideATransaction" classname="com.lps.cms.embossing.perso.event.writer.OutboxEventWriterTest" time="0.001" />
+  <testcase name="returnsNullWhenAnIdenticalEventAlreadyExists" classname="com.lps.cms.embossing.perso.event.writer.OutboxEventWriterTest" time="0.004">
+    </testcase>
+  <testcase name="returnsTheEventIdWhenTheRowIsInserted" classname="com.lps.cms.embossing.perso.event.writer.OutboxEventWriterTest" time="0.003" />
+  <testcase name="rejectsAnEnvelopeThatCannotBeSerialised" classname="com.lps.cms.embossing.perso.event.writer.OutboxEventWriterTest" time="0.058" />
+</testsuite>

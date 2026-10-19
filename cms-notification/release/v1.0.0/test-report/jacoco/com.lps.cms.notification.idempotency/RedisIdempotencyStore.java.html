@@ -1,0 +1,113 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>RedisIdempotencyStore.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">cms-notification</a> &gt; <a href="index.source.html" class="el_package">com.lps.cms.notification.idempotency</a> &gt; <span class="el_source">RedisIdempotencyStore.java</span></div><h1>RedisIdempotencyStore.java</h1><pre class="source lang-java linenums">package com.lps.cms.notification.idempotency;
+
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+import org.springframework.data.redis.core.StringRedisTemplate;
+import org.springframework.data.redis.core.script.DefaultRedisScript;
+
+import java.time.Duration;
+import java.util.List;
+import java.util.Optional;
+
+/**
+ * Redis-backed idempotency store safe for multi-instance deployments.
+ * &lt;p&gt;
+ * Uses {@code SET key value NX EX} for atomic claim. Values are compact:
+ * {@code IN_PROGRESS:{eventId}} / {@code COMPLETED:{eventId}}.
+ * Abandon deletes only when the key is still in-progress (Lua) so a race cannot
+ * wipe a completed marker after a successful publish.
+ */
+public class RedisIdempotencyStore implements IdempotencyStore {
+
+<span class="fc" id="L22">    private static final Logger log = LoggerFactory.getLogger(RedisIdempotencyStore.class);</span>
+
+    private static final String IN_PROGRESS_PREFIX = &quot;IN_PROGRESS:&quot;;
+    private static final String COMPLETED_PREFIX = &quot;COMPLETED:&quot;;
+
+    /**
+     * Delete only if value is still IN_PROGRESS for this event (avoid clobbering COMPLETED).
+     */
+<span class="fc" id="L30">    private static final DefaultRedisScript&lt;Long&gt; ABANDON_SCRIPT = new DefaultRedisScript&lt;&gt;(</span>
+            &quot;&quot;&quot;
+                    local current = redis.call('GET', KEYS[1])
+                    if current == false then
+                      return 0
+                    end
+                    if string.sub(current, 1, 12) == 'IN_PROGRESS:' then
+                      return redis.call('DEL', KEYS[1])
+                    end
+                    return 0
+                    &quot;&quot;&quot;,
+            Long.class
+    );
+
+    private final StringRedisTemplate redisTemplate;
+    private final String keyPrefix;
+    private final Duration ttl;
+
+<span class="fc" id="L48">    public RedisIdempotencyStore(StringRedisTemplate redisTemplate, String keyPrefix, Duration ttl) {</span>
+<span class="fc" id="L49">        this.redisTemplate = redisTemplate;</span>
+<span class="fc bfc" id="L50" title="All 2 branches covered.">        this.keyPrefix = keyPrefix.endsWith(&quot;:&quot;) ? keyPrefix : keyPrefix + &quot;:&quot;;</span>
+<span class="fc" id="L51">        this.ttl = ttl;</span>
+<span class="fc" id="L52">    }</span>
+
+    @Override
+    public Optional&lt;IdempotencyRecord&gt; find(IdempotencyKey key) {
+<span class="fc" id="L56">        String value = redisTemplate.opsForValue().get(redisKey(key));</span>
+<span class="fc" id="L57">        return Optional.ofNullable(value).flatMap(this::parse);</span>
+    }
+
+    @Override
+    public boolean tryBegin(IdempotencyKey key) {
+<span class="fc" id="L62">        Boolean claimed = redisTemplate.opsForValue().setIfAbsent(</span>
+<span class="fc" id="L63">                redisKey(key),</span>
+<span class="fc" id="L64">                IN_PROGRESS_PREFIX + key.eventId(),</span>
+                ttl
+        );
+<span class="fc" id="L67">        boolean acquired = Boolean.TRUE.equals(claimed);</span>
+<span class="pc bpc" id="L68" title="1 of 4 branches missed.">        if (acquired &amp;&amp; log.isDebugEnabled()) {</span>
+<span class="nc" id="L69">            log.debug(&quot;Idempotency claim acquired key={}&quot;, key.asStorageKey());</span>
+        }
+<span class="fc" id="L71">        return acquired;</span>
+    }
+
+    @Override
+    public void complete(IdempotencyKey key) {
+<span class="fc" id="L76">        redisTemplate.opsForValue().set(</span>
+<span class="fc" id="L77">                redisKey(key),</span>
+<span class="fc" id="L78">                COMPLETED_PREFIX + key.eventId(),</span>
+                ttl
+        );
+<span class="pc bpc" id="L81" title="1 of 2 branches missed.">        if (log.isDebugEnabled()) {</span>
+<span class="nc" id="L82">            log.debug(&quot;Idempotency claim completed key={}&quot;, key.asStorageKey());</span>
+        }
+<span class="fc" id="L84">    }</span>
+
+    @Override
+    public void abandon(IdempotencyKey key) {
+<span class="fc" id="L88">        Long deleted = redisTemplate.execute(ABANDON_SCRIPT, List.of(redisKey(key)));</span>
+<span class="pc bpc" id="L89" title="1 of 2 branches missed.">        if (log.isDebugEnabled()) {</span>
+<span class="nc" id="L90">            log.debug(&quot;Idempotency claim abandon key={} deleted={}&quot;, key.asStorageKey(), deleted);</span>
+        }
+<span class="fc" id="L92">    }</span>
+
+    private String redisKey(IdempotencyKey key) {
+<span class="fc" id="L95">        return keyPrefix + key.asStorageKey();</span>
+    }
+
+    private Optional&lt;IdempotencyRecord&gt; parse(String value) {
+<span class="fc bfc" id="L99" title="All 2 branches covered.">        if (value.startsWith(COMPLETED_PREFIX)) {</span>
+<span class="fc" id="L100">            return Optional.of(new IdempotencyRecord(</span>
+                    IdempotencyStatus.COMPLETED,
+<span class="fc" id="L102">                    value.substring(COMPLETED_PREFIX.length())));</span>
+        }
+<span class="fc bfc" id="L104" title="All 2 branches covered.">        if (value.startsWith(IN_PROGRESS_PREFIX)) {</span>
+<span class="fc" id="L105">            return Optional.of(new IdempotencyRecord(</span>
+                    IdempotencyStatus.IN_PROGRESS,
+<span class="fc" id="L107">                    value.substring(IN_PROGRESS_PREFIX.length())));</span>
+        }
+<span class="fc" id="L109">        log.warn(&quot;Ignoring unrecognized idempotency value: {}&quot;, value);</span>
+<span class="fc" id="L110">        return Optional.empty();</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.14.202510111229</span></div></body></html>

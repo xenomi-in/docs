@@ -1,0 +1,40 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>EventSource.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">cms-notification</a> &gt; <a href="index.source.html" class="el_package">com.lps.cms.notification.model</a> &gt; <span class="el_source">EventSource.java</span></div><h1>EventSource.java</h1><pre class="source lang-java linenums">package com.lps.cms.notification.model;
+
+import org.springframework.util.StringUtils;
+
+import java.util.Arrays;
+import java.util.Locale;
+import java.util.Optional;
+
+/**
+ * Upstream systems allowed to publish notification events.
+ * &lt;p&gt;
+ * The source is a first-class routing dimension: each source publishes to its own
+ * Kafka topic set (see {@code app.notification.topics.sources.*}). Adding a new
+ * upstream requires a new constant here plus its topic configuration.
+ */
+<span class="fc" id="L16">public enum EventSource {</span>
+
+    /** cms-core-service events. */
+<span class="fc" id="L19">    CMS,</span>
+
+    /** Switch (transaction switch) events. */
+<span class="fc" id="L22">    SWITCH;</span>
+
+    /**
+     * Parses a client-supplied source, tolerating case and surrounding whitespace.
+     *
+     * @param value raw {@code eventSource} from the request; may be null or blank
+     * @return the matching source, or empty when the value is blank or unknown
+     */
+    public static Optional&lt;EventSource&gt; fromValue(String value) {
+<span class="fc bfc" id="L31" title="All 2 branches covered.">        if (!StringUtils.hasText(value)) {</span>
+<span class="fc" id="L32">            return Optional.empty();</span>
+        }
+<span class="fc" id="L34">        String normalized = value.trim().toUpperCase(Locale.ROOT);</span>
+<span class="fc" id="L35">        return Arrays.stream(values())</span>
+<span class="fc" id="L36">                .filter(source -&gt; source.name().equals(normalized))</span>
+<span class="fc" id="L37">                .findFirst();</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.14.202510111229</span></div></body></html>

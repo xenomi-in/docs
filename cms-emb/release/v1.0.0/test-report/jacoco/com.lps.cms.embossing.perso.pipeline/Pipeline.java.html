@@ -1,0 +1,58 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>Pipeline.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">embossing-service</a> &gt; <a href="index.source.html" class="el_package">com.lps.cms.embossing.perso.pipeline</a> &gt; <span class="el_source">Pipeline.java</span></div><h1>Pipeline.java</h1><pre class="source lang-java linenums">package com.lps.cms.embossing.perso.pipeline;
+
+import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
+import org.springframework.stereotype.Service;
+
+import com.lps.cms.embossing.perso.event.correlation.JobRun;
+import com.lps.cms.embossing.perso.exception.EmbossingException;
+import com.lps.cms.embossing.perso.file.transmit.FileTransmitter;
+
+/**
+ * Runs one fulfilment cycle: reserve eligible requests, generate their files,
+ * then transmit files that are ready for SFTP.
+ */
+<span class="fc" id="L15">@Slf4j</span>
+@Service
+@RequiredArgsConstructor
+public class Pipeline {
+
+    private final FulfilmentJob fulfilmentJob;
+    private final FileTransmitter fileTransmitter;
+
+    public void execute() {
+<span class="fc" id="L24">        JobRun.start();</span>
+        try {
+<span class="fc" id="L26">            var batches = fulfilmentJob.claimAndBatch();</span>
+<span class="fc" id="L27">            int generated = 0;</span>
+<span class="fc bfc" id="L28" title="All 2 branches covered.">            for (var batch : batches) {</span>
+                try {
+<span class="fc bfc" id="L30" title="All 2 branches covered.">                    if (fulfilmentJob.generateOne(batch.batchId(), batch.requestType(), batch.institutionId())) {</span>
+<span class="fc" id="L31">                        generated++;</span>
+                    }
+<span class="fc" id="L33">                } catch (EmbossingException ex) {</span>
+<span class="fc" id="L34">                    log.error(&quot;File generation failed for batch {} code={}&quot;, batch.batchId(), ex.code(), ex);</span>
+<span class="fc" id="L35">                    fulfilmentJob.markGenerationFailed(batch.batchId(), batch.institutionId(), ex.getMessage());</span>
+<span class="fc" id="L36">                } catch (RuntimeException ex) {</span>
+<span class="fc" id="L37">                    log.error(&quot;File generation failed for batch {}&quot;, batch.batchId(), ex);</span>
+<span class="fc" id="L38">                    fulfilmentJob.markGenerationFailed(batch.batchId(), batch.institutionId(), &quot;File generation failed&quot;);</span>
+<span class="fc" id="L39">                }</span>
+<span class="fc" id="L40">            }</span>
+<span class="fc" id="L41">            int transmitted = transmitReadyFiles();</span>
+<span class="fc" id="L42">            log.info(&quot;Embossing pipeline completed — correlationId={} batches={} generated={} transmitted={}&quot;,</span>
+<span class="fc" id="L43">                    JobRun.current(), batches.size(), generated, transmitted);</span>
+        } finally {
+<span class="fc" id="L45">            JobRun.clear();</span>
+        }
+<span class="fc" id="L47">    }</span>
+
+    private int transmitReadyFiles() {
+        try {
+<span class="fc" id="L51">            return fileTransmitter.transmitReady();</span>
+<span class="nc" id="L52">        } catch (RuntimeException ex) {</span>
+<span class="nc" id="L53">            log.error(&quot;SFTP transmission failed&quot;, ex);</span>
+<span class="nc" id="L54">            return 0;</span>
+        }
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.15.202606040825</span></div></body></html>

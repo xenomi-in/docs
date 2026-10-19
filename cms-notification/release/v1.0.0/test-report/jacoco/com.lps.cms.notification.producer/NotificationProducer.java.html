@@ -1,0 +1,151 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>NotificationProducer.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">cms-notification</a> &gt; <a href="index.source.html" class="el_package">com.lps.cms.notification.producer</a> &gt; <span class="el_source">NotificationProducer.java</span></div><h1>NotificationProducer.java</h1><pre class="source lang-java linenums">package com.lps.cms.notification.producer;
+
+import com.cms.notification.avro.NotificationEvent;
+import com.lps.cms.notification.config.NotificationProducerProperties;
+import com.lps.cms.notification.config.NotificationTopicsProperties;
+import com.lps.cms.notification.model.EventSource;
+
+import io.github.resilience4j.bulkhead.Bulkhead;
+import io.github.resilience4j.bulkhead.BulkheadRegistry;
+import io.github.resilience4j.circuitbreaker.CircuitBreaker;
+import io.github.resilience4j.circuitbreaker.CircuitBreakerRegistry;
+import io.micrometer.core.instrument.MeterRegistry;
+import io.micrometer.core.instrument.Timer;
+import org.apache.kafka.clients.producer.RecordMetadata;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+import org.springframework.kafka.core.KafkaTemplate;
+import org.springframework.kafka.support.SendResult;
+import org.springframework.stereotype.Service;
+
+import java.time.Duration;
+import java.util.concurrent.ExecutionException;
+import java.util.concurrent.TimeUnit;
+import java.util.concurrent.TimeoutException;
+import java.util.function.Supplier;
+
+/**
+ * Synchronously publishes enriched notification events to Kafka using Avro serialization
+ * and Schema Registry.
+ * &lt;p&gt;
+ * The target topic is resolved from the event's {@link EventSource}: each upstream system
+ * (CMS, Switch) owns a dedicated topic so streams can be scaled, retained, and consumed
+ * independently.
+ * &lt;p&gt;
+ * Each source is guarded independently so one upstream cannot degrade the other:
+ * &lt;ul&gt;
+ *   &lt;li&gt;&lt;b&gt;Bulkhead&lt;/b&gt; — caps concurrent in-flight publishes per source, protecting the
+ *       servlet thread pool from being exhausted by a single upstream during a slowdown.&lt;/li&gt;
+ *   &lt;li&gt;&lt;b&gt;Circuit breaker&lt;/b&gt; — opens after sustained publish failures so callers get an
+ *       immediate retryable 503 instead of holding a thread for the full delivery budget.
+ *       Only {@link NotificationPublishException} is recorded as a failure; client errors
+ *       (validation, oversized payloads) are raised before the guards and never trip it.&lt;/li&gt;
+ * &lt;/ul&gt;
+ */
+@Service
+public class NotificationProducer {
+
+<span class="fc" id="L48">    private static final Logger log = LoggerFactory.getLogger(NotificationProducer.class);</span>
+
+    /** Prefix for per-source circuit breaker and bulkhead instance names. */
+    static final String GUARD_NAME_PREFIX = &quot;kafka-publish-&quot;;
+
+    private static final String PUBLISH_TIMER = &quot;notifications.publish&quot;;
+
+    private final KafkaTemplate&lt;String, NotificationEvent&gt; kafkaTemplate;
+    private final NotificationTopicsProperties topics;
+    private final NotificationEventAvroMapper avroMapper;
+    private final Duration publishAwaitTimeout;
+    private final CircuitBreakerRegistry circuitBreakerRegistry;
+    private final BulkheadRegistry bulkheadRegistry;
+    private final MeterRegistry meterRegistry;
+
+    public NotificationProducer(KafkaTemplate&lt;String, NotificationEvent&gt; kafkaTemplate,
+                                NotificationTopicsProperties topics,
+                                NotificationEventAvroMapper avroMapper,
+                                NotificationProducerProperties producerProperties,
+                                CircuitBreakerRegistry circuitBreakerRegistry,
+                                BulkheadRegistry bulkheadRegistry,
+<span class="fc" id="L69">                                MeterRegistry meterRegistry) {</span>
+<span class="fc" id="L70">        this.kafkaTemplate = kafkaTemplate;</span>
+<span class="fc" id="L71">        this.topics = topics;</span>
+<span class="fc" id="L72">        this.avroMapper = avroMapper;</span>
+<span class="fc" id="L73">        this.publishAwaitTimeout = producerProperties.publishAwaitTimeout();</span>
+<span class="fc" id="L74">        this.circuitBreakerRegistry = circuitBreakerRegistry;</span>
+<span class="fc" id="L75">        this.bulkheadRegistry = bulkheadRegistry;</span>
+<span class="fc" id="L76">        this.meterRegistry = meterRegistry;</span>
+<span class="fc" id="L77">    }</span>
+
+    /**
+     * Maps the domain event to Avro, then sends it to the source-specific topic through the
+     * source's bulkhead and circuit breaker, blocking until ack or timeout.
+     * &lt;p&gt;
+     * The await ({@code delivery.timeout.ms + awaitBuffer}) is intentionally longer than the producer's
+     * own {@code delivery.timeout.ms}, so the future always resolves with the producer's authoritative
+     * outcome before this wait elapses. This guarantees a failure is never reported while a record is
+     * still in flight (which could otherwise be delivered later and produce a duplicate). Callers that
+     * retry on failure must reuse the same {@code eventId}, which downstream consumers treat as the
+     * idempotency key, since legitimate retries remain at-least-once.
+     *
+     * @param event enriched domain event to publish
+     * @throws NotificationPublishException when the send is interrupted, fails, or times out
+     * @throws io.github.resilience4j.circuitbreaker.CallNotPermittedException when the source's circuit is open
+     * @throws io.github.resilience4j.bulkhead.BulkheadFullException when the source's concurrency cap is reached
+     */
+    public void publish(com.lps.cms.notification.model.NotificationEvent event) {
+<span class="fc" id="L96">        EventSource source = event.eventSource();</span>
+<span class="fc" id="L97">        String topic = topics.eventsTopic(source);</span>
+<span class="fc" id="L98">        String partitionKey = NotificationPartitionKey.resolve(event);</span>
+        // Mapping (and payload validation) happens before the resilience guards so
+        // client errors surface as 4xx and are never recorded as publish failures.
+<span class="fc" id="L101">        NotificationEvent avroEvent = avroMapper.toAvro(event);</span>
+
+<span class="fc" id="L103">        String guardName = GUARD_NAME_PREFIX + source.name();</span>
+<span class="fc" id="L104">        CircuitBreaker circuitBreaker = circuitBreakerRegistry.circuitBreaker(guardName);</span>
+<span class="fc" id="L105">        Bulkhead bulkhead = bulkheadRegistry.bulkhead(guardName);</span>
+
+<span class="pc bpc" id="L107" title="1 of 2 branches missed.">        if (log.isDebugEnabled()) {</span>
+<span class="nc" id="L108">            log.debug(&quot;Publishing to Kafka eventId={} topic={} partitionKey={} awaitTimeout={}&quot;,</span>
+<span class="nc" id="L109">                    event.eventId(), topic, partitionKey, publishAwaitTimeout);</span>
+        }
+
+<span class="fc" id="L112">        Supplier&lt;RecordMetadata&gt; guardedSend = Bulkhead.decorateSupplier(bulkhead,</span>
+<span class="fc" id="L113">                CircuitBreaker.decorateSupplier(circuitBreaker,</span>
+<span class="fc" id="L114">                        () -&gt; send(topic, partitionKey, avroEvent, event.eventId())));</span>
+
+<span class="fc" id="L116">        Timer.Sample sample = Timer.start(meterRegistry);</span>
+        try {
+<span class="fc" id="L118">            RecordMetadata metadata = guardedSend.get();</span>
+<span class="fc" id="L119">            sample.stop(publishTimer(source, &quot;success&quot;));</span>
+<span class="fc" id="L120">            log.info(&quot;Published notification eventId={} topic={} partition={} offset={}&quot;,</span>
+<span class="fc" id="L121">                    event.eventId(), metadata.topic(), metadata.partition(), metadata.offset());</span>
+<span class="fc" id="L122">        } catch (RuntimeException ex) {</span>
+<span class="fc" id="L123">            sample.stop(publishTimer(source, &quot;failure&quot;));</span>
+<span class="fc" id="L124">            throw ex;</span>
+<span class="fc" id="L125">        }</span>
+<span class="fc" id="L126">    }</span>
+
+    private RecordMetadata send(String topic, String partitionKey, NotificationEvent avroEvent, String eventId) {
+        try {
+<span class="fc" id="L130">            SendResult&lt;String, NotificationEvent&gt; result = kafkaTemplate.send(topic, partitionKey, avroEvent)</span>
+<span class="fc" id="L131">                    .get(publishAwaitTimeout.toMillis(), TimeUnit.MILLISECONDS);</span>
+<span class="fc" id="L132">            return result.getRecordMetadata();</span>
+<span class="fc" id="L133">        } catch (InterruptedException ex) {</span>
+<span class="fc" id="L134">            Thread.currentThread().interrupt();</span>
+<span class="fc" id="L135">            log.warn(&quot;Kafka publish interrupted eventId={} topic={}&quot;, eventId, topic);</span>
+<span class="fc" id="L136">            throw new NotificationPublishException(&quot;Interrupted while publishing notification event&quot;, ex);</span>
+<span class="fc" id="L137">        } catch (ExecutionException ex) {</span>
+<span class="fc" id="L138">            log.error(&quot;Kafka publish failed eventId={} topic={}&quot;, eventId, topic, ex.getCause());</span>
+<span class="fc" id="L139">            throw new NotificationPublishException(&quot;Failed to publish notification event&quot;, ex.getCause());</span>
+<span class="fc" id="L140">        } catch (TimeoutException ex) {</span>
+<span class="fc" id="L141">            log.warn(&quot;Kafka publish await exceeded eventId={} topic={} awaitTimeout={}&quot;,</span>
+                    eventId, topic, publishAwaitTimeout);
+<span class="fc" id="L143">            throw new NotificationPublishException(&quot;Timed out while publishing notification event&quot;, ex);</span>
+        }
+    }
+
+    private Timer publishTimer(EventSource source, String outcome) {
+<span class="fc" id="L148">        return meterRegistry.timer(PUBLISH_TIMER, &quot;source&quot;, source.name(), &quot;outcome&quot;, outcome);</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.14.202510111229</span></div></body></html>

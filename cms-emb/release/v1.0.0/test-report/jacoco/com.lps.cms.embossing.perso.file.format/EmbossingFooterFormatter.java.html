@@ -1,0 +1,25 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>EmbossingFooterFormatter.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">embossing-service</a> &gt; <a href="index.source.html" class="el_package">com.lps.cms.embossing.perso.file.format</a> &gt; <span class="el_source">EmbossingFooterFormatter.java</span></div><h1>EmbossingFooterFormatter.java</h1><pre class="source lang-java linenums">package com.lps.cms.embossing.perso.file.format;
+
+import com.lps.cms.embossing.perso.file.model.EmbossingFooterParams;
+
+/**
+ * Formats one END footer line. The record type is at most 3 characters
+ * and the detail count is at most 9 digits.
+ */
+<span class="fc" id="L9">public class EmbossingFooterFormatter {</span>
+
+    private static final String RECORD_TYPE = &quot;END&quot;;
+    private static final int LEN_RECORD_TYPE = 3;
+    private static final int LEN_RECORD_COUNT = 9;
+
+    public String format(EmbossingFooterParams params) {
+<span class="fc bfc" id="L16" title="All 2 branches covered.">        String recordType = params.recordType() != null ? params.recordType() : RECORD_TYPE;</span>
+<span class="fc" id="L17">        return max(recordType, LEN_RECORD_TYPE) + &quot;|&quot; + max(String.valueOf(params.recordCount()), LEN_RECORD_COUNT);</span>
+    }
+
+    private static String max(String value, int maxLength) {
+<span class="pc bpc" id="L21" title="1 of 2 branches missed.">        if (value == null) return &quot;&quot;;</span>
+<span class="fc bfc" id="L22" title="All 2 branches covered.">        return value.length() &lt;= maxLength ? value : value.substring(0, maxLength);</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.15.202606040825</span></div></body></html>

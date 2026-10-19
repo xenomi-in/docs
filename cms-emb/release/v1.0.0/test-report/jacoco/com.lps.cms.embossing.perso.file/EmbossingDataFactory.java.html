@@ -1,0 +1,134 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>EmbossingDataFactory.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">embossing-service</a> &gt; <a href="index.source.html" class="el_package">com.lps.cms.embossing.perso.file</a> &gt; <span class="el_source">EmbossingDataFactory.java</span></div><h1>EmbossingDataFactory.java</h1><pre class="source lang-java linenums">package com.lps.cms.embossing.perso.file;
+
+import com.lps.cms.embossing.perso.cms.card.CardFileLine;
+import com.lps.cms.embossing.perso.exception.EmbossingErrorCodes;
+import com.lps.cms.embossing.perso.exception.FileGenerationException;
+import com.lps.cms.embossing.perso.file.model.EmbossingDetailLineParams;
+import com.lps.cms.embossing.perso.file.model.EmbossingFileData;
+import com.lps.cms.embossing.perso.file.model.EmbossingFooterParams;
+import com.lps.cms.embossing.perso.file.model.EmbossingHeaderParams;
+import com.lps.cms.embossing.perso.file.data.SensitiveCardDataProvider;
+import lombok.RequiredArgsConstructor;
+import org.springframework.stereotype.Component;
+
+import java.time.format.DateTimeFormatter;
+import java.util.List;
+
+/**
+ * Builds {@link EmbossingFileData} for one reserved batch.
+ * PAN, CVV, and track data are taken from {@link SensitiveCardDataProvider}.
+ */
+@Component
+@RequiredArgsConstructor
+public class EmbossingDataFactory {
+
+<span class="fc" id="L25">    private static final DateTimeFormatter YYMM = DateTimeFormatter.ofPattern(&quot;yyMM&quot;);</span>
+<span class="fc" id="L26">    private static final DateTimeFormatter MMDDHHMMSS = DateTimeFormatter.ofPattern(&quot;MMddHHmmss&quot;);</span>
+
+    private final SensitiveCardDataProvider sensitiveCardDataProvider;
+
+    public EmbossingFileData load(String requestType, List&lt;CardFileLine&gt; lines) {
+<span class="fc bfc" id="L31" title="All 2 branches covered.">        if (lines.isEmpty()) {</span>
+<span class="fc" id="L32">            throw new FileGenerationException(EmbossingErrorCodes.BATCH_EMPTY, &quot;Batch has no card lines&quot;);</span>
+        }
+<span class="fc" id="L34">        CardFileLine first = lines.getFirst();</span>
+<span class="fc bfc" id="L35" title="All 2 branches covered.">        String newOrReplacement = &quot;REPLACEMENT&quot;.equalsIgnoreCase(requestType) ? &quot;R&quot; : &quot;N&quot;;</span>
+<span class="fc" id="L36">        EmbossingHeaderParams header = new EmbossingHeaderParams(</span>
+                &quot;EMB&quot;,
+<span class="fc" id="L38">                truncate(first.institutionCode(), 3),</span>
+<span class="fc" id="L39">                java.time.LocalDateTime.now().format(MMDDHHMMSS),</span>
+<span class="fc" id="L40">                truncate(first.institutionId().toString(), 10),</span>
+                newOrReplacement,
+<span class="fc" id="L42">                truncate(first.productCode(), 6),</span>
+<span class="fc" id="L43">                truncate(first.productCode(), 6));</span>
+
+<span class="fc" id="L45">        return new EmbossingFileData(header, lines.stream().map(line -&gt; detail(line, first.productCode())),</span>
+<span class="fc" id="L46">                new EmbossingFooterParams(&quot;END&quot;, lines.size()));</span>
+    }
+
+    private EmbossingDetailLineParams detail(CardFileLine card, String expectedProductCode) {
+<span class="fc bfc" id="L50" title="All 2 branches covered.">        if (!expectedProductCode.equals(card.productCode())) {</span>
+<span class="fc" id="L51">            throw new FileGenerationException(EmbossingErrorCodes.BATCH_PRODUCT_MISMATCH,</span>
+<span class="fc" id="L52">                    &quot;Batch contains multiple products; card=&quot; + card.cardId());</span>
+        }
+<span class="fc" id="L54">        SensitiveCardDataProvider.SensitiveCardData sensitive = sensitiveCardDataProvider.resolve(card);</span>
+<span class="fc" id="L55">        validateSensitiveData(card.cardId(), sensitive);</span>
+<span class="fc bfc" id="L56" title="All 2 branches covered.">        String sequence = card.reservedSequence() != null ? card.reservedSequence() : card.cardSequence();</span>
+<span class="fc" id="L57">        return new EmbossingDetailLineParams(</span>
+                    &quot;DET&quot;,
+<span class="fc" id="L59">                    card.waybillNumber(),</span>
+<span class="fc" id="L60">                    sensitive.pan(),</span>
+<span class="pc bpc" id="L61" title="1 of 2 branches missed.">                    sequence == null ? null : sequence.substring(Math.max(0, sequence.length() - 2)),</span>
+<span class="fc" id="L62">                    card.embossedName1(),</span>
+<span class="fc bfc" id="L63" title="All 2 branches covered.">                    card.issueDate() == null ? null : card.issueDate().format(YYMM),</span>
+<span class="fc" id="L64">                    card.expiryDate().format(YYMM),</span>
+<span class="fc" id="L65">                    sensitive.cvv2(),</span>
+                    null,
+<span class="fc" id="L67">                    sensitive.track2(),</span>
+<span class="fc" id="L68">                    sensitive.cvv1(),</span>
+                    null,
+<span class="fc" id="L70">                    card.panLastFour(),</span>
+<span class="fc" id="L71">                    card.title(),</span>
+<span class="fc" id="L72">                    card.address1(),</span>
+<span class="fc" id="L73">                    card.address2(),</span>
+                    null,
+                    null,
+<span class="fc" id="L76">                    card.city(),</span>
+<span class="fc" id="L77">                    card.state(),</span>
+<span class="fc" id="L78">                    card.country(),</span>
+<span class="fc" id="L79">                    card.postalCode(),</span>
+<span class="fc" id="L80">                    card.firstName(),</span>
+<span class="fc" id="L81">                    card.middleName(),</span>
+<span class="fc" id="L82">                    card.lastName(),</span>
+<span class="fc" id="L83">                    card.embossedName1(),</span>
+<span class="fc" id="L84">                    truncate(card.productCode(), 20),</span>
+                    &quot;N&quot;,
+                    &quot;P&quot;,
+                    &quot;N&quot;,
+                    null,
+<span class="fc" id="L89">                    card.embossedName3(),</span>
+<span class="fc" id="L90">                    card.embossedName4(),</span>
+<span class="fc" id="L91">                    card.address1(),</span>
+<span class="fc" id="L92">                    card.address2(),</span>
+                    null,
+                    null,
+<span class="fc" id="L95">                    card.city(),</span>
+<span class="fc" id="L96">                    card.state(),</span>
+<span class="fc" id="L97">                    card.country(),</span>
+<span class="fc" id="L98">                    card.postalCode(),</span>
+<span class="fc" id="L99">                    card.mobile(),</span>
+<span class="fc" id="L100">                    card.mobile(),</span>
+<span class="fc" id="L101">                    card.email(),</span>
+<span class="fc" id="L102">                    truncate(card.productCode(), 6),</span>
+<span class="fc" id="L103">                    truncate(card.productCode(), 6),</span>
+                    null,
+                    null,
+                    null,
+                    null);
+    }
+
+    private static void validateSensitiveData(java.util.UUID cardId,
+                                              SensitiveCardDataProvider.SensitiveCardData sensitive) {
+<span class="pc bpc" id="L112" title="2 of 6 branches missed.">        if (sensitive == null || sensitive.pan() == null || !sensitive.pan().matches(&quot;[0-9]{12,19}&quot;)) {</span>
+<span class="fc" id="L113">            throw new FileGenerationException(EmbossingErrorCodes.SENSITIVE_DATA_INVALID,</span>
+                    &quot;Secure export returned an invalid PAN for card=&quot; + cardId);
+        }
+<span class="pc bpc" id="L116" title="1 of 4 branches missed.">        if (sensitive.cvv1() == null || !sensitive.cvv1().matches(&quot;[0-9]{3,4}&quot;)</span>
+<span class="pc bpc" id="L117" title="2 of 4 branches missed.">                || sensitive.cvv2() == null || !sensitive.cvv2().matches(&quot;[0-9]{3,4}&quot;)) {</span>
+<span class="fc" id="L118">            throw new FileGenerationException(EmbossingErrorCodes.SENSITIVE_DATA_INVALID,</span>
+                    &quot;Secure export returned invalid CVV data for card=&quot; + cardId);
+        }
+<span class="pc bpc" id="L121" title="1 of 4 branches missed.">        if (sensitive.track2() == null || sensitive.track2().isBlank()) {</span>
+<span class="fc" id="L122">            throw new FileGenerationException(EmbossingErrorCodes.SENSITIVE_DATA_INVALID,</span>
+                    &quot;Secure export did not return Track 2 for card=&quot; + cardId);
+        }
+<span class="fc" id="L125">    }</span>
+
+    private static String truncate(String value, int max) {
+<span class="pc bpc" id="L128" title="1 of 2 branches missed.">        if (value == null) {</span>
+<span class="nc" id="L129">            return &quot;&quot;;</span>
+        }
+<span class="fc bfc" id="L131" title="All 2 branches covered.">        return value.length() &lt;= max ? value : value.substring(0, max);</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.15.202606040825</span></div></body></html>

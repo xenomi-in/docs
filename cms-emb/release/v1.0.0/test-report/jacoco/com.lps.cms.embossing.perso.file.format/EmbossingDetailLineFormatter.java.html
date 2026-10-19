@@ -1,0 +1,122 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>EmbossingDetailLineFormatter.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">embossing-service</a> &gt; <a href="index.source.html" class="el_package">com.lps.cms.embossing.perso.file.format</a> &gt; <span class="el_source">EmbossingDetailLineFormatter.java</span></div><h1>EmbossingDetailLineFormatter.java</h1><pre class="source lang-java linenums">package com.lps.cms.embossing.perso.file.format;
+
+import com.lps.cms.embossing.perso.exception.EmbossingErrorCodes;
+import com.lps.cms.embossing.perso.exception.FileGenerationException;
+import com.lps.cms.embossing.perso.file.model.EmbossingDetailLineParams;
+
+/**
+ * Formats one DET record. Values longer than the field maximum are truncated.
+ * Shorter values are written unchanged, and the line ends with {@code ~}.
+ */
+<span class="fc" id="L11">public class EmbossingDetailLineFormatter {</span>
+
+    private static final String RECORD_TYPE = &quot;DET&quot;;
+    private static final String DELIMITER = &quot;|&quot;;
+    private static final String END_DELIMITER = &quot;~&quot;;
+
+    private static final int LEN_AIRWAY_BILL = 30;
+    private static final int LEN_CARD_NUMBER = 19;
+    private static final int LEN_CARD_SEQ = 2;
+    private static final int LEN_CARD_NAME = 27;
+    private static final int LEN_START_DATE = 4;
+    private static final int LEN_EXPIRY_DATE = 4;
+    private static final int LEN_CVC2 = 3;
+    private static final int LEN_TRACK1 = 76;
+    private static final int LEN_TRACK2 = 37;
+    private static final int LEN_ICVV = 3;
+    private static final int LEN_CRN = 16;
+    private static final int LEN_ARN_CIF = 16;
+    private static final int LEN_SHORT = 5;
+    private static final int LEN_ADDRESS = 30;
+    private static final int LEN_EMBOSSED_NAME = 35;
+    private static final int LEN_TEMPLATE_ID = 20;
+    private static final int LEN_ONE = 1;
+    private static final int LEN_APP_PREF_NAME = 16;
+    private static final int LEN_LINE_EMB = 27;
+    private static final int LEN_DELIVERY_ADDRESS = 50;
+    private static final int LEN_DELIVERY_OTHER = 30;
+    private static final int LEN_DELIVERY_EMAIL = 100;
+    private static final int LEN_PLASTIC_PRODUCT = 6;
+    private static final int LEN_IMAGE = 20;
+    private static final int LEN_PROV1 = 100;
+    private static final int LEN_PROV2 = 50;
+    private static final int LEN_PROV3 = 25;
+
+    public String format(EmbossingDetailLineParams p) {
+<span class="fc bfc" id="L46" title="All 2 branches covered.">        return (p.recordType() != null ? p.recordType() : RECORD_TYPE) + DELIMITER</span>
+<span class="fc" id="L47">                + pad(p.airwayBillNumber(), LEN_AIRWAY_BILL)</span>
+<span class="fc" id="L48">                + DELIMITER + pad(p.cardNumber(), LEN_CARD_NUMBER)</span>
+<span class="fc" id="L49">                + DELIMITER + pad(p.cardSequenceNumber(), LEN_CARD_SEQ)</span>
+<span class="fc" id="L50">                + DELIMITER + pad(p.cardName(), LEN_CARD_NAME)</span>
+<span class="fc" id="L51">                + DELIMITER + pad(p.startDate(), LEN_START_DATE)</span>
+<span class="fc" id="L52">                + DELIMITER + pad(p.expiryDate(), LEN_EXPIRY_DATE)</span>
+<span class="fc" id="L53">                + DELIMITER + pad(p.cvc2(), LEN_CVC2)</span>
+<span class="fc" id="L54">                + DELIMITER + pad(p.track1Data(), LEN_TRACK1)</span>
+<span class="fc" id="L55">                + DELIMITER + pad(p.track2Data(), LEN_TRACK2)</span>
+<span class="fc" id="L56">                + DELIMITER + pad(p.iCvv(), LEN_ICVV)</span>
+<span class="fc" id="L57">                + DELIMITER + pad(p.crnProxyNumber(), LEN_CRN)</span>
+<span class="fc" id="L58">                + DELIMITER + pad(p.arnCifId(), LEN_ARN_CIF)</span>
+<span class="fc" id="L59">                + DELIMITER + pad(p.salutation(), LEN_SHORT)</span>
+<span class="fc" id="L60">                + DELIMITER + pad(p.address1(), LEN_ADDRESS)</span>
+<span class="fc" id="L61">                + DELIMITER + pad(p.address2(), LEN_ADDRESS)</span>
+<span class="fc" id="L62">                + DELIMITER + pad(p.address3(), LEN_ADDRESS)</span>
+<span class="fc" id="L63">                + DELIMITER + pad(p.address4(), LEN_ADDRESS)</span>
+<span class="fc" id="L64">                + DELIMITER + pad(p.city(), LEN_ADDRESS)</span>
+<span class="fc" id="L65">                + DELIMITER + pad(p.state(), LEN_ADDRESS)</span>
+<span class="fc" id="L66">                + DELIMITER + pad(p.country(), LEN_ADDRESS)</span>
+<span class="fc" id="L67">                + DELIMITER + pad(p.postalCode(), LEN_ADDRESS)</span>
+<span class="fc" id="L68">                + DELIMITER + pad(p.firstName(), LEN_ADDRESS)</span>
+<span class="fc" id="L69">                + DELIMITER + pad(p.middleName(), LEN_ADDRESS)</span>
+<span class="fc" id="L70">                + DELIMITER + pad(p.lastName(), LEN_ADDRESS)</span>
+<span class="fc" id="L71">                + DELIMITER + pad(p.embossedName(), LEN_EMBOSSED_NAME)</span>
+<span class="fc" id="L72">                + DELIMITER + pad(p.templateId(), LEN_TEMPLATE_ID)</span>
+<span class="fc" id="L73">                + DELIMITER + pad(p.typeOfDelivery(), LEN_ONE)</span>
+<span class="fc" id="L74">                + DELIMITER + pad(p.cardHolderStatus(), LEN_ONE)</span>
+<span class="fc" id="L75">                + DELIMITER + pad(p.newCustomer(), LEN_ONE)</span>
+<span class="fc" id="L76">                + DELIMITER + pad(p.applicationPreferredName(), LEN_APP_PREF_NAME)</span>
+<span class="fc" id="L77">                + DELIMITER + pad(p.thirdLineEmbossing(), LEN_LINE_EMB)</span>
+<span class="fc" id="L78">                + DELIMITER + pad(p.fourthLineEmbossing(), LEN_LINE_EMB)</span>
+<span class="fc" id="L79">                + DELIMITER + pad(p.deliveryAddress1(), LEN_DELIVERY_ADDRESS)</span>
+<span class="fc" id="L80">                + DELIMITER + pad(p.deliveryAddress2(), LEN_DELIVERY_ADDRESS)</span>
+<span class="fc" id="L81">                + DELIMITER + pad(p.deliveryAddress3(), LEN_DELIVERY_ADDRESS)</span>
+<span class="fc" id="L82">                + DELIMITER + pad(p.deliveryAddress4(), LEN_DELIVERY_ADDRESS)</span>
+<span class="fc" id="L83">                + DELIMITER + pad(p.deliveryCity(), LEN_DELIVERY_OTHER)</span>
+<span class="fc" id="L84">                + DELIMITER + pad(p.deliveryState(), LEN_DELIVERY_OTHER)</span>
+<span class="fc" id="L85">                + DELIMITER + pad(p.deliveryCountry(), LEN_DELIVERY_OTHER)</span>
+<span class="fc" id="L86">                + DELIMITER + pad(p.deliveryPostcode(), LEN_DELIVERY_OTHER)</span>
+<span class="fc" id="L87">                + DELIMITER + pad(p.deliveryContact(), LEN_DELIVERY_OTHER)</span>
+<span class="fc" id="L88">                + DELIMITER + pad(p.deliveryMobileNo(), LEN_DELIVERY_OTHER)</span>
+<span class="fc" id="L89">                + DELIMITER + pad(p.deliveryEmailId(), LEN_DELIVERY_EMAIL)</span>
+<span class="fc" id="L90">                + DELIMITER + pad(p.plasticCode(), LEN_PLASTIC_PRODUCT)</span>
+<span class="fc" id="L91">                + DELIMITER + pad(p.productCode(), LEN_PLASTIC_PRODUCT)</span>
+                + DELIMITER + DELIMITER  // two empty placeholders per spec
+<span class="fc" id="L93">                + DELIMITER + pad(p.imageFileName(), LEN_IMAGE)</span>
+<span class="fc" id="L94">                + DELIMITER + pad(p.provisionalField1(), LEN_PROV1)</span>
+<span class="fc" id="L95">                + DELIMITER + pad(p.provisionalField2(), LEN_PROV2)</span>
+<span class="fc" id="L96">                + DELIMITER + pad(p.provisionalField3(), LEN_PROV3)</span>
+                + END_DELIMITER;
+    }
+
+    private static String pad(String value, int length) {
+<span class="fc bfc" id="L101" title="All 2 branches covered.">        if (value == null) value = &quot;&quot;;</span>
+<span class="fc" id="L102">        validateFileField(value);</span>
+<span class="fc bfc" id="L103" title="All 2 branches covered.">        if (value.length() &gt;= length) return value.substring(0, length);</span>
+<span class="fc" id="L104">        return value + &quot;&quot;.repeat(length - value.length());</span>
+    }
+
+    private static void validateFileField(String value) {
+<span class="pc bpc" id="L108" title="2 of 6 branches missed.">        if (value.indexOf('|') &gt;= 0 || value.indexOf('~') &gt;= 0 || value.indexOf('\r') &gt;= 0</span>
+<span class="fc bfc" id="L109" title="All 2 branches covered.">                || value.indexOf('\n') &gt;= 0) {</span>
+<span class="fc" id="L110">            throw new FileGenerationException(EmbossingErrorCodes.FILE_CONTENT_INVALID,</span>
+                    &quot;Embossing field contains a record delimiter or line break&quot;);
+        }
+<span class="fc bfc" id="L113" title="All 2 branches covered.">        for (int index = 0; index &lt; value.length(); index++) {</span>
+<span class="fc" id="L114">            char character = value.charAt(index);</span>
+<span class="pc bpc" id="L115" title="1 of 4 branches missed.">            if (character &lt; 0x20 || character &gt; 0x7E) {</span>
+<span class="fc" id="L116">                throw new FileGenerationException(EmbossingErrorCodes.FILE_CONTENT_INVALID,</span>
+                        &quot;Embossing file fields must be printable ASCII&quot;);
+            }
+        }
+<span class="fc" id="L120">    }</span>
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.15.202606040825</span></div></body></html>

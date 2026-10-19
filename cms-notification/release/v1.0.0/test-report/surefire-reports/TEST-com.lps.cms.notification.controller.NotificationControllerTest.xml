@@ -1,0 +1,27 @@
+<?xml version='1.0' encoding='utf-8'?>
+<testsuite xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:noNamespaceSchemaLocation="https://maven.apache.org/surefire/maven-surefire-plugin/xsd/surefire-test-report.xsd" version="3.0.2" name="com.lps.cms.notification.controller.NotificationControllerTest" time="0.324" tests="12" errors="0" skipped="0" failures="0" flakes="0">
+  <testcase name="returns413WhenPayloadTooLarge" classname="com.lps.cms.notification.controller.NotificationControllerTest" time="0.102">
+    </testcase>
+  <testcase name="returns503WithRetryAfterWhenCircuitOpen" classname="com.lps.cms.notification.controller.NotificationControllerTest" time="0.006">
+    </testcase>
+  <testcase name="returns202WithReplayHeaderOnIdempotentRetry" classname="com.lps.cms.notification.controller.NotificationControllerTest" time="0.005">
+    </testcase>
+  <testcase name="returns500ForUnexpectedErrors" classname="com.lps.cms.notification.controller.NotificationControllerTest" time="0.019">
+    </testcase>
+  <testcase name="returns409WithRetryAfterOnIdempotencyConflict" classname="com.lps.cms.notification.controller.NotificationControllerTest" time="0.004">
+    </testcase>
+  <testcase name="returns400OnBusinessRuleViolation" classname="com.lps.cms.notification.controller.NotificationControllerTest" time="0.004">
+    </testcase>
+  <testcase name="returns400WhenIdempotencyKeyMissing" classname="com.lps.cms.notification.controller.NotificationControllerTest" time="0.011">
+    </testcase>
+  <testcase name="returns429WithRetryAfterWhenBulkheadFull" classname="com.lps.cms.notification.controller.NotificationControllerTest" time="0.004">
+    </testcase>
+  <testcase name="returns503WithRetryAfterOnPublishFailure" classname="com.lps.cms.notification.controller.NotificationControllerTest" time="0.004">
+    </testcase>
+  <testcase name="returns400WhenInstitutionHeaderMissing" classname="com.lps.cms.notification.controller.NotificationControllerTest" time="0.003">
+    </testcase>
+  <testcase name="generatesATraceIdWhenTheCallerOmitsOne" classname="com.lps.cms.notification.controller.NotificationControllerTest" time="0.005">
+    </testcase>
+  <testcase name="returns202WithEventIdAndTraceHeaders" classname="com.lps.cms.notification.controller.NotificationControllerTest" time="0.004">
+    </testcase>
+</testsuite>
