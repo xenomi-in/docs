@@ -1,0 +1,1098 @@
+timestamp_utc,check_id,thread_group,plan_step,label,kind,http_status,result,role,reported_under,elapsed_ms
+2026-10-16T07:17:12.550Z,S-0001,00 - Shared configuration bootstrap,00.0,00.0 - Initialize run data,SCRIPT,200,PASS,HARNESS,,1212
+2026-10-16T07:17:13.772Z,S-0002,00 - Shared configuration bootstrap,00.1,00.1 - Seed Switch BIN for this run,SCRIPT,200,PASS,FIXTURE,,98
+2026-10-16T07:17:13.976Z,S-0003,00 - Shared configuration bootstrap,00.2,00.2 - Application health,HTTP,200,PASS,HARNESS,,28
+2026-10-16T07:17:14.045Z,S-0004,00 - Shared configuration bootstrap,00.3,00.3 - Get Keycloak access token,HTTP,200,PASS,HARNESS,,12
+2026-10-16T07:17:14.096Z,S-0005,00 - Shared configuration bootstrap,00.4,00.4 - HSM provider health,HTTP,200,PASS,CHECK,W02; W25,388
+2026-10-16T07:17:14.504Z,S-0006,00 - Shared configuration bootstrap,01.1,01.1 - Use the CMS institution mapped to Switch institution 10,SCRIPT,200,PASS,FIXTURE,W01,87
+2026-10-16T07:17:14.592Z,S-0007,00 - Shared configuration bootstrap,01.2,01.2 - Enable operational policy,HTTP,200,PASS,CHECK,W01; W25,44
+2026-10-16T07:17:14.637Z,S-0008,00 - Shared configuration bootstrap,01.3,01.3 - Configure security policy,HTTP,200,PASS,CHECK,W01; W25,7
+2026-10-16T07:17:14.645Z,S-0009,00 - Shared configuration bootstrap,01.4,01.4 - Create BIN,HTTP,201,PASS,CHECK,W03; W25,29
+2026-10-16T07:17:14.676Z,S-0010,00 - Shared configuration bootstrap,01.5,01.5 - Create issuing PAN range,HTTP,201,PASS,CHECK,W03; W25,13
+2026-10-16T07:17:14.690Z,S-0011,00 - Shared configuration bootstrap,01.6,01.6 - Submit issuing range,HTTP,200,PASS,CHECK,W03; W25,9
+2026-10-16T07:17:14.700Z,S-0012,00 - Shared configuration bootstrap,01.7,01.7 - Activate issuing range,HTTP,200,PASS,CHECK,W03; W25,11
+2026-10-16T07:17:14.712Z,S-0013,00 - Shared configuration bootstrap,01.8,01.8 - Create unassigned PAN range,HTTP,201,PASS,CHECK,W03,11
+2026-10-16T07:17:14.724Z,S-0014,00 - Shared configuration bootstrap,01.9,01.9 - Submit unassigned range,HTTP,200,PASS,CHECK,W03,11
+2026-10-16T07:17:14.736Z,S-0015,00 - Shared configuration bootstrap,01.10,01.10 - Activate unassigned range,HTTP,200,PASS,CHECK,W03,26
+2026-10-16T07:17:14.763Z,S-0016,00 - Shared configuration bootstrap,01.11,01.11 - Create an 8-digit BIN,HTTP,201,PASS,CHECK,W03,10
+2026-10-16T07:17:14.774Z,S-0017,00 - Shared configuration bootstrap,01.12,01.12 - Seed card vendor and personalisation batch,SCRIPT,200,PASS,FIXTURE,,55
+2026-10-16T07:17:14.829Z,S-0018,00 - Shared configuration bootstrap,01.13,01.13 - Create virtual card design,HTTP,201,PASS,CHECK,W07,7
+2026-10-16T07:17:14.836Z,S-0019,00 - Shared configuration bootstrap,01.14,01.14 - Activate virtual card design,HTTP,200,PASS,CHECK,W07,6
+2026-10-16T07:17:14.843Z,S-0020,00 - Shared configuration bootstrap,01.15,01.15 - Create physical card design,HTTP,201,PASS,CHECK,W07; W25,6
+2026-10-16T07:17:14.850Z,S-0021,00 - Shared configuration bootstrap,01.16,01.16 - Activate physical card design,HTTP,200,PASS,CHECK,W07; W25,4
+2026-10-16T07:17:14.504Z,S-0022,00 - Shared configuration bootstrap,01,"01 - Institution, BIN and ranges",SCRIPT,200,PASS,GROUP_TOTAL,,336
+2026-10-16T07:17:14.856Z,S-0023,00 - Shared configuration bootstrap,02.1,02.1 - Create issuing product,HTTP,201,PASS,CHECK,W05; W25,8
+2026-10-16T07:17:14.865Z,S-0024,00 - Shared configuration bootstrap,02.2,02.2 - Create issuing product version,HTTP,201,PASS,CHECK,W05; W25,7
+2026-10-16T07:17:14.874Z,S-0025,00 - Shared configuration bootstrap,02.3,02.3 - Configure issuing product card form,HTTP,200,PASS,CHECK,W06; W25,5
+2026-10-16T07:17:14.880Z,S-0026,00 - Shared configuration bootstrap,02.4,02.4 - Configure issuing product PIN policy,HTTP,200,PASS,CHECK,W06; W25,5
+2026-10-16T07:17:14.885Z,S-0027,00 - Shared configuration bootstrap,02.5,02.5 - Configure issuing product default controls,HTTP,200,PASS,CHECK,W06; W25,7
+2026-10-16T07:17:14.893Z,S-0028,00 - Shared configuration bootstrap,02.6.1,02.6.1 - Create DOMESTIC_ATM limit on issuing product,HTTP,201,PASS,CHECK,W06,5
+2026-10-16T07:17:14.899Z,S-0029,00 - Shared configuration bootstrap,02.6.2,02.6.2 - Create DOMESTIC_POS limit on issuing product,HTTP,201,PASS,CHECK,W06,4
+2026-10-16T07:17:14.904Z,S-0030,00 - Shared configuration bootstrap,02.6.3,02.6.3 - Create DOMESTIC_ECOMMERCE limit on issuing product,HTTP,201,PASS,CHECK,W06,5
+2026-10-16T07:17:14.910Z,S-0031,00 - Shared configuration bootstrap,02.6.4,02.6.4 - Create DOMESTIC_CONTACTLESS limit on issuing product,HTTP,201,PASS,CHECK,W06,5
+2026-10-16T07:17:14.916Z,S-0032,00 - Shared configuration bootstrap,02.6.5,02.6.5 - Create INTERNATIONAL_ATM limit on issuing product,HTTP,201,PASS,CHECK,W06,5
+2026-10-16T07:17:14.922Z,S-0033,00 - Shared configuration bootstrap,02.6.6,02.6.6 - Create INTERNATIONAL_POS limit on issuing product,HTTP,201,PASS,CHECK,W06,5
+2026-10-16T07:17:14.928Z,S-0034,00 - Shared configuration bootstrap,02.6.7,02.6.7 - Create INTERNATIONAL_ECOMMERCE limit on issuing product,HTTP,201,PASS,CHECK,W06,5
+2026-10-16T07:17:14.933Z,S-0035,00 - Shared configuration bootstrap,02.6.8,02.6.8 - Create INTERNATIONAL_CONTACTLESS limit on issuing product,HTTP,201,PASS,CHECK,W06,5
+2026-10-16T07:17:14.939Z,S-0036,00 - Shared configuration bootstrap,02.7.1,02.7.1 - Create RENEWAL replacement policy,HTTP,201,PASS,CHECK,W06; W19,7
+2026-10-16T07:17:14.947Z,S-0037,00 - Shared configuration bootstrap,02.7.2,02.7.2 - Create DAMAGED replacement policy,HTTP,201,PASS,CHECK,W06; W19,13
+2026-10-16T07:17:14.961Z,S-0038,00 - Shared configuration bootstrap,02.7.3,02.7.3 - Create LOST replacement policy,HTTP,201,PASS,CHECK,W06; W18,7
+2026-10-16T07:17:14.969Z,S-0039,00 - Shared configuration bootstrap,02.7.4,02.7.4 - Create STOLEN replacement policy,HTTP,201,PASS,CHECK,W06; W18,14
+2026-10-16T07:17:14.984Z,S-0040,00 - Shared configuration bootstrap,02.7.5,02.7.5 - Create COMPROMISED replacement policy,HTTP,201,PASS,CHECK,W06; W18,11
+2026-10-16T07:17:14.997Z,S-0041,00 - Shared configuration bootstrap,02.7.6,02.7.6 - Create UPGRADE (disallowed) replacement policy,HTTP,201,PASS,CHECK,W06,10
+2026-10-16T07:17:15.008Z,S-0042,00 - Shared configuration bootstrap,02.7p,02.7p - Configure issuing product personalisation policy,HTTP,200,PASS,CHECK,W06; W25,10
+2026-10-16T07:17:15.019Z,S-0043,00 - Shared configuration bootstrap,02.8,02.8 - Assign BIN range to issuing product,HTTP,201,PASS,CHECK,W08; W25,10
+2026-10-16T07:17:15.030Z,S-0044,00 - Shared configuration bootstrap,02.8a,02.8a - Assign virtual card design to issuing product,HTTP,201,PASS,CHECK,W08; W25,11
+2026-10-16T07:17:15.042Z,S-0045,00 - Shared configuration bootstrap,02.8b,02.8b - Activate issuing product design assignment,HTTP,200,PASS,CHECK,W08; W25,9
+2026-10-16T07:17:15.052Z,S-0046,00 - Shared configuration bootstrap,02.8e,02.8e - Create issuing product CVM profile,HTTP,201,PASS,CHECK,W07; W25,11
+2026-10-16T07:17:15.064Z,S-0047,00 - Shared configuration bootstrap,02.8f,02.8f - Activate issuing product CVM profile,HTTP,200,PASS,CHECK,W07; W25,6
+2026-10-16T07:17:15.071Z,S-0048,00 - Shared configuration bootstrap,02.9,02.9 - Submit issuing product,HTTP,200,PASS,CHECK,W08; W25,8
+2026-10-16T07:17:15.080Z,S-0049,00 - Shared configuration bootstrap,02.10,02.10 - Activate issuing product,HTTP,200,PASS,CHECK,W08; W25,8
+2026-10-16T07:17:15.089Z,S-0050,00 - Shared configuration bootstrap,02.11,02.11 - Submit issuing product version,HTTP,200,PASS,CHECK,W08; W25,10
+2026-10-16T07:17:15.099Z,S-0051,00 - Shared configuration bootstrap,02.12,02.12 - Activate issuing product version,HTTP,200,PASS,CHECK,W08; W25,9
+2026-10-16T07:17:15.109Z,S-0052,00 - Shared configuration bootstrap,02.13,02.13 - Submit issuing product assignment,HTTP,200,PASS,CHECK,W08; W25,8
+2026-10-16T07:17:15.117Z,S-0053,00 - Shared configuration bootstrap,02.14,02.14 - Activate issuing product assignment,HTTP,200,PASS,CHECK,W08; W25,6
+2026-10-16T07:17:14.855Z,S-0054,00 - Shared configuration bootstrap,02,02 - Configure issuing product,SCRIPT,200,PASS,GROUP_TOTAL,,239
+2026-10-16T07:17:15.124Z,S-0055,00 - Shared configuration bootstrap,03.1,03.1 - Create single-PAN ceiling product,HTTP,201,PASS,PRECONDITION,W13,8
+2026-10-16T07:17:15.133Z,S-0056,00 - Shared configuration bootstrap,03.2,03.2 - Create single-PAN ceiling product version,HTTP,201,PASS,PRECONDITION,W13,9
+2026-10-16T07:17:15.142Z,S-0057,00 - Shared configuration bootstrap,03.3,03.3 - Configure single-PAN ceiling product card form,HTTP,200,PASS,PRECONDITION,W13,9
+2026-10-16T07:17:15.151Z,S-0058,00 - Shared configuration bootstrap,03.4,03.4 - Configure single-PAN ceiling product PIN policy,HTTP,200,PASS,PRECONDITION,W13,7
+2026-10-16T07:17:15.158Z,S-0059,00 - Shared configuration bootstrap,03.5,03.5 - Configure single-PAN ceiling product default controls,HTTP,200,PASS,PRECONDITION,W13,6
+2026-10-16T07:17:15.165Z,S-0060,00 - Shared configuration bootstrap,03.8,03.8 - Assign BIN range to single-PAN ceiling product,HTTP,201,PASS,PRECONDITION,W13,7
+2026-10-16T07:17:15.173Z,S-0061,00 - Shared configuration bootstrap,03.9,03.9 - Submit single-PAN ceiling product,HTTP,200,PASS,PRECONDITION,W13,8
+2026-10-16T07:17:15.182Z,S-0062,00 - Shared configuration bootstrap,03.10,03.10 - Activate single-PAN ceiling product,HTTP,200,PASS,PRECONDITION,W13,11
+2026-10-16T07:17:15.194Z,S-0063,00 - Shared configuration bootstrap,03.11,03.11 - Submit single-PAN ceiling product version,HTTP,200,PASS,PRECONDITION,W13,9
+2026-10-16T07:17:15.204Z,S-0064,00 - Shared configuration bootstrap,03.12,03.12 - Activate single-PAN ceiling product version,HTTP,200,PASS,PRECONDITION,W13,10
+2026-10-16T07:17:15.214Z,S-0065,00 - Shared configuration bootstrap,03.13,03.13 - Submit single-PAN ceiling product assignment,HTTP,200,PASS,PRECONDITION,W13,6
+2026-10-16T07:17:15.221Z,S-0066,00 - Shared configuration bootstrap,03.14,03.14 - Activate single-PAN ceiling product assignment,HTTP,200,PASS,PRECONDITION,W13,7
+2026-10-16T07:17:15.123Z,S-0067,00 - Shared configuration bootstrap,03,03 - Configure single-PAN ceiling product,SCRIPT,200,PASS,GROUP_TOTAL,,97
+2026-10-16T07:17:15.229Z,S-0068,00 - Shared configuration bootstrap,04.1,04.1 - Create draft product,HTTP,201,PASS,PRECONDITION,W08,6
+2026-10-16T07:17:15.236Z,S-0069,00 - Shared configuration bootstrap,04.2,04.2 - Create draft product version,HTTP,201,PASS,PRECONDITION,W08,9
+2026-10-16T07:17:15.246Z,S-0070,00 - Shared configuration bootstrap,04.3,04.3 - Configure draft product card form,HTTP,200,PASS,PRECONDITION,W08,6
+2026-10-16T07:17:15.252Z,S-0071,00 - Shared configuration bootstrap,04.4,04.4 - Configure draft product PIN policy,HTTP,200,PASS,PRECONDITION,W08,8
+2026-10-16T07:17:15.261Z,S-0072,00 - Shared configuration bootstrap,04.5,04.5 - Configure draft product default controls,HTTP,200,PASS,PRECONDITION,W08,5
+2026-10-16T07:17:15.267Z,S-0073,00 - Shared configuration bootstrap,04.8,04.8 - Assign BIN range to draft product,HTTP,201,PASS,PRECONDITION,W08,6
+2026-10-16T07:17:15.229Z,S-0074,00 - Shared configuration bootstrap,04,04 - Configure draft product,SCRIPT,200,PASS,GROUP_TOTAL,,40
+2026-10-16T07:17:15.274Z,S-0075,00 - Shared configuration bootstrap,04b.1,04b.1 - Create virtual-then-physical product,HTTP,201,PASS,PRECONDITION,W11,7
+2026-10-16T07:17:15.282Z,S-0076,00 - Shared configuration bootstrap,04b.2,04b.2 - Create virtual-then-physical product version,HTTP,201,PASS,PRECONDITION,W11,9
+2026-10-16T07:17:15.292Z,S-0077,00 - Shared configuration bootstrap,04b.3,04b.3 - Configure virtual-then-physical product card form,HTTP,200,PASS,PRECONDITION,W11,8
+2026-10-16T07:17:15.301Z,S-0078,00 - Shared configuration bootstrap,04b.4,04b.4 - Configure virtual-then-physical product PIN policy,HTTP,200,PASS,PRECONDITION,W11,7
+2026-10-16T07:17:15.309Z,S-0079,00 - Shared configuration bootstrap,04b.5,04b.5 - Configure virtual-then-physical product default controls,HTTP,200,PASS,PRECONDITION,W11,6
+2026-10-16T07:17:15.316Z,S-0080,00 - Shared configuration bootstrap,04b.7p,04b.7p - Configure virtual-then-physical product personalisation policy,HTTP,200,PASS,PRECONDITION,W11,7
+2026-10-16T07:17:15.324Z,S-0081,00 - Shared configuration bootstrap,04b.8,04b.8 - Assign BIN range to virtual-then-physical product,HTTP,201,PASS,PRECONDITION,W11,7
+2026-10-16T07:17:15.331Z,S-0082,00 - Shared configuration bootstrap,04b.8a,04b.8a - Assign physical card design to virtual-then-physical product,HTTP,201,PASS,PRECONDITION,W11,7
+2026-10-16T07:17:15.339Z,S-0083,00 - Shared configuration bootstrap,04b.8b,04b.8b - Activate virtual-then-physical product design assignment,HTTP,200,PASS,PRECONDITION,W11,7
+2026-10-16T07:17:15.346Z,S-0084,00 - Shared configuration bootstrap,04b.8c,04b.8c - Create virtual-then-physical product technology profile,HTTP,201,PASS,PRECONDITION,W11,7
+2026-10-16T07:17:15.354Z,S-0085,00 - Shared configuration bootstrap,04b.8d,04b.8d - Activate virtual-then-physical product technology profile,HTTP,200,PASS,PRECONDITION,W11,6
+2026-10-16T07:17:15.361Z,S-0086,00 - Shared configuration bootstrap,04b.8e,04b.8e - Create virtual-then-physical product CVM profile,HTTP,201,PASS,PRECONDITION,W11,10
+2026-10-16T07:17:15.372Z,S-0087,00 - Shared configuration bootstrap,04b.8f,04b.8f - Activate virtual-then-physical product CVM profile,HTTP,200,PASS,PRECONDITION,W11,6
+2026-10-16T07:17:15.379Z,S-0088,00 - Shared configuration bootstrap,04b.9,04b.9 - Submit virtual-then-physical product,HTTP,200,PASS,PRECONDITION,W11,8
+2026-10-16T07:17:15.387Z,S-0089,00 - Shared configuration bootstrap,04b.10,04b.10 - Activate virtual-then-physical product,HTTP,200,PASS,PRECONDITION,W11,8
+2026-10-16T07:17:15.396Z,S-0090,00 - Shared configuration bootstrap,04b.11,04b.11 - Submit virtual-then-physical product version,HTTP,200,PASS,PRECONDITION,W11,8
+2026-10-16T07:17:15.405Z,S-0091,00 - Shared configuration bootstrap,04b.12,04b.12 - Activate virtual-then-physical product version,HTTP,200,PASS,PRECONDITION,W11,8
+2026-10-16T07:17:15.414Z,S-0092,00 - Shared configuration bootstrap,04b.13,04b.13 - Submit virtual-then-physical product assignment,HTTP,200,PASS,PRECONDITION,W11,5
+2026-10-16T07:17:15.419Z,S-0093,00 - Shared configuration bootstrap,04b.14,04b.14 - Activate virtual-then-physical product assignment,HTTP,200,PASS,PRECONDITION,W11,7
+2026-10-16T07:17:15.274Z,S-0094,00 - Shared configuration bootstrap,04b,04b - Configure virtual-then-physical product,SCRIPT,200,PASS,GROUP_TOTAL,,138
+2026-10-16T07:17:15.426Z,S-0095,00 - Shared configuration bootstrap,04c.1,04c.1 - Create physical-only product,HTTP,201,PASS,PRECONDITION,W10,7
+2026-10-16T07:17:15.434Z,S-0096,00 - Shared configuration bootstrap,04c.2,04c.2 - Create physical-only product version,HTTP,201,PASS,PRECONDITION,W10,6
+2026-10-16T07:17:15.441Z,S-0097,00 - Shared configuration bootstrap,04c.3,04c.3 - Configure physical-only product card form,HTTP,200,PASS,PRECONDITION,W10,5
+2026-10-16T07:17:15.447Z,S-0098,00 - Shared configuration bootstrap,04c.4,04c.4 - Configure physical-only product PIN policy,HTTP,200,PASS,PRECONDITION,W10,11
+2026-10-16T07:17:15.459Z,S-0099,00 - Shared configuration bootstrap,04c.5,04c.5 - Configure physical-only product default controls,HTTP,200,PASS,PRECONDITION,W10,5
+2026-10-16T07:17:15.465Z,S-0100,00 - Shared configuration bootstrap,04c.7p,04c.7p - Configure physical-only product personalisation policy,HTTP,200,PASS,PRECONDITION,W10,6
+2026-10-16T07:17:15.472Z,S-0101,00 - Shared configuration bootstrap,04c.8,04c.8 - Assign BIN range to physical-only product,HTTP,201,PASS,PRECONDITION,W10,7
+2026-10-16T07:17:15.480Z,S-0102,00 - Shared configuration bootstrap,04c.8a,04c.8a - Assign physical card design to physical-only product,HTTP,201,PASS,PRECONDITION,W10,7
+2026-10-16T07:17:15.488Z,S-0103,00 - Shared configuration bootstrap,04c.8b,04c.8b - Activate physical-only product design assignment,HTTP,200,PASS,PRECONDITION,W10,7
+2026-10-16T07:17:15.496Z,S-0104,00 - Shared configuration bootstrap,04c.8c,04c.8c - Create physical-only product technology profile,HTTP,201,PASS,CHECK,W07; W10,6
+2026-10-16T07:17:15.503Z,S-0105,00 - Shared configuration bootstrap,04c.8d,04c.8d - Activate physical-only product technology profile,HTTP,200,PASS,CHECK,W07; W10,7
+2026-10-16T07:17:15.511Z,S-0106,00 - Shared configuration bootstrap,04c.8e,04c.8e - Create physical-only product CVM profile,HTTP,201,PASS,PRECONDITION,W10,9
+2026-10-16T07:17:15.521Z,S-0107,00 - Shared configuration bootstrap,04c.8f,04c.8f - Activate physical-only product CVM profile,HTTP,200,PASS,PRECONDITION,W10,8
+2026-10-16T07:17:15.529Z,S-0108,00 - Shared configuration bootstrap,04c.9,04c.9 - Submit physical-only product,HTTP,200,PASS,PRECONDITION,W10,7
+2026-10-16T07:17:15.537Z,S-0109,00 - Shared configuration bootstrap,04c.10,04c.10 - Activate physical-only product,HTTP,200,PASS,PRECONDITION,W10,7
+2026-10-16T07:17:15.545Z,S-0110,00 - Shared configuration bootstrap,04c.11,04c.11 - Submit physical-only product version,HTTP,200,PASS,PRECONDITION,W10,9
+2026-10-16T07:17:15.555Z,S-0111,00 - Shared configuration bootstrap,04c.12,04c.12 - Activate physical-only product version,HTTP,200,PASS,PRECONDITION,W10,9
+2026-10-16T07:17:15.565Z,S-0112,00 - Shared configuration bootstrap,04c.13,04c.13 - Submit physical-only product assignment,HTTP,200,PASS,PRECONDITION,W10,7
+2026-10-16T07:17:15.572Z,S-0113,00 - Shared configuration bootstrap,04c.14,04c.14 - Activate physical-only product assignment,HTTP,200,PASS,PRECONDITION,W10,8
+2026-10-16T07:17:15.426Z,S-0114,00 - Shared configuration bootstrap,04c,04c - Configure physical-only product,SCRIPT,200,PASS,GROUP_TOTAL,,138
+2026-10-16T07:17:15.581Z,S-0115,00 - Shared configuration bootstrap,04d.1,04d.1 - Create same-day virtual-and-physical product,HTTP,201,PASS,PRECONDITION,W12,8
+2026-10-16T07:17:15.590Z,S-0116,00 - Shared configuration bootstrap,04d.2,04d.2 - Create same-day virtual-and-physical product version,HTTP,201,PASS,PRECONDITION,W12,9
+2026-10-16T07:17:15.600Z,S-0117,00 - Shared configuration bootstrap,04d.3,04d.3 - Configure same-day virtual-and-physical product card form,HTTP,200,PASS,PRECONDITION,W12,6
+2026-10-16T07:17:15.606Z,S-0118,00 - Shared configuration bootstrap,04d.4,04d.4 - Configure same-day virtual-and-physical product PIN policy,HTTP,200,PASS,PRECONDITION,W12,7
+2026-10-16T07:17:15.613Z,S-0119,00 - Shared configuration bootstrap,04d.5,04d.5 - Configure same-day virtual-and-physical product default controls,HTTP,200,PASS,PRECONDITION,W12,6
+2026-10-16T07:17:15.620Z,S-0120,00 - Shared configuration bootstrap,04d.7p,04d.7p - Configure same-day virtual-and-physical product personalisation policy,HTTP,200,PASS,PRECONDITION,W12,6
+2026-10-16T07:17:15.627Z,S-0121,00 - Shared configuration bootstrap,04d.8,04d.8 - Assign BIN range to same-day virtual-and-physical product,HTTP,201,PASS,PRECONDITION,W12,7
+2026-10-16T07:17:15.635Z,S-0122,00 - Shared configuration bootstrap,04d.8a,04d.8a - Assign physical card design to same-day virtual-and-physical product,HTTP,201,PASS,PRECONDITION,W12,7
+2026-10-16T07:17:15.643Z,S-0123,00 - Shared configuration bootstrap,04d.8b,04d.8b - Activate same-day virtual-and-physical product design assignment,HTTP,200,PASS,PRECONDITION,W12,7
+2026-10-16T07:17:15.650Z,S-0124,00 - Shared configuration bootstrap,04d.8c,04d.8c - Create same-day virtual-and-physical product technology profile,HTTP,201,PASS,PRECONDITION,W12,8
+2026-10-16T07:17:15.659Z,S-0125,00 - Shared configuration bootstrap,04d.8d,04d.8d - Activate same-day virtual-and-physical product technology profile,HTTP,200,PASS,PRECONDITION,W12,7
+2026-10-16T07:17:15.667Z,S-0126,00 - Shared configuration bootstrap,04d.8e,04d.8e - Create same-day virtual-and-physical product CVM profile,HTTP,201,PASS,PRECONDITION,W12,8
+2026-10-16T07:17:15.676Z,S-0127,00 - Shared configuration bootstrap,04d.8f,04d.8f - Activate same-day virtual-and-physical product CVM profile,HTTP,200,PASS,PRECONDITION,W12,7
+2026-10-16T07:17:15.684Z,S-0128,00 - Shared configuration bootstrap,04d.9,04d.9 - Submit same-day virtual-and-physical product,HTTP,200,PASS,PRECONDITION,W12,7
+2026-10-16T07:17:15.693Z,S-0129,00 - Shared configuration bootstrap,04d.10,04d.10 - Activate same-day virtual-and-physical product,HTTP,200,PASS,PRECONDITION,W12,7
+2026-10-16T07:17:15.701Z,S-0130,00 - Shared configuration bootstrap,04d.11,04d.11 - Submit same-day virtual-and-physical product version,HTTP,200,PASS,PRECONDITION,W12,8
+2026-10-16T07:17:15.709Z,S-0131,00 - Shared configuration bootstrap,04d.12,04d.12 - Activate same-day virtual-and-physical product version,HTTP,200,PASS,PRECONDITION,W12,9
+2026-10-16T07:17:15.719Z,S-0132,00 - Shared configuration bootstrap,04d.13,04d.13 - Submit same-day virtual-and-physical product assignment,HTTP,200,PASS,PRECONDITION,W12,5
+2026-10-16T07:17:15.725Z,S-0133,00 - Shared configuration bootstrap,04d.14,04d.14 - Activate same-day virtual-and-physical product assignment,HTTP,200,PASS,PRECONDITION,W12,6
+2026-10-16T07:17:15.581Z,S-0134,00 - Shared configuration bootstrap,04d,04d - Configure same-day virtual-and-physical product,SCRIPT,200,PASS,GROUP_TOTAL,,135
+2026-10-16T07:17:15.731Z,S-0135,00 - Shared configuration bootstrap,04e.1,04e.1 - Create multiple-virtual-PAN product,HTTP,201,PASS,PRECONDITION,W13,6
+2026-10-16T07:17:15.738Z,S-0136,00 - Shared configuration bootstrap,04e.2,04e.2 - Create multiple-virtual-PAN product version,HTTP,201,PASS,PRECONDITION,W13,7
+2026-10-16T07:17:15.747Z,S-0137,00 - Shared configuration bootstrap,04e.3,04e.3 - Configure multiple-virtual-PAN product card form,HTTP,200,PASS,PRECONDITION,W13,5
+2026-10-16T07:17:15.753Z,S-0138,00 - Shared configuration bootstrap,04e.4,04e.4 - Configure multiple-virtual-PAN product PIN policy,HTTP,200,PASS,PRECONDITION,W13,6
+2026-10-16T07:17:15.760Z,S-0139,00 - Shared configuration bootstrap,04e.5,04e.5 - Configure multiple-virtual-PAN product default controls,HTTP,200,PASS,PRECONDITION,W13,6
+2026-10-16T07:17:15.767Z,S-0140,00 - Shared configuration bootstrap,04e.7p,04e.7p - Configure multiple-virtual-PAN product personalisation policy,HTTP,200,PASS,PRECONDITION,W13,6
+2026-10-16T07:17:15.774Z,S-0141,00 - Shared configuration bootstrap,04e.8,04e.8 - Assign BIN range to multiple-virtual-PAN product,HTTP,201,PASS,PRECONDITION,W13,7
+2026-10-16T07:17:15.782Z,S-0142,00 - Shared configuration bootstrap,04e.8a,04e.8a - Assign physical card design to multiple-virtual-PAN product,HTTP,201,PASS,PRECONDITION,W13,7
+2026-10-16T07:17:15.790Z,S-0143,00 - Shared configuration bootstrap,04e.8b,04e.8b - Activate multiple-virtual-PAN product design assignment,HTTP,200,PASS,PRECONDITION,W13,7
+2026-10-16T07:17:15.797Z,S-0144,00 - Shared configuration bootstrap,04e.8c,04e.8c - Create multiple-virtual-PAN product technology profile,HTTP,201,PASS,PRECONDITION,W13,7
+2026-10-16T07:17:15.804Z,S-0145,00 - Shared configuration bootstrap,04e.8d,04e.8d - Activate multiple-virtual-PAN product technology profile,HTTP,200,PASS,PRECONDITION,W13,6
+2026-10-16T07:17:15.811Z,S-0146,00 - Shared configuration bootstrap,04e.8e,04e.8e - Create multiple-virtual-PAN product CVM profile,HTTP,201,PASS,PRECONDITION,W13,9
+2026-10-16T07:17:15.821Z,S-0147,00 - Shared configuration bootstrap,04e.8f,04e.8f - Activate multiple-virtual-PAN product CVM profile,HTTP,200,PASS,PRECONDITION,W13,5
+2026-10-16T07:17:15.827Z,S-0148,00 - Shared configuration bootstrap,04e.9,04e.9 - Submit multiple-virtual-PAN product,HTTP,200,PASS,PRECONDITION,W13,7
+2026-10-16T07:17:15.835Z,S-0149,00 - Shared configuration bootstrap,04e.10,04e.10 - Activate multiple-virtual-PAN product,HTTP,200,PASS,PRECONDITION,W13,8
+2026-10-16T07:17:15.843Z,S-0150,00 - Shared configuration bootstrap,04e.11,04e.11 - Submit multiple-virtual-PAN product version,HTTP,200,PASS,PRECONDITION,W13,9
+2026-10-16T07:17:15.852Z,S-0151,00 - Shared configuration bootstrap,04e.12,04e.12 - Activate multiple-virtual-PAN product version,HTTP,200,PASS,PRECONDITION,W13,8
+2026-10-16T07:17:15.860Z,S-0152,00 - Shared configuration bootstrap,04e.13,04e.13 - Submit multiple-virtual-PAN product assignment,HTTP,200,PASS,PRECONDITION,W13,6
+2026-10-16T07:17:15.866Z,S-0153,00 - Shared configuration bootstrap,04e.14,04e.14 - Activate multiple-virtual-PAN product assignment,HTTP,200,PASS,PRECONDITION,W13,6
+2026-10-16T07:17:15.731Z,S-0154,00 - Shared configuration bootstrap,04e,04e - Configure multiple-virtual-PAN product,SCRIPT,200,PASS,GROUP_TOTAL,,128
+2026-10-16T07:17:15.872Z,S-0155,00 - Shared configuration bootstrap,05.1,05.1 - Generate PAN encryption DEK,HTTP,201,PASS,CHECK,W02; W25,123
+2026-10-16T07:17:15.996Z,S-0156,00 - Shared configuration bootstrap,05.2,05.2 - Activate PAN encryption DEK,HTTP,200,PASS,CHECK,W02; W25,6
+2026-10-16T07:17:16.002Z,S-0157,00 - Shared configuration bootstrap,05.3,05.3 - Create PAN encryption assignment,HTTP,201,PASS,CHECK,W02; W25,9
+2026-10-16T07:17:16.011Z,S-0158,00 - Shared configuration bootstrap,05.4,05.4 - Activate PAN encryption assignment,HTTP,200,PASS,CHECK,W02; W25,7
+2026-10-16T07:17:16.018Z,S-0159,00 - Shared configuration bootstrap,05.5,05.5 - Generate PAN HMAC key,HTTP,201,PASS,CHECK,W02,121
+2026-10-16T07:17:16.140Z,S-0160,00 - Shared configuration bootstrap,05.6,05.6 - Activate PAN HMAC key,HTTP,200,PASS,CHECK,W02,7
+2026-10-16T07:17:16.148Z,S-0161,00 - Shared configuration bootstrap,05.7,05.7 - Create PAN HMAC assignment,HTTP,201,PASS,CHECK,W02,9
+2026-10-16T07:17:16.157Z,S-0162,00 - Shared configuration bootstrap,05.8,05.8 - Activate PAN HMAC assignment,HTTP,200,PASS,CHECK,W02,8
+2026-10-16T07:17:16.165Z,S-0163,00 - Shared configuration bootstrap,05.9,05.9 - Generate BIN CVV key,HTTP,201,PASS,CHECK,W04; W25,122
+2026-10-16T07:17:16.288Z,S-0164,00 - Shared configuration bootstrap,05.10,05.10 - Activate BIN CVV key,HTTP,200,PASS,CHECK,W04; W25,7
+2026-10-16T07:17:16.296Z,S-0165,00 - Shared configuration bootstrap,05.11,05.11 - Create BIN CVV assignment,HTTP,201,PASS,CHECK,W04; W25,6
+2026-10-16T07:17:16.303Z,S-0166,00 - Shared configuration bootstrap,05.12,05.12 - Activate BIN CVV assignment,HTTP,200,PASS,CHECK,W04; W25,9
+2026-10-16T07:17:16.313Z,S-0167,00 - Shared configuration bootstrap,05.13,05.13 - Generate EMV IMK (PGK),HTTP,201,PASS,CHECK,W04,115
+2026-10-16T07:17:16.429Z,S-0168,00 - Shared configuration bootstrap,05.14,05.14 - Activate EMV IMK,HTTP,200,PASS,CHECK,W04,10
+2026-10-16T07:17:16.440Z,S-0169,00 - Shared configuration bootstrap,05.15,05.15 - Create EMV key-derivation assignment,HTTP,201,PASS,CHECK,W04,10
+2026-10-16T07:17:16.450Z,S-0170,00 - Shared configuration bootstrap,05.16,05.16 - Activate EMV key-derivation assignment,HTTP,200,PASS,CHECK,W04,9
+2026-10-16T07:17:15.872Z,S-0171,00 - Shared configuration bootstrap,05,05 - HSM keys and assignments,SCRIPT,200,PASS,GROUP_TOTAL,,578
+2026-10-16T07:17:16.461Z,S-0172,00 - Shared configuration bootstrap,06.1,06.1 - Create primary customer,HTTP,201,PASS,FIXTURE,,30
+2026-10-16T07:17:16.492Z,S-0173,00 - Shared configuration bootstrap,06.2,06.2 - Create second customer,HTTP,201,PASS,FIXTURE,,7
+2026-10-16T07:17:16.500Z,S-0174,00 - Shared configuration bootstrap,06.3.1,06.3.1 - Create account 1,HTTP,201,PASS,FIXTURE,,18
+2026-10-16T07:17:16.519Z,S-0175,00 - Shared configuration bootstrap,06.4.1,06.4.1 - Link account 1 to primary customer,HTTP,201,PASS,FIXTURE,,26
+2026-10-16T07:17:16.546Z,S-0176,00 - Shared configuration bootstrap,06.3.2,06.3.2 - Create account 2,HTTP,201,PASS,FIXTURE,,6
+2026-10-16T07:17:16.553Z,S-0177,00 - Shared configuration bootstrap,06.4.2,06.4.2 - Link account 2 to primary customer,HTTP,201,PASS,FIXTURE,,11
+2026-10-16T07:17:16.565Z,S-0178,00 - Shared configuration bootstrap,06.3.3,06.3.3 - Create account 3,HTTP,201,PASS,FIXTURE,,7
+2026-10-16T07:17:16.573Z,S-0179,00 - Shared configuration bootstrap,06.4.3,06.4.3 - Link account 3 to primary customer,HTTP,201,PASS,FIXTURE,,10
+2026-10-16T07:17:16.584Z,S-0180,00 - Shared configuration bootstrap,06.3.4,06.3.4 - Create account 4,HTTP,201,PASS,FIXTURE,,8
+2026-10-16T07:17:16.592Z,S-0181,00 - Shared configuration bootstrap,06.4.4,06.4.4 - Link account 4 to primary customer,HTTP,201,PASS,FIXTURE,,10
+2026-10-16T07:17:16.602Z,S-0182,00 - Shared configuration bootstrap,06.3.5,06.3.5 - Create account 5,HTTP,201,PASS,FIXTURE,,8
+2026-10-16T07:17:16.611Z,S-0183,00 - Shared configuration bootstrap,06.4.5,06.4.5 - Link account 5 to primary customer,HTTP,201,PASS,FIXTURE,,9
+2026-10-16T07:17:16.621Z,S-0184,00 - Shared configuration bootstrap,06.3.6,06.3.6 - Create account 6,HTTP,201,PASS,FIXTURE,,6
+2026-10-16T07:17:16.628Z,S-0185,00 - Shared configuration bootstrap,06.4.6,06.4.6 - Link account 6 to primary customer,HTTP,201,PASS,FIXTURE,,9
+2026-10-16T07:17:16.637Z,S-0186,00 - Shared configuration bootstrap,06.3.7,06.3.7 - Create account 7,HTTP,201,PASS,FIXTURE,,7
+2026-10-16T07:17:16.645Z,S-0187,00 - Shared configuration bootstrap,06.4.7,06.4.7 - Link account 7 to primary customer,HTTP,201,PASS,FIXTURE,,8
+2026-10-16T07:17:16.654Z,S-0188,00 - Shared configuration bootstrap,06.3.8,06.3.8 - Create account 8,HTTP,201,PASS,FIXTURE,,7
+2026-10-16T07:17:16.662Z,S-0189,00 - Shared configuration bootstrap,06.4.8,06.4.8 - Link account 8 to primary customer,HTTP,201,PASS,FIXTURE,,8
+2026-10-16T07:17:16.671Z,S-0190,00 - Shared configuration bootstrap,06.3.9,06.3.9 - Create account 9,HTTP,201,PASS,FIXTURE,,8
+2026-10-16T07:17:16.680Z,S-0191,00 - Shared configuration bootstrap,06.4.9,06.4.9 - Link account 9 to primary customer,HTTP,201,PASS,FIXTURE,,9
+2026-10-16T07:17:16.690Z,S-0192,00 - Shared configuration bootstrap,06.3.10,06.3.10 - Create account 10,HTTP,201,PASS,FIXTURE,,8
+2026-10-16T07:17:16.698Z,S-0193,00 - Shared configuration bootstrap,06.4.10,06.4.10 - Link account 10 to primary customer,HTTP,201,PASS,FIXTURE,,10
+2026-10-16T07:17:16.709Z,S-0194,00 - Shared configuration bootstrap,06.3.11,06.3.11 - Create account 11,HTTP,201,PASS,FIXTURE,,7
+2026-10-16T07:17:16.717Z,S-0195,00 - Shared configuration bootstrap,06.4.11,06.4.11 - Link account 11 to primary customer,HTTP,201,PASS,FIXTURE,,10
+2026-10-16T07:17:16.728Z,S-0196,00 - Shared configuration bootstrap,06.3.12,06.3.12 - Create account 12,HTTP,201,PASS,FIXTURE,,6
+2026-10-16T07:17:16.735Z,S-0197,00 - Shared configuration bootstrap,06.4.12,06.4.12 - Link account 12 to primary customer,HTTP,201,PASS,FIXTURE,,10
+2026-10-16T07:17:16.745Z,S-0198,00 - Shared configuration bootstrap,06.3.13,06.3.13 - Create account 13,HTTP,201,PASS,FIXTURE,,8
+2026-10-16T07:17:16.754Z,S-0199,00 - Shared configuration bootstrap,06.4.13,06.4.13 - Link account 13 to primary customer,HTTP,201,PASS,FIXTURE,,10
+2026-10-16T07:17:16.765Z,S-0200,00 - Shared configuration bootstrap,06.3.14,06.3.14 - Create account 14,HTTP,201,PASS,FIXTURE,,7
+2026-10-16T07:17:16.773Z,S-0201,00 - Shared configuration bootstrap,06.4.14,06.4.14 - Link account 14 to primary customer,HTTP,201,PASS,FIXTURE,,8
+2026-10-16T07:17:16.782Z,S-0202,00 - Shared configuration bootstrap,06.3.15,06.3.15 - Create account 15,HTTP,201,PASS,FIXTURE,,7
+2026-10-16T07:17:16.789Z,S-0203,00 - Shared configuration bootstrap,06.4.15,06.4.15 - Link account 15 to primary customer,HTTP,201,PASS,FIXTURE,,11
+2026-10-16T07:17:16.800Z,S-0204,00 - Shared configuration bootstrap,06.3.16,06.3.16 - Create account 16,HTTP,201,PASS,FIXTURE,,7
+2026-10-16T07:17:16.808Z,S-0205,00 - Shared configuration bootstrap,06.4.16,06.4.16 - Link account 16 to primary customer,HTTP,201,PASS,FIXTURE,,10
+2026-10-16T07:17:16.819Z,S-0206,00 - Shared configuration bootstrap,06.3.17,06.3.17 - Create account 17,HTTP,201,PASS,FIXTURE,,7
+2026-10-16T07:17:16.827Z,S-0207,00 - Shared configuration bootstrap,06.4.17,06.4.17 - Link account 17 to primary customer,HTTP,201,PASS,FIXTURE,,10
+2026-10-16T07:17:16.838Z,S-0208,00 - Shared configuration bootstrap,06.3.18,06.3.18 - Create account 18,HTTP,201,PASS,FIXTURE,,7
+2026-10-16T07:17:16.846Z,S-0209,00 - Shared configuration bootstrap,06.4.18,06.4.18 - Link account 18 to primary customer,HTTP,201,PASS,FIXTURE,,9
+2026-10-16T07:17:16.855Z,S-0210,00 - Shared configuration bootstrap,06.3.19,06.3.19 - Create account 19,HTTP,201,PASS,FIXTURE,,9
+2026-10-16T07:17:16.864Z,S-0211,00 - Shared configuration bootstrap,06.4.19,06.4.19 - Link account 19 to primary customer,HTTP,201,PASS,FIXTURE,,11
+2026-10-16T07:17:16.876Z,S-0212,00 - Shared configuration bootstrap,06.3.20,06.3.20 - Create account 20,HTTP,201,PASS,FIXTURE,,9
+2026-10-16T07:17:16.886Z,S-0213,00 - Shared configuration bootstrap,06.4.20,06.4.20 - Link account 20 to primary customer,HTTP,201,PASS,FIXTURE,,13
+2026-10-16T07:17:16.900Z,S-0214,00 - Shared configuration bootstrap,06.3.21,06.3.21 - Create account 21,HTTP,201,PASS,FIXTURE,,7
+2026-10-16T07:17:16.908Z,S-0215,00 - Shared configuration bootstrap,06.4.21,06.4.21 - Link account 21 to primary customer,HTTP,201,PASS,FIXTURE,,10
+2026-10-16T07:17:16.919Z,S-0216,00 - Shared configuration bootstrap,06.3.22,06.3.22 - Create account 22,HTTP,201,PASS,FIXTURE,,7
+2026-10-16T07:17:16.926Z,S-0217,00 - Shared configuration bootstrap,06.4.22,06.4.22 - Link account 22 to primary customer,HTTP,201,PASS,FIXTURE,,18
+2026-10-16T07:17:16.945Z,S-0218,00 - Shared configuration bootstrap,06.3.23,06.3.23 - Create account 23,HTTP,201,PASS,FIXTURE,,6
+2026-10-16T07:17:16.952Z,S-0219,00 - Shared configuration bootstrap,06.4.23,06.4.23 - Link account 23 to primary customer,HTTP,201,PASS,FIXTURE,,9
+2026-10-16T07:17:16.962Z,S-0220,00 - Shared configuration bootstrap,06.3.24,06.3.24 - Create account 24,HTTP,201,PASS,FIXTURE,,6
+2026-10-16T07:17:16.969Z,S-0221,00 - Shared configuration bootstrap,06.4.24,06.4.24 - Link account 24 to primary customer,HTTP,201,PASS,FIXTURE,,9
+2026-10-16T07:17:16.979Z,S-0222,00 - Shared configuration bootstrap,06.3.25,06.3.25 - Create account 25,HTTP,201,PASS,FIXTURE,,6
+2026-10-16T07:17:16.986Z,S-0223,00 - Shared configuration bootstrap,06.4.25,06.4.25 - Link account 25 to primary customer,HTTP,201,PASS,FIXTURE,,9
+2026-10-16T07:17:16.995Z,S-0224,00 - Shared configuration bootstrap,06.3.26,06.3.26 - Create account 26,HTTP,201,PASS,FIXTURE,,7
+2026-10-16T07:17:17.002Z,S-0225,00 - Shared configuration bootstrap,06.4.26,06.4.26 - Link account 26 to primary customer,HTTP,201,PASS,FIXTURE,,10
+2026-10-16T07:17:17.013Z,S-0226,00 - Shared configuration bootstrap,06.3.27,06.3.27 - Create account 27,HTTP,201,PASS,FIXTURE,,6
+2026-10-16T07:17:17.020Z,S-0227,00 - Shared configuration bootstrap,06.4.27,06.4.27 - Link account 27 to primary customer,HTTP,201,PASS,FIXTURE,,10
+2026-10-16T07:17:17.031Z,S-0228,00 - Shared configuration bootstrap,06.3.28,06.3.28 - Create account 28,HTTP,201,PASS,FIXTURE,,7
+2026-10-16T07:17:17.039Z,S-0229,00 - Shared configuration bootstrap,06.4.28,06.4.28 - Link account 28 to primary customer,HTTP,201,PASS,FIXTURE,,17
+2026-10-16T07:17:17.056Z,S-0230,00 - Shared configuration bootstrap,06.3.29,06.3.29 - Create account 29,HTTP,201,PASS,FIXTURE,,12
+2026-10-16T07:17:17.069Z,S-0231,00 - Shared configuration bootstrap,06.4.29,06.4.29 - Link account 29 to primary customer,HTTP,201,PASS,FIXTURE,,10
+2026-10-16T07:17:17.079Z,S-0232,00 - Shared configuration bootstrap,06.3.30,06.3.30 - Create account 30,HTTP,201,PASS,FIXTURE,,6
+2026-10-16T07:17:17.085Z,S-0233,00 - Shared configuration bootstrap,06.4.30,06.4.30 - Link account 30 to primary customer,HTTP,201,PASS,FIXTURE,,9
+2026-10-16T07:17:17.094Z,S-0234,00 - Shared configuration bootstrap,06.3.31,06.3.31 - Create account 31,HTTP,201,PASS,FIXTURE,,6
+2026-10-16T07:17:17.101Z,S-0235,00 - Shared configuration bootstrap,06.4.31,06.4.31 - Link account 31 to primary customer,HTTP,201,PASS,FIXTURE,,8
+2026-10-16T07:17:17.110Z,S-0236,00 - Shared configuration bootstrap,06.3.32,06.3.32 - Create account 32,HTTP,201,PASS,FIXTURE,,5
+2026-10-16T07:17:17.116Z,S-0237,00 - Shared configuration bootstrap,06.4.32,06.4.32 - Link account 32 to primary customer,HTTP,201,PASS,FIXTURE,,10
+2026-10-16T07:17:17.126Z,S-0238,00 - Shared configuration bootstrap,06.3.33,06.3.33 - Create account 33,HTTP,201,PASS,FIXTURE,,7
+2026-10-16T07:17:17.134Z,S-0239,00 - Shared configuration bootstrap,06.4.33,06.4.33 - Link account 33 to primary customer,HTTP,201,PASS,FIXTURE,,12
+2026-10-16T07:17:17.146Z,S-0240,00 - Shared configuration bootstrap,06.3.34,06.3.34 - Create account 34,HTTP,201,PASS,FIXTURE,,8
+2026-10-16T07:17:17.155Z,S-0241,00 - Shared configuration bootstrap,06.4.34,06.4.34 - Link account 34 to primary customer,HTTP,201,PASS,FIXTURE,,10
+2026-10-16T07:17:17.166Z,S-0242,00 - Shared configuration bootstrap,06.3.35,06.3.35 - Create account 35,HTTP,201,PASS,FIXTURE,,8
+2026-10-16T07:17:17.175Z,S-0243,00 - Shared configuration bootstrap,06.4.35,06.4.35 - Link account 35 to primary customer,HTTP,201,PASS,FIXTURE,,10
+2026-10-16T07:17:17.186Z,S-0244,00 - Shared configuration bootstrap,06.3.36,06.3.36 - Create account 36,HTTP,201,PASS,FIXTURE,,7
+2026-10-16T07:17:17.194Z,S-0245,00 - Shared configuration bootstrap,06.4.36,06.4.36 - Link account 36 to primary customer,HTTP,201,PASS,FIXTURE,,8
+2026-10-16T07:17:17.203Z,S-0246,00 - Shared configuration bootstrap,06.3.37,06.3.37 - Create account 37,HTTP,201,PASS,FIXTURE,,7
+2026-10-16T07:17:17.211Z,S-0247,00 - Shared configuration bootstrap,06.4.37,06.4.37 - Link account 37 to primary customer,HTTP,201,PASS,FIXTURE,,8
+2026-10-16T07:17:17.220Z,S-0248,00 - Shared configuration bootstrap,06.3.38,06.3.38 - Create account 38,HTTP,201,PASS,FIXTURE,,7
+2026-10-16T07:17:17.228Z,S-0249,00 - Shared configuration bootstrap,06.4.38,06.4.38 - Link account 38 to primary customer,HTTP,201,PASS,FIXTURE,,9
+2026-10-16T07:17:17.237Z,S-0250,00 - Shared configuration bootstrap,06.3.39,06.3.39 - Create account 39,HTTP,201,PASS,FIXTURE,,7
+2026-10-16T07:17:17.245Z,S-0251,00 - Shared configuration bootstrap,06.4.39,06.4.39 - Link account 39 to primary customer,HTTP,201,PASS,FIXTURE,,8
+2026-10-16T07:17:17.254Z,S-0252,00 - Shared configuration bootstrap,06.3.40,06.3.40 - Create account 40,HTTP,201,PASS,FIXTURE,,7
+2026-10-16T07:17:17.262Z,S-0253,00 - Shared configuration bootstrap,06.4.40,06.4.40 - Link account 40 to primary customer,HTTP,201,PASS,FIXTURE,,8
+2026-10-16T07:17:17.271Z,S-0254,00 - Shared configuration bootstrap,06.5,06.5 - Create shipping address,HTTP,201,PASS,FIXTURE,,10
+2026-10-16T07:17:16.460Z,S-0255,00 - Shared configuration bootstrap,06,"06 - Customer-service customer, account and address fixtures",SCRIPT,200,PASS,GROUP_TOTAL,,757
+2026-10-16T07:17:17.282Z,S-0256,00 - Shared configuration bootstrap,06b,"06b - Seed restriction snapshots, activation policy and policy activations",SCRIPT,200,PASS,GROUP_TOTAL,,160
+2026-10-16T07:17:17.444Z,S-0257,00 - Shared configuration bootstrap,07,07 - Publish shared configuration to later thread groups,SCRIPT,200,PASS,GROUP_TOTAL,,38
+2026-10-16T07:17:17.488Z,S-0258,10 - A. Configuration eligibility and transitions,10.0,10.0 - Load shared configuration for configuration eligibility,SCRIPT,200,PASS,HARNESS,,26
+2026-10-16T07:17:17.515Z,S-0259,10 - A. Configuration eligibility and transitions,10.0b,10.0b - Get Keycloak access token,HTTP,200,PASS,HARNESS,,10
+2026-10-16T07:17:17.530Z,S-0260,10 - A. Configuration eligibility and transitions,10.1,10.1 - A06 Reject DRAFT to ACTIVE in one step,HTTP,400,PASS,CHECK,W08,18
+2026-10-16T07:17:17.566Z,S-0261,10 - A. Configuration eligibility and transitions,10.2,10.2 - A06 Draft version is unchanged,HTTP,200,PASS,CHECK,W08,7
+2026-10-16T07:17:17.587Z,S-0262,10 - A. Configuration eligibility and transitions,10.3,10.3 - Prepare rejected issuance: A05 issuance on a DRAFT product version,SCRIPT,200,PASS,HARNESS,,29
+2026-10-16T07:17:17.617Z,S-0263,10 - A. Configuration eligibility and transitions,10.3.1,10.3.1 - Submit rejected issuance: A05 issuance on a DRAFT product version,HTTP,422,PASS,CHECK,W08,12
+2026-10-16T07:17:17.659Z,S-0264,10 - A. Configuration eligibility and transitions,10.3.3,10.3.3 - Require no card was created: A05 issuance on a DRAFT product version,SCRIPT,200,PASS,CHECK,W08,18
+2026-10-16T07:17:17.677Z,S-0265,10 - A. Configuration eligibility and transitions,10.4,10.4 - Prepare rejected issuance: A03 issuance on an unassigned PAN range,SCRIPT,200,PASS,HARNESS,,12
+2026-10-16T07:17:17.690Z,S-0266,10 - A. Configuration eligibility and transitions,10.4.1,10.4.1 - Submit rejected issuance: A03 issuance on an unassigned PAN range,HTTP,422,PASS,CHECK,W08,16
+2026-10-16T07:17:17.741Z,S-0267,10 - A. Configuration eligibility and transitions,10.4.3,10.4.3 - Require no card was created: A03 issuance on an unassigned PAN range,SCRIPT,200,PASS,CHECK,W08,11
+2026-10-16T07:17:17.752Z,S-0268,10 - A. Configuration eligibility and transitions,10.5,10.5 - Prepare rejected issuance: A03 issuance on an unknown PAN range,SCRIPT,200,PASS,HARNESS,,10
+2026-10-16T07:17:17.762Z,S-0269,10 - A. Configuration eligibility and transitions,10.5.1,10.5.1 - Submit rejected issuance: A03 issuance on an unknown PAN range,HTTP,404,PASS,CHECK,W08,13
+2026-10-16T07:17:17.797Z,S-0270,10 - A. Configuration eligibility and transitions,10.5.3,10.5.3 - Require no card was created: A03 issuance on an unknown PAN range,SCRIPT,200,PASS,CHECK,W08,12
+2026-10-16T07:17:17.809Z,S-0271,10 - A. Configuration eligibility and transitions,10.6,10.6 - Prepare issuance: A09 virtual card,SCRIPT,200,PASS,HARNESS,,11
+2026-10-16T07:17:17.820Z,S-0272,10 - A. Configuration eligibility and transitions,10.6.1,10.6.1 - Submit issuance: A09 virtual card,HTTP,202,PASS,CHECK,W09; W25,55
+2026-10-16T07:17:19.910Z,S-0273,10 - A. Configuration eligibility and transitions,10.6.2a,10.6.2a - Read issuance operation: A09 virtual card,HTTP,200,PASS,POLL,W09,5
+2026-10-16T07:17:21.938Z,S-0274,10 - A. Configuration eligibility and transitions,10.6.2a,10.6.2a - Read issuance operation: A09 virtual card,HTTP,200,PASS,POLL,W09,4
+2026-10-16T07:17:23.953Z,S-0275,10 - A. Configuration eligibility and transitions,10.6.2a,10.6.2a - Read issuance operation: A09 virtual card,HTTP,200,PASS,CHECK,W09,6
+2026-10-16T07:17:23.962Z,S-0276,10 - A. Configuration eligibility and transitions,10.6.3,10.6.3 - Require issued card: A09 virtual card,SCRIPT,200,PASS,CHECK,W09; W25,6
+2026-10-16T07:17:23.969Z,S-0277,10 - A. Configuration eligibility and transitions,10.7,10.7 - A09 Reject physical production on a VIRTUAL_ONLY product,HTTP,400,PASS,CHECK,W09,16
+2026-10-16T07:17:23.994Z,S-0278,10 - A. Configuration eligibility and transitions,10.8,10.8 - A09 The refused request created no production reference,HTTP,200,PASS,CHECK,W09; W25,6
+2026-10-16T07:17:24.008Z,S-0279,10 - A. Configuration eligibility and transitions,10.9,10.9 - A01 Institution lookup by code agrees with lookup by id,HTTP,200,PASS,CHECK,W01,5
+2026-10-16T07:17:24.024Z,S-0280,11 - B. Customer and account relationships,11.0,11.0 - Load shared configuration for relationships,SCRIPT,200,PASS,HARNESS,,13
+2026-10-16T07:17:24.037Z,S-0281,11 - B. Customer and account relationships,11.0b,11.0b - Get Keycloak access token,HTTP,200,PASS,HARNESS,,9
+2026-10-16T07:17:24.048Z,S-0282,11 - B. Customer and account relationships,11.1,11.1 - Prepare rejected issuance: B02 unknown customer reference,SCRIPT,200,PASS,HARNESS,,6
+2026-10-16T07:17:24.055Z,S-0283,11 - B. Customer and account relationships,11.1.1,11.1.1 - Submit rejected issuance: B02 unknown customer reference,HTTP,404,PASS,CHECK,W09,8
+2026-10-16T07:17:24.077Z,S-0284,11 - B. Customer and account relationships,11.1.3,11.1.3 - Require no card was created: B02 unknown customer reference,SCRIPT,200,PASS,CHECK,W09,7
+2026-10-16T07:17:24.084Z,S-0285,11 - B. Customer and account relationships,11.2,11.2 - Prepare rejected issuance: B02 unknown account reference,SCRIPT,200,PASS,HARNESS,,7
+2026-10-16T07:17:24.092Z,S-0286,11 - B. Customer and account relationships,11.2.1,11.2.1 - Submit rejected issuance: B02 unknown account reference,HTTP,404,PASS,CHECK,W09,5
+2026-10-16T07:17:24.109Z,S-0287,11 - B. Customer and account relationships,11.2.3,11.2.3 - Require no card was created: B02 unknown account reference,SCRIPT,200,PASS,CHECK,W09,6
+2026-10-16T07:17:24.115Z,S-0288,11 - B. Customer and account relationships,11.3,11.3 - Prepare issuance: B04 first card on shared account,SCRIPT,200,PASS,HARNESS,,6
+2026-10-16T07:17:24.121Z,S-0289,11 - B. Customer and account relationships,11.3.1,11.3.1 - Submit issuance: B04 first card on shared account,HTTP,202,PASS,CHECK,W09,29
+2026-10-16T07:17:26.171Z,S-0290,11 - B. Customer and account relationships,11.3.2a,11.3.2a - Read issuance operation: B04 first card on shared account,HTTP,200,PASS,POLL,W09,5
+2026-10-16T07:17:28.199Z,S-0291,11 - B. Customer and account relationships,11.3.2a,11.3.2a - Read issuance operation: B04 first card on shared account,HTTP,200,PASS,CHECK,W09,5
+2026-10-16T07:17:28.205Z,S-0292,11 - B. Customer and account relationships,11.3.3,11.3.3 - Require issued card: B04 first card on shared account,SCRIPT,200,PASS,CHECK,W09,6
+2026-10-16T07:17:28.211Z,S-0293,11 - B. Customer and account relationships,11.4,11.4 - Prepare issuance: B04 second card on shared account,SCRIPT,200,PASS,HARNESS,,4
+2026-10-16T07:17:28.215Z,S-0294,11 - B. Customer and account relationships,11.4.1,11.4.1 - Submit issuance: B04 second card on shared account,HTTP,202,PASS,CHECK,W09,17
+2026-10-16T07:17:30.243Z,S-0295,11 - B. Customer and account relationships,11.4.2a,11.4.2a - Read issuance operation: B04 second card on shared account,HTTP,200,PASS,POLL,W09,5
+2026-10-16T07:17:32.270Z,S-0296,11 - B. Customer and account relationships,11.4.2a,11.4.2a - Read issuance operation: B04 second card on shared account,HTTP,200,PASS,POLL,W09,5
+2026-10-16T07:17:34.290Z,S-0297,11 - B. Customer and account relationships,11.4.2a,11.4.2a - Read issuance operation: B04 second card on shared account,HTTP,200,PASS,CHECK,W09,4
+2026-10-16T07:17:34.296Z,S-0298,11 - B. Customer and account relationships,11.4.3,11.4.3 - Require issued card: B04 second card on shared account,SCRIPT,200,PASS,CHECK,W09,5
+2026-10-16T07:17:34.301Z,S-0299,11 - B. Customer and account relationships,11.5,11.5 - B04 The two cards are distinct identities,SCRIPT,200,PASS,CHECK,W09,6
+2026-10-16T07:17:34.307Z,S-0300,11 - B. Customer and account relationships,11.6,11.6 - B04 Both cards report the same account linkage,HTTP,200,PASS,CHECK,W09,7
+2026-10-16T07:17:34.336Z,S-0301,11 - B. Customer and account relationships,11.7,11.7 - Activate B04 first card,HTTP,200,PASS,CHECK,W09; W25,19
+2026-10-16T07:17:34.365Z,S-0302,11 - B. Customer and account relationships,11.8,11.8 - B06 Activating one card left the sibling untouched,HTTP,200,PASS,CHECK,W09; W25,5
+2026-10-16T07:17:34.381Z,S-0303,"12 - C. Issuance request validation, duplicates and idempotency",12.0,12.0 - Load shared configuration for issuance validation,SCRIPT,200,PASS,HARNESS,,9
+2026-10-16T07:17:34.390Z,S-0304,"12 - C. Issuance request validation, duplicates and idempotency",12.0b,12.0b - Get Keycloak access token,HTTP,200,PASS,HARNESS,,8
+2026-10-16T07:17:34.400Z,S-0305,"12 - C. Issuance request validation, duplicates and idempotency",12.1,12.1 - C04 Missing customerReferenceId is rejected,HTTP,400,PASS,CHECK,W09,3
+2026-10-16T07:17:34.411Z,S-0306,"12 - C. Issuance request validation, duplicates and idempotency",12.2,12.2 - C04 Missing accountReferenceId is rejected,HTTP,400,PASS,CHECK,W09,4
+2026-10-16T07:17:34.421Z,S-0307,"12 - C. Issuance request validation, duplicates and idempotency",12.3,12.3 - C04 Missing productId is rejected,HTTP,400,PASS,CHECK,W09,5
+2026-10-16T07:17:34.433Z,S-0308,"12 - C. Issuance request validation, duplicates and idempotency",12.4,12.4 - C04 Missing productVersionId is rejected,HTTP,400,PASS,CHECK,W09,5
+2026-10-16T07:17:34.447Z,S-0309,"12 - C. Issuance request validation, duplicates and idempotency",12.5,12.5 - C04 Missing binRangeId is rejected,HTTP,400,PASS,CHECK,W09,4
+2026-10-16T07:17:34.458Z,S-0310,"12 - C. Issuance request validation, duplicates and idempotency",12.6,12.6 - C04 Missing activationPolicyVersionId is rejected,HTTP,400,PASS,CHECK,W09,4
+2026-10-16T07:17:34.471Z,S-0311,"12 - C. Issuance request validation, duplicates and idempotency",12.7,12.7 - C04 Malformed UUID is rejected,HTTP,400,PASS,CHECK,W09,4
+2026-10-16T07:17:34.484Z,S-0312,"12 - C. Issuance request validation, duplicates and idempotency",12.8,12.8 - C04 Unsupported accountLinkType is rejected,HTTP,400,PASS,CHECK,W09,4
+2026-10-16T07:17:34.507Z,S-0313,"12 - C. Issuance request validation, duplicates and idempotency",12.9,12.9 - C04 Oversized embossed name is rejected,HTTP,400,PASS,CHECK,W09,5
+2026-10-16T07:17:34.519Z,S-0314,"12 - C. Issuance request validation, duplicates and idempotency",12.10,12.10 - C06 Issuance without an Idempotency-Key is rejected,HTTP,400,PASS,CHECK,W09,2
+2026-10-16T07:17:34.528Z,S-0315,"12 - C. Issuance request validation, duplicates and idempotency",12.11,12.11 - Prepare issuance: C05 first card at the ceiling,SCRIPT,200,PASS,HARNESS,,9
+2026-10-16T07:17:34.537Z,S-0316,"12 - C. Issuance request validation, duplicates and idempotency",12.11.1,12.11.1 - Submit issuance: C05 first card at the ceiling,HTTP,202,PASS,CHECK,W13,20
+2026-10-16T07:17:36.584Z,S-0317,"12 - C. Issuance request validation, duplicates and idempotency",12.11.2a,12.11.2a - Read issuance operation: C05 first card at the ceiling,HTTP,200,PASS,POLL,W13,5
+2026-10-16T07:17:38.611Z,S-0318,"12 - C. Issuance request validation, duplicates and idempotency",12.11.2a,12.11.2a - Read issuance operation: C05 first card at the ceiling,HTTP,200,PASS,CHECK,W13,6
+2026-10-16T07:17:38.619Z,S-0319,"12 - C. Issuance request validation, duplicates and idempotency",12.11.3,12.11.3 - Require issued card: C05 first card at the ceiling,SCRIPT,200,PASS,CHECK,W13,11
+2026-10-16T07:17:38.630Z,S-0320,"12 - C. Issuance request validation, duplicates and idempotency",12.12,12.12 - Prepare rejected issuance: C05 second card beyond the single-PAN ceiling,SCRIPT,200,PASS,HARNESS,,4
+2026-10-16T07:17:38.634Z,S-0321,"12 - C. Issuance request validation, duplicates and idempotency",12.12.1,12.12.1 - Submit rejected issuance: C05 second card beyond the single-PAN ceiling,HTTP,422,PASS,CHECK,W13,13
+2026-10-16T07:17:38.660Z,S-0322,"12 - C. Issuance request validation, duplicates and idempotency",12.12.3,12.12.3 - Require no card was created: C05 second card beyond the single-PAN ceiling,SCRIPT,200,PASS,CHECK,W13,5
+2026-10-16T07:17:38.668Z,S-0323,"12 - C. Issuance request validation, duplicates and idempotency",12.13,12.13 - C05 The ceiling account still holds exactly one card,HTTP,200,PASS,CHECK,W13,7
+2026-10-16T07:17:38.685Z,S-0324,"12 - C. Issuance request validation, duplicates and idempotency",12.14,12.14 - C07 Unknown issuance operation is not found,HTTP,404,PASS,CHECK,W09,3
+2026-10-16T07:17:38.697Z,S-0325,13 - D. Activation prerequisites and state matrix,13.0,13.0 - Load shared configuration for activation,SCRIPT,200,PASS,HARNESS,,16
+2026-10-16T07:17:38.714Z,S-0326,13 - D. Activation prerequisites and state matrix,13.0b,13.0b - Get Keycloak access token,HTTP,200,PASS,HARNESS,,7
+2026-10-16T07:17:38.722Z,S-0327,13 - D. Activation prerequisites and state matrix,13.1,13.1 - Prepare issuance: D05 frozen-then-activated card,SCRIPT,200,PASS,HARNESS,,5
+2026-10-16T07:17:38.727Z,S-0328,13 - D. Activation prerequisites and state matrix,13.1.1,13.1.1 - Submit issuance: D05 frozen-then-activated card,HTTP,202,PASS,CHECK,Supplementary: Card activation with an existing hold,19
+2026-10-16T07:17:40.771Z,S-0329,13 - D. Activation prerequisites and state matrix,13.1.2a,13.1.2a - Read issuance operation: D05 frozen-then-activated card,HTTP,200,PASS,POLL,Supplementary: Card activation with an existing hold,5
+2026-10-16T07:17:42.788Z,S-0330,13 - D. Activation prerequisites and state matrix,13.1.2a,13.1.2a - Read issuance operation: D05 frozen-then-activated card,HTTP,200,PASS,POLL,Supplementary: Card activation with an existing hold,5
+2026-10-16T07:17:44.804Z,S-0331,13 - D. Activation prerequisites and state matrix,13.1.2a,13.1.2a - Read issuance operation: D05 frozen-then-activated card,HTTP,200,PASS,CHECK,Supplementary: Card activation with an existing hold,4
+2026-10-16T07:17:44.810Z,S-0332,13 - D. Activation prerequisites and state matrix,13.1.3,13.1.3 - Require issued card: D05 frozen-then-activated card,SCRIPT,200,PASS,CHECK,Supplementary: Card activation with an existing hold,5
+2026-10-16T07:17:44.815Z,S-0333,13 - D. Activation prerequisites and state matrix,13.2,13.2 - D05 Freeze the pending card,HTTP,200,PASS,CHECK,Supplementary: Card activation with an existing hold,12
+2026-10-16T07:17:44.834Z,S-0334,13 - D. Activation prerequisites and state matrix,13.3,13.3 - D05 Activate the frozen card,HTTP,200,PASS,CHECK,Supplementary: Card activation with an existing hold,11
+2026-10-16T07:17:44.852Z,S-0335,13 - D. Activation prerequisites and state matrix,13.4,13.4 - D05 The freeze survived the activation attempt,HTTP,200,PASS,CHECK,Supplementary: Card activation with an existing hold,5
+2026-10-16T07:17:44.863Z,S-0336,13 - D. Activation prerequisites and state matrix,13.5,13.5 - Prepare issuance: D04 permanently blocked card,SCRIPT,200,PASS,HARNESS,,4
+2026-10-16T07:17:44.868Z,S-0337,13 - D. Activation prerequisites and state matrix,13.5.1,13.5.1 - Submit issuance: D04 permanently blocked card,HTTP,202,PASS,SET_UP,W17,18
+2026-10-16T07:17:46.903Z,S-0338,13 - D. Activation prerequisites and state matrix,13.5.2a,13.5.2a - Read issuance operation: D04 permanently blocked card,HTTP,200,PASS,POLL,W17,4
+2026-10-16T07:17:48.919Z,S-0339,13 - D. Activation prerequisites and state matrix,13.5.2a,13.5.2a - Read issuance operation: D04 permanently blocked card,HTTP,200,PASS,SET_UP,W17,4
+2026-10-16T07:17:48.924Z,S-0340,13 - D. Activation prerequisites and state matrix,13.5.3,13.5.3 - Require issued card: D04 permanently blocked card,SCRIPT,200,PASS,SET_UP,W17,5
+2026-10-16T07:17:48.929Z,S-0341,13 - D. Activation prerequisites and state matrix,13.6,13.6 - Activate D04 card,HTTP,200,PASS,SET_UP,W17,16
+2026-10-16T07:17:48.952Z,S-0342,13 - D. Activation prerequisites and state matrix,13.7,13.7 - D04 Report the card LOST,HTTP,200,PASS,CHECK,W17,12
+2026-10-16T07:17:48.970Z,S-0343,13 - D. Activation prerequisites and state matrix,13.8,13.8 - D04 A blocked card cannot be activated,HTTP,422,PASS,CHECK,W17,6
+2026-10-16T07:17:48.982Z,S-0344,13 - D. Activation prerequisites and state matrix,13.9,13.9 - G03 A permanent LOST hold cannot be released,HTTP,422,PASS,CHECK,W17,5
+2026-10-16T07:17:48.994Z,S-0345,13 - D. Activation prerequisites and state matrix,13.9b,13.9b - H09 A blocked card cannot change controls,HTTP,422,PASS,CHECK,W14,5
+2026-10-16T07:17:49.005Z,S-0346,13 - D. Activation prerequisites and state matrix,13.10,13.10 - D04 The refused actions left the card blocked,HTTP,200,PASS,CHECK,W17,5
+2026-10-16T07:17:49.020Z,S-0347,14 - H. Card controls across every channel and direction,14.0,14.0 - Load shared configuration for card controls,SCRIPT,200,PASS,HARNESS,,10
+2026-10-16T07:17:49.031Z,S-0348,14 - H. Card controls across every channel and direction,14.0b,14.0b - Get Keycloak access token,HTTP,200,PASS,HARNESS,,9
+2026-10-16T07:17:49.041Z,S-0349,14 - H. Card controls across every channel and direction,14.1,14.1 - Prepare issuance: H controls card,SCRIPT,200,PASS,HARNESS,,5
+2026-10-16T07:17:49.046Z,S-0350,14 - H. Card controls across every channel and direction,14.1.1,14.1.1 - Submit issuance: H controls card,HTTP,202,PASS,SET_UP,W14,22
+2026-10-16T07:17:51.090Z,S-0351,14 - H. Card controls across every channel and direction,14.1.2a,14.1.2a - Read issuance operation: H controls card,HTTP,200,PASS,POLL,W14,5
+2026-10-16T07:17:53.115Z,S-0352,14 - H. Card controls across every channel and direction,14.1.2a,14.1.2a - Read issuance operation: H controls card,HTTP,200,PASS,POLL,W14,4
+2026-10-16T07:17:55.125Z,S-0353,14 - H. Card controls across every channel and direction,14.1.2a,14.1.2a - Read issuance operation: H controls card,HTTP,200,PASS,SET_UP,W14,4
+2026-10-16T07:17:55.130Z,S-0354,14 - H. Card controls across every channel and direction,14.1.3,14.1.3 - Require issued card: H controls card,SCRIPT,200,PASS,SET_UP,W14,4
+2026-10-16T07:17:55.135Z,S-0355,14 - H. Card controls across every channel and direction,14.2,14.2 - Activate H controls card,HTTP,200,PASS,SET_UP,W14,11
+2026-10-16T07:17:55.154Z,S-0356,14 - H. Card controls across every channel and direction,14.3,14.3 - H05 The card starts on product defaults,HTTP,200,PASS,CHECK,W14; W25,5
+2026-10-16T07:17:55.175Z,S-0357,14 - H. Card controls across every channel and direction,14.4.1,14.4.1 - H08 More than eight dimensions is rejected,HTTP,400,PASS,CHECK,W14,5
+2026-10-16T07:17:55.186Z,S-0358,14 - H. Card controls across every channel and direction,14.4.2,14.4.2 - H08 A dimension without enabled is rejected,HTTP,400,PASS,CHECK,W14,6
+2026-10-16T07:17:55.199Z,S-0359,14 - H. Card controls across every channel and direction,14.4.3,14.4.3 - H08 An unknown channel is rejected,HTTP,400,PASS,CHECK,W14,4
+2026-10-16T07:17:55.210Z,S-0360,14 - H. Card controls across every channel and direction,14.4.4,14.4.4 - H08 An unknown geography is rejected,HTTP,400,PASS,CHECK,W14,5
+2026-10-16T07:17:55.222Z,S-0361,14 - H. Card controls across every channel and direction,14.4.5,14.4.5 - H08 A negative per-transaction limit is rejected,HTTP,400,PASS,CHECK,W14; W15,5
+2026-10-16T07:17:55.236Z,S-0362,14 - H. Card controls across every channel and direction,14.4.6,14.4.6 - H08 A null controls list is rejected,HTTP,400,PASS,CHECK,W14,6
+2026-10-16T07:17:55.250Z,S-0363,14 - H. Card controls across every channel and direction,14.4.7,14.4.7 - H08 A repeated dimension in one request is rejected,HTTP,422,PASS,CHECK,W14,11
+2026-10-16T07:17:55.269Z,S-0364,14 - H. Card controls across every channel and direction,14.5,14.5 - H08 No invalid payload changed the profile,HTTP,200,PASS,CHECK,W14,7
+2026-10-16T07:17:55.287Z,S-0365,14 - H. Card controls across every channel and direction,14.5b,14.5b - H01 Enable the international master switch,HTTP,200,PASS,CHECK,W14,14
+2026-10-16T07:17:55.312Z,S-0366,14 - H. Card controls across every channel and direction,14.6,14.6 - H03 Enable one dimension only,HTTP,200,PASS,CHECK,W14; W25,15
+2026-10-16T07:17:55.343Z,S-0367,14 - H. Card controls across every channel and direction,14.7.1,14.7.1 - H01 Enable dimension batch 1,HTTP,200,PASS,CHECK,W14,16
+2026-10-16T07:17:55.370Z,S-0368,14 - H. Card controls across every channel and direction,14.7.2,14.7.2 - H01 Enable dimension batch 2,HTTP,200,PASS,CHECK,W14,14
+2026-10-16T07:17:55.394Z,S-0369,14 - H. Card controls across every channel and direction,14.8,14.8 - H01 The international scope survived the dimension sweep,HTTP,200,PASS,CHECK,W14,5
+2026-10-16T07:17:55.406Z,S-0370,14 - H. Card controls across every channel and direction,14.9,14.9 - H09 Every dimension reads back enabled,HTTP,200,PASS,CHECK,W14; W25,4
+2026-10-16T07:17:55.419Z,S-0371,14 - H. Card controls across every channel and direction,14.11.1,14.11.1 - H02 Disable dimension batch 1,HTTP,200,PASS,CHECK,W14,16
+2026-10-16T07:17:55.445Z,S-0372,14 - H. Card controls across every channel and direction,14.11.2,14.11.2 - H02 Disable dimension batch 2,HTTP,200,PASS,CHECK,W14,15
+2026-10-16T07:17:55.470Z,S-0373,14 - H. Card controls across every channel and direction,14.12,14.12 - H09 Every dimension reads back disabled,HTTP,200,PASS,CHECK,W14,5
+2026-10-16T07:17:55.483Z,S-0374,14 - H. Card controls across every channel and direction,14.13,14.13 - H02 A repeated no-op update is accepted,HTTP,200,PASS,CHECK,W14,13
+2026-10-16T07:17:55.508Z,S-0375,15 - I. Per-transaction limit boundaries,15.0,15.0 - Load shared configuration for per-transaction limits,SCRIPT,200,PASS,HARNESS,,7
+2026-10-16T07:17:55.516Z,S-0376,15 - I. Per-transaction limit boundaries,15.0b,15.0b - Get Keycloak access token,HTTP,200,PASS,HARNESS,,8
+2026-10-16T07:17:55.525Z,S-0377,15 - I. Per-transaction limit boundaries,15.1,15.1 - Prepare issuance: I limits card,SCRIPT,200,PASS,HARNESS,,5
+2026-10-16T07:17:55.530Z,S-0378,15 - I. Per-transaction limit boundaries,15.1.1,15.1.1 - Submit issuance: I limits card,HTTP,202,PASS,SET_UP,W15,19
+2026-10-16T07:17:57.587Z,S-0379,15 - I. Per-transaction limit boundaries,15.1.2a,15.1.2a - Read issuance operation: I limits card,HTTP,200,PASS,POLL,W15,5
+2026-10-16T07:17:59.629Z,S-0380,15 - I. Per-transaction limit boundaries,15.1.2a,15.1.2a - Read issuance operation: I limits card,HTTP,200,PASS,SET_UP,W15,7
+2026-10-16T07:17:59.638Z,S-0381,15 - I. Per-transaction limit boundaries,15.1.3,15.1.3 - Require issued card: I limits card,SCRIPT,200,PASS,SET_UP,W15,13
+2026-10-16T07:17:59.652Z,S-0382,15 - I. Per-transaction limit boundaries,15.2,15.2 - Activate I limits card,HTTP,200,PASS,SET_UP,W15,17
+2026-10-16T07:17:59.677Z,S-0383,15 - I. Per-transaction limit boundaries,15.2b,15.2b - Derive the limit boundary values,SCRIPT,200,PASS,HARNESS,,8
+2026-10-16T07:17:59.686Z,S-0384,15 - I. Per-transaction limit boundaries,15.3,15.3 - I01 The issued card carries the product limits,HTTP,200,PASS,CHECK,W15; W25,5
+2026-10-16T07:17:59.717Z,S-0385,15 - I. Per-transaction limit boundaries,15.5.1,15.5.1 - Report the skipped limit boundaries,SCRIPT,SKIPPED,NOT_EXECUTED,CHECK,W15,7
+2026-10-16T07:17:59.726Z,S-0386,"16 - J. Replacement lineage, eligibility and the implementation boundary",16.0,16.0 - Load shared configuration for replacement,SCRIPT,200,PASS,HARNESS,,14
+2026-10-16T07:17:59.741Z,S-0387,"16 - J. Replacement lineage, eligibility and the implementation boundary",16.0b,16.0b - Get Keycloak access token,HTTP,200,PASS,HARNESS,,7
+2026-10-16T07:17:59.749Z,S-0388,"16 - J. Replacement lineage, eligibility and the implementation boundary",16.1,16.1 - Prepare issuance: J01 replacement source,SCRIPT,200,PASS,HARNESS,,7
+2026-10-16T07:17:59.757Z,S-0389,"16 - J. Replacement lineage, eligibility and the implementation boundary",16.1.1,16.1.1 - Submit issuance: J01 replacement source,HTTP,202,PASS,SET_UP,W19,24
+2026-10-16T07:18:01.803Z,S-0390,"16 - J. Replacement lineage, eligibility and the implementation boundary",16.1.2a,16.1.2a - Read issuance operation: J01 replacement source,HTTP,200,PASS,POLL,W19,5
+2026-10-16T07:18:03.816Z,S-0391,"16 - J. Replacement lineage, eligibility and the implementation boundary",16.1.2a,16.1.2a - Read issuance operation: J01 replacement source,HTTP,200,PASS,SET_UP,W19,4
+2026-10-16T07:18:03.821Z,S-0392,"16 - J. Replacement lineage, eligibility and the implementation boundary",16.1.3,16.1.3 - Require issued card: J01 replacement source,SCRIPT,200,PASS,SET_UP,W19,4
+2026-10-16T07:18:03.826Z,S-0393,"16 - J. Replacement lineage, eligibility and the implementation boundary",16.2,16.2 - Activate J01 source,HTTP,200,PASS,SET_UP,W19,23
+2026-10-16T07:18:03.856Z,S-0394,"16 - J. Replacement lineage, eligibility and the implementation boundary",16.3,16.3 - J01 Record the source identity,HTTP,200,PASS,CHECK,W19,4
+2026-10-16T07:18:03.868Z,S-0395,"16 - J. Replacement lineage, eligibility and the implementation boundary",16.4,16.4 - J06 Enable a non-default control on the source,HTTP,200,PASS,CHECK,W19,12
+2026-10-16T07:18:03.887Z,S-0396,"16 - J. Replacement lineage, eligibility and the implementation boundary",16.5,16.5 - Prepare replacement: J01 same-PAN replacement,SCRIPT,200,PASS,HARNESS,,4
+2026-10-16T07:18:03.892Z,S-0397,"16 - J. Replacement lineage, eligibility and the implementation boundary",16.5.1,16.5.1 - Submit replacement: J01 same-PAN replacement,HTTP,202,PASS,CHECK,W19; W25,31
+2026-10-16T07:18:05.942Z,S-0398,"16 - J. Replacement lineage, eligibility and the implementation boundary",16.5.2a,16.5.2a - Read replacement request: J01 same-PAN replacement,HTTP,200,PASS,POLL,W19,5
+2026-10-16T07:18:07.964Z,S-0399,"16 - J. Replacement lineage, eligibility and the implementation boundary",16.5.2a,16.5.2a - Read replacement request: J01 same-PAN replacement,HTTP,200,PASS,CHECK,W19,12
+2026-10-16T07:18:07.978Z,S-0400,"16 - J. Replacement lineage, eligibility and the implementation boundary",16.5.3,16.5.3 - Require completed replacement: J01 same-PAN replacement,SCRIPT,200,PASS,CHECK,W19; W25,16
+2026-10-16T07:18:07.994Z,S-0401,"16 - J. Replacement lineage, eligibility and the implementation boundary",16.6,16.6 - J05 The successor preserves the PAN and the account linkage,HTTP,200,PASS,CHECK,W19; W25,5
+2026-10-16T07:18:08.005Z,S-0402,"16 - J. Replacement lineage, eligibility and the implementation boundary",16.7,"16.7 - J06 The successor control profile is rebuilt, not inherited",HTTP,200,PASS,CHECK,W19,4
+2026-10-16T07:18:08.020Z,S-0403,"16 - J. Replacement lineage, eligibility and the implementation boundary",16.8,16.8 - J04 The source card state after a same-PAN replacement,HTTP,200,PASS,CHECK,W19,5
+2026-10-16T07:18:08.032Z,S-0404,"16 - J. Replacement lineage, eligibility and the implementation boundary",16.8b,16.8b - J04 The renewal switched off the source card-not-present channels,HTTP,200,PASS,CHECK,W19,4
+2026-10-16T07:18:08.051Z,S-0405,"16 - J. Replacement lineage, eligibility and the implementation boundary",16.9,16.9 - J07 A source with an existing replacement request is refused,HTTP,422,PASS,CHECK,W19,12
+2026-10-16T07:18:08.071Z,S-0406,"16 - J. Replacement lineage, eligibility and the implementation boundary",16.10,16.10 - Prepare issuance: J09 eligibility source,SCRIPT,200,PASS,HARNESS,,4
+2026-10-16T07:18:08.076Z,S-0407,"16 - J. Replacement lineage, eligibility and the implementation boundary",16.10.1,16.10.1 - Submit issuance: J09 eligibility source,HTTP,202,PASS,SET_UP,W19,18
+2026-10-16T07:18:10.112Z,S-0408,"16 - J. Replacement lineage, eligibility and the implementation boundary",16.10.2a,16.10.2a - Read issuance operation: J09 eligibility source,HTTP,200,PASS,SET_UP,W19,4
+2026-10-16T07:18:10.125Z,S-0409,"16 - J. Replacement lineage, eligibility and the implementation boundary",16.10.3,16.10.3 - Require issued card: J09 eligibility source,SCRIPT,200,PASS,SET_UP,W19,4
+2026-10-16T07:18:10.129Z,S-0410,"16 - J. Replacement lineage, eligibility and the implementation boundary",16.11,16.11 - Activate J09 source,HTTP,200,PASS,SET_UP,W19,16
+2026-10-16T07:18:10.152Z,S-0411,"16 - J. Replacement lineage, eligibility and the implementation boundary",16.12,16.12 - J09 A disallowed replacement reason is refused,HTTP,422,PASS,CHECK,W19,8
+2026-10-16T07:18:10.169Z,S-0412,"16 - J. Replacement lineage, eligibility and the implementation boundary",16.13,16.13 - J09 A replacement reason with no policy is refused,HTTP,422,PASS,CHECK,W19,6
+2026-10-16T07:18:10.181Z,S-0413,"16 - J. Replacement lineage, eligibility and the implementation boundary",16.14,16.14 - J02 A damaged replacement of a virtual-only card is refused,HTTP,422,PASS,CHECK,W19,6
+2026-10-16T07:18:10.193Z,S-0414,"16 - J. Replacement lineage, eligibility and the implementation boundary",16.15,16.15 - J09 The refused replacements left the card alone,HTTP,200,PASS,CHECK,W19,4
+2026-10-16T07:18:10.204Z,S-0415,"16 - J. Replacement lineage, eligibility and the implementation boundary",16.16,16.16 - J07 No successor was created for the refused reasons,HTTP,200,PASS,CHECK,W19,5
+2026-10-16T07:18:10.215Z,S-0416,"16 - J. Replacement lineage, eligibility and the implementation boundary",16.17,16.17 - J03 Report the eligibility card LOST,HTTP,200,PASS,CHECK,W18,16
+2026-10-16T07:18:10.237Z,S-0417,"16 - J. Replacement lineage, eligibility and the implementation boundary",16.18,16.18 - J03 A permanently restricted PAN family cannot be renewed onto the same PAN,HTTP,422,PASS,CHECK,W18,7
+2026-10-16T07:18:10.249Z,S-0418,"16 - J. Replacement lineage, eligibility and the implementation boundary",16.19,16.19 - J03 The lost card was not replaced,HTTP,200,PASS,CHECK,W18,5
+2026-10-16T07:18:10.260Z,S-0419,"16 - J. Replacement lineage, eligibility and the implementation boundary",16.20,16.20 - A malformed PIN block is a validation error,HTTP,400,PASS,CHECK,W16,8
+2026-10-16T07:18:10.274Z,S-0420,"16 - J. Replacement lineage, eligibility and the implementation boundary",16.21,16.21 - PIN reset must not include the current PIN,HTTP,400,PASS,CHECK,W16,6
+2026-10-16T07:18:10.288Z,S-0421,17 - K. Renewal depth: repeated generations and restrictions,17.0,17.0 - Load shared configuration for renewal depth,SCRIPT,200,PASS,HARNESS,,9
+2026-10-16T07:18:10.297Z,S-0422,17 - K. Renewal depth: repeated generations and restrictions,17.0b,17.0b - Get Keycloak access token,HTTP,200,PASS,HARNESS,,7
+2026-10-16T07:18:10.305Z,S-0423,17 - K. Renewal depth: repeated generations and restrictions,17.1,17.1 - Prepare issuance: K09 generation one,SCRIPT,200,PASS,HARNESS,,4
+2026-10-16T07:18:10.309Z,S-0424,17 - K. Renewal depth: repeated generations and restrictions,17.1.1,17.1.1 - Submit issuance: K09 generation one,HTTP,202,PASS,SET_UP,W19,17
+2026-10-16T07:18:12.344Z,S-0425,17 - K. Renewal depth: repeated generations and restrictions,17.1.2a,17.1.2a - Read issuance operation: K09 generation one,HTTP,200,PASS,POLL,W19,10
+2026-10-16T07:18:14.375Z,S-0426,17 - K. Renewal depth: repeated generations and restrictions,17.1.2a,17.1.2a - Read issuance operation: K09 generation one,HTTP,200,PASS,SET_UP,W19,5
+2026-10-16T07:18:14.380Z,S-0427,17 - K. Renewal depth: repeated generations and restrictions,17.1.3,17.1.3 - Require issued card: K09 generation one,SCRIPT,200,PASS,SET_UP,W19,5
+2026-10-16T07:18:14.385Z,S-0428,17 - K. Renewal depth: repeated generations and restrictions,17.2,17.2 - Activate K09 generation one,HTTP,200,PASS,SET_UP,W19,21
+2026-10-16T07:18:14.414Z,S-0429,17 - K. Renewal depth: repeated generations and restrictions,17.3,17.3 - K09 Record generation one,HTTP,200,PASS,CHECK,W19,5
+2026-10-16T07:18:14.425Z,S-0430,17 - K. Renewal depth: repeated generations and restrictions,17.4,17.4 - Prepare replacement: K09 first renewal,SCRIPT,200,PASS,HARNESS,,3
+2026-10-16T07:18:14.428Z,S-0431,17 - K. Renewal depth: repeated generations and restrictions,17.4.1,17.4.1 - Submit replacement: K09 first renewal,HTTP,202,PASS,CHECK,W19,28
+2026-10-16T07:18:16.476Z,S-0432,17 - K. Renewal depth: repeated generations and restrictions,17.4.2a,17.4.2a - Read replacement request: K09 first renewal,HTTP,200,PASS,POLL,W19,6
+2026-10-16T07:18:18.493Z,S-0433,17 - K. Renewal depth: repeated generations and restrictions,17.4.2a,17.4.2a - Read replacement request: K09 first renewal,HTTP,200,PASS,CHECK,W19,5
+2026-10-16T07:18:18.499Z,S-0434,17 - K. Renewal depth: repeated generations and restrictions,17.4.3,17.4.3 - Require completed replacement: K09 first renewal,SCRIPT,200,PASS,CHECK,W19,5
+2026-10-16T07:18:18.504Z,S-0435,17 - K. Renewal depth: repeated generations and restrictions,17.5,17.5 - K01 Generation two keeps the PAN and moves the expiry out,HTTP,200,PASS,CHECK,W19,4
+2026-10-16T07:18:18.518Z,S-0436,17 - K. Renewal depth: repeated generations and restrictions,17.6,17.6 - K04 Generation one is still usable under BLOCK_ON_EXPIRY,HTTP,200,PASS,CHECK,W19,3
+2026-10-16T07:18:18.527Z,S-0437,17 - K. Renewal depth: repeated generations and restrictions,17.7,17.7 - Activate K09 generation two,HTTP,200,PASS,CHECK,W19,16
+2026-10-16T07:18:18.549Z,S-0438,17 - K. Renewal depth: repeated generations and restrictions,17.8,17.8 - Prepare replacement: K09 second renewal,SCRIPT,200,PASS,HARNESS,,3
+2026-10-16T07:18:18.552Z,S-0439,17 - K. Renewal depth: repeated generations and restrictions,17.8.1,17.8.1 - Submit replacement: K09 second renewal,HTTP,202,PASS,CHECK,W19,25
+2026-10-16T07:18:20.599Z,S-0440,17 - K. Renewal depth: repeated generations and restrictions,17.8.2a,17.8.2a - Read replacement request: K09 second renewal,HTTP,200,PASS,POLL,W19,6
+2026-10-16T07:18:22.626Z,S-0441,17 - K. Renewal depth: repeated generations and restrictions,17.8.2a,17.8.2a - Read replacement request: K09 second renewal,HTTP,200,PASS,CHECK,W19,6
+2026-10-16T07:18:22.633Z,S-0442,17 - K. Renewal depth: repeated generations and restrictions,17.8.3,17.8.3 - Require completed replacement: K09 second renewal,SCRIPT,200,PASS,CHECK,W19,5
+2026-10-16T07:18:22.638Z,S-0443,17 - K. Renewal depth: repeated generations and restrictions,17.9,17.9 - K09 Three generations are distinct records on one PAN,SCRIPT,200,PASS,CHECK,W19,8
+2026-10-16T07:18:22.646Z,S-0444,17 - K. Renewal depth: repeated generations and restrictions,17.10,17.10 - K01 Generation three extends the expiry again,HTTP,200,PASS,CHECK,W19,9
+2026-10-16T07:18:22.674Z,S-0445,17 - K. Renewal depth: repeated generations and restrictions,17.11,17.11 - K05 Freeze generation three,HTTP,200,PASS,CHECK,W19,11
+2026-10-16T07:18:22.692Z,S-0446,17 - K. Renewal depth: repeated generations and restrictions,17.12,17.12 - K05 Generation one is unaffected by the freeze,HTTP,200,PASS,CHECK,W19,4
+2026-10-16T07:18:22.702Z,S-0447,17 - K. Renewal depth: repeated generations and restrictions,17.13,17.13 - K07 Renewal of a frozen card follows a defined rule,HTTP,422,PASS,CHECK,W19,9
+2026-10-16T07:18:22.720Z,S-0448,17 - K. Renewal depth: repeated generations and restrictions,17.14,17.14 - K07 The frozen source kept its restriction,HTTP,200,PASS,CHECK,W19,5
+2026-10-16T07:18:22.734Z,S-0449,18 - M. Closure from every state and operations afterwards,18.0,18.0 - Load shared configuration for closure,SCRIPT,200,PASS,HARNESS,,16
+2026-10-16T07:18:22.751Z,S-0450,18 - M. Closure from every state and operations afterwards,18.0b,18.0b - Get Keycloak access token,HTTP,200,PASS,HARNESS,,9
+2026-10-16T07:18:22.761Z,S-0451,18 - M. Closure from every state and operations afterwards,18.1,18.1 - Prepare issuance: M01 pending card,SCRIPT,200,PASS,HARNESS,,6
+2026-10-16T07:18:22.768Z,S-0452,18 - M. Closure from every state and operations afterwards,18.1.1,18.1.1 - Submit issuance: M01 pending card,HTTP,202,PASS,CHECK,Supplementary: Card closure from every state,23
+2026-10-16T07:18:24.811Z,S-0453,18 - M. Closure from every state and operations afterwards,18.1.2a,18.1.2a - Read issuance operation: M01 pending card,HTTP,200,PASS,CHECK,Supplementary: Card closure from every state,3
+2026-10-16T07:18:24.824Z,S-0454,18 - M. Closure from every state and operations afterwards,18.1.3,18.1.3 - Require issued card: M01 pending card,SCRIPT,200,PASS,CHECK,Supplementary: Card closure from every state,7
+2026-10-16T07:18:24.831Z,S-0455,18 - M. Closure from every state and operations afterwards,18.1b,18.1b - M02 An unrecognised closure reason is refused,HTTP,422,PASS,CHECK,Supplementary: Card closure from every state,17
+2026-10-16T07:18:24.855Z,S-0456,18 - M. Closure from every state and operations afterwards,18.1c,18.1c - M02 The refused closure left the card pending,HTTP,200,PASS,CHECK,Supplementary: Card closure from every state,5
+2026-10-16T07:18:24.866Z,S-0457,18 - M. Closure from every state and operations afterwards,18.2,18.2 - M01 Close a PENDING card,HTTP,200,PASS,CHECK,Supplementary: Card closure from every state,20
+2026-10-16T07:18:24.892Z,S-0458,18 - M. Closure from every state and operations afterwards,18.3,18.3 - M03 Replaying the closure returns the first outcome,HTTP,200,PASS,CHECK,Supplementary: Card closure from every state,3
+2026-10-16T07:18:24.902Z,S-0459,18 - M. Closure from every state and operations afterwards,18.4,18.4 - M03 Closing again under a new key is refused,HTTP,422,PASS,CHECK,Supplementary: Card closure from every state,5
+2026-10-16T07:18:24.913Z,S-0460,18 - M. Closure from every state and operations afterwards,18.5,18.5 - M05 Closure metadata is persisted,HTTP,200,PASS,CHECK,Supplementary: Card closure from every state,4
+2026-10-16T07:18:24.924Z,S-0461,18 - M. Closure from every state and operations afterwards,18.6.1,18.6.1 - M07 A closed card cannot be activated,HTTP,422,PASS,CHECK,Supplementary: Card closure from every state,6
+2026-10-16T07:18:24.936Z,S-0462,18 - M. Closure from every state and operations afterwards,18.6.2,18.6.2 - M07 A closed card cannot take a new hold,HTTP,422,PASS,CHECK,Supplementary: Card closure from every state,6
+2026-10-16T07:18:24.948Z,S-0463,18 - M. Closure from every state and operations afterwards,18.6.3,18.6.3 - M07 A closed card with no hold set cannot release one,HTTP,422,PASS,CHECK,Supplementary: Card closure from every state,4
+2026-10-16T07:18:24.958Z,S-0464,18 - M. Closure from every state and operations afterwards,18.6.4,18.6.4 - M07 A closed card cannot change controls,HTTP,422,PASS,CHECK,W14,6
+2026-10-16T07:18:24.970Z,S-0465,18 - M. Closure from every state and operations afterwards,18.6.5,18.6.5 - M07 A closed card cannot be renewed,HTTP,422,PASS,CHECK,Supplementary: Card closure from every state,8
+2026-10-16T07:18:24.984Z,S-0466,18 - M. Closure from every state and operations afterwards,18.7,18.7 - M07 No refused operation disturbed the closed card,HTTP,200,PASS,CHECK,Supplementary: Card closure from every state,4
+2026-10-16T07:18:24.994Z,S-0467,18 - M. Closure from every state and operations afterwards,18.8,18.8 - Prepare issuance: M01 frozen card,SCRIPT,200,PASS,HARNESS,,3
+2026-10-16T07:18:24.997Z,S-0468,18 - M. Closure from every state and operations afterwards,18.8.1,18.8.1 - Submit issuance: M01 frozen card,HTTP,202,PASS,CHECK,Supplementary: Card closure from every state,22
+2026-10-16T07:18:27.044Z,S-0469,18 - M. Closure from every state and operations afterwards,18.8.2a,18.8.2a - Read issuance operation: M01 frozen card,HTTP,200,PASS,POLL,Supplementary: Card closure from every state,7
+2026-10-16T07:18:29.064Z,S-0470,18 - M. Closure from every state and operations afterwards,18.8.2a,18.8.2a - Read issuance operation: M01 frozen card,HTTP,200,PASS,CHECK,Supplementary: Card closure from every state,4
+2026-10-16T07:18:29.068Z,S-0471,18 - M. Closure from every state and operations afterwards,18.8.3,18.8.3 - Require issued card: M01 frozen card,SCRIPT,200,PASS,CHECK,Supplementary: Card closure from every state,8
+2026-10-16T07:18:29.076Z,S-0472,18 - M. Closure from every state and operations afterwards,18.9,18.9 - Prepare issuance: M09 sibling card,SCRIPT,200,PASS,HARNESS,,7
+2026-10-16T07:18:29.083Z,S-0473,18 - M. Closure from every state and operations afterwards,18.9.1,18.9.1 - Submit issuance: M09 sibling card,HTTP,202,PASS,CHECK,Supplementary: Card closure from every state,31
+2026-10-16T07:18:31.126Z,S-0474,18 - M. Closure from every state and operations afterwards,18.9.2a,18.9.2a - Read issuance operation: M09 sibling card,HTTP,200,PASS,POLL,Supplementary: Card closure from every state,3
+2026-10-16T07:18:33.151Z,S-0475,18 - M. Closure from every state and operations afterwards,18.9.2a,18.9.2a - Read issuance operation: M09 sibling card,HTTP,200,PASS,POLL,Supplementary: Card closure from every state,9
+2026-10-16T07:18:35.162Z,S-0476,18 - M. Closure from every state and operations afterwards,18.9.2a,18.9.2a - Read issuance operation: M09 sibling card,HTTP,200,PASS,CHECK,Supplementary: Card closure from every state,4
+2026-10-16T07:18:35.166Z,S-0477,18 - M. Closure from every state and operations afterwards,18.9.3,18.9.3 - Require issued card: M09 sibling card,SCRIPT,200,PASS,CHECK,Supplementary: Card closure from every state,5
+2026-10-16T07:18:35.171Z,S-0478,18 - M. Closure from every state and operations afterwards,18.10,18.10 - Activate M01 frozen card,HTTP,200,PASS,CHECK,Supplementary: Card closure from every state,18
+2026-10-16T07:18:35.197Z,S-0479,18 - M. Closure from every state and operations afterwards,18.11,18.11 - Activate M09 sibling card,HTTP,200,PASS,CHECK,Supplementary: Card closure from every state,16
+2026-10-16T07:18:35.219Z,S-0480,18 - M. Closure from every state and operations afterwards,18.12,18.12 - M01 Freeze before closing,HTTP,200,PASS,CHECK,Supplementary: Card closure from every state,13
+2026-10-16T07:18:35.238Z,S-0481,18 - M. Closure from every state and operations afterwards,18.13,18.13 - M01 Close a FROZEN card,HTTP,200,PASS,CHECK,Supplementary: Card closure from every state,13
+2026-10-16T07:18:35.257Z,S-0482,18 - M. Closure from every state and operations afterwards,18.14,18.14 - M09 Closing one card left its sibling active,HTTP,200,PASS,CHECK,Supplementary: Card closure from every state,4
+2026-10-16T07:18:35.268Z,S-0483,18 - M. Closure from every state and operations afterwards,18.15,18.15 - M09 The account still lists both cards with the right states,HTTP,200,PASS,CHECK,Supplementary: Card closure from every state,7
+2026-10-16T07:18:35.290Z,S-0484,19 - Q. CMS to Switch synchronization depth,19.0,19.0 - Load shared configuration for Switch synchronization,SCRIPT,200,PASS,HARNESS,,7
+2026-10-16T07:18:35.297Z,S-0485,19 - Q. CMS to Switch synchronization depth,19.0b,19.0b - Get Keycloak access token,HTTP,200,PASS,HARNESS,,8
+2026-10-16T07:18:35.306Z,S-0486,19 - Q. CMS to Switch synchronization depth,19.1,19.1 - Prepare issuance: Q switch card,SCRIPT,200,PASS,HARNESS,,3
+2026-10-16T07:18:35.310Z,S-0487,19 - Q. CMS to Switch synchronization depth,19.1.1,19.1.1 - Submit issuance: Q switch card,HTTP,202,PASS,SET_UP,W19,16
+2026-10-16T07:18:37.336Z,S-0488,19 - Q. CMS to Switch synchronization depth,19.1.2a,19.1.2a - Read issuance operation: Q switch card,HTTP,200,PASS,POLL,W19,6
+2026-10-16T07:18:39.358Z,S-0489,19 - Q. CMS to Switch synchronization depth,19.1.2a,19.1.2a - Read issuance operation: Q switch card,HTTP,200,PASS,SET_UP,W19,3
+2026-10-16T07:18:39.362Z,S-0490,19 - Q. CMS to Switch synchronization depth,19.1.3,19.1.3 - Require issued card: Q switch card,SCRIPT,200,PASS,SET_UP,W19,5
+2026-10-16T07:18:39.367Z,S-0491,19 - Q. CMS to Switch synchronization depth,19.2,19.2 - Q09 The sync view is readable before registration completes,HTTP,200,PASS,CHECK,Supplementary: CMS to Switch synchronisation view,6
+2026-10-16T07:18:39.380Z,S-0492,19 - Q. CMS to Switch synchronization depth,19.4,19.4 - Activate Q switch card,HTTP,200,PASS,SET_UP,W19,13
+2026-10-16T07:18:39.399Z,S-0493,19 - Q. CMS to Switch synchronization depth,19.6,19.6 - Q01 Freeze the card,HTTP,200,PASS,CHECK,Supplementary: CMS to Switch synchronisation view,10
+2026-10-16T07:18:39.415Z,S-0494,19 - Q. CMS to Switch synchronization depth,19.8,19.8 - Q01 Release the freeze,HTTP,200,PASS,CHECK,Supplementary: CMS to Switch synchronisation view,10
+2026-10-16T07:18:39.431Z,S-0495,19 - Q. CMS to Switch synchronization depth,19.10,19.10 - Q02 Compare the CMS card with the Switch profile,SCRIPT,200,NOT_EXECUTED,CHECK,Supplementary: CMS to Switch synchronisation view,20
+2026-10-16T07:18:39.451Z,S-0496,19 - Q. CMS to Switch synchronization depth,19.11,19.11 - Prepare replacement: Q08 same-PAN renewal,SCRIPT,200,PASS,HARNESS,,3
+2026-10-16T07:18:39.455Z,S-0497,19 - Q. CMS to Switch synchronization depth,19.11.1,19.11.1 - Submit replacement: Q08 same-PAN renewal,HTTP,202,PASS,CHECK,W19,39
+2026-10-16T07:18:41.502Z,S-0498,19 - Q. CMS to Switch synchronization depth,19.11.2a,19.11.2a - Read replacement request: Q08 same-PAN renewal,HTTP,200,PASS,POLL,W19,4
+2026-10-16T07:18:43.517Z,S-0499,19 - Q. CMS to Switch synchronization depth,19.11.2a,19.11.2a - Read replacement request: Q08 same-PAN renewal,HTTP,200,PASS,CHECK,W19,7
+2026-10-16T07:18:43.525Z,S-0500,19 - Q. CMS to Switch synchronization depth,19.11.3,19.11.3 - Require completed replacement: Q08 same-PAN renewal,SCRIPT,200,PASS,CHECK,W19,7
+2026-10-16T07:18:43.533Z,S-0501,19 - Q. CMS to Switch synchronization depth,19.13,19.13 - Q08 The Switch keeps the two same-PAN generations apart,SCRIPT,200,NOT_EXECUTED,CHECK,W19,10
+2026-10-16T07:18:43.546Z,S-0502,20 - R. Idempotency across every mutation,20.0,20.0 - Load shared configuration for idempotency,SCRIPT,200,PASS,HARNESS,,6
+2026-10-16T07:18:43.553Z,S-0503,20 - R. Idempotency across every mutation,20.0b,20.0b - Get Keycloak access token,HTTP,200,PASS,HARNESS,,6
+2026-10-16T07:18:43.560Z,S-0504,20 - R. Idempotency across every mutation,20.1,20.1 - Prepare issuance: R idempotency card,SCRIPT,200,PASS,HARNESS,,5
+2026-10-16T07:18:43.566Z,S-0505,20 - R. Idempotency across every mutation,20.1.1,20.1.1 - Submit issuance: R idempotency card,HTTP,202,PASS,CHECK,Supplementary: Idempotency on holds and configuration writes,16
+2026-10-16T07:18:45.607Z,S-0506,20 - R. Idempotency across every mutation,20.1.2a,20.1.2a - Read issuance operation: R idempotency card,HTTP,200,PASS,CHECK,Supplementary: Idempotency on holds and configuration writes,4
+2026-10-16T07:18:45.617Z,S-0507,20 - R. Idempotency across every mutation,20.1.3,20.1.3 - Require issued card: R idempotency card,SCRIPT,200,PASS,CHECK,Supplementary: Idempotency on holds and configuration writes,4
+2026-10-16T07:18:45.622Z,S-0508,20 - R. Idempotency across every mutation,20.2,20.2 - Activate R idempotency card,HTTP,200,PASS,CHECK,Supplementary: Idempotency on holds and configuration writes,16
+2026-10-16T07:18:45.644Z,S-0509,20 - R. Idempotency across every mutation,20.3.1a,20.3.1a - R01 First control update,HTTP,200,PASS,CHECK,W14,10
+2026-10-16T07:18:45.661Z,S-0510,20 - R. Idempotency across every mutation,20.3.1b,20.3.1b - R01 Replay the control update,HTTP,200,PASS,CHECK,W14,3
+2026-10-16T07:18:45.670Z,S-0511,20 - R. Idempotency across every mutation,20.3.1c,20.3.1c - R01 Conflicting control payload under the same key,HTTP,409,PASS,CHECK,W14,3
+2026-10-16T07:18:45.695Z,S-0512,20 - R. Idempotency across every mutation,20.3.1d,20.3.1d - R04 A control update without an Idempotency-Key is rejected,HTTP,400,PASS,CHECK,W14,2
+2026-10-16T07:18:45.704Z,S-0513,20 - R. Idempotency across every mutation,20.3.1e,20.3.1e - R04 A malformed Idempotency-Key is rejected,HTTP,400,PASS,CHECK,W14,3
+2026-10-16T07:18:45.712Z,S-0514,20 - R. Idempotency across every mutation,20.4a,20.4a - R01 First hold placement,HTTP,200,PASS,CHECK,Supplementary: Idempotency on holds and configuration writes,10
+2026-10-16T07:18:45.731Z,S-0515,20 - R. Idempotency across every mutation,20.4b,20.4b - R01 Replay the hold placement,HTTP,200,PASS,CHECK,Supplementary: Idempotency on holds and configuration writes,2
+2026-10-16T07:18:45.740Z,S-0516,20 - R. Idempotency across every mutation,20.5,20.5 - R01 Exactly one freeze is effective,HTTP,200,PASS,CHECK,Supplementary: Idempotency on holds and configuration writes,4
+2026-10-16T07:18:45.751Z,S-0517,21 - R03 Concurrent issuance under one idempotency key,21.0,21.0 - Load shared configuration for concurrent issuance,SCRIPT,200,PASS,HARNESS,,15
+2026-10-16T07:18:45.767Z,S-0518,21 - R03 Concurrent issuance under one idempotency key,21.0b,21.0b - Get Keycloak access token,HTTP,200,PASS,HARNESS,,7
+2026-10-16T07:18:46.256Z,S-0519,21 - R03 Concurrent issuance under one idempotency key,21.0,21.0 - Load shared configuration for concurrent issuance,SCRIPT,200,PASS,HARNESS,,3
+2026-10-16T07:18:46.261Z,S-0520,21 - R03 Concurrent issuance under one idempotency key,21.0b,21.0b - Get Keycloak access token,HTTP,200,PASS,HARNESS,,19
+2026-10-16T07:18:46.281Z,S-0521,21 - R03 Concurrent issuance under one idempotency key,21.1,21.1 - R03 Prepare one shared request for both threads,SCRIPT,200,PASS,HARNESS,,9
+2026-10-16T07:18:46.282Z,S-0522,21 - R03 Concurrent issuance under one idempotency key,21.1,21.1 - R03 Prepare one shared request for both threads,SCRIPT,200,PASS,HARNESS,,8
+2026-10-16T07:18:46.291Z,S-0523,21 - R03 Concurrent issuance under one idempotency key,21.3,21.3 - R03 Submit the shared issuance request,HTTP,202,PASS,POLL,W09,20
+2026-10-16T07:18:46.291Z,S-0524,21 - R03 Concurrent issuance under one idempotency key,21.3,21.3 - R03 Submit the shared issuance request,HTTP,202,PASS,CHECK,W09,21
+2026-10-16T07:18:46.322Z,S-0525,22 - R03 Concurrent issuance outcome,22.0,22.0 - Load shared configuration for concurrent issuance outcome,SCRIPT,200,PASS,HARNESS,,7
+2026-10-16T07:18:46.329Z,S-0526,22 - R03 Concurrent issuance outcome,22.0b,22.0b - Get Keycloak access token,HTTP,200,PASS,HARNESS,,6
+2026-10-16T07:18:46.336Z,S-0527,22 - R03 Concurrent issuance outcome,22.1,22.1 - R03 Allow the accepted operation to settle,SCRIPT,200,PASS,HARNESS,,10024
+2026-10-16T07:18:56.362Z,S-0528,22 - R03 Concurrent issuance outcome,22.2,22.2 - R03 Exactly one card exists for the shared key,HTTP,200,PASS,CHECK,W09,18
+2026-10-16T07:18:56.407Z,S-0529,"23 - S. Authorization, tenancy and protected fields",23.0,23.0 - Load shared configuration for authorization,SCRIPT,200,PASS,HARNESS,,10
+2026-10-16T07:18:56.418Z,S-0530,"23 - S. Authorization, tenancy and protected fields",23.0b,23.0b - Get Keycloak access token,HTTP,200,PASS,HARNESS,,10
+2026-10-16T07:18:56.429Z,S-0531,"23 - S. Authorization, tenancy and protected fields",23.1,23.1 - S01 A read without a token is rejected,HTTP,401,PASS,CHECK,Supplementary: Authentication and tenancy boundaries,2
+2026-10-16T07:18:56.438Z,S-0532,"23 - S. Authorization, tenancy and protected fields",23.2,23.2 - S01 A malformed bearer token is rejected,HTTP,401,PASS,CHECK,Supplementary: Authentication and tenancy boundaries,2
+2026-10-16T07:18:56.445Z,S-0533,"23 - S. Authorization, tenancy and protected fields",23.3,23.3 - S01 An unauthenticated mutation is rejected,HTTP,401,PASS,CHECK,Supplementary: Authentication and tenancy boundaries,2
+2026-10-16T07:18:56.453Z,S-0534,"23 - S. Authorization, tenancy and protected fields",23.4,23.4 - S03 Determine the scope of this plan's token,SCRIPT,200,PASS,HARNESS,,16
+2026-10-16T07:18:56.469Z,S-0535,"23 - S. Authorization, tenancy and protected fields",23.5,23.5 - S03 An unknown institution is not found and leaks nothing,HTTP,404,PASS,CHECK,Supplementary: Authentication and tenancy boundaries,4
+2026-10-16T07:18:56.480Z,S-0536,"23 - S. Authorization, tenancy and protected fields",23.6,23.6 - Get Keycloak access token,HTTP,401,PASS,HARNESS,,8
+2026-10-16T07:18:56.499Z,S-0537,"23 - S. Authorization, tenancy and protected fields",23.8.1,23.8.1 - Report that tenant isolation is unproven,SCRIPT,TENANCY_UNPROVEN,NOT_EXECUTED,CHECK,Supplementary: Authentication and tenancy boundaries,5
+2026-10-16T07:18:56.504Z,S-0538,"23 - S. Authorization, tenancy and protected fields",23.9,23.9 - S05 The X-Institution-Id header is prohibited on V2,HTTP,400,PASS,CHECK,Supplementary: Authentication and tenancy boundaries,2
+2026-10-16T07:18:56.512Z,S-0539,"23 - S. Authorization, tenancy and protected fields",23.10,23.10 - S03 An unknown card in the caller's institution is not found,HTTP,404,PASS,CHECK,Supplementary: Authentication and tenancy boundaries,5
+2026-10-16T07:18:56.525Z,S-0540,"23 - S. Authorization, tenancy and protected fields",23.11,23.11 - S05 There is no ordinary card update endpoint,HTTP,500,PASS,CHECK,Supplementary: Authentication and tenancy boundaries,15
+2026-10-16T07:18:56.550Z,S-0541,"24 - T. Reads, lineage and operational visibility",24.0,24.0 - Load shared configuration for reads and lineage,SCRIPT,200,PASS,HARNESS,,8
+2026-10-16T07:18:56.558Z,S-0542,"24 - T. Reads, lineage and operational visibility",24.0b,24.0b - Get Keycloak access token,HTTP,200,PASS,HARNESS,,7
+2026-10-16T07:18:56.566Z,S-0543,"24 - T. Reads, lineage and operational visibility",24.1,24.1 - Prepare issuance: T lineage card,SCRIPT,200,PASS,HARNESS,,4
+2026-10-16T07:18:56.571Z,S-0544,"24 - T. Reads, lineage and operational visibility",24.1.1,24.1.1 - Submit issuance: T lineage card,HTTP,202,PASS,SET_UP,W19,18
+2026-10-16T07:18:58.610Z,S-0545,"24 - T. Reads, lineage and operational visibility",24.1.2a,24.1.2a - Read issuance operation: T lineage card,HTTP,200,PASS,POLL,W19,9
+2026-10-16T07:19:00.654Z,S-0546,"24 - T. Reads, lineage and operational visibility",24.1.2a,24.1.2a - Read issuance operation: T lineage card,HTTP,200,PASS,SET_UP,W19,4
+2026-10-16T07:19:00.659Z,S-0547,"24 - T. Reads, lineage and operational visibility",24.1.3,24.1.3 - Require issued card: T lineage card,SCRIPT,200,PASS,SET_UP,W19,7
+2026-10-16T07:19:00.666Z,S-0548,"24 - T. Reads, lineage and operational visibility",24.2,24.2 - Activate T lineage card,HTTP,200,PASS,SET_UP,W19,16
+2026-10-16T07:19:00.688Z,S-0549,"24 - T. Reads, lineage and operational visibility",24.3,24.3 - T01 The detail view is the reference state,HTTP,200,PASS,CHECK,W25; Supplementary: Card reads and operation visibility,4
+2026-10-16T07:19:00.698Z,S-0550,"24 - T. Reads, lineage and operational visibility",24.4,24.4 - T01 The account listing agrees with the detail view,HTTP,200,PASS,CHECK,W25; Supplementary: Card reads and operation visibility,6
+2026-10-16T07:19:00.713Z,S-0551,"24 - T. Reads, lineage and operational visibility",24.5,24.5 - T01 The customer listing exposes the card,HTTP,200,PASS,CHECK,W25; Supplementary: Card reads and operation visibility,18
+2026-10-16T07:19:00.740Z,S-0552,"24 - T. Reads, lineage and operational visibility",24.6,24.6 - Prepare replacement: T02 lineage renewal,SCRIPT,200,PASS,HARNESS,,3
+2026-10-16T07:19:00.743Z,S-0553,"24 - T. Reads, lineage and operational visibility",24.6.1,24.6.1 - Submit replacement: T02 lineage renewal,HTTP,202,PASS,CHECK,W19,26
+2026-10-16T07:19:02.780Z,S-0554,"24 - T. Reads, lineage and operational visibility",24.6.2a,24.6.2a - Read replacement request: T02 lineage renewal,HTTP,200,PASS,CHECK,W19,24
+2026-10-16T07:19:02.824Z,S-0555,"24 - T. Reads, lineage and operational visibility",24.6.3,24.6.3 - Require completed replacement: T02 lineage renewal,SCRIPT,200,PASS,CHECK,W19,8
+2026-10-16T07:19:02.832Z,S-0556,"24 - T. Reads, lineage and operational visibility",24.7,24.7 - T02 The replacement record links both generations,HTTP,200,PASS,CHECK,W19; W25,4
+2026-10-16T07:19:02.843Z,S-0557,"24 - T. Reads, lineage and operational visibility",24.8,24.8 - T03 The predecessor stays readable after renewal,HTTP,200,PASS,CHECK,W19,3
+2026-10-16T07:19:02.852Z,S-0558,"24 - T. Reads, lineage and operational visibility",24.9,24.9 - T03 An obsolete replacement identifier is not found,HTTP,404,PASS,CHECK,W19,4
+2026-10-16T07:19:02.861Z,S-0559,"24 - T. Reads, lineage and operational visibility",24.10,24.10 - T06 The issuance operation stays queryable after completion,HTTP,200,PASS,CHECK,W25; Supplementary: Card reads and operation visibility,3
+2026-10-16T07:19:02.872Z,S-0560,25 - V. Combined restrictions and cross-card isolation,25.0,25.0 - Load shared configuration for state matrix,SCRIPT,200,PASS,HARNESS,,9
+2026-10-16T07:19:02.882Z,S-0561,25 - V. Combined restrictions and cross-card isolation,25.0b,25.0b - Get Keycloak access token,HTTP,200,PASS,HARNESS,,9
+2026-10-16T07:19:02.892Z,S-0562,25 - V. Combined restrictions and cross-card isolation,25.1,25.1 - Prepare issuance: V combined-restriction card,SCRIPT,200,PASS,HARNESS,,4
+2026-10-16T07:19:02.896Z,S-0563,25 - V. Combined restrictions and cross-card isolation,25.1.1,25.1.1 - Submit issuance: V combined-restriction card,HTTP,202,PASS,CHECK,Supplementary: Independent holds and cross-card isolation,21
+2026-10-16T07:19:04.939Z,S-0564,25 - V. Combined restrictions and cross-card isolation,25.1.2a,25.1.2a - Read issuance operation: V combined-restriction card,HTTP,200,PASS,POLL,Supplementary: Independent holds and cross-card isolation,5
+2026-10-16T07:19:06.960Z,S-0565,25 - V. Combined restrictions and cross-card isolation,25.1.2a,25.1.2a - Read issuance operation: V combined-restriction card,HTTP,200,PASS,CHECK,Supplementary: Independent holds and cross-card isolation,4
+2026-10-16T07:19:06.965Z,S-0566,25 - V. Combined restrictions and cross-card isolation,25.1.3,25.1.3 - Require issued card: V combined-restriction card,SCRIPT,200,PASS,CHECK,Supplementary: Independent holds and cross-card isolation,4
+2026-10-16T07:19:06.969Z,S-0567,25 - V. Combined restrictions and cross-card isolation,25.2,25.2 - Prepare issuance: V isolation witness card,SCRIPT,200,PASS,HARNESS,,4
+2026-10-16T07:19:06.974Z,S-0568,25 - V. Combined restrictions and cross-card isolation,25.2.1,25.2.1 - Submit issuance: V isolation witness card,HTTP,202,PASS,CHECK,Supplementary: Independent holds and cross-card isolation,14
+2026-10-16T07:19:09.005Z,S-0569,25 - V. Combined restrictions and cross-card isolation,25.2.2a,25.2.2a - Read issuance operation: V isolation witness card,HTTP,200,PASS,POLL,Supplementary: Independent holds and cross-card isolation,5
+2026-10-16T07:19:11.016Z,S-0570,25 - V. Combined restrictions and cross-card isolation,25.2.2a,25.2.2a - Read issuance operation: V isolation witness card,HTTP,200,PASS,CHECK,Supplementary: Independent holds and cross-card isolation,5
+2026-10-16T07:19:11.022Z,S-0571,25 - V. Combined restrictions and cross-card isolation,25.2.3,25.2.3 - Require issued card: V isolation witness card,SCRIPT,200,PASS,CHECK,Supplementary: Independent holds and cross-card isolation,4
+2026-10-16T07:19:11.026Z,S-0572,25 - V. Combined restrictions and cross-card isolation,25.3,25.3 - Activate V combined-restriction card,HTTP,200,PASS,CHECK,Supplementary: Independent holds and cross-card isolation,16
+2026-10-16T07:19:11.049Z,S-0573,25 - V. Combined restrictions and cross-card isolation,25.4,25.4 - Activate V isolation witness card,HTTP,200,PASS,CHECK,Supplementary: Independent holds and cross-card isolation,11
+2026-10-16T07:19:11.065Z,S-0574,25 - V. Combined restrictions and cross-card isolation,25.5,25.5 - V06 Record the witness card state,HTTP,200,PASS,CHECK,Supplementary: Independent holds and cross-card isolation,4
+2026-10-16T07:19:11.077Z,S-0575,25 - V. Combined restrictions and cross-card isolation,25.6,25.6 - V03 Place a customer freeze,HTTP,200,PASS,CHECK,Supplementary: Independent holds and cross-card isolation,12
+2026-10-16T07:19:11.094Z,S-0576,25 - V. Combined restrictions and cross-card isolation,25.7,25.7 - V03 Place an independent operations freeze,HTTP,200,PASS,CHECK,Supplementary: Independent holds and cross-card isolation,10
+2026-10-16T07:19:11.110Z,S-0577,25 - V. Combined restrictions and cross-card isolation,25.8,25.8 - V03 Release only the customer freeze,HTTP,200,PASS,CHECK,Supplementary: Independent holds and cross-card isolation,10
+2026-10-16T07:19:11.125Z,S-0578,25 - V. Combined restrictions and cross-card isolation,25.9,25.9 - V03 The card is still restricted by the remaining hold,HTTP,200,PASS,CHECK,Supplementary: Independent holds and cross-card isolation,5
+2026-10-16T07:19:11.135Z,S-0579,25 - V. Combined restrictions and cross-card isolation,25.10,25.10 - V02 Releasing an absent hold is refused,HTTP,422,PASS,CHECK,Supplementary: Independent holds and cross-card isolation,5
+2026-10-16T07:19:11.146Z,S-0580,25 - V. Combined restrictions and cross-card isolation,25.11,25.11 - V02 The refused release changed nothing,HTTP,200,PASS,CHECK,Supplementary: Independent holds and cross-card isolation,6
+2026-10-16T07:19:11.158Z,S-0581,25 - V. Combined restrictions and cross-card isolation,25.12,25.12 - V03 Release the last hold,HTTP,200,PASS,CHECK,Supplementary: Independent holds and cross-card isolation,9
+2026-10-16T07:19:11.173Z,S-0582,25 - V. Combined restrictions and cross-card isolation,25.13,25.13 - V06 The witness card never moved,HTTP,200,PASS,CHECK,Supplementary: Independent holds and cross-card isolation,4
+2026-10-16T07:19:11.206Z,S-0583,26 - A02/A08 Institution-level restrictions (runs last),26.0,26.0 - Load shared configuration for institution restrictions,SCRIPT,200,PASS,HARNESS,,18
+2026-10-16T07:19:11.225Z,S-0584,26 - A02/A08 Institution-level restrictions (runs last),26.0b,26.0b - Get Keycloak access token,HTTP,200,PASS,HARNESS,,6
+2026-10-16T07:19:11.232Z,S-0585,26 - A02/A08 Institution-level restrictions (runs last),26.1,26.1 - Prepare issuance: A08 live card,SCRIPT,200,PASS,HARNESS,,7
+2026-10-16T07:19:11.239Z,S-0586,26 - A02/A08 Institution-level restrictions (runs last),26.1.1,26.1.1 - Submit issuance: A08 live card,HTTP,202,PASS,SET_UP,W01,16
+2026-10-16T07:19:13.274Z,S-0587,26 - A02/A08 Institution-level restrictions (runs last),26.1.2a,26.1.2a - Read issuance operation: A08 live card,HTTP,200,PASS,POLL,W01,4
+2026-10-16T07:19:15.299Z,S-0588,26 - A02/A08 Institution-level restrictions (runs last),26.1.2a,26.1.2a - Read issuance operation: A08 live card,HTTP,200,PASS,SET_UP,W01,6
+2026-10-16T07:19:15.306Z,S-0589,26 - A02/A08 Institution-level restrictions (runs last),26.1.3,26.1.3 - Require issued card: A08 live card,SCRIPT,200,PASS,SET_UP,W01,8
+2026-10-16T07:19:15.314Z,S-0590,26 - A02/A08 Institution-level restrictions (runs last),26.2,26.2 - Activate A08 live card,HTTP,200,PASS,SET_UP,W01,17
+2026-10-16T07:19:15.337Z,S-0591,26 - A02/A08 Institution-level restrictions (runs last),26.3,26.3 - A08 Record the live card state,HTTP,200,PASS,SET_UP,W01,4
+2026-10-16T07:19:15.346Z,S-0592,26 - A02/A08 Institution-level restrictions (runs last),26.4,26.4 - A02 Disable card issuance at the institution,HTTP,200,PASS,CHECK,W01,6
+2026-10-16T07:19:15.357Z,S-0593,26 - A02/A08 Institution-level restrictions (runs last),26.5,26.5 - Prepare rejected issuance: A02 issuance while the institution has issuing disabled,SCRIPT,200,PASS,HARNESS,,3
+2026-10-16T07:19:15.361Z,S-0594,26 - A02/A08 Institution-level restrictions (runs last),26.5.1,26.5.1 - Submit rejected issuance: A02 issuance while the institution has issuing disabled,HTTP,422,PASS,CHECK,W01,4
+2026-10-16T07:19:15.375Z,S-0595,26 - A02/A08 Institution-level restrictions (runs last),26.5.3,26.5.3 - Require no card was created: A02 issuance while the institution has issuing disabled,SCRIPT,200,PASS,CHECK,W01,5
+2026-10-16T07:19:15.380Z,S-0596,26 - A02/A08 Institution-level restrictions (runs last),26.5b,26.5b - Note the outcome of the disabled-issuance probe,SCRIPT,200,PASS,INFORMATIONAL,,3
+2026-10-16T07:19:15.383Z,S-0597,26 - A02/A08 Institution-level restrictions (runs last),26.6,26.6 - A08 The live card is unaffected by the policy change,HTTP,200,PASS,CHECK,W01,4
+2026-10-16T07:19:15.393Z,S-0598,26 - A02/A08 Institution-level restrictions (runs last),26.7,26.7 - A08 A live card can still be frozen while issuing is off,HTTP,200,PASS,CHECK,W01,10
+2026-10-16T07:19:15.408Z,S-0599,26 - A02/A08 Institution-level restrictions (runs last),26.8,26.8 - A08 Release the freeze,HTTP,200,PASS,CHECK,W01,9
+2026-10-16T07:19:15.422Z,S-0600,26 - A02/A08 Institution-level restrictions (runs last),26.9,26.9 - A02 Restore card issuance at the institution,HTTP,200,PASS,CHECK,W01,6
+2026-10-16T07:19:15.433Z,S-0601,26 - A02/A08 Institution-level restrictions (runs last),26.10,26.10 - A02 The operational policy is back to its starting state,HTTP,200,PASS,CHECK,W01,3
+2026-10-16T07:19:15.444Z,S-0602,27 - Product configuration depth,27.0,27.0 - Load shared configuration for product configuration depth,SCRIPT,200,PASS,HARNESS,,7
+2026-10-16T07:19:15.451Z,S-0603,27 - Product configuration depth,27.0b,27.0b - Get Keycloak access token,HTTP,200,PASS,HARNESS,,8
+2026-10-16T07:19:15.461Z,S-0604,27 - Product configuration depth,27.1,27.1 - Product lookup by UUID,HTTP,200,PASS,CHECK,W05,3
+2026-10-16T07:19:15.469Z,S-0605,27 - Product configuration depth,27.2,27.2 - Product lookup by code,HTTP,200,PASS,CHECK,W05,4
+2026-10-16T07:19:15.478Z,S-0606,27 - Product configuration depth,27.3,27.3 - Product list and filter,HTTP,200,PASS,CHECK,W05,5
+2026-10-16T07:19:15.491Z,S-0607,27 - Product configuration depth,27.4,27.4 - Default controls read API,HTTP,200,PASS,CHECK,W06,3
+2026-10-16T07:19:15.499Z,S-0608,27 - Product configuration depth,27.5,27.5 - Personalisation policy read,HTTP,200,PASS,CHECK,W06,4
+2026-10-16T07:19:15.511Z,S-0609,27 - Product configuration depth,27.6,27.6 - Replacement policies list,HTTP,200,PASS,CHECK,W06; W18,6
+2026-10-16T07:19:15.528Z,S-0610,27 - Product configuration depth,27.7,27.7 - Replacement policy by id,HTTP,200,PASS,CHECK,W06; W18,4
+2026-10-16T07:19:15.539Z,S-0611,27 - Product configuration depth,27.8,27.8 - Product limits list and get,HTTP,200,PASS,CHECK,W06,4
+2026-10-16T07:19:15.548Z,S-0612,27 - Product configuration depth,27.9,27.9 - Individual limit retrieval,HTTP,200,PASS,CHECK,W06,3
+2026-10-16T07:19:15.557Z,S-0613,27 - Product configuration depth,27.10,27.10 - Card design get,HTTP,200,PASS,CHECK,W07,3
+2026-10-16T07:19:15.565Z,S-0614,27 - Product configuration depth,27.11,27.11 - Card design list,HTTP,200,PASS,CHECK,W07,5
+2026-10-16T07:19:15.579Z,S-0615,27 - Product configuration depth,27.12,27.12 - Design assignment list,HTTP,200,PASS,CHECK,W07,4
+2026-10-16T07:19:15.589Z,S-0616,27 - Product configuration depth,27.13,27.13 - Technology profile get,HTTP,200,PASS,CHECK,W07,4
+2026-10-16T07:19:15.598Z,S-0617,27 - Product configuration depth,27.14,27.14 - CVM profile get with ordered rules,HTTP,200,PASS,CHECK,W07,6
+2026-10-16T07:19:15.610Z,S-0618,27 - Product configuration depth,27.15,27.15 - Activated version configuration is immutable,HTTP,400,PASS,CHECK,W06,15
+2026-10-16T07:19:15.633Z,S-0619,27 - Product configuration depth,27.16,27.16 - Personalisation cannot change on an ACTIVE version,HTTP,400,PASS,CHECK,W06,6
+2026-10-16T07:19:15.646Z,S-0620,27 - Product configuration depth,27.17,27.17 - Create a new product version after activation,HTTP,201,PASS,CHECK,W05,9
+2026-10-16T07:19:15.660Z,S-0621,27 - Product configuration depth,27.18,27.18 - Product versions list includes both,HTTP,200,PASS,CHECK,W05,5
+2026-10-16T07:19:15.675Z,S-0622,27 - Product configuration depth,27.19,27.19 - Draft version cannot jump straight to ACTIVE,HTTP,400,PASS,CHECK,W08,5
+2026-10-16T07:19:15.686Z,S-0623,27 - Product configuration depth,27.20,27.20 - Replacement policy update only while DRAFT,HTTP,400,PASS,CHECK,W06,9
+2026-10-16T07:19:15.700Z,S-0624,27 - Product configuration depth,27.21,27.21 - Replacement policy update on the draft product,HTTP,201,PASS,CHECK,W06,15
+2026-10-16T07:19:15.723Z,S-0625,27 - Product configuration depth,27.22,27.22 - Update draft replacement policy,HTTP,200,PASS,CHECK,W06,9
+2026-10-16T07:19:15.739Z,S-0626,27 - Product configuration depth,27.23,27.23 - Create a disposable card design,HTTP,201,PASS,CHECK,W07,12
+2026-10-16T07:19:15.757Z,S-0627,27 - Product configuration depth,27.24,27.24 - Rename a DRAFT design,HTTP,200,PASS,CHECK,W07,11
+2026-10-16T07:19:15.773Z,S-0628,27 - Product configuration depth,27.25,27.25 - Activate the disposable design,HTTP,200,PASS,CHECK,W07,6
+2026-10-16T07:19:15.784Z,S-0629,27 - Product configuration depth,27.26,27.26 - ACTIVE design configuration is immutable,HTTP,400,PASS,CHECK,W07,5
+2026-10-16T07:19:15.794Z,S-0630,27 - Product configuration depth,27.27,27.27 - Suspend the disposable design,HTTP,200,PASS,CHECK,W07,6
+2026-10-16T07:19:15.805Z,S-0631,27 - Product configuration depth,27.28,27.28 - Reactivate the disposable design,HTTP,200,PASS,CHECK,W07,6
+2026-10-16T07:19:15.816Z,S-0632,27 - Product configuration depth,27.29,27.29 - Retire the disposable design,HTTP,200,PASS,CHECK,W07,6
+2026-10-16T07:19:15.827Z,S-0633,27 - Product configuration depth,27.30,27.30 - RETIRED design cannot return to ACTIVE,HTTP,400,PASS,CHECK,W07,5
+2026-10-16T07:19:15.838Z,S-0634,27 - Product configuration depth,27.31,27.31 - Assign the virtual design to the DRAFT product,HTTP,201,PASS,CHECK,W08,9
+2026-10-16T07:19:15.853Z,S-0635,27 - Product configuration depth,27.32,27.32 - Activate the draft-product design assignment,HTTP,200,PASS,CHECK,W08,6
+2026-10-16T07:19:15.865Z,S-0636,27 - Product configuration depth,27.33,27.33 - ACTIVE assignment configuration is immutable,HTTP,400,PASS,CHECK,W08,5
+2026-10-16T07:19:15.876Z,S-0637,27 - Product configuration depth,27.34,27.34 - Suspend the draft-product design assignment,HTTP,200,PASS,CHECK,W08,7
+2026-10-16T07:19:15.888Z,S-0638,27 - Product configuration depth,27.35,27.35 - Close the draft-product design assignment,HTTP,200,PASS,CHECK,W08,5
+2026-10-16T07:19:15.898Z,S-0639,27 - Product configuration depth,27.36,27.36 - CLOSED assignment cannot return to ACTIVE,HTTP,400,PASS,CHECK,W08,6
+2026-10-16T07:19:15.909Z,S-0640,27 - Product configuration depth,27.37,27.37 - Limit update on an ACTIVE version is refused,HTTP,400,PASS,CHECK,W06,7
+2026-10-16T07:19:15.921Z,S-0641,27 - Product configuration depth,27.38,27.38 - Create a limit on the DRAFT version,HTTP,201,PASS,CHECK,W06,6
+2026-10-16T07:19:15.933Z,S-0642,27 - Product configuration depth,27.39,27.39 - Update the DRAFT limit,HTTP,200,PASS,CHECK,W06,6
+2026-10-16T07:19:15.944Z,S-0643,27 - Product configuration depth,27.40,27.40 - Overlapping effective dates stay a second DRAFT,HTTP,201,PASS,CHECK,W06,7
+2026-10-16T07:19:15.956Z,S-0644,27 - Product configuration depth,27.41,27.41 - The product still has one ACTIVE version,HTTP,200,PASS,CHECK,W06,4
+2026-10-16T07:19:15.972Z,S-0645,28 - Physical and virtual issuance modes,28.0,28.0 - Load shared configuration for issuance modes,SCRIPT,200,PASS,HARNESS,,6
+2026-10-16T07:19:15.978Z,S-0646,28 - Physical and virtual issuance modes,28.0b,28.0b - Get Keycloak access token,HTTP,200,PASS,HARNESS,,7
+2026-10-16T07:19:15.986Z,S-0647,28 - Physical and virtual issuance modes,28.1,28.1 - Prepare issuance: virtual-then-physical card,SCRIPT,200,PASS,HARNESS,,3
+2026-10-16T07:19:15.990Z,S-0648,28 - Physical and virtual issuance modes,28.1.1,28.1.1 - Submit issuance: virtual-then-physical card,HTTP,202,PASS,CHECK,W11,17
+2026-10-16T07:19:18.029Z,S-0649,28 - Physical and virtual issuance modes,28.1.2a,28.1.2a - Read issuance operation: virtual-then-physical card,HTTP,200,PASS,POLL,W11,4
+2026-10-16T07:19:20.049Z,S-0650,28 - Physical and virtual issuance modes,28.1.2a,28.1.2a - Read issuance operation: virtual-then-physical card,HTTP,200,PASS,POLL,W11,4
+2026-10-16T07:19:22.054Z,S-0651,28 - Physical and virtual issuance modes,28.1.2a,28.1.2a - Read issuance operation: virtual-then-physical card,HTTP,200,PASS,CHECK,W11,7
+2026-10-16T07:19:22.062Z,S-0652,28 - Physical and virtual issuance modes,28.1.3,28.1.3 - Require issued card: virtual-then-physical card,SCRIPT,200,PASS,CHECK,W11,8
+2026-10-16T07:19:22.070Z,S-0653,28 - Physical and virtual issuance modes,28.2,28.2 - VIRTUAL_THEN_PHYSICAL_LATER issues as VIRTUAL and is not yet activated,HTTP,200,PASS,CHECK,W11,4
+2026-10-16T07:19:22.080Z,S-0654,28 - Physical and virtual issuance modes,28.3,28.3 - Successful physical-production request,HTTP,201,PASS,CHECK,W11,16
+2026-10-16T07:19:22.102Z,S-0655,28 - Physical and virtual issuance modes,28.3b,28.3b - Replay the physical-production request,HTTP,201,PASS,CHECK,W11,3
+2026-10-16T07:19:22.110Z,S-0656,28 - Physical and virtual issuance modes,28.4,28.4 - Duplicate physical-production request,HTTP,422,PASS,CHECK,W11,6
+2026-10-16T07:19:22.121Z,S-0657,28 - Physical and virtual issuance modes,28.5,28.5 - Prepare issuance: later card for close,SCRIPT,200,PASS,HARNESS,,5
+2026-10-16T07:19:22.126Z,S-0658,28 - Physical and virtual issuance modes,28.5.1,28.5.1 - Submit issuance: later card for close,HTTP,202,PASS,CHECK,W11,17
+2026-10-16T07:19:24.157Z,S-0659,28 - Physical and virtual issuance modes,28.5.2a,28.5.2a - Read issuance operation: later card for close,HTTP,200,PASS,POLL,W11,4
+2026-10-16T07:19:26.171Z,S-0660,28 - Physical and virtual issuance modes,28.5.2a,28.5.2a - Read issuance operation: later card for close,HTTP,200,PASS,CHECK,W11,4
+2026-10-16T07:19:26.176Z,S-0661,28 - Physical and virtual issuance modes,28.5.3,28.5.3 - Require issued card: later card for close,SCRIPT,200,PASS,CHECK,W11,4
+2026-10-16T07:19:26.180Z,S-0662,28 - Physical and virtual issuance modes,28.6,28.6 - Activate later2,HTTP,200,PASS,CHECK,W11,16
+2026-10-16T07:19:26.201Z,S-0663,28 - Physical and virtual issuance modes,28.7,28.7 - Close the later card,HTTP,200,PASS,CHECK,W11,10
+2026-10-16T07:19:26.217Z,S-0664,28 - Physical and virtual issuance modes,28.8,28.8 - Production after closure,HTTP,422,PASS,CHECK,W11,6
+2026-10-16T07:19:26.228Z,S-0665,28 - Physical and virtual issuance modes,28.9,28.9 - Prepare issuance: later card for block,SCRIPT,200,PASS,HARNESS,,3
+2026-10-16T07:19:26.231Z,S-0666,28 - Physical and virtual issuance modes,28.9.1,28.9.1 - Submit issuance: later card for block,HTTP,202,PASS,CHECK,W11,14
+2026-10-16T07:19:28.270Z,S-0667,28 - Physical and virtual issuance modes,28.9.2a,28.9.2a - Read issuance operation: later card for block,HTTP,200,PASS,POLL,W11,10
+2026-10-16T07:19:30.310Z,S-0668,28 - Physical and virtual issuance modes,28.9.2a,28.9.2a - Read issuance operation: later card for block,HTTP,200,PASS,POLL,W11,6
+2026-10-16T07:19:32.323Z,S-0669,28 - Physical and virtual issuance modes,28.9.2a,28.9.2a - Read issuance operation: later card for block,HTTP,200,PASS,CHECK,W11,4
+2026-10-16T07:19:32.328Z,S-0670,28 - Physical and virtual issuance modes,28.9.3,28.9.3 - Require issued card: later card for block,SCRIPT,200,PASS,CHECK,W11,3
+2026-10-16T07:19:32.332Z,S-0671,28 - Physical and virtual issuance modes,28.10,28.10 - Activate later3,HTTP,200,PASS,CHECK,W11,16
+2026-10-16T07:19:32.353Z,S-0672,28 - Physical and virtual issuance modes,28.11,28.11 - Permanent block before production,HTTP,200,PASS,CHECK,W11,9
+2026-10-16T07:19:32.367Z,S-0673,28 - Physical and virtual issuance modes,28.12,28.12 - Production after permanent block,HTTP,422,PASS,CHECK,W11,5
+2026-10-16T07:19:32.377Z,S-0674,28 - Physical and virtual issuance modes,28.12b,28.12b - Close a BLOCKED card,HTTP,200,PASS,CHECK,W11,16
+2026-10-16T07:19:32.398Z,S-0675,28 - Physical and virtual issuance modes,28.13,28.13 - Prepare issuance: PHYSICAL_ONLY card,SCRIPT,200,PASS,HARNESS,,3
+2026-10-16T07:19:32.401Z,S-0676,28 - Physical and virtual issuance modes,28.13.1,28.13.1 - Submit issuance: PHYSICAL_ONLY card,HTTP,202,PASS,CHECK,W10,20
+2026-10-16T07:19:34.436Z,S-0677,28 - Physical and virtual issuance modes,28.13.2a,28.13.2a - Read issuance operation: PHYSICAL_ONLY card,HTTP,200,PASS,POLL,W10,4
+2026-10-16T07:19:36.448Z,S-0678,28 - Physical and virtual issuance modes,28.13.2a,28.13.2a - Read issuance operation: PHYSICAL_ONLY card,HTTP,200,PASS,CHECK,W10,3
+2026-10-16T07:19:36.451Z,S-0679,28 - Physical and virtual issuance modes,28.13.3,28.13.3 - Require issued card: PHYSICAL_ONLY card,SCRIPT,200,PASS,CHECK,W10,4
+2026-10-16T07:19:36.456Z,S-0680,28 - Physical and virtual issuance modes,28.14,28.14 - PHYSICAL_ONLY confirms a physical card and a production request,HTTP,200,PASS,CHECK,W10,4
+2026-10-16T07:19:36.466Z,S-0681,28 - Physical and virtual issuance modes,28.15,28.15 - Prepare issuance: same-day virtual and physical card,SCRIPT,200,PASS,HARNESS,,4
+2026-10-16T07:19:36.470Z,S-0682,28 - Physical and virtual issuance modes,28.15.1,28.15.1 - Submit issuance: same-day virtual and physical card,HTTP,202,PASS,CHECK,W12,22
+2026-10-16T07:19:38.505Z,S-0683,28 - Physical and virtual issuance modes,28.15.2a,28.15.2a - Read issuance operation: same-day virtual and physical card,HTTP,200,PASS,POLL,W12,3
+2026-10-16T07:19:40.519Z,S-0684,28 - Physical and virtual issuance modes,28.15.2a,28.15.2a - Read issuance operation: same-day virtual and physical card,HTTP,200,PASS,POLL,W12,9
+2026-10-16T07:19:42.544Z,S-0685,28 - Physical and virtual issuance modes,28.15.2a,28.15.2a - Read issuance operation: same-day virtual and physical card,HTTP,200,PASS,CHECK,W12,3
+2026-10-16T07:19:42.547Z,S-0686,28 - Physical and virtual issuance modes,28.15.3,28.15.3 - Require issued card: same-day virtual and physical card,SCRIPT,200,PASS,CHECK,W12,4
+2026-10-16T07:19:42.551Z,S-0687,28 - Physical and virtual issuance modes,28.15.4,28.15.4 - SAME_DAY confirms a dual-form card with its own PAN,HTTP,200,PASS,CHECK,W12,5
+2026-10-16T07:19:42.562Z,S-0688,28 - Physical and virtual issuance modes,28.16a,28.16a - Prepare issuance: multi virtual 1,SCRIPT,200,PASS,HARNESS,,3
+2026-10-16T07:19:42.565Z,S-0689,28 - Physical and virtual issuance modes,28.16a.1,28.16a.1 - Submit issuance: multi virtual 1,HTTP,202,PASS,CHECK,W13,37
+2026-10-16T07:19:44.621Z,S-0690,28 - Physical and virtual issuance modes,28.16a.2a,28.16a.2a - Read issuance operation: multi virtual 1,HTTP,200,PASS,POLL,W13,8
+2026-10-16T07:19:46.654Z,S-0691,28 - Physical and virtual issuance modes,28.16a.2a,28.16a.2a - Read issuance operation: multi virtual 1,HTTP,200,PASS,CHECK,W13,4
+2026-10-16T07:19:46.659Z,S-0692,28 - Physical and virtual issuance modes,28.16a.3,28.16a.3 - Require issued card: multi virtual 1,SCRIPT,200,PASS,CHECK,W13,4
+2026-10-16T07:19:46.663Z,S-0693,28 - Physical and virtual issuance modes,28.16b,28.16b - Prepare issuance: multi virtual 2,SCRIPT,200,PASS,HARNESS,,4
+2026-10-16T07:19:46.667Z,S-0694,28 - Physical and virtual issuance modes,28.16b.1,28.16b.1 - Submit issuance: multi virtual 2,HTTP,202,PASS,CHECK,W13,23
+2026-10-16T07:19:48.709Z,S-0695,28 - Physical and virtual issuance modes,28.16b.2a,28.16b.2a - Read issuance operation: multi virtual 2,HTTP,200,PASS,POLL,W13,5
+2026-10-16T07:19:50.735Z,S-0696,28 - Physical and virtual issuance modes,28.16b.2a,28.16b.2a - Read issuance operation: multi virtual 2,HTTP,200,PASS,POLL,W13,4
+2026-10-16T07:19:52.753Z,S-0697,28 - Physical and virtual issuance modes,28.16b.2a,28.16b.2a - Read issuance operation: multi virtual 2,HTTP,200,PASS,CHECK,W13,8
+2026-10-16T07:19:52.762Z,S-0698,28 - Physical and virtual issuance modes,28.16b.3,28.16b.3 - Require issued card: multi virtual 2,SCRIPT,200,PASS,CHECK,W13,12
+2026-10-16T07:19:52.774Z,S-0699,28 - Physical and virtual issuance modes,28.16c,28.16c - Prepare rejected issuance: maximumActiveVirtualPans=2 refuses a third card,SCRIPT,200,PASS,HARNESS,,8
+2026-10-16T07:19:52.783Z,S-0700,28 - Physical and virtual issuance modes,28.16c.1,28.16c.1 - Submit rejected issuance: maximumActiveVirtualPans=2 refuses a third card,HTTP,422,PASS,CHECK,W13,19
+2026-10-16T07:19:52.811Z,S-0701,28 - Physical and virtual issuance modes,28.16c.3,28.16c.3 - Require no card was created: maximumActiveVirtualPans=2 refuses a third card,SCRIPT,200,PASS,CHECK,W13,3
+2026-10-16T07:19:52.814Z,S-0702,28 - Physical and virtual issuance modes,28.17,28.17 - Prepare issuance: virtual-only production probe,SCRIPT,200,PASS,HARNESS,,3
+2026-10-16T07:19:52.817Z,S-0703,28 - Physical and virtual issuance modes,28.17.1,28.17.1 - Submit issuance: virtual-only production probe,HTTP,202,PASS,CHECK,W09,20
+2026-10-16T07:19:54.846Z,S-0704,28 - Physical and virtual issuance modes,28.17.2a,28.17.2a - Read issuance operation: virtual-only production probe,HTTP,200,PASS,POLL,W09,4
+2026-10-16T07:19:56.860Z,S-0705,28 - Physical and virtual issuance modes,28.17.2a,28.17.2a - Read issuance operation: virtual-only production probe,HTTP,200,PASS,CHECK,W09,5
+2026-10-16T07:19:56.867Z,S-0706,28 - Physical and virtual issuance modes,28.17.3,28.17.3 - Require issued card: virtual-only production probe,SCRIPT,200,PASS,CHECK,W09,4
+2026-10-16T07:19:56.872Z,S-0707,28 - Physical and virtual issuance modes,28.18,28.18 - VIRTUAL_ONLY still refuses physical production,HTTP,422,PASS,CHECK,W09,7
+2026-10-16T07:19:56.884Z,S-0708,28 - Physical and virtual issuance modes,28.19,28.19 - activate-physical before delivery,HTTP,422,PASS,CHECK,W10,13
+2026-10-16T07:19:56.902Z,S-0709,28 - Physical and virtual issuance modes,28.20,28.20 - make-use-ready before physical activation,HTTP,422,PASS,CHECK,W10,8
+2026-10-16T07:19:56.916Z,S-0710,28 - Physical and virtual issuance modes,28.21,28.21 - Later product stores PRIORITY production,HTTP,200,PASS,CHECK,W11,4
+2026-10-16T07:19:56.925Z,S-0711,28 - Physical and virtual issuance modes,28.22,28.22 - Physical-only product stores STANDARD production,HTTP,200,PASS,CHECK,W10,3
+2026-10-16T07:19:56.933Z,S-0712,28 - Physical and virtual issuance modes,28.23,28.23 - Same-day product stores EMERGENCY production,HTTP,200,PASS,CHECK,W12,3
+2026-10-16T07:19:56.942Z,S-0713,28 - Physical and virtual issuance modes,28.24,28.24 - List personalisation batches on the embossing service,HTTP,200,PASS,CHECK,W10,18
+2026-10-16T07:19:56.966Z,S-0714,28 - Physical and virtual issuance modes,28.25,28.25 - List CREATED personalisation batches,HTTP,200,PASS,CHECK,W10,5
+2026-10-16T07:19:56.976Z,S-0715,28 - Physical and virtual issuance modes,28.26,28.26 - Unknown personalisation batch is not found,HTTP,404,PASS,CHECK,W10,4
+2026-10-16T07:19:56.991Z,S-0716,28 - Physical and virtual issuance modes,28.27,28.27 - Unknown personalisation file is not found,HTTP,404,PASS,CHECK,W10,7
+2026-10-16T07:19:57.003Z,S-0717,28 - Physical and virtual issuance modes,28.28,28.28 - Files for an unknown batch are not found,HTTP,404,PASS,CHECK,W10,4
+2026-10-16T07:19:57.012Z,S-0718,28 - Physical and virtual issuance modes,28.29,28.29 - Invalid batch status is refused,HTTP,400,PASS,CHECK,W10,5
+2026-10-16T07:19:57.024Z,S-0719,28 - Physical and virtual issuance modes,28.30,28.30 - Read the listed personalisation batch,HTTP,200,PASS,CHECK,W10,5
+2026-10-16T07:19:57.035Z,S-0720,28 - Physical and virtual issuance modes,28.31,28.31 - List files for the listed personalisation batch,HTTP,200,PASS,CHECK,W10,6
+2026-10-16T07:19:57.050Z,S-0721,29 - Replacement workflow boundaries,29.0,29.0 - Load shared configuration for replacement boundaries,SCRIPT,200,PASS,HARNESS,,15
+2026-10-16T07:19:57.065Z,S-0722,29 - Replacement workflow boundaries,29.0b,29.0b - Get Keycloak access token,HTTP,200,PASS,HARNESS,,7
+2026-10-16T07:19:57.073Z,S-0723,29 - Replacement workflow boundaries,29.3.1,29.3.1 - Prepare issuance: LOST security source,SCRIPT,200,PASS,HARNESS,,6
+2026-10-16T07:19:57.079Z,S-0724,29 - Replacement workflow boundaries,29.3.1.1,29.3.1.1 - Submit issuance: LOST security source,HTTP,202,PASS,SET_UP,W18,22
+2026-10-16T07:19:59.125Z,S-0725,29 - Replacement workflow boundaries,29.3.1.2a,29.3.1.2a - Read issuance operation: LOST security source,HTTP,200,PASS,POLL,W18,8
+2026-10-16T07:20:01.163Z,S-0726,29 - Replacement workflow boundaries,29.3.1.2a,29.3.1.2a - Read issuance operation: LOST security source,HTTP,200,PASS,POLL,W18,4
+2026-10-16T07:20:03.173Z,S-0727,29 - Replacement workflow boundaries,29.3.1.2a,29.3.1.2a - Read issuance operation: LOST security source,HTTP,200,PASS,SET_UP,W18,9
+2026-10-16T07:20:03.184Z,S-0728,29 - Replacement workflow boundaries,29.3.1.3,29.3.1.3 - Require issued card: LOST security source,SCRIPT,200,PASS,SET_UP,W18,17
+2026-10-16T07:20:03.202Z,S-0729,29 - Replacement workflow boundaries,29.3.2,29.3.2 - Activate LOST security source,HTTP,200,PASS,SET_UP,W18,22
+2026-10-16T07:20:03.229Z,S-0730,29 - Replacement workflow boundaries,29.3.3,29.3.3 - Record LOST source identity,HTTP,200,PASS,CHECK,W18,3
+2026-10-16T07:20:03.237Z,S-0731,29 - Replacement workflow boundaries,29.3.4,29.3.4 - Prepare replacement: LOST new-PAN security replacement,SCRIPT,200,PASS,HARNESS,,2
+2026-10-16T07:20:03.239Z,S-0732,29 - Replacement workflow boundaries,29.3.4.1,29.3.4.1 - Submit replacement: LOST new-PAN security replacement,HTTP,202,PASS,CHECK,W18,55
+2026-10-16T07:20:05.302Z,S-0733,29 - Replacement workflow boundaries,29.3.4.2a,29.3.4.2a - Read replacement request: LOST new-PAN security replacement,HTTP,200,PASS,POLL,W18,6
+2026-10-16T07:20:07.329Z,S-0734,29 - Replacement workflow boundaries,29.3.4.2a,29.3.4.2a - Read replacement request: LOST new-PAN security replacement,HTTP,200,PASS,CHECK,W18,6
+2026-10-16T07:20:07.336Z,S-0735,29 - Replacement workflow boundaries,29.3.4.3,29.3.4.3 - Require completed replacement: LOST new-PAN security replacement,SCRIPT,200,PASS,CHECK,W18,8
+2026-10-16T07:20:07.344Z,S-0736,29 - Replacement workflow boundaries,29.3.5,29.3.5 - LOST source is BLOCKED immediately,HTTP,200,PASS,CHECK,W18,4
+2026-10-16T07:20:07.353Z,S-0737,29 - Replacement workflow boundaries,29.3.6,29.3.6 - LOST successor has a new PAN family,HTTP,200,PASS,CHECK,W18,4
+2026-10-16T07:20:07.362Z,S-0738,29 - Replacement workflow boundaries,29.4.1,29.4.1 - Prepare issuance: STOLEN security source,SCRIPT,200,PASS,HARNESS,,3
+2026-10-16T07:20:07.365Z,S-0739,29 - Replacement workflow boundaries,29.4.1.1,29.4.1.1 - Submit issuance: STOLEN security source,HTTP,202,PASS,SET_UP,W18,15
+2026-10-16T07:20:09.389Z,S-0740,29 - Replacement workflow boundaries,29.4.1.2a,29.4.1.2a - Read issuance operation: STOLEN security source,HTTP,200,PASS,POLL,W18,10
+2026-10-16T07:20:11.418Z,S-0741,29 - Replacement workflow boundaries,29.4.1.2a,29.4.1.2a - Read issuance operation: STOLEN security source,HTTP,200,PASS,POLL,W18,9
+2026-10-16T07:20:13.441Z,S-0742,29 - Replacement workflow boundaries,29.4.1.2a,29.4.1.2a - Read issuance operation: STOLEN security source,HTTP,200,PASS,SET_UP,W18,5
+2026-10-16T07:20:13.446Z,S-0743,29 - Replacement workflow boundaries,29.4.1.3,29.4.1.3 - Require issued card: STOLEN security source,SCRIPT,200,PASS,SET_UP,W18,5
+2026-10-16T07:20:13.451Z,S-0744,29 - Replacement workflow boundaries,29.4.2,29.4.2 - Activate STOLEN security source,HTTP,200,PASS,SET_UP,W18,17
+2026-10-16T07:20:13.474Z,S-0745,29 - Replacement workflow boundaries,29.4.3,29.4.3 - Record STOLEN source identity,HTTP,200,PASS,CHECK,W18,6
+2026-10-16T07:20:13.486Z,S-0746,29 - Replacement workflow boundaries,29.4.4,29.4.4 - Prepare replacement: STOLEN new-PAN security replacement,SCRIPT,200,PASS,HARNESS,,3
+2026-10-16T07:20:13.490Z,S-0747,29 - Replacement workflow boundaries,29.4.4.1,29.4.4.1 - Submit replacement: STOLEN new-PAN security replacement,HTTP,202,PASS,CHECK,W18,36
+2026-10-16T07:20:15.539Z,S-0748,29 - Replacement workflow boundaries,29.4.4.2a,29.4.4.2a - Read replacement request: STOLEN new-PAN security replacement,HTTP,200,PASS,POLL,W18,9
+2026-10-16T07:20:17.569Z,S-0749,29 - Replacement workflow boundaries,29.4.4.2a,29.4.4.2a - Read replacement request: STOLEN new-PAN security replacement,HTTP,200,PASS,CHECK,W18,17
+2026-10-16T07:20:17.588Z,S-0750,29 - Replacement workflow boundaries,29.4.4.3,29.4.4.3 - Require completed replacement: STOLEN new-PAN security replacement,SCRIPT,200,PASS,CHECK,W18,12
+2026-10-16T07:20:17.600Z,S-0751,29 - Replacement workflow boundaries,29.4.5,29.4.5 - STOLEN source is BLOCKED immediately,HTTP,200,PASS,CHECK,W18,7
+2026-10-16T07:20:17.612Z,S-0752,29 - Replacement workflow boundaries,29.4.6,29.4.6 - STOLEN successor has a new PAN family,HTTP,200,PASS,CHECK,W18,4
+2026-10-16T07:20:17.623Z,S-0753,29 - Replacement workflow boundaries,29.5.1,29.5.1 - Prepare issuance: COMPROMISED security source,SCRIPT,200,PASS,HARNESS,,2
+2026-10-16T07:20:17.625Z,S-0754,29 - Replacement workflow boundaries,29.5.1.1,29.5.1.1 - Submit issuance: COMPROMISED security source,HTTP,202,PASS,SET_UP,W18,16
+2026-10-16T07:20:19.656Z,S-0755,29 - Replacement workflow boundaries,29.5.1.2a,29.5.1.2a - Read issuance operation: COMPROMISED security source,HTTP,200,PASS,POLL,W18,9
+2026-10-16T07:20:21.694Z,S-0756,29 - Replacement workflow boundaries,29.5.1.2a,29.5.1.2a - Read issuance operation: COMPROMISED security source,HTTP,200,PASS,POLL,W18,4
+2026-10-16T07:20:23.712Z,S-0757,29 - Replacement workflow boundaries,29.5.1.2a,29.5.1.2a - Read issuance operation: COMPROMISED security source,HTTP,200,PASS,SET_UP,W18,3
+2026-10-16T07:20:23.716Z,S-0758,29 - Replacement workflow boundaries,29.5.1.3,29.5.1.3 - Require issued card: COMPROMISED security source,SCRIPT,200,PASS,SET_UP,W18,4
+2026-10-16T07:20:23.720Z,S-0759,29 - Replacement workflow boundaries,29.5.2,29.5.2 - Activate COMPROMISED security source,HTTP,200,PASS,SET_UP,W18,11
+2026-10-16T07:20:23.736Z,S-0760,29 - Replacement workflow boundaries,29.5.3,29.5.3 - Record COMPROMISED source identity,HTTP,200,PASS,CHECK,W18,4
+2026-10-16T07:20:23.746Z,S-0761,29 - Replacement workflow boundaries,29.5.4,29.5.4 - Prepare replacement: COMPROMISED new-PAN security replacement,SCRIPT,200,PASS,HARNESS,,1
+2026-10-16T07:20:23.748Z,S-0762,29 - Replacement workflow boundaries,29.5.4.1,29.5.4.1 - Submit replacement: COMPROMISED new-PAN security replacement,HTTP,202,PASS,CHECK,W18,37
+2026-10-16T07:20:25.797Z,S-0763,29 - Replacement workflow boundaries,29.5.4.2a,29.5.4.2a - Read replacement request: COMPROMISED new-PAN security replacement,HTTP,200,PASS,POLL,W18,4
+2026-10-16T07:20:27.816Z,S-0764,29 - Replacement workflow boundaries,29.5.4.2a,29.5.4.2a - Read replacement request: COMPROMISED new-PAN security replacement,HTTP,200,PASS,CHECK,W18,13
+2026-10-16T07:20:27.831Z,S-0765,29 - Replacement workflow boundaries,29.5.4.3,29.5.4.3 - Require completed replacement: COMPROMISED new-PAN security replacement,SCRIPT,200,PASS,CHECK,W18,12
+2026-10-16T07:20:27.843Z,S-0766,29 - Replacement workflow boundaries,29.5.5,29.5.5 - COMPROMISED source is BLOCKED immediately,HTTP,200,PASS,CHECK,W18,5
+2026-10-16T07:20:27.853Z,S-0767,29 - Replacement workflow boundaries,29.5.6,29.5.6 - COMPROMISED successor has a new PAN family,HTTP,200,PASS,CHECK,W18,3
+2026-10-16T07:20:27.861Z,S-0768,29 - Replacement workflow boundaries,29.6,29.6 - Prepare issuance: non-security eligibility card,SCRIPT,200,PASS,HARNESS,,3
+2026-10-16T07:20:27.864Z,S-0769,29 - Replacement workflow boundaries,29.6.1,29.6.1 - Submit issuance: non-security eligibility card,HTTP,202,PASS,SET_UP,W19,19
+2026-10-16T07:20:29.906Z,S-0770,29 - Replacement workflow boundaries,29.6.2a,29.6.2a - Read issuance operation: non-security eligibility card,HTTP,200,PASS,POLL,W19,6
+2026-10-16T07:20:31.920Z,S-0771,29 - Replacement workflow boundaries,29.6.2a,29.6.2a - Read issuance operation: non-security eligibility card,HTTP,200,PASS,POLL,W19,5
+2026-10-16T07:20:33.938Z,S-0772,29 - Replacement workflow boundaries,29.6.2a,29.6.2a - Read issuance operation: non-security eligibility card,HTTP,200,PASS,SET_UP,W19,4
+2026-10-16T07:20:33.943Z,S-0773,29 - Replacement workflow boundaries,29.6.3,29.6.3 - Require issued card: non-security eligibility card,SCRIPT,200,PASS,SET_UP,W19,4
+2026-10-16T07:20:33.947Z,S-0774,29 - Replacement workflow boundaries,29.6a,29.6a - Activate non-security eligibility card,HTTP,200,PASS,SET_UP,W19,15
+2026-10-16T07:20:33.967Z,S-0775,29 - Replacement workflow boundaries,29.6b,29.6b - DAMAGED is refused by eligibility,HTTP,422,PASS,CHECK,W19,5
+2026-10-16T07:20:33.977Z,S-0776,29 - Replacement workflow boundaries,29.7,29.7 - NAME_CHANGE is refused by eligibility,HTTP,422,PASS,CHECK,W18,5
+2026-10-16T07:20:33.987Z,S-0777,29 - Replacement workflow boundaries,29.8,29.8 - Replacement approve is still stubbed,HTTP,422,PASS,CHECK,W18,6
+2026-10-16T07:20:33.998Z,S-0778,29 - Replacement workflow boundaries,29.9,29.9 - Replacement reject is still stubbed,HTTP,422,PASS,CHECK,W18,4
+2026-10-16T07:20:34.007Z,S-0779,29 - Replacement workflow boundaries,29.10,29.10 - Replacement complete is still stubbed,HTTP,422,PASS,CHECK,W18,4
+2026-10-16T07:20:34.015Z,S-0780,29 - Replacement workflow boundaries,29.11,29.11 - Document live vs stubbed replacement paths,SCRIPT,200,PASS,INFORMATIONAL,,3
+2026-10-16T07:20:34.020Z,S-0781,30 - PIN lifecycle depth,30.0,30.0 - Load shared configuration for PIN lifecycle,SCRIPT,200,PASS,HARNESS,,6
+2026-10-16T07:20:34.027Z,S-0782,30 - PIN lifecycle depth,30.0b,30.0b - Get Keycloak access token,HTTP,200,PASS,HARNESS,,7
+2026-10-16T07:20:34.034Z,S-0783,30 - PIN lifecycle depth,30.1,30.1 - Prepare issuance: PIN depth card,SCRIPT,200,PASS,HARNESS,,4
+2026-10-16T07:20:34.038Z,S-0784,30 - PIN lifecycle depth,30.1.1,30.1.1 - Submit issuance: PIN depth card,HTTP,202,PASS,SET_UP,W16,15
+2026-10-16T07:20:36.072Z,S-0785,30 - PIN lifecycle depth,30.1.2a,30.1.2a - Read issuance operation: PIN depth card,HTTP,200,PASS,POLL,W16,3
+2026-10-16T07:20:38.096Z,S-0786,30 - PIN lifecycle depth,30.1.2a,30.1.2a - Read issuance operation: PIN depth card,HTTP,200,PASS,SET_UP,W16,9
+2026-10-16T07:20:38.107Z,S-0787,30 - PIN lifecycle depth,30.1.3,30.1.3 - Require issued card: PIN depth card,SCRIPT,200,PASS,SET_UP,W16,21
+2026-10-16T07:20:38.129Z,S-0788,30 - PIN lifecycle depth,30.2,30.2 - Activate PIN depth,HTTP,200,PASS,SET_UP,W16,10
+2026-10-16T07:20:38.152Z,S-0789,30 - PIN lifecycle depth,30.3,30.3 - PIN history is readable without PIN material,HTTP,200,PASS,CHECK,W16; W25,4
+2026-10-16T07:20:38.164Z,S-0790,30 - PIN lifecycle depth,30.3b,30.3b - PIN state is metadata for a Switch-enrolled family,HTTP,200,PASS,CHECK,W16,4
+2026-10-16T07:20:38.174Z,S-0791,30 - PIN lifecycle depth,30.4,30.4 - A PIN change with a short block is a validation error,HTTP,400,PASS,CHECK,W16; W25,5
+2026-10-16T07:20:38.184Z,S-0792,30 - PIN lifecycle depth,30.5,30.5 - PIN change without the current PIN is refused,HTTP,400,PASS,CHECK,W16,4
+2026-10-16T07:20:38.193Z,S-0793,30 - PIN lifecycle depth,30.6,30.6 - An unsupported PIN block format is a validation error,HTTP,400,PASS,CHECK,W16,4
+2026-10-16T07:20:38.202Z,S-0794,30 - PIN lifecycle depth,30.7,30.7 - A PIN change is refused before a PIN is established,HTTP,409,PASS,CHECK,W16; W25,7
+2026-10-16T07:20:38.215Z,S-0795,30 - PIN lifecycle depth,30.8,30.8 - First PIN selection cannot claim an existing PIN version,HTTP,409,PASS,CHECK,W16,5
+2026-10-16T07:20:38.225Z,S-0796,30 - PIN lifecycle depth,30.9,30.9 - Place a permanent LOST hold on the PIN card,HTTP,200,PASS,CHECK,W16,9
+2026-10-16T07:20:38.239Z,S-0797,30 - PIN lifecycle depth,30.10,30.10 - A permanent security hold refuses PIN change,HTTP,422,PASS,CHECK,W16,6
+2026-10-16T07:20:38.251Z,S-0798,30 - PIN lifecycle depth,30.11,30.11 - Close the blocked PIN card,HTTP,200,PASS,CHECK,W16,11
+2026-10-16T07:20:38.267Z,S-0799,30 - PIN lifecycle depth,30.12,30.12 - A closed card refuses PIN reset,HTTP,422,PASS,CHECK,W16,5
+2026-10-16T07:20:38.277Z,S-0800,30 - PIN lifecycle depth,30.13,30.13 - An unknown PIN operation is not found,HTTP,404,PASS,CHECK,W16,3
+2026-10-16T07:20:38.283Z,S-0801,30 - PIN lifecycle depth,30.14,30.14 - Remaining PIN cases need a Switch-accepted PIN,SCRIPT,200,PASS,INFORMATIONAL,,3
+2026-10-16T07:20:38.288Z,S-0802,31 - Canonical lifecycle commands and holds,31.0,31.0 - Load shared configuration for canonical lifecycle,SCRIPT,200,PASS,HARNESS,,12
+2026-10-16T07:20:38.300Z,S-0803,31 - Canonical lifecycle commands and holds,31.0b,31.0b - Get Keycloak access token,HTTP,200,PASS,HARNESS,,6
+2026-10-16T07:20:38.307Z,S-0804,31 - Canonical lifecycle commands and holds,31.1,31.1 - Prepare issuance: canonical lifecycle card,SCRIPT,200,PASS,HARNESS,,6
+2026-10-16T07:20:38.314Z,S-0805,31 - Canonical lifecycle commands and holds,31.1.1,31.1.1 - Submit issuance: canonical lifecycle card,HTTP,202,PASS,SET_UP,W17,16
+2026-10-16T07:20:40.342Z,S-0806,31 - Canonical lifecycle commands and holds,31.1.2a,31.1.2a - Read issuance operation: canonical lifecycle card,HTTP,200,PASS,POLL,W17,4
+2026-10-16T07:20:42.368Z,S-0807,31 - Canonical lifecycle commands and holds,31.1.2a,31.1.2a - Read issuance operation: canonical lifecycle card,HTTP,200,PASS,SET_UP,W17,5
+2026-10-16T07:20:42.374Z,S-0808,31 - Canonical lifecycle commands and holds,31.1.3,31.1.3 - Require issued card: canonical lifecycle card,SCRIPT,200,PASS,SET_UP,W17,3
+2026-10-16T07:20:42.378Z,S-0809,31 - Canonical lifecycle commands and holds,31.2,31.2 - Activate canonical,HTTP,200,PASS,SET_UP,W17,16
+2026-10-16T07:20:42.400Z,S-0810,31 - Canonical lifecycle commands and holds,31.3,31.3 - Capture lifecycle version and account,HTTP,200,PASS,CHECK,Supplementary: Canonical lifecycle commands and hold escalation,5
+2026-10-16T07:20:42.411Z,S-0811,31 - Canonical lifecycle commands and holds,31.4,31.4 - make-use-ready on an already ready card,HTTP,422,PASS,CHECK,Supplementary: Canonical lifecycle commands and hold escalation,7
+2026-10-16T07:20:42.424Z,S-0812,31 - Canonical lifecycle commands and holds,31.5,31.5 - activate-physical on a VIRTUAL card,HTTP,422,PASS,CHECK,Supplementary: Canonical lifecycle commands and hold escalation,7
+2026-10-16T07:20:42.436Z,S-0813,31 - Canonical lifecycle commands and holds,31.6,31.6 - Compatibility suspend,HTTP,200,PASS,CHECK,Supplementary: Canonical lifecycle commands and hold escalation,9
+2026-10-16T07:20:42.450Z,S-0814,31 - Canonical lifecycle commands and holds,31.7,31.7 - Compatibility unblock,HTTP,200,PASS,CHECK,Supplementary: Canonical lifecycle commands and hold escalation,8
+2026-10-16T07:20:42.463Z,S-0815,31 - Canonical lifecycle commands and holds,31.8,31.8 - Place OPS freeze then escalate security,HTTP,200,PASS,CHECK,Supplementary: Canonical lifecycle commands and hold escalation,9
+2026-10-16T07:20:42.477Z,S-0816,31 - Canonical lifecycle commands and holds,31.9,31.9 - Place RISK_BLOCK,HTTP,200,PASS,CHECK,Supplementary: Canonical lifecycle commands and hold escalation,10
+2026-10-16T07:20:42.492Z,S-0817,31 - Canonical lifecycle commands and holds,31.10,31.10 - Escalate RISK_BLOCK to LOST,HTTP,200,PASS,CHECK,Supplementary: Canonical lifecycle commands and hold escalation,10
+2026-10-16T07:20:42.508Z,S-0818,31 - Canonical lifecycle commands and holds,31.11,31.11 - Repeated escalate without higher priority,HTTP,422,PASS,CHECK,Supplementary: Canonical lifecycle commands and hold escalation,5
+2026-10-16T07:20:42.517Z,S-0819,31 - Canonical lifecycle commands and holds,31.12,31.12 - Hotlist without hotlist permission,HTTP,403,PASS,CHECK,W17; W25,3
+2026-10-16T07:20:42.525Z,S-0820,31 - Canonical lifecycle commands and holds,31.13,31.13 - Prepare issuance: canonical close card,SCRIPT,200,PASS,HARNESS,,3
+2026-10-16T07:20:42.528Z,S-0821,31 - Canonical lifecycle commands and holds,31.13.1,31.13.1 - Submit issuance: canonical close card,HTTP,202,PASS,CHECK,Supplementary: Canonical lifecycle commands and hold escalation,14
+2026-10-16T07:20:44.563Z,S-0822,31 - Canonical lifecycle commands and holds,31.13.2a,31.13.2a - Read issuance operation: canonical close card,HTTP,200,PASS,POLL,Supplementary: Canonical lifecycle commands and hold escalation,9
+2026-10-16T07:20:46.591Z,S-0823,31 - Canonical lifecycle commands and holds,31.13.2a,31.13.2a - Read issuance operation: canonical close card,HTTP,200,PASS,POLL,Supplementary: Canonical lifecycle commands and hold escalation,5
+2026-10-16T07:20:48.607Z,S-0824,31 - Canonical lifecycle commands and holds,31.13.2a,31.13.2a - Read issuance operation: canonical close card,HTTP,200,PASS,CHECK,Supplementary: Canonical lifecycle commands and hold escalation,9
+2026-10-16T07:20:48.619Z,S-0825,31 - Canonical lifecycle commands and holds,31.13.3,31.13.3 - Require issued card: canonical close card,SCRIPT,200,PASS,CHECK,Supplementary: Canonical lifecycle commands and hold escalation,11
+2026-10-16T07:20:48.631Z,S-0826,31 - Canonical lifecycle commands and holds,31.14,31.14 - Capture pending card for command close,HTTP,200,PASS,CHECK,Supplementary: Canonical lifecycle commands and hold escalation,11
+2026-10-16T07:20:48.651Z,S-0827,31 - Canonical lifecycle commands and holds,31.15,31.15 - Canonical commands/close from PENDING,HTTP,200,PASS,CHECK,Supplementary: Canonical lifecycle commands and hold escalation,16
+2026-10-16T07:20:48.674Z,S-0828,31 - Canonical lifecycle commands and holds,31.16,31.16 - Card is CLOSED after canonical close,HTTP,200,PASS,CHECK,Supplementary: Canonical lifecycle commands and hold escalation,4
+2026-10-16T07:20:48.683Z,S-0829,31 - Canonical lifecycle commands and holds,31.18,31.18 - Prepare issuance: close-from-ACTIVE card,SCRIPT,200,PASS,HARNESS,,3
+2026-10-16T07:20:48.686Z,S-0830,31 - Canonical lifecycle commands and holds,31.18.1,31.18.1 - Submit issuance: close-from-ACTIVE card,HTTP,202,PASS,CHECK,Supplementary: Canonical lifecycle commands and hold escalation,15
+2026-10-16T07:20:50.724Z,S-0831,31 - Canonical lifecycle commands and holds,31.18.2a,31.18.2a - Read issuance operation: close-from-ACTIVE card,HTTP,200,PASS,POLL,Supplementary: Canonical lifecycle commands and hold escalation,4
+2026-10-16T07:20:52.747Z,S-0832,31 - Canonical lifecycle commands and holds,31.18.2a,31.18.2a - Read issuance operation: close-from-ACTIVE card,HTTP,200,PASS,CHECK,Supplementary: Canonical lifecycle commands and hold escalation,10
+2026-10-16T07:20:52.760Z,S-0833,31 - Canonical lifecycle commands and holds,31.18.3,31.18.3 - Require issued card: close-from-ACTIVE card,SCRIPT,200,PASS,CHECK,Supplementary: Canonical lifecycle commands and hold escalation,9
+2026-10-16T07:20:52.769Z,S-0834,31 - Canonical lifecycle commands and holds,31.19,31.19 - Activate close-from-ACTIVE,HTTP,200,PASS,CHECK,Supplementary: Canonical lifecycle commands and hold escalation,16
+2026-10-16T07:20:52.791Z,S-0835,31 - Canonical lifecycle commands and holds,31.20,31.20 - Capture ACTIVE card version,HTTP,200,PASS,CHECK,Supplementary: Canonical lifecycle commands and hold escalation,4
+2026-10-16T07:20:52.800Z,S-0836,31 - Canonical lifecycle commands and holds,31.21,31.21 - Canonical close from ACTIVE,HTTP,200,PASS,CHECK,Supplementary: Canonical lifecycle commands and hold escalation,14
+2026-10-16T07:20:52.819Z,S-0837,31 - Canonical lifecycle commands and holds,31.22,31.22 - Card is CLOSED after close from ACTIVE,HTTP,200,PASS,CHECK,Supplementary: Canonical lifecycle commands and hold escalation,5
+2026-10-16T07:20:52.829Z,S-0838,31 - Canonical lifecycle commands and holds,31.23,31.23 - Hotlist CUSTOMER_REQUEST is refused before Switch,HTTP,403,PASS,CHECK,W17,3
+2026-10-16T07:20:52.838Z,S-0839,31 - Canonical lifecycle commands and holds,31.24,31.24 - Hotlist of a CLOSED card is refused before Switch,HTTP,403,PASS,CHECK,W17,3
+2026-10-16T07:20:52.846Z,S-0840,31 - Canonical lifecycle commands and holds,31.17,31.17 - Temporary hold expiry needs a controllable clock,SCRIPT,200,PASS,INFORMATIONAL,,3
+2026-10-16T07:20:52.851Z,S-0841,32 - Institution management depth,32.0,32.0 - Load shared configuration for institution depth,SCRIPT,200,PASS,HARNESS,,7
+2026-10-16T07:20:52.859Z,S-0842,32 - Institution management depth,32.0b,32.0b - Get Keycloak access token,HTTP,200,PASS,HARNESS,,6
+2026-10-16T07:20:52.866Z,S-0843,32 - Institution management depth,32.1,32.1 - Institution lookup by UUID,HTTP,200,PASS,CHECK,W01,5
+2026-10-16T07:20:52.877Z,S-0844,32 - Institution management depth,32.2,32.2 - Institution list/search,HTTP,200,PASS,CHECK,W01,3
+2026-10-16T07:20:52.888Z,S-0845,32 - Institution management depth,32.3,32.3 - Institution partial update,HTTP,200,PASS,CHECK,W01,10
+2026-10-16T07:20:52.903Z,S-0846,32 - Institution management depth,32.4,32.4 - Duplicate institution code,HTTP,409,PASS,CHECK,W01,8
+2026-10-16T07:20:52.917Z,S-0847,32 - Institution management depth,32.5,32.5 - Invalid institution code characters,HTTP,400,PASS,CHECK,W01,4
+2026-10-16T07:20:52.927Z,S-0848,32 - Institution management depth,32.6,32.6 - Invalid address country code,HTTP,400,PASS,CHECK,W01,5
+2026-10-16T07:20:52.936Z,S-0849,32 - Institution management depth,32.7,32.7 - Security policy retrieval,HTTP,200,PASS,CHECK,W01; W25,5
+2026-10-16T07:20:52.946Z,S-0850,32 - Institution management depth,32.8,32.8 - Operational policy retrieval,HTTP,200,PASS,CHECK,W01; W25,3
+2026-10-16T07:20:52.953Z,S-0851,32 - Institution management depth,32.9,32.9 - Operational policy update then read-back,HTTP,200,PASS,CHECK,W01,6
+2026-10-16T07:20:52.964Z,S-0852,32 - Institution management depth,32.10,32.10 - Maker-checker not exercised,SCRIPT,200,PASS,INFORMATIONAL,,2
+2026-10-16T07:20:52.967Z,S-0853,32 - Institution management depth,32.11,32.11 - Invalid base currency,HTTP,400,PASS,CHECK,W01,4
+2026-10-16T07:20:52.976Z,S-0854,32 - Institution management depth,32.12,32.12 - Timezone longer than 60 characters,HTTP,400,PASS,CHECK,W01,5
+2026-10-16T07:20:52.995Z,S-0855,32 - Institution management depth,32.13,32.13 - Suspend the institution,HTTP,200,PASS,CHECK,W01,7
+2026-10-16T07:20:53.008Z,S-0856,32 - Institution management depth,32.14,32.14 - Restore the institution to ACTIVE,HTTP,200,PASS,CHECK,W01,5
+2026-10-16T07:20:53.020Z,S-0857,33 - BIN and PAN-range management depth,33.0,33.0 - Load shared configuration for BIN depth,SCRIPT,200,PASS,HARNESS,,21
+2026-10-16T07:20:53.042Z,S-0858,33 - BIN and PAN-range management depth,33.0b,33.0b - Get Keycloak access token,HTTP,200,PASS,HARNESS,,6
+2026-10-16T07:20:53.049Z,S-0859,33 - BIN and PAN-range management depth,33.1,33.1 - BIN get,HTTP,200,PASS,CHECK,W03,6
+2026-10-16T07:20:53.061Z,S-0860,33 - BIN and PAN-range management depth,33.2,33.2 - Prepare BIN list scan,SCRIPT,200,PASS,HARNESS,,2
+2026-10-16T07:20:53.067Z,S-0861,33 - BIN and PAN-range management depth,33.2a,33.2a - BIN list/filter page,HTTP,200,PASS,CHECK,W03,9
+2026-10-16T07:20:53.095Z,S-0862,33 - BIN and PAN-range management depth,33.2,33.2 - BIN list/filter includes both BINs created in this run,SCRIPT,200,PASS,CHECK,W03,8
+2026-10-16T07:20:53.103Z,S-0863,33 - BIN and PAN-range management depth,33.3,33.3 - BIN lookup by network,HTTP,200,PASS,CHECK,W03,6
+2026-10-16T07:20:53.115Z,S-0864,33 - BIN and PAN-range management depth,33.4,33.4 - Prepare BIN list scan,SCRIPT,200,PASS,HARNESS,,2
+2026-10-16T07:20:53.119Z,S-0865,33 - BIN and PAN-range management depth,33.4a,33.4a - Active BIN lookup by network page,HTTP,200,PASS,CHECK,W03,6
+2026-10-16T07:20:53.134Z,S-0866,33 - BIN and PAN-range management depth,33.4,33.4 - Active BIN lookup by network includes the BIN created in this run,SCRIPT,200,PASS,CHECK,W03,4
+2026-10-16T07:20:53.138Z,S-0867,33 - BIN and PAN-range management depth,33.5,33.5 - Eight-digit BIN,HTTP,200,PASS,CHECK,W03,4
+2026-10-16T07:20:53.147Z,S-0868,33 - BIN and PAN-range management depth,33.6,33.6 - BIN full PUT with current version,HTTP,200,PASS,CHECK,W03,9
+2026-10-16T07:20:53.162Z,S-0869,33 - BIN and PAN-range management depth,33.7,33.7 - Optimistic-lock conflict with stale version,HTTP,409,PASS,CHECK,W03,5
+2026-10-16T07:20:53.172Z,S-0870,33 - BIN and PAN-range management depth,33.8,33.8 - Immutable BIN field rejected,HTTP,400,PASS,CHECK,W03,4
+2026-10-16T07:20:53.182Z,S-0871,33 - BIN and PAN-range management depth,33.9,33.9 - Invalid binLength,HTTP,400,PASS,CHECK,W03,7
+2026-10-16T07:20:53.195Z,S-0872,33 - BIN and PAN-range management depth,33.10,33.10 - Overlapping range on same BIN,HTTP,400,PASS,CHECK,W03,7
+2026-10-16T07:20:53.207Z,S-0873,33 - BIN and PAN-range management depth,33.11,33.11 - Invalid range boundaries,HTTP,400,PASS,CHECK,W03,6
+2026-10-16T07:20:53.218Z,S-0874,33 - BIN and PAN-range management depth,33.12,33.12 - Range list and get,HTTP,200,PASS,CHECK,W03,9
+2026-10-16T07:20:53.234Z,S-0875,33 - BIN and PAN-range management depth,33.13,33.13 - Range get,HTTP,200,PASS,CHECK,W03,6
+2026-10-16T07:20:53.245Z,S-0876,33 - BIN and PAN-range management depth,33.14,33.14 - Create suspendable range,HTTP,201,PASS,CHECK,W03,12
+2026-10-16T07:20:53.257Z,S-0877,33 - BIN and PAN-range management depth,33.14b,33.14b - Replay suspendable range create,HTTP,201,PASS,CHECK,W03,2
+2026-10-16T07:20:53.279Z,S-0878,33 - BIN and PAN-range management depth,33.15,33.15 - Submit suspendable range,HTTP,200,PASS,CHECK,W03,10
+2026-10-16T07:20:53.290Z,S-0879,33 - BIN and PAN-range management depth,33.16,33.16 - Activate suspendable range,HTTP,200,PASS,CHECK,W03,6
+2026-10-16T07:20:53.297Z,S-0880,33 - BIN and PAN-range management depth,33.17,33.17 - Suspend range,HTTP,200,PASS,CHECK,W03,8
+2026-10-16T07:20:53.311Z,S-0881,33 - BIN and PAN-range management depth,33.18,33.18 - Prepare rejected issuance: issuance from a SUSPENDED range,SCRIPT,200,PASS,HARNESS,,5
+2026-10-16T07:20:53.316Z,S-0882,33 - BIN and PAN-range management depth,33.18.1,33.18.1 - Submit rejected issuance: issuance from a SUSPENDED range,HTTP,422,PASS,CHECK,W03,8
+2026-10-16T07:20:53.334Z,S-0883,33 - BIN and PAN-range management depth,33.18.3,33.18.3 - Require no card was created: issuance from a SUSPENDED range,SCRIPT,200,PASS,CHECK,W03,5
+2026-10-16T07:20:53.339Z,S-0884,33 - BIN and PAN-range management depth,33.19,33.19 - Close the suspended range,HTTP,200,PASS,CHECK,W03,11
+2026-10-16T07:20:53.354Z,S-0885,33 - BIN and PAN-range management depth,33.20,33.20 - CLOSED range cannot return to ACTIVE,HTTP,400,PASS,CHECK,W03,6
+2026-10-16T07:20:53.365Z,S-0886,33 - BIN and PAN-range management depth,33.21,33.21 - Prepare rejected issuance: issuance from a CLOSED range,SCRIPT,200,PASS,HARNESS,,3
+2026-10-16T07:20:53.368Z,S-0887,33 - BIN and PAN-range management depth,33.21.1,33.21.1 - Submit rejected issuance: issuance from a CLOSED range,HTTP,422,PASS,CHECK,W03,8
+2026-10-16T07:20:53.384Z,S-0888,33 - BIN and PAN-range management depth,33.21.3,33.21.3 - Require no card was created: issuance from a CLOSED range,SCRIPT,200,PASS,CHECK,W03,3
+2026-10-16T07:20:53.389Z,S-0889,34 - HSM and key management depth,34.0,34.0 - Load shared configuration for HSM depth,SCRIPT,200,PASS,HARNESS,,6
+2026-10-16T07:20:53.396Z,S-0890,34 - HSM and key management depth,34.0b,34.0b - Get Keycloak access token,HTTP,200,PASS,HARNESS,,6
+2026-10-16T07:20:53.403Z,S-0891,34 - HSM and key management depth,34.1,34.1 - Key list,HTTP,200,PASS,CHECK,W02,8
+2026-10-16T07:20:53.417Z,S-0892,34 - HSM and key management depth,34.2,34.2 - Key get,HTTP,200,PASS,CHECK,W02,3
+2026-10-16T07:20:53.426Z,S-0893,34 - HSM and key management depth,34.3,34.3 - Data-key assignment list,HTTP,200,PASS,CHECK,W02,5
+2026-10-16T07:20:53.435Z,S-0894,34 - HSM and key management depth,34.4,34.4 - BIN HSM assignment list,HTTP,200,PASS,CHECK,W04,6
+2026-10-16T07:20:53.446Z,S-0895,34 - HSM and key management depth,34.5,34.5 - Register an existing key reference,HTTP,201,PASS,CHECK,W02,17
+2026-10-16T07:20:53.468Z,S-0896,34 - HSM and key management depth,34.6,34.6 - Rotate an ACTIVE key,HTTP,201,PASS,CHECK,W23,9
+2026-10-16T07:20:53.482Z,S-0897,34 - HSM and key management depth,34.7,34.7 - Incorrect key-purpose scope,HTTP,400,PASS,CHECK,W02,7
+2026-10-16T07:20:53.494Z,S-0898,34 - HSM and key management depth,34.8,34.8 - HSM import without KEK fixtures is refused,HTTP,400,PASS,CHECK,W02,4
+2026-10-16T07:20:53.502Z,S-0899,34 - HSM and key management depth,34.10,34.10 - Create a second PAN encryption assignment,HTTP,201,PASS,CHECK,W02,9
+2026-10-16T07:20:53.516Z,S-0900,34 - HSM and key management depth,34.11,34.11 - Replay the successor assignment create,HTTP,201,PASS,CHECK,W02,3
+2026-10-16T07:20:53.524Z,S-0901,34 - HSM and key management depth,34.12,34.12 - Activate the successor assignment,HTTP,200,PASS,CHECK,W02,8
+2026-10-16T07:20:53.536Z,S-0902,34 - HSM and key management depth,34.13,34.13 - Previous PAN assignment is DECRYPT_ONLY,HTTP,200,PASS,CHECK,W02,5
+2026-10-16T07:20:53.547Z,S-0903,34 - HSM and key management depth,34.9,34.9 - Document HSM timeout and rotation-on-cards cases,SCRIPT,200,PASS,INFORMATIONAL,,2
+2026-10-16T07:20:53.551Z,S-0904,35 - Idempotency across configuration writes,35.0,35.0 - Load shared configuration for idempotency depth,SCRIPT,200,PASS,HARNESS,,7
+2026-10-16T07:20:53.558Z,S-0905,35 - Idempotency across configuration writes,35.0b,35.0b - Get Keycloak access token,HTTP,200,PASS,HARNESS,,8
+2026-10-16T07:20:53.567Z,S-0906,35 - Idempotency across configuration writes,35.1a,35.1a - First operational-policy PUT,HTTP,200,PASS,CHECK,W01,7
+2026-10-16T07:20:53.578Z,S-0907,35 - Idempotency across configuration writes,35.1b,35.1b - Replay operational-policy PUT,HTTP,200,PASS,CHECK,W01,3
+2026-10-16T07:20:53.585Z,S-0908,35 - Idempotency across configuration writes,35.2a,35.2a - First security-policy PUT,HTTP,200,PASS,CHECK,W01,8
+2026-10-16T07:20:53.599Z,S-0909,35 - Idempotency across configuration writes,35.2b,35.2b - Replay security-policy PUT,HTTP,200,PASS,CHECK,W01,3
+2026-10-16T07:20:53.607Z,S-0910,35 - Idempotency across configuration writes,35.3a,35.3a - First hold escalate key on a fresh card setup,HTTP,201,PASS,CHECK,Supplementary: Idempotency on holds and configuration writes,9
+2026-10-16T07:20:53.621Z,S-0911,35 - Idempotency across configuration writes,35.3b,35.3b - Replay product create,HTTP,201,PASS,CHECK,Supplementary: Idempotency on holds and configuration writes,4
+2026-10-16T07:20:53.629Z,S-0912,35 - Idempotency across configuration writes,35.4,35.4 - Same key on a different endpoint is a separate request,HTTP,200,PASS,CHECK,W01,5
+2026-10-16T07:20:53.639Z,S-0913,35 - Idempotency across configuration writes,35.5,35.5 - Oversized idempotency body is documented,SCRIPT,200,PASS,INFORMATIONAL,,2
+2026-10-16T07:20:53.641Z,S-0914,35 - Idempotency across configuration writes,35.6,35.6 - Document restart/retention/tenant-key cases,SCRIPT,200,PASS,INFORMATIONAL,,2
+2026-10-16T07:20:53.643Z,S-0915,35 - Idempotency across configuration writes,35.7,35.7 - Mint a disposable BIN number,SCRIPT,200,PASS,FIXTURE,W03,6
+2026-10-16T07:20:53.649Z,S-0916,35 - Idempotency across configuration writes,35.8,35.8 - Create a disposable BIN,HTTP,201,PASS,CHECK,W03,8
+2026-10-16T07:20:53.662Z,S-0917,35 - Idempotency across configuration writes,35.9,35.9 - Replay disposable BIN create,HTTP,201,PASS,CHECK,W03,2
+2026-10-16T07:20:53.670Z,S-0918,36 - Error envelope and contract validation,36.0,36.0 - Load shared configuration for contract envelope,SCRIPT,200,PASS,HARNESS,,6
+2026-10-16T07:20:53.676Z,S-0919,36 - Error envelope and contract validation,36.0b,36.0b - Get Keycloak access token,HTTP,200,PASS,HARNESS,,6
+2026-10-16T07:20:53.683Z,S-0920,36 - Error envelope and contract validation,36.1,36.1 - Success envelope has meta.requestId and timestamp,HTTP,200,PASS,CHECK,Supplementary: API envelope and request validation,4
+2026-10-16T07:20:53.693Z,S-0921,36 - Error envelope and contract validation,36.2,36.2 - Error envelope on validation failure,HTTP,400,PASS,CHECK,Supplementary: API envelope and request validation,3
+2026-10-16T07:20:53.708Z,S-0922,36 - Error envelope and contract validation,36.3,36.3 - Unsupported content type,HTTP,415,PASS,CHECK,Supplementary: API envelope and request validation,4
+2026-10-16T07:20:53.717Z,S-0923,36 - Error envelope and contract validation,36.4,36.4 - Empty JSON body on a required-body write,HTTP,400,PASS,CHECK,Supplementary: API envelope and request validation,4
+2026-10-16T07:20:53.725Z,S-0924,36 - Error envelope and contract validation,36.5,36.5 - Unknown JSON field on BIN PUT,HTTP,400,PASS,CHECK,Supplementary: API envelope and request validation,5
+2026-10-16T07:20:53.735Z,S-0925,36 - Error envelope and contract validation,36.6,36.6 - OpenAPI schema compliance note,SCRIPT,200,PASS,INFORMATIONAL,,3
+2026-10-16T07:20:53.740Z,S-0926,37 - Pagination and query behavior,37.0,37.0 - Load shared configuration for pagination,SCRIPT,200,PASS,HARNESS,,14
+2026-10-16T07:20:53.754Z,S-0927,37 - Pagination and query behavior,37.0b,37.0b - Get Keycloak access token,HTTP,200,PASS,HARNESS,,16
+2026-10-16T07:20:53.771Z,S-0928,37 - Pagination and query behavior,37.1,37.1 - Default page and limit,HTTP,200,PASS,CHECK,Supplementary: Pagination behaviour,12
+2026-10-16T07:20:53.788Z,S-0929,37 - Pagination and query behavior,37.2,37.2 - Explicit first page,HTTP,200,PASS,CHECK,Supplementary: Pagination behaviour,4
+2026-10-16T07:20:53.797Z,S-0930,37 - Pagination and query behavior,37.3,37.3 - Page beyond last is empty,HTTP,200,PASS,CHECK,Supplementary: Pagination behaviour,5
+2026-10-16T07:20:53.807Z,S-0931,37 - Pagination and query behavior,37.4,37.4 - Limit greater than 100 is capped,HTTP,200,PASS,CHECK,Supplementary: Pagination behaviour,7
+2026-10-16T07:20:53.819Z,S-0932,37 - Pagination and query behavior,37.5,37.5 - Page zero treated as default,HTTP,200,PASS,CHECK,Supplementary: Pagination behaviour,6
+2026-10-16T07:20:53.829Z,S-0933,37 - Pagination and query behavior,37.6,37.6 - Negative page/limit,HTTP,200,PASS,CHECK,Supplementary: Pagination behaviour,5
+2026-10-16T07:20:53.839Z,S-0934,37 - Pagination and query behavior,37.7,37.7 - Invalid enum filter,HTTP,400,PASS,CHECK,Supplementary: Pagination behaviour,3
+2026-10-16T07:20:53.846Z,S-0935,37 - Pagination and query behavior,37.8,37.8 - Institution pagination,HTTP,200,PASS,CHECK,Supplementary: Pagination behaviour,5
+2026-10-16T07:20:53.856Z,S-0936,37 - Pagination and query behavior,37.9,37.9 - Key pagination,HTTP,200,PASS,CHECK,Supplementary: Pagination behaviour,5
+2026-10-16T07:20:53.865Z,S-0937,37 - Pagination and query behavior,37.10,37.10 - Outbox pagination,HTTP,200,PASS,CHECK,Supplementary: Pagination behaviour,5
+2026-10-16T07:20:53.874Z,S-0938,37 - Pagination and query behavior,37.11,37.11 - Replacement-policy first page,HTTP,200,PASS,CHECK,W06,5
+2026-10-16T07:20:53.884Z,S-0939,37 - Pagination and query behavior,37.12,37.12 - Replacement-policy middle page,HTTP,200,PASS,CHECK,W06,6
+2026-10-16T07:20:53.895Z,S-0940,37 - Pagination and query behavior,37.13,37.13 - Product list second page,HTTP,200,PASS,CHECK,Supplementary: Pagination behaviour,5
+2026-10-16T07:20:53.907Z,S-0941,38 - Outbox operations and Switch recovery docs,38.0,38.0 - Load shared configuration for outbox and Switch ops,SCRIPT,200,PASS,HARNESS,,5
+2026-10-16T07:20:53.913Z,S-0942,38 - Outbox operations and Switch recovery docs,38.0b,38.0b - Get Keycloak access token,HTTP,200,PASS,HARNESS,,9
+2026-10-16T07:20:53.923Z,S-0943,38 - Outbox operations and Switch recovery docs,38.1,38.1 - List outbox events,HTTP,200,PASS,CHECK,Supplementary: Outbox operations,4
+2026-10-16T07:20:53.935Z,S-0944,38 - Outbox operations and Switch recovery docs,38.3,38.3 - Replay dead-letter batch,HTTP,200,PASS,CHECK,Supplementary: Outbox operations,12
+2026-10-16T07:20:53.952Z,S-0945,38 - Outbox operations and Switch recovery docs,38.4,38.4 - Switch failure/recovery catalogue,SCRIPT,200,PASS,INFORMATIONAL,,1
+2026-10-16T07:20:53.955Z,S-0946,39 - Permission and token claim boundaries,39.0,39.0 - Load shared configuration for permission boundaries,SCRIPT,200,PASS,HARNESS,,6
+2026-10-16T07:20:53.961Z,S-0947,39 - Permission and token claim boundaries,39.0b,39.0b - Get Keycloak access token,HTTP,200,PASS,HARNESS,,7
+2026-10-16T07:20:53.970Z,S-0948,39 - Permission and token claim boundaries,39.1,39.1 - Expired/malformed token,HTTP,401,PASS,CHECK,Supplementary: Authentication and tenancy boundaries,2
+2026-10-16T07:20:53.976Z,S-0949,39 - Permission and token claim boundaries,39.2,39.2 - Missing Authorization,HTTP,401,PASS,CHECK,Supplementary: Authentication and tenancy boundaries,1
+2026-10-16T07:20:53.981Z,S-0950,39 - Permission and token claim boundaries,39.3,39.3 - Document role-matrix requirements,SCRIPT,200,PASS,INFORMATIONAL,,1
+2026-10-16T07:20:53.984Z,S-0951,40 - Resilience and recovery catalogue,40.0,40.0 - Load shared configuration for resilience catalogue,SCRIPT,200,PASS,HARNESS,,6
+2026-10-16T07:20:53.990Z,S-0952,40 - Resilience and recovery catalogue,40.0b,40.0b - Get Keycloak access token,HTTP,200,PASS,HARNESS,,7
+2026-10-16T07:20:53.998Z,S-0953,40 - Resilience and recovery catalogue,40.1,40.1 - Controlled resilience scenarios are documented,SCRIPT,200,PASS,INFORMATIONAL,,5
+2026-10-16T07:20:54.008Z,S-0954,"41 - Falcon product version, design, range and key isolation",41.0,41.0 - Load shared configuration for Falcon configuration changes,SCRIPT,200,PASS,HARNESS,,7
+2026-10-16T07:20:54.015Z,S-0955,"41 - Falcon product version, design, range and key isolation",41.0b,41.0b - Get Keycloak access token,HTTP,200,PASS,HARNESS,,7
+2026-10-16T07:20:54.023Z,S-0956,"41 - Falcon product version, design, range and key isolation",41.01.1,41.01.1 - Create isolated configuration account 1,HTTP,201,PASS,FIXTURE,W20,33
+2026-10-16T07:20:54.057Z,S-0957,"41 - Falcon product version, design, range and key isolation",41.02.1,41.02.1 - Link isolated configuration account 1,HTTP,201,PASS,FIXTURE,W20,7
+2026-10-16T07:20:54.065Z,S-0958,"41 - Falcon product version, design, range and key isolation",41.01.2,41.01.2 - Create isolated configuration account 2,HTTP,201,PASS,FIXTURE,W20,4
+2026-10-16T07:20:54.070Z,S-0959,"41 - Falcon product version, design, range and key isolation",41.02.2,41.02.2 - Link isolated configuration account 2,HTTP,201,PASS,FIXTURE,W20,6
+2026-10-16T07:20:54.077Z,S-0960,"41 - Falcon product version, design, range and key isolation",41.01.3,41.01.3 - Create isolated configuration account 3,HTTP,201,PASS,FIXTURE,W20,4
+2026-10-16T07:20:54.081Z,S-0961,"41 - Falcon product version, design, range and key isolation",41.02.3,41.02.3 - Link isolated configuration account 3,HTTP,201,PASS,FIXTURE,W20,5
+2026-10-16T07:20:54.087Z,S-0962,"41 - Falcon product version, design, range and key isolation",41.01.4,41.01.4 - Create isolated configuration account 4,HTTP,201,PASS,FIXTURE,W20,5
+2026-10-16T07:20:54.092Z,S-0963,"41 - Falcon product version, design, range and key isolation",41.02.4,41.02.4 - Link isolated configuration account 4,HTTP,201,PASS,FIXTURE,W20,6
+2026-10-16T07:20:54.098Z,S-0964,"41 - Falcon product version, design, range and key isolation",41.03,41.03 - Seed no-hold snapshots for four new configuration accounts,SCRIPT,200,PASS,FIXTURE,W20,164
+2026-10-16T07:20:54.263Z,S-0965,"41 - Falcon product version, design, range and key isolation",41.04.1,41.04.1 - W21 Create card design version 1,HTTP,201,PASS,CHECK,W21,5
+2026-10-16T07:20:54.274Z,S-0966,"41 - Falcon product version, design, range and key isolation",41.05.1,41.05.1 - W21 Activate card design version 1,HTTP,200,PASS,CHECK,W21,5
+2026-10-16T07:20:54.283Z,S-0967,"41 - Falcon product version, design, range and key isolation",41.06,41.06 - Use isolated design A for new configuration product,SCRIPT,200,PASS,HARNESS,,2
+2026-10-16T07:20:54.285Z,S-0968,"41 - Falcon product version, design, range and key isolation",41.07.1,41.07.1 - Create client configuration product,HTTP,201,PASS,PRECONDITION,W20,7
+2026-10-16T07:20:54.293Z,S-0969,"41 - Falcon product version, design, range and key isolation",41.07.2,41.07.2 - Create client configuration product version,HTTP,201,PASS,PRECONDITION,W20,5
+2026-10-16T07:20:54.298Z,S-0970,"41 - Falcon product version, design, range and key isolation",41.07.3,41.07.3 - Configure client configuration product card form,HTTP,200,PASS,PRECONDITION,W20,6
+2026-10-16T07:20:54.304Z,S-0971,"41 - Falcon product version, design, range and key isolation",41.07.4,41.07.4 - Configure client configuration product PIN policy,HTTP,200,PASS,PRECONDITION,W20,10
+2026-10-16T07:20:54.314Z,S-0972,"41 - Falcon product version, design, range and key isolation",41.07.5,41.07.5 - Configure client configuration product default controls,HTTP,200,PASS,PRECONDITION,W20,10
+2026-10-16T07:20:54.324Z,S-0973,"41 - Falcon product version, design, range and key isolation",41.07.6.1,41.07.6.1 - Create DOMESTIC_ATM limit on client configuration product,HTTP,201,PASS,PRECONDITION,W20,5
+2026-10-16T07:20:54.330Z,S-0974,"41 - Falcon product version, design, range and key isolation",41.07.6.2,41.07.6.2 - Create DOMESTIC_POS limit on client configuration product,HTTP,201,PASS,PRECONDITION,W20,3
+2026-10-16T07:20:54.333Z,S-0975,"41 - Falcon product version, design, range and key isolation",41.07.6.3,41.07.6.3 - Create DOMESTIC_ECOMMERCE limit on client configuration product,HTTP,201,PASS,PRECONDITION,W20,4
+2026-10-16T07:20:54.338Z,S-0976,"41 - Falcon product version, design, range and key isolation",41.07.6.4,41.07.6.4 - Create DOMESTIC_CONTACTLESS limit on client configuration product,HTTP,201,PASS,PRECONDITION,W20,4
+2026-10-16T07:20:54.342Z,S-0977,"41 - Falcon product version, design, range and key isolation",41.07.6.5,41.07.6.5 - Create INTERNATIONAL_ATM limit on client configuration product,HTTP,201,PASS,PRECONDITION,W20,4
+2026-10-16T07:20:54.346Z,S-0978,"41 - Falcon product version, design, range and key isolation",41.07.6.6,41.07.6.6 - Create INTERNATIONAL_POS limit on client configuration product,HTTP,201,PASS,PRECONDITION,W20,4
+2026-10-16T07:20:54.351Z,S-0979,"41 - Falcon product version, design, range and key isolation",41.07.6.7,41.07.6.7 - Create INTERNATIONAL_ECOMMERCE limit on client configuration product,HTTP,201,PASS,PRECONDITION,W20,4
+2026-10-16T07:20:54.355Z,S-0980,"41 - Falcon product version, design, range and key isolation",41.07.6.8,41.07.6.8 - Create INTERNATIONAL_CONTACTLESS limit on client configuration product,HTTP,201,PASS,PRECONDITION,W20,4
+2026-10-16T07:20:54.359Z,S-0981,"41 - Falcon product version, design, range and key isolation",41.07.7p,41.07.7p - Configure client configuration product personalisation policy,HTTP,200,PASS,PRECONDITION,W20,5
+2026-10-16T07:20:54.365Z,S-0982,"41 - Falcon product version, design, range and key isolation",41.07.8,41.07.8 - Assign BIN range to client configuration product,HTTP,201,PASS,PRECONDITION,W20,6
+2026-10-16T07:20:54.372Z,S-0983,"41 - Falcon product version, design, range and key isolation",41.07.8a,41.07.8a - Assign physical card design to client configuration product,HTTP,201,PASS,PRECONDITION,W20,5
+2026-10-16T07:20:54.378Z,S-0984,"41 - Falcon product version, design, range and key isolation",41.07.8b,41.07.8b - Activate client configuration product design assignment,HTTP,200,PASS,PRECONDITION,W20,3
+2026-10-16T07:20:54.382Z,S-0985,"41 - Falcon product version, design, range and key isolation",41.07.8c,41.07.8c - Create client configuration product technology profile,HTTP,201,PASS,PRECONDITION,W20,6
+2026-10-16T07:20:54.388Z,S-0986,"41 - Falcon product version, design, range and key isolation",41.07.8d,41.07.8d - Activate client configuration product technology profile,HTTP,200,PASS,PRECONDITION,W20,6
+2026-10-16T07:20:54.395Z,S-0987,"41 - Falcon product version, design, range and key isolation",41.07.8e,41.07.8e - Create client configuration product CVM profile,HTTP,201,PASS,PRECONDITION,W20,21
+2026-10-16T07:20:54.417Z,S-0988,"41 - Falcon product version, design, range and key isolation",41.07.8f,41.07.8f - Activate client configuration product CVM profile,HTTP,200,PASS,PRECONDITION,W20,6
+2026-10-16T07:20:54.285Z,S-0989,"41 - Falcon product version, design, range and key isolation",41.07,41.07 - Configure client configuration product,SCRIPT,200,PASS,PRECONDITION,W20,128
+2026-10-16T07:20:54.423Z,S-0990,"41 - Falcon product version, design, range and key isolation",41.08,41.08 - Activate only new v1 PIN and personalisation fixtures,SCRIPT,200,PASS,FIXTURE,W20,38
+2026-10-16T07:20:54.462Z,S-0991,"41 - Falcon product version, design, range and key isolation",41.09.1,41.09.1 - PENDING_APPROVAL,HTTP,200,PASS,CHECK,W20,9
+2026-10-16T07:20:54.476Z,S-0992,"41 - Falcon product version, design, range and key isolation",41.09.2,41.09.2 - ACTIVE,HTTP,200,PASS,CHECK,W20,11
+2026-10-16T07:20:54.492Z,S-0993,"41 - Falcon product version, design, range and key isolation",41.10.1,41.10.1 - PENDING_APPROVAL,HTTP,200,PASS,CHECK,W20,11
+2026-10-16T07:20:54.509Z,S-0994,"41 - Falcon product version, design, range and key isolation",41.10.2,41.10.2 - ACTIVE,HTTP,200,PASS,CHECK,W20,9
+2026-10-16T07:20:54.524Z,S-0995,"41 - Falcon product version, design, range and key isolation",41.11.1,41.11.1 - PENDING_APPROVAL,HTTP,200,PASS,CHECK,W20,9
+2026-10-16T07:20:54.538Z,S-0996,"41 - Falcon product version, design, range and key isolation",41.11.2,41.11.2 - ACTIVE,HTTP,200,PASS,CHECK,W20,10
+2026-10-16T07:20:54.552Z,S-0997,"41 - Falcon product version, design, range and key isolation",41.12,41.12 - Prepare issuance: CLIENT CARD A,SCRIPT,200,PASS,HARNESS,,5
+2026-10-16T07:20:54.557Z,S-0998,"41 - Falcon product version, design, range and key isolation",41.12.1,41.12.1 - Submit issuance: CLIENT CARD A,HTTP,202,PASS,CHECK,W10; W20,21
+2026-10-16T07:20:56.597Z,S-0999,"41 - Falcon product version, design, range and key isolation",41.12.2a,41.12.2a - Read issuance operation: CLIENT CARD A,HTTP,200,PASS,POLL,W10; W20,11
+2026-10-16T07:20:58.622Z,S-1000,"41 - Falcon product version, design, range and key isolation",41.12.2a,41.12.2a - Read issuance operation: CLIENT CARD A,HTTP,200,PASS,CHECK,W10; W20,4
+2026-10-16T07:20:58.627Z,S-1001,"41 - Falcon product version, design, range and key isolation",41.12.3,41.12.3 - Require issued card: CLIENT CARD A,SCRIPT,200,PASS,CHECK,W10; W20,6
+2026-10-16T07:20:58.634Z,S-1002,"41 - Falcon product version, design, range and key isolation",41.13,41.13 - W20 W21 W23 Retain Card A immutable issuance snapshot,SCRIPT,200,PASS,CHECK,W20; W21,159
+2026-10-16T07:20:58.793Z,S-1003,"41 - Falcon product version, design, range and key isolation",41.14,41.14 - W20 Retain Card A controls before version change,HTTP,200,PASS,CHECK,W20,4
+2026-10-16T07:20:58.807Z,S-1004,"41 - Falcon product version, design, range and key isolation",41.04.2,41.04.2 - W21 Create card design version 2,HTTP,201,PASS,CHECK,W21,16
+2026-10-16T07:20:58.829Z,S-1005,"41 - Falcon product version, design, range and key isolation",41.05.2,41.05.2 - W21 Activate card design version 2,HTTP,200,PASS,CHECK,W21,5
+2026-10-16T07:20:58.839Z,S-1006,"41 - Falcon product version, design, range and key isolation",41.15,41.15 - W20 Create second version under same stable product,HTTP,201,PASS,CHECK,W20,6
+2026-10-16T07:20:58.850Z,S-1007,"41 - Falcon product version, design, range and key isolation",41.16,41.16 - W20 Set v2 physical-only form,HTTP,200,PASS,CHECK,W20,6
+2026-10-16T07:20:58.860Z,S-1008,"41 - Falcon product version, design, range and key isolation",41.17,41.17 - W20 Set changed v2 PIN retry policy,HTTP,200,PASS,CHECK,W20,5
+2026-10-16T07:20:58.869Z,S-1009,"41 - Falcon product version, design, range and key isolation",41.18,41.18 - W20 Set v2 POS disabled by default,HTTP,200,PASS,CHECK,W20,6
+2026-10-16T07:20:58.880Z,S-1010,"41 - Falcon product version, design, range and key isolation",41.19,41.19 - W20 Set v2 DOMESTIC_ATM default,HTTP,201,PASS,CHECK,W20,4
+2026-10-16T07:20:58.889Z,S-1011,"41 - Falcon product version, design, range and key isolation",41.19,41.19 - W20 Set v2 DOMESTIC_POS default,HTTP,201,PASS,CHECK,W20,6
+2026-10-16T07:20:58.899Z,S-1012,"41 - Falcon product version, design, range and key isolation",41.19,41.19 - W20 Set v2 DOMESTIC_ECOMMERCE default,HTTP,201,PASS,CHECK,W20,6
+2026-10-16T07:20:58.909Z,S-1013,"41 - Falcon product version, design, range and key isolation",41.19,41.19 - W20 Set v2 DOMESTIC_CONTACTLESS default,HTTP,201,PASS,CHECK,W20,5
+2026-10-16T07:20:58.918Z,S-1014,"41 - Falcon product version, design, range and key isolation",41.19,41.19 - W20 Set v2 INTERNATIONAL_ATM default,HTTP,201,PASS,CHECK,W20,5
+2026-10-16T07:20:58.928Z,S-1015,"41 - Falcon product version, design, range and key isolation",41.19,41.19 - W20 Set v2 INTERNATIONAL_POS default,HTTP,201,PASS,CHECK,W20,4
+2026-10-16T07:20:58.937Z,S-1016,"41 - Falcon product version, design, range and key isolation",41.19,41.19 - W20 Set v2 INTERNATIONAL_ECOMMERCE default,HTTP,201,PASS,CHECK,W20,5
+2026-10-16T07:20:58.947Z,S-1017,"41 - Falcon product version, design, range and key isolation",41.19,41.19 - W20 Set v2 INTERNATIONAL_CONTACTLESS default,HTTP,201,PASS,CHECK,W20,5
+2026-10-16T07:20:58.958Z,S-1018,"41 - Falcon product version, design, range and key isolation",41.20,41.20 - W20 Set v2 personalisation policy,HTTP,200,PASS,CHECK,W20,6
+2026-10-16T07:20:58.968Z,S-1019,"41 - Falcon product version, design, range and key isolation",41.21,41.21 - W21 Assign design version 2 only to product v2,HTTP,201,PASS,CHECK,W21,7
+2026-10-16T07:20:58.989Z,S-1020,"41 - Falcon product version, design, range and key isolation",41.22,41.22 - W21 Activate design v2 assignment,HTTP,200,PASS,CHECK,W21,7
+2026-10-16T07:20:59.001Z,S-1021,"41 - Falcon product version, design, range and key isolation",41.23,41.23 - W20 Create independent v2 technology profile,HTTP,201,PASS,CHECK,W20,7
+2026-10-16T07:20:59.013Z,S-1022,"41 - Falcon product version, design, range and key isolation",41.24,41.24 - W20 Activate v2 technology,HTTP,200,PASS,CHECK,W20,6
+2026-10-16T07:20:59.025Z,S-1023,"41 - Falcon product version, design, range and key isolation",41.25,41.25 - W20 Create independent v2 CVM profile,HTTP,201,PASS,CHECK,W20,8
+2026-10-16T07:20:59.039Z,S-1024,"41 - Falcon product version, design, range and key isolation",41.26,41.26 - W20 Activate v2 CVM,HTTP,200,PASS,CHECK,W20,5
+2026-10-16T07:20:59.049Z,S-1025,"41 - Falcon product version, design, range and key isolation",41.27,41.27 - Activate only new v2 PIN and personalisation fixtures,SCRIPT,200,PASS,FIXTURE,W20,41
+2026-10-16T07:20:59.090Z,S-1026,"41 - Falcon product version, design, range and key isolation",41.28,41.28 - W20 Retire own product v1 before v2 activation,HTTP,200,PASS,CHECK,W20,8
+2026-10-16T07:20:59.102Z,S-1027,"41 - Falcon product version, design, range and key isolation",41.29.1,41.29.1 - PENDING_APPROVAL,HTTP,200,PASS,CHECK,W20,7
+2026-10-16T07:20:59.113Z,S-1028,"41 - Falcon product version, design, range and key isolation",41.29.2,41.29.2 - ACTIVE,HTTP,200,PASS,CHECK,W20,7
+2026-10-16T07:20:59.125Z,S-1029,"41 - Falcon product version, design, range and key isolation",41.30,41.30 - W20 Reject active version default rewrite,HTTP,400,PASS,CHECK,W20,4
+2026-10-16T07:20:59.135Z,S-1030,"41 - Falcon product version, design, range and key isolation",41.31,41.31 - W21 Reject active design artwork metadata rewrite,HTTP,400,PASS,CHECK,W21,5
+2026-10-16T07:20:59.144Z,S-1031,"41 - Falcon product version, design, range and key isolation",41.32,41.32 - W22 Prepare disjoint additional PAN range,SCRIPT,200,PASS,HARNESS,,3
+2026-10-16T07:20:59.147Z,S-1032,"41 - Falcon product version, design, range and key isolation",41.33,41.33 - W22 Create additional range on same BIN,HTTP,201,PASS,CHECK,W22,10
+2026-10-16T07:20:59.162Z,S-1033,"41 - Falcon product version, design, range and key isolation",41.34.1,41.34.1 - PENDING_APPROVAL,HTTP,200,PASS,CHECK,W22,7
+2026-10-16T07:20:59.174Z,S-1034,"41 - Falcon product version, design, range and key isolation",41.34.2,41.34.2 - ACTIVE,HTTP,200,PASS,CHECK,W22,7
+2026-10-16T07:20:59.185Z,S-1035,"41 - Falcon product version, design, range and key isolation",41.35,41.35 - W22 Assign expanded range to existing product,HTTP,201,PASS,CHECK,W22,6
+2026-10-16T07:20:59.196Z,S-1036,"41 - Falcon product version, design, range and key isolation",41.36.1,41.36.1 - PENDING_APPROVAL,HTTP,200,PASS,CHECK,W22,6
+2026-10-16T07:20:59.206Z,S-1037,"41 - Falcon product version, design, range and key isolation",41.36.2,41.36.2 - ACTIVE,HTTP,200,PASS,CHECK,W22,7
+2026-10-16T07:20:59.217Z,S-1038,"41 - Falcon product version, design, range and key isolation",41.42,41.42 - Prepare issuance: CLIENT CARD B,SCRIPT,200,PASS,HARNESS,,5
+2026-10-16T07:20:59.223Z,S-1039,"41 - Falcon product version, design, range and key isolation",41.42.1,41.42.1 - Submit issuance: CLIENT CARD B,HTTP,202,PASS,CHECK,W20; W22,14
+2026-10-16T07:21:01.257Z,S-1040,"41 - Falcon product version, design, range and key isolation",41.42.2a,41.42.2a - Read issuance operation: CLIENT CARD B,HTTP,200,PASS,POLL,W20; W22,5
+2026-10-16T07:21:03.283Z,S-1041,"41 - Falcon product version, design, range and key isolation",41.42.2a,41.42.2a - Read issuance operation: CLIENT CARD B,HTTP,200,PASS,CHECK,W20; W22,10
+2026-10-16T07:21:03.295Z,S-1042,"41 - Falcon product version, design, range and key isolation",41.42.3,41.42.3 - Require issued card: CLIENT CARD B,SCRIPT,200,PASS,CHECK,W20; W22,19
+2026-10-16T07:21:03.321Z,S-1043,"41 - Falcon product version, design, range and key isolation",41.43,41.43 - W20 W22 Card B selects v2 and expanded range,HTTP,200,PASS,CHECK,W20; W22,4
+2026-10-16T07:21:03.330Z,S-1044,"41 - Falcon product version, design, range and key isolation",41.44,41.44 - W20 Card B receives new POS default,HTTP,200,PASS,CHECK,W20,6
+2026-10-16T07:21:03.343Z,S-1045,"41 - Falcon product version, design, range and key isolation",41.45,41.45 - W22 Expanded range records allocation and remaining capacity,HTTP,200,PASS,CHECK,W22,6
+2026-10-16T07:21:03.355Z,S-1046,"41 - Falcon product version, design, range and key isolation",41.46,"41.46 - W20 W21 W23 Card B new profile, design and CVK lineage",SCRIPT,200,PASS,CHECK,W20; W21,46
+2026-10-16T07:21:03.405Z,S-1047,"41 - Falcon product version, design, range and key isolation",41.47.1,41.47.1 - Create independent shared-BIN client product,HTTP,201,PASS,PRECONDITION,W24,8
+2026-10-16T07:21:03.414Z,S-1048,"41 - Falcon product version, design, range and key isolation",41.47.2,41.47.2 - Create independent shared-BIN client product version,HTTP,201,PASS,PRECONDITION,W24,6
+2026-10-16T07:21:03.421Z,S-1049,"41 - Falcon product version, design, range and key isolation",41.47.3,41.47.3 - Configure independent shared-BIN client product card form,HTTP,200,PASS,PRECONDITION,W24,6
+2026-10-16T07:21:03.427Z,S-1050,"41 - Falcon product version, design, range and key isolation",41.47.4,41.47.4 - Configure independent shared-BIN client product PIN policy,HTTP,200,PASS,PRECONDITION,W24,5
+2026-10-16T07:21:03.432Z,S-1051,"41 - Falcon product version, design, range and key isolation",41.47.5,41.47.5 - Configure independent shared-BIN client product default controls,HTTP,200,PASS,PRECONDITION,W24,5
+2026-10-16T07:21:03.437Z,S-1052,"41 - Falcon product version, design, range and key isolation",41.47.6.1,41.47.6.1 - Create DOMESTIC_ATM limit on independent shared-BIN client product,HTTP,201,PASS,PRECONDITION,W24,5
+2026-10-16T07:21:03.442Z,S-1053,"41 - Falcon product version, design, range and key isolation",41.47.6.2,41.47.6.2 - Create DOMESTIC_POS limit on independent shared-BIN client product,HTTP,201,PASS,PRECONDITION,W24,4
+2026-10-16T07:21:03.446Z,S-1054,"41 - Falcon product version, design, range and key isolation",41.47.6.3,41.47.6.3 - Create DOMESTIC_ECOMMERCE limit on independent shared-BIN client product,HTTP,201,PASS,PRECONDITION,W24,3
+2026-10-16T07:21:03.450Z,S-1055,"41 - Falcon product version, design, range and key isolation",41.47.6.4,41.47.6.4 - Create DOMESTIC_CONTACTLESS limit on independent shared-BIN client product,HTTP,201,PASS,PRECONDITION,W24,4
+2026-10-16T07:21:03.454Z,S-1056,"41 - Falcon product version, design, range and key isolation",41.47.6.5,41.47.6.5 - Create INTERNATIONAL_ATM limit on independent shared-BIN client product,HTTP,201,PASS,PRECONDITION,W24,5
+2026-10-16T07:21:03.460Z,S-1057,"41 - Falcon product version, design, range and key isolation",41.47.6.6,41.47.6.6 - Create INTERNATIONAL_POS limit on independent shared-BIN client product,HTTP,201,PASS,PRECONDITION,W24,5
+2026-10-16T07:21:03.465Z,S-1058,"41 - Falcon product version, design, range and key isolation",41.47.6.7,41.47.6.7 - Create INTERNATIONAL_ECOMMERCE limit on independent shared-BIN client product,HTTP,201,PASS,PRECONDITION,W24,7
+2026-10-16T07:21:03.472Z,S-1059,"41 - Falcon product version, design, range and key isolation",41.47.6.8,41.47.6.8 - Create INTERNATIONAL_CONTACTLESS limit on independent shared-BIN client product,HTTP,201,PASS,PRECONDITION,W24,6
+2026-10-16T07:21:03.479Z,S-1060,"41 - Falcon product version, design, range and key isolation",41.47.7p,41.47.7p - Configure independent shared-BIN client product personalisation policy,HTTP,200,PASS,PRECONDITION,W24,5
+2026-10-16T07:21:03.485Z,S-1061,"41 - Falcon product version, design, range and key isolation",41.47.8,41.47.8 - Assign BIN range to independent shared-BIN client product,HTTP,201,PASS,PRECONDITION,W24,7
+2026-10-16T07:21:03.492Z,S-1062,"41 - Falcon product version, design, range and key isolation",41.47.8a,41.47.8a - Assign virtual card design to independent shared-BIN client product,HTTP,201,PASS,PRECONDITION,W24,7
+2026-10-16T07:21:03.499Z,S-1063,"41 - Falcon product version, design, range and key isolation",41.47.8b,41.47.8b - Activate independent shared-BIN client product design assignment,HTTP,200,PASS,PRECONDITION,W24,7
+2026-10-16T07:21:03.506Z,S-1064,"41 - Falcon product version, design, range and key isolation",41.47.8e,41.47.8e - Create independent shared-BIN client product CVM profile,HTTP,201,PASS,PRECONDITION,W24,10
+2026-10-16T07:21:03.516Z,S-1065,"41 - Falcon product version, design, range and key isolation",41.47.8f,41.47.8f - Activate independent shared-BIN client product CVM profile,HTTP,200,PASS,PRECONDITION,W24,6
+2026-10-16T07:21:03.405Z,S-1066,"41 - Falcon product version, design, range and key isolation",41.47,41.47 - Configure independent shared-BIN client product,SCRIPT,200,PASS,PRECONDITION,W24,111
+2026-10-16T07:21:03.522Z,S-1067,"41 - Falcon product version, design, range and key isolation",41.48,41.48 - Activate only independent product policy fixtures,SCRIPT,200,PASS,FIXTURE,W24,38
+2026-10-16T07:21:03.560Z,S-1068,"41 - Falcon product version, design, range and key isolation",41.49.1,41.49.1 - PENDING_APPROVAL,HTTP,200,PASS,CHECK,W24,8
+2026-10-16T07:21:03.573Z,S-1069,"41 - Falcon product version, design, range and key isolation",41.49.2,41.49.2 - ACTIVE,HTTP,200,PASS,CHECK,W24,7
+2026-10-16T07:21:03.585Z,S-1070,"41 - Falcon product version, design, range and key isolation",41.50.1,41.50.1 - PENDING_APPROVAL,HTTP,200,PASS,CHECK,W24,6
+2026-10-16T07:21:03.596Z,S-1071,"41 - Falcon product version, design, range and key isolation",41.50.2,41.50.2 - ACTIVE,HTTP,200,PASS,CHECK,W24,8
+2026-10-16T07:21:03.609Z,S-1072,"41 - Falcon product version, design, range and key isolation",41.51.1,41.51.1 - PENDING_APPROVAL,HTTP,200,PASS,CHECK,W24,6
+2026-10-16T07:21:03.619Z,S-1073,"41 - Falcon product version, design, range and key isolation",41.51.2,41.51.2 - ACTIVE,HTTP,200,PASS,CHECK,W24,8
+2026-10-16T07:21:03.633Z,S-1074,"41 - Falcon product version, design, range and key isolation",41.52,41.52 - Prepare issuance: CLIENT CARD C,SCRIPT,200,PASS,HARNESS,,5
+2026-10-16T07:21:03.638Z,S-1075,"41 - Falcon product version, design, range and key isolation",41.52.1,41.52.1 - Submit issuance: CLIENT CARD C,HTTP,202,PASS,CHECK,W24,20
+2026-10-16T07:21:05.675Z,S-1076,"41 - Falcon product version, design, range and key isolation",41.52.2a,41.52.2a - Read issuance operation: CLIENT CARD C,HTTP,200,PASS,POLL,W24,7
+2026-10-16T07:21:07.693Z,S-1077,"41 - Falcon product version, design, range and key isolation",41.52.2a,41.52.2a - Read issuance operation: CLIENT CARD C,HTTP,200,PASS,POLL,W24,3
+2026-10-16T07:21:09.706Z,S-1078,"41 - Falcon product version, design, range and key isolation",41.52.2a,41.52.2a - Read issuance operation: CLIENT CARD C,HTTP,200,PASS,CHECK,W24,4
+2026-10-16T07:21:09.711Z,S-1079,"41 - Falcon product version, design, range and key isolation",41.52.3,41.52.3 - Require issued card: CLIENT CARD C,SCRIPT,200,PASS,CHECK,W24,3
+2026-10-16T07:21:09.716Z,S-1080,"41 - Falcon product version, design, range and key isolation",41.53,41.53 - W24 Independent product uses same BIN and its own version,HTTP,200,PASS,CHECK,W24,4
+2026-10-16T07:21:09.725Z,S-1081,"41 - Falcon product version, design, range and key isolation",41.54,41.54 - W24 Independent product retains its POS default,HTTP,200,PASS,CHECK,W24,4
+2026-10-16T07:21:09.737Z,S-1082,"41 - Falcon product version, design, range and key isolation",41.55,41.55 - W20 W21 W22 W23 Card A immutable facts survive all changes,SCRIPT,200,PASS,CHECK,W20; W21; W22,49
+2026-10-16T07:21:09.787Z,S-1083,"41 - Falcon product version, design, range and key isolation",41.56,41.56 - W20 W24 Card A controls unchanged after both products issued,HTTP,200,PASS,CHECK,W20; W24,5
+2026-10-16T07:21:09.799Z,S-1084,"41 - Falcon product version, design, range and key isolation",41.57,41.57 - W24 Product v2 defaults unchanged by other product,HTTP,200,PASS,CHECK,W20; W24,4
+2026-10-16T07:21:09.810Z,S-1085,"41 - Falcon product version, design, range and key isolation",41.58,41.58 - W21 Original design version remains ACTIVE,HTTP,200,PASS,CHECK,W21,5
+2026-10-16T07:21:09.822Z,S-1086,"41 - Falcon product version, design, range and key isolation",41.36a,41.36a - W23 Initialize independent rotation readiness,SCRIPT,200,PASS,HARNESS,,4
+2026-10-16T07:21:09.826Z,S-1087,"41 - Falcon product version, design, range and key isolation",41.36b,41.36b - W23 Record the prior BIN CVK before rotation,HTTP,200,PASS,CHECK,W23,3
+2026-10-16T07:21:09.834Z,S-1088,"41 - Falcon product version, design, range and key isolation",41.37,41.37 - W23 Generate real successor BIN CVK using HSM,HTTP,201,PASS,CHECK,W23,113
+2026-10-16T07:21:09.953Z,S-1089,"41 - Falcon product version, design, range and key isolation",41.37a,41.37a - W23 Prepare rotation using only newly generated HSM wrapped key,SCRIPT,200,PASS,FIXTURE,W23,39
+2026-10-16T07:21:09.992Z,S-1090,"41 - Falcon product version, design, range and key isolation",41.37b,41.37b - W23 Register rotated CVK version,HTTP,201,PASS,CHECK,W23,8
+2026-10-16T07:21:10.006Z,S-1091,"41 - Falcon product version, design, range and key isolation",41.38,41.38 - W23 Activate successor CVK,HTTP,200,PASS,CHECK,W23,14
+2026-10-16T07:21:10.025Z,S-1092,"41 - Falcon product version, design, range and key isolation",41.38a,41.38a - W23 Prior CVK is retained for verification only after successor activation,HTTP,200,PASS,CHECK,W23,3
+2026-10-16T07:21:10.034Z,S-1093,"41 - Falcon product version, design, range and key isolation",41.39,41.39 - W23 Create successor BIN key assignment,HTTP,201,PASS,CHECK,W23,9
+2026-10-16T07:21:10.048Z,S-1094,"41 - Falcon product version, design, range and key isolation",41.40,41.40 - W23 Activate successor BIN key assignment,HTTP,500,FAIL,CHECK,W23,11
+2026-10-16T07:21:10.067Z,S-1095,"41 - Falcon product version, design, range and key isolation",41.41,41.41 - W23 Verify old key assignment VERIFY_ONLY and successor ACTIVE,HTTP,200,FAIL,CHECK,W23,6
+2026-10-16T07:21:10.089Z,S-1096,"41 - Falcon product version, design, range and key isolation",41.64,41.64 - W23 Postrotation issuance skipped because key assignment is unavailable,SCRIPT,SKIPPED,NOT_EXECUTED,CHECK,W23,4
+2026-10-16T07:21:10.093Z,S-1097,"41 - Falcon product version, design, range and key isolation",41.65,41.65 - W23 Card A historical key reference survives rotation attempt,SCRIPT,200,PASS,CHECK,W23,50

@@ -1,0 +1,54 @@
+{
+  "run_id": "FALCON-CMS-FULL-PVK-2026-10-20",
+  "started_at_utc": "2026-10-20T07:37:05Z",
+  "finished_at_utc": "2026-10-20T07:48:57Z",
+  "duration": "11 min 52 s",
+  "tooling": "Apache JMeter 5.6.3 on Java 21.0.11",
+  "samples_recorded": 1314,
+  "assertion_failures": 7,
+  "settings": {
+    "WAIT_FOR_SWITCH_SYNC": "true",
+    "SKIP_ACCOUNTING_TESTS": "true",
+    "ALLOW_TEST_FIXTURES": "true"
+  },
+  "scenario_outcome": {
+    "PASS": 19,
+    "PARTIAL": 5,
+    "FAIL": 1
+  },
+  "status_changes": [
+    {
+      "id": "W04",
+      "from": "PARTIAL",
+      "to": "PASS",
+      "reason": "Samplers 05.17 through 05.25 passed. The BIN has an active PIN_GENERATION assignment on a BIN PVK and an active PIN_BLOCK_ENCRYPTION assignment on an institution ZPK."
+    }
+  ],
+  "retained_partial": ["W15", "W16", "W17", "W19", "W25"],
+  "retained_fail": ["W23"],
+  "key_assignments": {
+    "05.17 - Generate BIN PVK": "PASS",
+    "05.18 - Activate BIN PVK": "PASS",
+    "05.19 - Create PIN generation assignment": "PASS",
+    "05.20 - Activate PIN generation assignment": "PASS",
+    "05.21 - Generate institution ZPK": "PASS",
+    "05.22 - Activate institution ZPK": "PASS",
+    "05.23 - Create PIN block encryption assignment": "PASS",
+    "05.24 - Activate PIN block encryption assignment": "PASS",
+    "05.25 - BIN has active PVK and ZPK assignments": "PASS"
+  },
+  "unchanged_gaps": {
+    "W15": "Accounting limit boundaries remained skipped.",
+    "W16": "PIN issuance was confirmed, and the plan still has no successful PIN change or reset.",
+    "W17": "Hot-list calls returned 403, so the 422 business-rule assertions were not reached.",
+    "W19": "Registration did not settle at Switch, and no old-card authorisation was sent.",
+    "W23": "Successor BIN key assignment activation returned HTTP 500 and the assignment did not become ACTIVE.",
+    "W25": "The authorisation leg was not executed."
+  },
+  "switch_waits_this_run": {
+    "14.10.2": "SWITCH_SYNC_TIMEOUT, appliedRevision 0, commands pending",
+    "18.16.2": "SWITCH_SYNC_TIMEOUT, appliedRevision 0, commands pending",
+    "19.3.2": "SWITCH_SYNC_TIMEOUT, appliedRevision 0, registration command pending",
+    "29.5s.2": "SWITCH_SYNC_TIMEOUT, appliedRevision 0, successor command pending"
+  }
+}

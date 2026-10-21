@@ -1,0 +1,101 @@
+# Copy outside source control and fill in secrets. Do not commit the copy.
+CMS_PROTOCOL=http
+CMS_HOST=localhost
+CMS_PORT=9800
+
+KEYCLOAK_PROTOCOL=http
+KEYCLOAK_HOST=localhost
+KEYCLOAK_REALM=cms
+KEYCLOAK_PORT=9000
+KEYCLOAK_CLIENT_ID=cms-local-client
+KEYCLOAK_CLIENT_SECRET=<provided at run time>
+
+# Optional second client, used ONLY by thread group 23 to prove tenant isolation.
+#
+# The client above must be platform-scoped, because the bootstrap creates an institution,
+# and CmsJwtRequestContextFilter lets a platform subject reach ANY institution path. No
+# request made with it can therefore demonstrate tenant isolation. This second client must:
+#   - have platform_access absent or false, and
+#   - carry an institution_id claim for some OTHER institution.
+# Any pre-existing institution works: the bootstrap creates a fresh one each run, so the
+# two are always different. Do not copy KEYCLOAK_CLIENT_ID here; a second platform client
+# fails 23.7.0 with TENANT_CLIENT_IS_PLATFORM and skips the isolation requests. Leave blank
+# and group 23 reports tenant isolation as UNPROVEN rather than quietly passing.
+TENANT_KEYCLOAK_CLIENT_ID=
+TENANT_KEYCLOAK_CLIENT_SECRET=<provided at run time>
+
+CMS_ACTOR_ID=jmeter-lifecycle
+
+# Customer-service V2 (boundary references). Bootstrap creates customers, accounts and
+# addresses here instead of inserting into cms_v2.customer_reference /
+# external_account_reference / address_reference directly.
+CUSTOMER_SERVICE_PROTOCOL=http
+CUSTOMER_SERVICE_HOST=localhost
+CUSTOMER_SERVICE_PORT=9801
+CUSTOMER_SOURCE_SYSTEM=LF_TEST
+
+# Embossing service V2. Group 28 calls the personalisation batch and file read APIs.
+# The Keycloak client needs cms:embossing:read or cms:embossing:manage, and platform_access
+# so the institution in the path is allowed. The scheduler creates batches; an empty list
+# is a valid result for a new institution.
+EMBOSSING_PROTOCOL=http
+EMBOSSING_HOST=localhost
+EMBOSSING_PORT=9803
+
+# Must be the same disposable database used by the CMS instance.
+# Database name must match EXPECTED_TEST_DATABASE. Tables remain in schema cms_v2.
+DB_URL=jdbc:postgresql://127.0.0.1:5432/cmsv2?sslmode=disable
+EXPECTED_TEST_DATABASE=cmsv2
+DB_USERNAME=postgres
+DB_PASSWORD=<provided at run time>
+
+# Required. The bootstrap thread group refuses to start unless this is true, and every
+# other thread group stops immediately when the bootstrap has published nothing.
+ALLOW_TEST_FIXTURES=true
+
+# Wait for Switch to apply each lifecycle event. Set false to exercise CMS only when
+# Switch is not running; the Switch profile comparisons then report as skipped rather
+# than failing.
+WAIT_FOR_SWITCH_SYNC=false
+
+# Exclude Accounting calls and card-limit boundary cases when the service is not running.
+# Initial limit reads and local negative request validation still run.
+SKIP_ACCOUNTING_TESTS=true
+
+# Used by bootstrap sampler 00.1 when WAIT_FOR_SWITCH_SYNC=true. Inserts this run's
+# random CMS BIN into Switch bin_details for institution 10 (the institution already
+# mapped to CMS 01a0a5f5-f71d-7d0f-ba69-a020a51bbbc1) as currency 356, and refreshes
+# the Switch BIN cache. The existing cms_institution_mapping row is left in place.
+# Thread group 19 also reads cms_card_profile and cms_card_command directly, so
+# SWITCH_DB_URL must point at the Switch database this CMS talks to.
+SWITCH_BASE_URL=http://localhost:8090
+SWITCH_DB_URL=jdbc:postgresql://127.0.0.1:5432/lpsswitch?sslmode=disable
+SWITCH_DB_USERNAME=postgres
+SWITCH_DB_PASSWORD=<provided at run time>
+SWITCH_BIN_INSTITUTION_ID=10
+
+# This plan issues roughly forty cards across the original and feedback area groups.
+MAX_POLLS=30
+POLL_INTERVAL_MS=2000
+SWITCH_SYNC_MAX_POLLS=60
+
+# Per-transaction limit ceiling configured on the test product, in minor units (INR
+# exponent 2, so 100000 is Rs 1,000). Thread group 15 sets a card limit to exactly this
+# value and expects it to be accepted, then one minor unit above it and expects a 422.
+#
+# CardControlsV2Service.validateLimit() checks the request against BOTH the product
+# maximum and the issuer-assigned Accounting card limit. Keep this at or below whatever
+# the configured Accounting service assigns to a new card on this product, otherwise
+# the at-the-ceiling case is refused by Accounting and 15.4.1 fails for the wrong reason.
+#
+# The Accounting card-limit wrapper must be configured for any of this to apply. Without
+# it every limit change returns 400 "Accounting card-limit wrapper is not configured",
+# and sampler 15.3b skips the boundary cases instead of failing them.
+PRODUCT_LIMIT_MAX_MINOR=100000
+PRODUCT_LIMIT_DEFAULT_MINOR=50000
+
+# Required for WAIT_FOR_SWITCH_SYNC=true. Separate Switch cache setup client,
+# authorized for switch:cache:manage and the Switch service audience/caller.
+SWITCH_CACHE_TOKEN_URL=
+SWITCH_CACHE_CLIENT_ID=
+SWITCH_CACHE_CLIENT_SECRET=<provided at run time>

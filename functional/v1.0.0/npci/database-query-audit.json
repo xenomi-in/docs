@@ -1,0 +1,163 @@
+[
+  {
+    "database": "lpsswitch",
+    "host": "127.0.0.1",
+    "started": "2026-10-16T15:18:25.830Z",
+    "sql": "SELECT coalesce(json_agg(e), '[]'::json) FROM (SELECT to_jsonb(t) - 'de2_pan' - 'de2_pan_ct' - 'de2_pan_iv' - 'de2_pan_tag' - 'pan_lookup_hmac' - 'de35_track2' - 'de36_track3' - 'de45_track1' - 'de52_pin_block' - 'de55_emv_data' - 'de64_mac' - 'de96_message_security_code' - 'raw_iso_message' AS record FROM \"public\".\"transaction\" t WHERE de37_rrn IN ('628920891197','628920020523','628920767460','628920668555','628920805157','628920196805') LIMIT 1001) e",
+    "status": "SUCCESS"
+  },
+  {
+    "database": "lpsswitch",
+    "host": "127.0.0.1",
+    "started": "2026-10-16T15:18:26.016Z",
+    "sql": "SELECT coalesce(json_agg(e), '[]'::json) FROM (SELECT to_jsonb(t) - 'reversal_message' - 'chip_data' AS record FROM \"public\".\"transaction_response\" t WHERE transaction_id IN ('1011792162525472989292','1011792162823372273089','1011792162808942220252','1011792162683890831263','1011792162685983341885','1011792162686059915516','1011792162817544502400','1011792162442218690407','01001016145401628920891197','01001016145525628920020523','01001016145803628920767460','04201016145805628920767460','01001016150008628920668555','01001016150017628920805157','01001016150023628920196805') LIMIT 1001) e",
+    "status": "SUCCESS"
+  },
+  {
+    "database": "lpsswitch",
+    "host": "127.0.0.1",
+    "started": "2026-10-16T15:18:26.174Z",
+    "sql": "SELECT coalesce(json_agg(e), '[]'::json) FROM (SELECT to_jsonb(t) - 'reversal_message' - 'chip_data' AS record FROM \"public\".\"transaction_audit_log\" t WHERE transaction_id IN ('1011792162525472989292','1011792162823372273089','1011792162808942220252','1011792162683890831263','1011792162685983341885','1011792162686059915516','1011792162817544502400','1011792162442218690407','01001016145401628920891197','01001016145525628920020523','01001016145803628920767460','04201016145805628920767460','01001016150008628920668555','01001016150017628920805157','01001016150023628920196805') LIMIT 1001) e",
+    "status": "SUCCESS"
+  },
+  {
+    "database": "lpsswitch",
+    "host": "127.0.0.1",
+    "started": "2026-10-16T15:18:26.329Z",
+    "sql": "SELECT coalesce(json_agg(e), '[]'::json) FROM (SELECT to_jsonb(t) - 'reversal_message' - 'chip_data' AS record FROM \"public\".\"transaction_fees\" t WHERE transaction_id IN ('1011792162525472989292','1011792162823372273089','1011792162808942220252','1011792162683890831263','1011792162685983341885','1011792162686059915516','1011792162817544502400','1011792162442218690407','01001016145401628920891197','01001016145525628920020523','01001016145803628920767460','04201016145805628920767460','01001016150008628920668555','01001016150017628920805157','01001016150023628920196805') LIMIT 1001) e",
+    "status": "SUCCESS"
+  },
+  {
+    "database": "lpsswitch",
+    "host": "127.0.0.1",
+    "started": "2026-10-16T15:18:26.506Z",
+    "sql": "SELECT coalesce(json_agg(e), '[]'::json) FROM (SELECT to_jsonb(t) - 'reversal_message' - 'chip_data' AS record FROM \"public\".\"transaction_reversals\" t WHERE transaction_id IN ('1011792162525472989292','1011792162823372273089','1011792162808942220252','1011792162683890831263','1011792162685983341885','1011792162686059915516','1011792162817544502400','1011792162442218690407','01001016145401628920891197','01001016145525628920020523','01001016145803628920767460','04201016145805628920767460','01001016150008628920668555','01001016150017628920805157','01001016150023628920196805') LIMIT 1001) e",
+    "status": "SUCCESS"
+  },
+  {
+    "database": "lpsswitch",
+    "host": "127.0.0.1",
+    "started": "2026-10-16T15:18:26.659Z",
+    "sql": "SELECT coalesce(json_agg(e), '[]'::json) FROM (SELECT to_jsonb(t) - 'reversal_message' - 'chip_data' AS record FROM \"public\".\"transaction_routing\" t WHERE transaction_id IN ('1011792162525472989292','1011792162823372273089','1011792162808942220252','1011792162683890831263','1011792162685983341885','1011792162686059915516','1011792162817544502400','1011792162442218690407','01001016145401628920891197','01001016145525628920020523','01001016145803628920767460','04201016145805628920767460','01001016150008628920668555','01001016150017628920805157','01001016150023628920196805') LIMIT 1001) e",
+    "status": "SUCCESS"
+  },
+  {
+    "database": "lpsswitch",
+    "host": "127.0.0.1",
+    "started": "2026-10-16T15:18:26.809Z",
+    "sql": "SELECT coalesce(json_agg(e), '[]'::json) FROM (SELECT to_jsonb(t) - 'transaction_data' AS record FROM \"public\".\"reversal_requests\" t WHERE original_rrn IN ('628920891197','628920020523','628920767460','628920668555','628920805157','628920196805') OR transaction_id IN ('1011792162525472989292','1011792162823372273089','1011792162808942220252','1011792162683890831263','1011792162685983341885','1011792162686059915516','1011792162817544502400','1011792162442218690407','01001016145401628920891197','01001016145525628920020523','01001016145803628920767460','04201016145805628920767460','01001016150008628920668555','01001016150017628920805157','01001016150023628920196805') LIMIT 1001) e",
+    "status": "SUCCESS"
+  },
+  {
+    "database": "lpsswitch",
+    "host": "127.0.0.1",
+    "started": "2026-10-16T15:18:26.964Z",
+    "sql": "SELECT coalesce(json_agg(t),'[]') FROM (SELECT table_schema,table_name,column_name,data_type FROM information_schema.columns WHERE table_schema='public' ORDER BY table_name,ordinal_position) t",
+    "status": "SUCCESS"
+  },
+  {
+    "database": "lpsswitch",
+    "host": "127.0.0.1",
+    "started": "2026-10-16T15:18:27.151Z",
+    "sql": "SELECT coalesce(json_agg(e), '[]'::json) FROM (SELECT to_jsonb(t) AS record FROM \"public\".\"si_mandates\" t WHERE \"last_rrn\" IN ('628920891197','628920020523','628920767460','628920668555','628920805157','628920196805') OR \"last_transaction_id\" IN ('1011792162525472989292','1011792162823372273089','1011792162808942220252','1011792162683890831263','1011792162685983341885','1011792162686059915516','1011792162817544502400','1011792162442218690407','01001016145401628920891197','01001016145525628920020523','01001016145803628920767460','04201016145805628920767460','01001016150008628920668555','01001016150017628920805157','01001016150023628920196805') OR \"revocation_request_rrn\" IN ('628920891197','628920020523','628920767460','628920668555','628920805157','628920196805') LIMIT 1001) e",
+    "status": "SUCCESS"
+  },
+  {
+    "database": "lpsswitch",
+    "host": "127.0.0.1",
+    "started": "2026-10-16T15:18:27.308Z",
+    "sql": "SELECT coalesce(json_agg(e), '[]'::json) FROM (SELECT to_jsonb(t) AS record FROM \"public\".\"audit_logs\" t WHERE \"performed_by\"::text ~ '628920891197|628920020523|628920767460|628920668555|628920805157|628920196805' OR \"ip_address\"::text ~ '628920891197|628920020523|628920767460|628920668555|628920805157|628920196805' OR \"request_id\"::text ~ '628920891197|628920020523|628920767460|628920668555|628920805157|628920196805' OR \"action_type\"::text ~ '628920891197|628920020523|628920767460|628920668555|628920805157|628920196805' OR \"entity\"::text ~ '628920891197|628920020523|628920767460|628920668555|628920805157|628920196805' OR \"before_snapshot\"::text ~ '628920891197|628920020523|628920767460|628920668555|628920805157|628920196805' OR \"after_snapshot\"::text ~ '628920891197|628920020523|628920767460|628920668555|628920805157|628920196805' LIMIT 1001) e",
+    "status": "SUCCESS"
+  },
+  {
+    "database": "lpsswitch",
+    "host": "127.0.0.1",
+    "started": "2026-10-16T15:18:27.483Z",
+    "sql": "SELECT coalesce(json_agg(e), '[]'::json) FROM (SELECT to_jsonb(t) AS record FROM \"public\".\"audit_log\" t WHERE \"action_type\"::text ~ '628920891197|628920020523|628920767460|628920668555|628920805157|628920196805' OR \"action_description\"::text ~ '628920891197|628920020523|628920767460|628920668555|628920805157|628920196805' OR \"performed_by\"::text ~ '628920891197|628920020523|628920767460|628920668555|628920805157|628920196805' LIMIT 1001) e",
+    "status": "SUCCESS"
+  },
+  {
+    "database": "cmsv2",
+    "host": "127.0.0.1",
+    "started": "2026-10-16T15:18:27.661Z",
+    "sql": "SELECT coalesce(json_agg(t),'[]') FROM (SELECT table_schema,table_name,column_name,data_type FROM information_schema.columns WHERE table_schema='cms_v2' ORDER BY table_name,ordinal_position) t",
+    "status": "SUCCESS"
+  },
+  {
+    "database": "cmsv2",
+    "host": "127.0.0.1",
+    "started": "2026-10-16T15:18:27.866Z",
+    "sql": "SELECT coalesce(json_agg(e), '[]'::json) FROM (SELECT to_jsonb(t) AS record FROM \"cms_v2\".\"outbox_event\" t WHERE \"aggregate_type\"::text ~ '628920891197|628920020523|628920767460|628920668555|628920805157|628920196805' OR \"aggregate_id\"::text ~ '628920891197|628920020523|628920767460|628920668555|628920805157|628920196805' OR \"event_type\"::text ~ '628920891197|628920020523|628920767460|628920668555|628920805157|628920196805' OR \"event_payload\"::text ~ '628920891197|628920020523|628920767460|628920668555|628920805157|628920196805' LIMIT 1001) e",
+    "status": "SUCCESS"
+  },
+  {
+    "database": "cmsv2",
+    "host": "127.0.0.1",
+    "started": "2026-10-16T15:18:28.074Z",
+    "sql": "SELECT coalesce(json_agg(e), '[]'::json) FROM (SELECT to_jsonb(t) AS record FROM \"cms_v2\".\"unified_audit_event\" t WHERE \"aggregate_type\"::text ~ '628920891197|628920020523|628920767460|628920668555|628920805157|628920196805' OR \"aggregate_id\"::text ~ '628920891197|628920020523|628920767460|628920668555|628920805157|628920196805' OR \"before_state_reference\"::text ~ '628920891197|628920020523|628920767460|628920668555|628920805157|628920196805' OR \"after_state_reference\"::text ~ '628920891197|628920020523|628920767460|628920668555|628920805157|628920196805' OR \"metadata\"::text ~ '628920891197|628920020523|628920767460|628920668555|628920805157|628920196805' LIMIT 1001) e",
+    "status": "SUCCESS"
+  },
+  {
+    "database": "cmsv2",
+    "host": "127.0.0.1",
+    "started": "2026-10-16T15:18:28.239Z",
+    "sql": "SELECT coalesce(json_agg(e), '[]'::json) FROM (SELECT to_jsonb(t) AS record FROM \"cms_v2\".\"provider_inbox_event\" t WHERE \"source_event_id\"::text ~ '628920891197|628920020523|628920767460|628920668555|628920805157|628920196805' OR \"event_type\"::text ~ '628920891197|628920020523|628920767460|628920668555|628920805157|628920196805' OR \"payload\"::text ~ '628920891197|628920020523|628920767460|628920668555|628920805157|628920196805' LIMIT 1001) e",
+    "status": "SUCCESS"
+  },
+  {
+    "database": "cmsv2",
+    "host": "127.0.0.1",
+    "started": "2026-10-16T15:18:28.379Z",
+    "sql": "SELECT coalesce(json_agg(e), '[]'::json) FROM (SELECT to_jsonb(t) AS record FROM \"cms_v2\".\"card_event\" t WHERE \"event_type\"::text ~ '628920891197|628920020523|628920767460|628920668555|628920805157|628920196805' OR \"event_payload\"::text ~ '628920891197|628920020523|628920767460|628920668555|628920805157|628920196805' OR \"actor_reference\"::text ~ '628920891197|628920020523|628920767460|628920668555|628920805157|628920196805' LIMIT 1001) e",
+    "status": "SUCCESS"
+  },
+  {
+    "database": "cmsv2",
+    "host": "127.0.0.1",
+    "started": "2026-10-16T15:18:28.597Z",
+    "sql": "SELECT coalesce(json_agg(e), '[]'::json) FROM (SELECT to_jsonb(t) AS record FROM \"cms_v2\".\"card_control_event\" t WHERE \"actor_reference\"::text ~ '628920891197|628920020523|628920767460|628920668555|628920805157|628920196805' LIMIT 1001) e",
+    "status": "SUCCESS"
+  },
+  {
+    "database": "cmsv2",
+    "host": "127.0.0.1",
+    "started": "2026-10-16T15:18:28.745Z",
+    "sql": "SELECT coalesce(json_agg(e), '[]'::json) FROM (SELECT to_jsonb(t) AS record FROM \"cms_v2\".\"reconciliation_exception\" t WHERE \"aggregate_type\"::text ~ '628920891197|628920020523|628920767460|628920668555|628920805157|628920196805' OR \"aggregate_id\"::text ~ '628920891197|628920020523|628920767460|628920668555|628920805157|628920196805' OR \"detail\"::text ~ '628920891197|628920020523|628920767460|628920668555|628920805157|628920196805' LIMIT 1001) e",
+    "status": "SUCCESS"
+  },
+  {
+    "database": "cmsv2",
+    "host": "127.0.0.1",
+    "started": "2026-10-16T15:18:28.893Z",
+    "sql": "SELECT coalesce(json_agg(e), '[]'::json) FROM (SELECT to_jsonb(t) AS record FROM \"cms_v2\".\"card_external_operation\" t WHERE \"provider_reference\"::text ~ '628920891197|628920020523|628920767460|628920668555|628920805157|628920196805' OR \"evidence_reference\"::text ~ '628920891197|628920020523|628920767460|628920668555|628920805157|628920196805' OR \"intent_payload\"::text ~ '628920891197|628920020523|628920767460|628920668555|628920805157|628920196805' LIMIT 1001) e",
+    "status": "SUCCESS"
+  },
+  {
+    "database": "cmsv2",
+    "host": "127.0.0.1",
+    "started": "2026-10-16T15:18:29.062Z",
+    "sql": "SELECT coalesce(json_agg(e), '[]'::json) FROM (SELECT to_jsonb(t) AS record FROM \"cms_v2\".\"api_idempotency_record\" t WHERE \"request_path\"::text ~ '628920891197|628920020523|628920767460|628920668555|628920805157|628920196805' OR \"response_content_type\"::text ~ '628920891197|628920020523|628920767460|628920668555|628920805157|628920196805' OR \"response_location\"::text ~ '628920891197|628920020523|628920767460|628920668555|628920805157|628920196805' LIMIT 1001) e",
+    "status": "SUCCESS"
+  },
+  {
+    "database": "clearingandreconciliation",
+    "host": "127.0.0.1",
+    "started": "2026-10-16T15:18:29.261Z",
+    "sql": "SELECT coalesce(json_agg(e), '[]'::json) FROM (SELECT to_jsonb(t) AS record FROM \"cs\".\"rgcs_raw_transaction\" t WHERE \"rrn\" IN ('628920891197','628920020523','628920767460','628920668555','628920805157','628920196805') LIMIT 1001) e",
+    "status": "SUCCESS"
+  },
+  {
+    "database": "clearingandreconciliation",
+    "host": "127.0.0.1",
+    "started": "2026-10-16T15:18:29.427Z",
+    "sql": "SELECT coalesce(json_agg(e), '[]'::json) FROM (SELECT to_jsonb(t) AS record FROM \"cs\".\"rgcs_presentment_item\" t WHERE \"ard_rrn\" IN ('628920891197','628920020523','628920767460','628920668555','628920805157','628920196805') LIMIT 1001) e",
+    "status": "SUCCESS"
+  },
+  {
+    "database": "clearingandreconciliation",
+    "host": "127.0.0.1",
+    "started": "2026-10-16T15:18:29.584Z",
+    "sql": "SELECT coalesce(json_agg(e), '[]'::json) FROM (SELECT to_jsonb(t) AS record FROM \"cs\".\"switch_authorization\" t WHERE \"rrn\" IN ('628920891197','628920020523','628920767460','628920668555','628920805157','628920196805') LIMIT 1001) e",
+    "status": "SUCCESS"
+  }
+]

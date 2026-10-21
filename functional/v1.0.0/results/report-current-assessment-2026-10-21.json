@@ -1,0 +1,266 @@
+{
+  "report_version": "2.3",
+  "as_of_date": "21 October 2026",
+  "assessment_basis": "Consolidated recorded evidence, not a single clean latest full-suite run",
+  "scenario_outcome": {
+    "PASS": 20,
+    "PARTIAL": 5,
+    "FAIL": 0
+  },
+  "complete_20_october_runs": {
+    "switch_sync": {
+      "run_id": "FALCON-CMS-FULL-COMPLETE-2026-10-20",
+      "WAIT_FOR_SWITCH_SYNC": true,
+      "samples": 1223,
+      "failing_samples": 18
+    },
+    "pvk_zpk": {
+      "run_id": "FALCON-CMS-FULL-PVK-2026-10-20",
+      "WAIT_FOR_SWITCH_SYNC": true,
+      "samples": 1314,
+      "failing_samples": 7
+    }
+  },
+  "scenario_assessments": {
+    "W01": {
+      "status": "PASS",
+      "displayed_count": "29/29",
+      "note": ""
+    },
+    "W02": {
+      "status": "PASS",
+      "displayed_count": "19/19",
+      "note": ""
+    },
+    "W03": {
+      "status": "PASS",
+      "displayed_count": "36/36",
+      "note": ""
+    },
+    "W04": {
+      "status": "PASS",
+      "displayed_count": "18/18",
+      "note": "PVK and ZPK assignments confirmed active"
+    },
+    "W05": {
+      "status": "PASS",
+      "displayed_count": "7/7",
+      "note": ""
+    },
+    "W06": {
+      "status": "PASS",
+      "displayed_count": "36/36",
+      "note": ""
+    },
+    "W07": {
+      "status": "PASS",
+      "displayed_count": "21/21",
+      "note": ""
+    },
+    "W08": {
+      "status": "PASS",
+      "displayed_count": "24/24",
+      "note": ""
+    },
+    "W09": {
+      "status": "PASS",
+      "displayed_count": "36/36",
+      "note": ""
+    },
+    "W10": {
+      "status": "PASS",
+      "displayed_count": "18/18",
+      "note": ""
+    },
+    "W11": {
+      "status": "PASS",
+      "displayed_count": "21/21",
+      "note": ""
+    },
+    "W12": {
+      "status": "PASS",
+      "displayed_count": "5/5",
+      "note": ""
+    },
+    "W13": {
+      "status": "PASS",
+      "displayed_count": "14/14",
+      "note": ""
+    },
+    "W14": {
+      "status": "PASS",
+      "displayed_count": "27/27",
+      "note": "Switch acknowledgement confirmed on 20 October at revision 7"
+    },
+    "W15": {
+      "status": "PARTIAL",
+      "displayed_count": "9/9 (+1 n/e)",
+      "note": "Known test-bed limitation: simulator uses a different card; limit authorisation unverified"
+    },
+    "W16": {
+      "status": "PARTIAL",
+      "displayed_count": "14/14",
+      "note": "Known test-bed limitation: different simulator card; positive PIN operations also untested"
+    },
+    "W17": {
+      "status": "PASS",
+      "displayed_count": "12/12",
+      "note": "Operations and cardholder hot-list confirmed"
+    },
+    "W18": {
+      "status": "PASS",
+      "displayed_count": "30/30",
+      "note": ""
+    },
+    "W19": {
+      "status": "PARTIAL",
+      "displayed_count": "44/44",
+      "note": "Known test-bed limitation: simulator uses a different card; old-card authorisation unverified"
+    },
+    "W20": {
+      "status": "PASS",
+      "displayed_count": "41/41",
+      "note": ""
+    },
+    "W21": {
+      "status": "PASS",
+      "displayed_count": "11/11",
+      "note": ""
+    },
+    "W22": {
+      "status": "PASS",
+      "displayed_count": "12/12",
+      "note": ""
+    },
+    "W23": {
+      "status": "PARTIAL",
+      "displayed_count": "11/11",
+      "note": "F-01 closed; known simulator limitation leaves old-card authorisation unverified"
+    },
+    "W24": {
+      "status": "PASS",
+      "displayed_count": "13/13",
+      "note": ""
+    },
+    "W25": {
+      "status": "PARTIAL",
+      "displayed_count": "57/57 baseline",
+      "note": "Combined evidence; final authorisation unverified and PIN coverage limited to validation"
+    }
+  },
+  "added_report_references": {
+    "R04-17": {
+      "source_file": "results/pvk-zpk-verification-2026-10-20.json",
+      "plan_step": "05.17",
+      "result": "PASS",
+      "date": "20 October 2026"
+    },
+    "R04-18": {
+      "source_file": "results/pvk-zpk-verification-2026-10-20.json",
+      "plan_step": "05.18",
+      "result": "PASS",
+      "date": "20 October 2026"
+    },
+    "R04-19": {
+      "source_file": "results/pvk-zpk-verification-2026-10-20.json",
+      "plan_step": "05.19",
+      "result": "PASS",
+      "date": "20 October 2026"
+    },
+    "R04-20": {
+      "source_file": "results/pvk-zpk-verification-2026-10-20.json",
+      "plan_step": "05.20",
+      "result": "PASS",
+      "date": "20 October 2026"
+    },
+    "R04-21": {
+      "source_file": "results/pvk-zpk-verification-2026-10-20.json",
+      "plan_step": "05.21",
+      "result": "PASS",
+      "date": "20 October 2026"
+    },
+    "R04-22": {
+      "source_file": "results/pvk-zpk-verification-2026-10-20.json",
+      "plan_step": "05.22",
+      "result": "PASS",
+      "date": "20 October 2026"
+    },
+    "R04-23": {
+      "source_file": "results/pvk-zpk-verification-2026-10-20.json",
+      "plan_step": "05.23",
+      "result": "PASS",
+      "date": "20 October 2026"
+    },
+    "R04-24": {
+      "source_file": "results/pvk-zpk-verification-2026-10-20.json",
+      "plan_step": "05.24",
+      "result": "PASS",
+      "date": "20 October 2026"
+    },
+    "R04-25": {
+      "source_file": "results/pvk-zpk-verification-2026-10-20.json",
+      "plan_step": "05.25",
+      "result": "PASS",
+      "date": "20 October 2026"
+    },
+    "R14-ACK": {
+      "source_file": "results/switch-sync-verification-2026-10-20.json",
+      "plan_step": "14.10.2",
+      "result": "PASS",
+      "date": "20 October 2026"
+    },
+    "R17-28": {
+      "source_file": "results/w17-hotlist-verification-2026-10-20.json",
+      "plan_step": "31.28",
+      "result": "PASS",
+      "date": "20 October 2026"
+    },
+    "R17-29": {
+      "source_file": "results/w17-hotlist-verification-2026-10-20.json",
+      "plan_step": "31.29",
+      "result": "PASS",
+      "date": "20 October 2026"
+    },
+    "R17-33": {
+      "source_file": "results/w17-hotlist-verification-2026-10-20.json",
+      "plan_step": "31.33",
+      "result": "PASS",
+      "date": "20 October 2026"
+    },
+    "R17-34": {
+      "source_file": "results/w17-hotlist-verification-2026-10-20.json",
+      "plan_step": "31.34",
+      "result": "PASS",
+      "date": "20 October 2026"
+    },
+    "R17-35": {
+      "source_file": "results/w17-hotlist-verification-2026-10-20.json",
+      "plan_step": "31.35",
+      "result": "PASS",
+      "date": "20 October 2026"
+    }
+  },
+  "unresolved_items": [
+    "Later Switch wait timeouts: controls 14.10.2, closed card 18.16.2, registration 19.3.2 and LOST successor 29.5s.2 in the 07:37 run; closure also timed out in the earlier run",
+    "Successful PIN selection/change/reset are not verified",
+    "Tenant isolation remains unproven",
+    "W15 uses an Accounting stub; live Accounting integration is unverified",
+    "NPCI simulator card mismatch prevents final authorisation on CMS scenario cards"
+  ],
+  "review_corrections": [
+    "Label baseline false setting and totals as historical",
+    "Show true for both complete 20 October runs and retain genuine timeouts",
+    "Correct W15 count to 9 passed plus one not executed",
+    "Include nine later W04 and one W14 acknowledgement checks",
+    "Include five positive W17 checks and supersede two permission-masked 403 rows with verified 422 results",
+    "Replace W25 permission-denial reference with positive hot-list evidence",
+    "Remove stale card-activation and development-status claims",
+    "Correct key-level DECRYPT_ONLY versus assignment VERIFY_ONLY wording",
+    "Correct asynchronous control-acknowledgement wording",
+    "Correct baseline-only plan/fixture/payload claims",
+    "Synchronise companion metadata and current evidence index"
+  ],
+  "editorial_changes": [
+    "Removed redundant section 1.2 Findings: two closed items and two observations; existing coverage gaps and exact key/assignment status terminology remain in their relevant sections. Historical findings remain archived."
+  ]
+}

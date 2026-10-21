@@ -1,0 +1,175 @@
+{
+  "run_id": "FALCON-CMS-W17-2026-10-20",
+  "started_at_utc": "2026-10-20T09:14:00Z",
+  "finished_at_utc": "2026-10-20T09:14:28Z",
+  "tooling": "Apache JMeter 5.6.3 on Java 21.0.11",
+  "samples_recorded": 328,
+  "assertion_failures": 0,
+  "settings": {
+    "WAIT_FOR_SWITCH_SYNC": "false",
+    "ALLOW_TEST_FIXTURES": "true",
+    "groups": "00 bootstrap and 31 canonical lifecycle"
+  },
+  "scenario_outcome": {
+    "PASS": 20,
+    "PARTIAL": 4,
+    "FAIL": 1
+  },
+  "status_changes": [
+    {
+      "id": "W17",
+      "from": "PARTIAL",
+      "to": "PASS",
+      "reason": "31.28 recorded callerType OPERATIONS and 31.34 recorded callerType CUSTOMER. Both card reads showed BLOCKED. 31.12 returned 403 ACCESS_DENIED."
+    }
+  ],
+  "retained_partial": [
+    "W15",
+    "W16",
+    "W19",
+    "W25"
+  ],
+  "retained_fail": [
+    "W23"
+  ],
+  "w17_samplers": [
+    {
+      "label": "31.12 - Hotlist without hotlist permission",
+      "response_code": "403",
+      "success": true,
+      "message": "Hotlist refused with 403 ACCESS_DENIED"
+    },
+    {
+      "label": "31.23 - Hotlist CUSTOMER_REQUEST is refused before Switch",
+      "response_code": "422",
+      "success": true,
+      "message": null
+    },
+    {
+      "label": "31.24 - Hotlist of a CLOSED card is refused before Switch",
+      "response_code": "422",
+      "success": true,
+      "message": null
+    },
+    {
+      "label": "31.25 - Prepare issuance: operations hotlist card",
+      "response_code": "200",
+      "success": true,
+      "message": "OK"
+    },
+    {
+      "label": "31.25.1 - Submit issuance: operations hotlist card",
+      "response_code": "202",
+      "success": true,
+      "message": null
+    },
+    {
+      "label": "31.25.2a - Read issuance operation: operations hotlist card",
+      "response_code": "200",
+      "success": true,
+      "message": null
+    },
+    {
+      "label": "31.25.2a - Read issuance operation: operations hotlist card",
+      "response_code": "200",
+      "success": true,
+      "message": null
+    },
+    {
+      "label": "31.25.3 - Require issued card: operations hotlist card",
+      "response_code": "200",
+      "success": true,
+      "message": "OK"
+    },
+    {
+      "label": "31.26 - Activate operations hotlist",
+      "response_code": "200",
+      "success": true,
+      "message": null
+    },
+    {
+      "label": "31.27 - Operations hotlist card is ACTIVE",
+      "response_code": "200",
+      "success": true,
+      "message": null
+    },
+    {
+      "label": "31.28 - Hotlist active card as operations",
+      "response_code": "200",
+      "success": true,
+      "message": null
+    },
+    {
+      "label": "31.29 - Operations hotlist card read shows BLOCKED",
+      "response_code": "200",
+      "success": true,
+      "message": null
+    },
+    {
+      "label": "31.30 - Prepare issuance: cardholder hotlist card",
+      "response_code": "200",
+      "success": true,
+      "message": "OK"
+    },
+    {
+      "label": "31.30.1 - Submit issuance: cardholder hotlist card",
+      "response_code": "202",
+      "success": true,
+      "message": null
+    },
+    {
+      "label": "31.30.2a - Read issuance operation: cardholder hotlist card",
+      "response_code": "200",
+      "success": true,
+      "message": null
+    },
+    {
+      "label": "31.30.2a - Read issuance operation: cardholder hotlist card",
+      "response_code": "200",
+      "success": true,
+      "message": null
+    },
+    {
+      "label": "31.30.2a - Read issuance operation: cardholder hotlist card",
+      "response_code": "200",
+      "success": true,
+      "message": null
+    },
+    {
+      "label": "31.30.3 - Require issued card: cardholder hotlist card",
+      "response_code": "200",
+      "success": true,
+      "message": "OK"
+    },
+    {
+      "label": "31.31 - Activate cardholder hotlist",
+      "response_code": "200",
+      "success": true,
+      "message": null
+    },
+    {
+      "label": "31.32 - Cardholder hotlist card is ACTIVE",
+      "response_code": "200",
+      "success": true,
+      "message": null
+    },
+    {
+      "label": "31.33 - Cardholder token is customer-only for this institution",
+      "response_code": "200",
+      "success": true,
+      "message": "Cardholder token is customer-only for this institution"
+    },
+    {
+      "label": "31.34 - Hotlist active card as cardholder",
+      "response_code": "200",
+      "success": true,
+      "message": "Cardholder hotlist recorded callerType CUSTOMER"
+    },
+    {
+      "label": "31.35 - Cardholder hotlist card read shows BLOCKED",
+      "response_code": "200",
+      "success": true,
+      "message": "Card read shows BLOCKED"
+    }
+  ]
+}

@@ -1,0 +1,172 @@
+{
+  "run_id": "W23-ROTATION-FIX-2026-10-21",
+  "started_at_utc": "2026-10-21T02:54:33.549Z",
+  "baseline_run": "FALCON-CMS-FUNC-2026-10-16",
+  "source_sha256": "ea5ca4c3e9315639098d20dc31d77dd440d6e968589e3b30e15f629bfb2a208b",
+  "checks": [
+    {
+      "id": "S-1094",
+      "name": "Activate successor BIN key assignment",
+      "result": "PASS",
+      "observed": "HTTP 200; successor ACTIVE",
+      "http_status": 200,
+      "request_id": "W23-ROTATION-FIX-2026-10-21-mvhiqurx-activate-req",
+      "timestamp_utc": "2026-10-21T02:54:34.121Z"
+    },
+    {
+      "id": "S-1095",
+      "name": "Verify old assignment VERIFY_ONLY and successor ACTIVE",
+      "result": "PASS",
+      "observed": "HTTP 200; old VERIFY_ONLY; successor ACTIVE",
+      "http_status": 200,
+      "old_effective_to": "2026-10-21T02:54:34.038538Z",
+      "request_id": "37004792-b57c-4630-93f9-f24b7c0495ec",
+      "timestamp_utc": "2026-10-21T02:54:34.155Z"
+    },
+    {
+      "id": "S-1096",
+      "name": "Postrotation issuance and successor key lineage",
+      "result": "PASS",
+      "observed": "Issuance CONFIRMED; new card references successor CVK and intended product version",
+      "replacement_for_skipped_plan_step": "41.64",
+      "executed_plan_steps": [
+        "41.60",
+        "41.62"
+      ],
+      "snapshot": {
+        "card_id": "01a15c64-2d3b-74f5-881c-14c0a3a345f6",
+        "product_id": "01a14395-d111-7ba2-9c56-4a357e7fbca5",
+        "product_version_id": "01a14395-e2db-7b2f-8980-7955bea677d8",
+        "bin_id": "01a14392-771a-7064-a29c-550f9733f703",
+        "bin_range_id": "01a14395-e411-7207-8451-c5aabb4fbd1d",
+        "card_design_id": "01a14395-e2bd-741d-8172-b38e07632be2",
+        "technology_profile_id": "01a14395-e37e-79e9-a104-2c62de17efac",
+        "cvm_profile_id": "01a14395-e396-7bad-bb2c-709666dc466d",
+        "cvv_key_id": "01a14396-0e6c-758c-8bec-556d4b082d0a",
+        "expiry_date": "2029-10-31",
+        "maximum_attempts": 5
+      },
+      "timestamp_utc": "2026-10-21T02:57:15.876Z"
+    },
+    {
+      "id": "S-1097",
+      "name": "Historical card key reference survives rotation",
+      "result": "PASS",
+      "observed": "Historical card snapshot unchanged; original CVK reference retained",
+      "snapshot": {
+        "card_id": "01a14395-d22c-790c-86ec-4af5a28e5be4",
+        "product_id": "01a14395-d111-7ba2-9c56-4a357e7fbca5",
+        "product_version_id": "01a14395-d117-7cc3-8493-1808bf1f58c3",
+        "bin_id": "01a14392-771a-7064-a29c-550f9733f703",
+        "bin_range_id": "01a14392-773a-782b-b51c-a7efff2d8aba",
+        "card_design_id": "01a14395-d0fa-7b49-b2ae-444c6154fac5",
+        "technology_profile_id": "01a14395-d171-733e-8dde-0992577bbb9b",
+        "cvm_profile_id": "01a14395-d17e-7f85-ad5f-57fa18a265c8",
+        "cvv_key_id": "01a14392-7d6f-768e-bbdc-fe1cc25a7da7",
+        "expiry_date": "2031-10-31",
+        "maximum_attempts": 3
+      },
+      "timestamp_utc": "2026-10-21T02:57:16.022Z"
+    }
+  ],
+  "initial_activation_run_id": "W23-ROTATION-FIX-2026-10-21-mvhiqurx",
+  "fixtures": {
+    "institution_id": "01a0a5f5-f71d-7d0f-ba69-a020a51bbbc1",
+    "bin_id": "01a14392-771a-7064-a29c-550f9733f703",
+    "old_assignment_id": "01a14392-7d8c-71ad-a0df-4219676e9d3a",
+    "successor_assignment_id": "01a14396-0e97-768b-b2ef-54b61648c862",
+    "old_key_id": "01a14392-7d6f-768e-bbdc-fe1cc25a7da7",
+    "successor_key_id": "01a14396-0e6c-758c-8bec-556d4b082d0a",
+    "historical_card_id": "01a14395-d22c-790c-86ec-4af5a28e5be4",
+    "product_id": "01a14395-d111-7ba2-9c56-4a357e7fbca5",
+    "product_version_id": "01a14395-e2db-7b2f-8980-7955bea677d8",
+    "account_id": "9718b143-bad8-4200-b3fe-a2cd558403f2"
+  },
+  "fixture_preparation": {
+    "plan_step": "41.03",
+    "scope": "Refresh only the original synthetic account-4 no-hold snapshot",
+    "before": {
+      "source_version": 1,
+      "observed_at": "2026-10-16T12:50:54.251895+05:30",
+      "valid_until": "2026-10-16T18:50:54.251895+05:30",
+      "evidence_reference": "lf-mvamxdwe-CLIENT-NO-HOLDS",
+      "compliance_hold_reason": null,
+      "collections_hold_reason": null
+    },
+    "after": {
+      "source_version": 2,
+      "observed_at": "2026-10-21T08:27:11.074571+05:30",
+      "valid_until": "2026-10-21T14:27:11.074571+05:30",
+      "evidence_reference": "W23-ROTATION-FIX-2026-10-21-mvhiu7uu-CLIENT-NO-HOLDS-REFRESH"
+    }
+  },
+  "issuance": {
+    "http_status": 202,
+    "request_id": "W23-ROTATION-FIX-2026-10-21-mvhiu7uu-issue-req",
+    "status": "CONFIRMED",
+    "operation_id": "01a15c64-2be2-70fb-a2d4-9d4619c32770",
+    "card_id": "01a15c64-2d3b-74f5-881c-14c0a3a345f6",
+    "card_snapshot": {
+      "card_id": "01a15c64-2d3b-74f5-881c-14c0a3a345f6",
+      "product_id": "01a14395-d111-7ba2-9c56-4a357e7fbca5",
+      "product_version_id": "01a14395-e2db-7b2f-8980-7955bea677d8",
+      "bin_id": "01a14392-771a-7064-a29c-550f9733f703",
+      "bin_range_id": "01a14395-e411-7207-8451-c5aabb4fbd1d",
+      "card_design_id": "01a14395-e2bd-741d-8172-b38e07632be2",
+      "technology_profile_id": "01a14395-e37e-79e9-a104-2c62de17efac",
+      "cvm_profile_id": "01a14395-e396-7bad-bb2c-709666dc466d",
+      "cvv_key_id": "01a14396-0e6c-758c-8bec-556d4b082d0a",
+      "expiry_date": "2029-10-31",
+      "maximum_attempts": 5
+    }
+  },
+  "finished_at_utc": "2026-10-21T02:57:16.023Z",
+  "npci_authorisation_executed": false,
+  "coverage_note": "Focused activation, assignment readback, postrotation issuance/key lineage, and historical metadata rerun. Historical-card transaction authorisation is not verified by this rerun.",
+  "regression_tests": [
+    {
+      "name": "BinHsmKeyAssignmentV2ServiceTest",
+      "tests": 2,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0,
+      "cases": [
+        "activationRejectsKeyThatIsNotActive",
+        "activationCutsPreviousActiveVersionOverToVerifyOnly"
+      ]
+    },
+    {
+      "name": "BinHsmKeyAssignmentPostgresIntegrationTest",
+      "tests": 5,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0,
+      "cases": [
+        "scheduledActivationReleasesBothUniqueIndexSlotsCorrectly",
+        "suspendedReactivationStillDemotesAnExistingActiveAssignment",
+        "repeatedRotationKeepsOneActiveAssignmentAndRetainsHistory",
+        "successorDatabaseFailureRollsBackTheAlreadyFlushedDemotion",
+        "firstActivationCommitsWithoutPreviousAssignment"
+      ]
+    }
+  ],
+  "current_w23_assessment": {
+    "status": "PARTIAL",
+    "consolidated_checks_passed": 11,
+    "consolidated_checks_executed": 11,
+    "closed_finding": "F-01",
+    "remaining_gap": "Known test-bed limitation: the NPCI simulator uses a different card; old-card authorisation after rotation remains unverified."
+  },
+  "initial_issuance_attempt": {
+    "http_status": 400,
+    "reason": "The original synthetic account restriction snapshot had expired.",
+    "resolution": "Refreshed only that original no-hold test snapshot under the test-fixture/database guard, then issuance confirmed."
+  },
+  "recorded_resume_metadata": {
+    "run_id": "W23-ROTATION-FIX-2026-10-21-mvhiu7uu",
+    "started_at_utc": "2026-10-21T02:57:10.473Z"
+  },
+  "issuance_retry_run_id": "W23-ROTATION-FIX-2026-10-21-mvhiu7uu",
+  "issuance_retry_started_at_utc": "2026-10-21T02:57:10.473Z",
+  "evidence_scope": "Composite focused verification: initial activation/state checks, followed by the resumed issuance and historical-reference checks; original attempt identifiers are retained"
+}

@@ -1,0 +1,43 @@
+{
+  "run_id": "W15-BIN-SYNC-2026-10-21",
+  "started_at_utc": "2026-10-20T19:21:12Z",
+  "card_id": "01a15ac2-a4ac-7181-96a7-2eb98dec24b2",
+  "product_version_id": "01a15896-d6d0-70c0-9610-107963851f18",
+  "switch_bin": "417089",
+  "switch_institution_id": 10,
+  "accounting_stub": "http://127.0.0.1:8095",
+  "assigned_limit_minor": 100000,
+  "currency": "INR",
+  "scenario_status": "PARTIAL",
+  "prior_run": {
+    "run_id": "W15-ACCOUNTING-STUB-2026-10-21",
+    "card_id": "01a15ab0-1e3b-781d-9a84-a973ca46bd89",
+    "switch": "Registration returned HTTP 400 before BIN 417089 existed in Switch institution 10. appliedRevision stayed 0."
+  },
+  "cases": {
+    "TC-015-01": {
+      "result": "PASS",
+      "cms": "PUT 200. Domestic ECOM stored 100000 and controlVersion moved from 1 to 2. Accounting snapshot assignedLimitMinor was 100000.",
+      "switch": "Registration and the ceiling update were acknowledged. At the ceiling wait, appliedRevision was 4 and no commands were pending. The final profile is authorization revision 7, control version 5, effective status ACTIVE."
+    },
+    "TC-015-02": {
+      "result": "PASS",
+      "cms": "PUT 422 BUSINESS_RULE_VIOLATION: Requested limit exceeds the product maximum for DOMESTIC_ECOMMERCE. Stored value stayed 100000 and controlVersion stayed 2."
+    },
+    "TC-015-03": {
+      "result": "PASS",
+      "cms": "With the stub marked stale, PUT returned HTTP 400: Accounting returned an invalid or stale card limit. Stored value and controlVersion were unchanged."
+    },
+    "TC-015-04": {
+      "result": "PASS",
+      "cms": "Zero was accepted and stored as 0. Domestic MOTO stayed disabled with limit 100000. CONTACTLESS_POS stayed disabled with limit 5000. A nested contactless field on POS was refused with 422. Domestic ATM stayed disabled at 50000.",
+      "switch": "The same values are stored on the Switch profile at authorization revision 7."
+    },
+    "TC-015-05": {
+      "result": "NOT_RUN",
+      "cms": "No authorisation was sent. Known test-bed limitation: the NPCI simulator uses a different transaction card, so limit authorisation on the CMS scenario card remains unverified.",
+      "historical_note": "No authorisation was sent. The running Switch container publishes only port 8090."
+    }
+  },
+  "reporting_scope": "Focused Accounting-stub and Switch-profile verification; live Accounting and final authorisation are not verified"
+}

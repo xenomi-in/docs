@@ -1,0 +1,113 @@
+{
+    "run_id":  "FALCON-CMS-FULL-COMPLETE-2026-10-20",
+    "started_at_utc":  "2026-10-20T06:24:15Z",
+    "finished_at_utc":  "2026-10-20T06:32:21Z",
+    "duration":  "8 min 6 s",
+    "tooling":  "Apache JMeter 5.6.3 on Java 21.0.11",
+    "switch":  "falcon-switch-core:1.0.58, port 8090",
+    "settings":  {
+                     "WAIT_FOR_SWITCH_SYNC":  "true",
+                     "SKIP_ACCOUNTING_TESTS":  "true",
+                     "ALLOW_TEST_FIXTURES":  "true"
+                 },
+    "samples_recorded":  1223,
+    "assertion_failures":  18,
+    "scenario_outcome":  {
+                             "PASS":  18,
+                             "PARTIAL":  6,
+                             "FAIL":  1
+                         },
+    "status_changes":  [
+                           {
+                               "id":  "W14",
+                               "from":  "PARTIAL",
+                               "to":  "PASS",
+                               "reason":  "The 16 October run did not await Switch acknowledgement. On 20 October, controls settled at Switch revision 7."
+                           }
+                       ],
+    "retained_partial":  [
+                             "W04",
+                             "W15",
+                             "W16",
+                             "W17",
+                             "W19",
+                             "W25"
+                         ],
+    "retained_fail":  [
+                          "W23"
+                      ],
+    "checkpoints":  {
+                        "29.5s.2 - Require Switch settled: LOST security-replacement successor":  {
+                                                                                                      "success":  true,
+                                                                                                      "response_code":  "200",
+                                                                                                      "observed":  "settled at Switch revision 2"
+                                                                                                  },
+                        "18.16.2 - Require Switch settled: closed card":  {
+                                                                              "success":  false,
+                                                                              "response_code":  "SWITCH_SYNC_TIMEOUT",
+                                                                              "observed":  "Switch did not settle for closed card within 60 polls; appliedRevision=2; three commands remained PENDING with zero attempts"
+                                                                          },
+                        "19.3.2 - Require Switch settled: Q registration":  {
+                                                                                "success":  true,
+                                                                                "response_code":  "200",
+                                                                                "observed":  "settled at Switch revision 2"
+                                                                            },
+                        "19.13 - Q08 The Switch keeps the two same-PAN generations apart":  {
+                                                                                                "success":  true,
+                                                                                                "response_code":  "200",
+                                                                                                "observed":  "Source and successor hold separate Switch profiles"
+                                                                                            },
+                        "19.7.2 - Require Switch settled: Q freeze":  {
+                                                                          "success":  true,
+                                                                          "response_code":  "200",
+                                                                          "observed":  "settled at Switch revision 4"
+                                                                      },
+                        "14.10.2 - Require Switch settled: controls enabled":  {
+                                                                                   "success":  true,
+                                                                                   "response_code":  "200",
+                                                                                   "observed":  "settled at Switch revision 7"
+                                                                               },
+                        "19.5.2 - Require Switch settled: Q activation":  {
+                                                                              "success":  true,
+                                                                              "response_code":  "200",
+                                                                              "observed":  "settled at Switch revision 3"
+                                                                          },
+                        "19.10 - Q02 Compare the CMS card with the Switch profile":  {
+                                                                                         "success":  true,
+                                                                                         "response_code":  "200",
+                                                                                         "observed":  "Exactly one Switch profile for the CMS card; the sampler found no outstanding Switch command."
+                                                                                     },
+                        "19.9.2 - Require Switch settled: Q release":  {
+                                                                           "success":  true,
+                                                                           "response_code":  "200",
+                                                                           "observed":  "settled at Switch revision 5"
+                                                                       },
+                        "19.12.2 - Require Switch settled: Q08 successor registration":  {
+                                                                                             "success":  true,
+                                                                                             "response_code":  "200",
+                                                                                             "observed":  "settled at Switch revision 2"
+                                                                                         }
+                    },
+    "closure_timeout":  {
+                            "check":  "18.16.2",
+                            "applied_revision":  2,
+                            "card_status":  "CLOSED",
+                            "pending":  [
+                                            {
+                                                "command_id":  "01a157fd-1e93-7ef6-9bfc-73f5408f40ec",
+                                                "snapshot_status":  "ACTIVE",
+                                                "attempts":  0
+                                            },
+                                            {
+                                                "command_id":  "01a157fd-1eef-75a1-b5a8-c288b0826708",
+                                                "snapshot_status":  "FROZEN",
+                                                "attempts":  0
+                                            },
+                                            {
+                                                "command_id":  "01a157fd-1f1f-7d43-9e7f-1b1c247d8218",
+                                                "snapshot_status":  "CLOSED",
+                                                "attempts":  0
+                                            }
+                                        ]
+                        }
+}

@@ -23,24 +23,54 @@
       border: 1px solid #e2e8f0;
     }
     a { color: #2563eb; }
+    .release-history { overflow-x: auto; }
+    .release-history table { width: 100%; border-collapse: collapse; }
+    .release-history th, .release-history td {
+      padding: 12px 10px;
+      text-align: left;
+      border-bottom: 1px solid #e2e8f0;
+      vertical-align: top;
+    }
+    .release-history th { background: #f5f7fb; }
+    .release-history caption { text-align: left; margin-bottom: 12px; }
+    .pending { color: #64748b; }
+    .version { white-space: nowrap; }
   </style>
 </head>
 <body>
   <h1>Xenomi Engineering Hub</h1>
-  <p>Release notes and test reports for our services.</p>
+  <p>Release notes, test results, and code coverage reports for our services.</p>
 
   <div class="service">
-    <h2>TCP Listener Servcie</h2>
-    <p>Latest release: v1.0.0</p>
-    <a href="tcp-listener/release/v1.0.0/RELEASE_NOTES_v1.0.0.html">Release Notes</a>
-    |
-    <a href="tcp-listener/release/v1.0.0/test-report/junit/index.html">JUnit Test Report</a>
-    |
-    <a href="tcp-listener/release/v1.0.0/test-report/jacoco/index.html">Coverage Report</a>
+    <h2>TCP Listener Service</h2>
+    <div class="release-history">
+      <table>
+        <caption>Latest documented version: v1.0.0. Planned next version: v1.0.1.</caption>
+        <thead>
+          <tr>
+            <th scope="col">Version</th>
+            <th scope="col">Status</th>
+            <th scope="col">Release Notes</th>
+            <th scope="col">JUnit Results</th>
+            <th scope="col">Coverage</th>
+          </tr>
+        </thead>
+        <tbody>
+         
+          <tr>
+            <th scope="row" class="version">v1.0.0</th>
+            <td>Documentation available</td>
+            <td><a href="tcp-listener/release/v1.0.0/RELEASE_NOTES_v1.0.0.html">Release Notes</a></td>
+            <td><a href="tcp-listener/release/v1.0.0/test-report/junit/index.html">JUnit Test Report</a></td>
+            <td><a href="tcp-listener/release/v1.0.0/test-report/jacoco/index.html">Coverage Report</a></td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
   </div>
 
   <div class="service">
-    <h2>Switch Core servcie</h2>
+    <h2>Switch Core Service</h2>
     <p>Latest release: v1.0.0 (candidate)</p>
     <a href="swith-core/release/v1.0.0/1.0.0.html">Release Notes</a>
     |
@@ -69,8 +99,8 @@
     <a href="cms-core/release/v1.0.0/test-report/coverage/index.html">Coverage Report</a>
   </div>
 
- <div class="service">
-    <h2>CMS Customer Servcie</h2>
+  <div class="service">
+    <h2>CMS Customer Service</h2>
     <p>Latest release: v1.0.0</p>
     <a href="cms-customer/release/v1.0.0/RELEASE_NOTES_1.0.0.html">Release Notes</a>
     |
@@ -90,7 +120,7 @@
   </div>
 
   <div class="service">
-    <h2>CMS embosing Vendor Service</h2>
+    <h2>CMS Embossing and Vendor Service</h2>
     <p>Latest release: v1.0.0</p>
     <a href="cms-emb/release/v1.0.0/RELEASE_NOTES_1.0.0.html">Release Notes</a>
     |
@@ -99,5 +129,13 @@
     <a href="cms-emb/release/v1.0.0/test-report/jacoco/index.html">Coverage Report</a>
   </div>
 
+  <div class="service">
+    <h2>Functional Test Reports</h2>
+
+    <a href="functional/v1.0.0/Falcon_CMS_Scenario_Test_Report.pdf">CMS Functional Test Report</a>
+    |
+    <a href="functional/v1.0.0/Falcon_Switch_Test_Report.pdf">Switch Functional Test Report</a>
+
+  </div>
 </body>
 </html>
